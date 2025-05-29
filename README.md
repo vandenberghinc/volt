@@ -12,7 +12,7 @@ When creating a project using volt it is advised to create the following project
         * `server.js` - A file that imports the server and all endpoints and optionall re-exports the server.
         * `start.js` - A file that imports `server.js` and calls `server.start()`.
 
-###### config.js
+###### ./config.js
 ```javascript
 // Imports.
 import * as volt from "@vandenberghinc/volt";
@@ -23,7 +23,7 @@ export const server = new volt.Server({
 })
 ```
 
-###### endpoints.js
+###### ./endpoints.js
 ```javascript
 // Imports.
 import { server } from "./config.js"
@@ -60,7 +60,7 @@ server.endpoint({
 export {}
 ```
 
-###### home.js
+###### ./home.js
 ```javascript
 // Imports.
 import * as volt from "@vandenberghinc/volt/frontend";
@@ -82,7 +82,7 @@ volt.utils.on_load(() => {
 })
 ```
 
-###### server.js
+###### ./server.js
 ```javascript
 // Imports.
 import { server } from "./config.js"
