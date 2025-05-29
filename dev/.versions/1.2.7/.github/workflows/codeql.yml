@@ -1,0 +1,86 @@
+# GitHub code scanning action with CodeQL.
+#
+# - In order for this configuration file to work ...
+#   The file "./dev/codeql/main.cpp" must exist.
+#   The file must include all parent source files.
+#   The `int main()` may be empty but it must exist.
+#
+# - The build command may need to be edited.
+#
+
+name: "Code Scanning - Action"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    #        ┌───────────── minute (0 - 59)
+    #        │  ┌───────────── hour (0 - 23)
+    #        │  │ ┌───────────── day of the month (1 - 31)
+    #        │  │ │ ┌───────────── month (1 - 12 or JAN-DEC)
+    #        │  │ │ │ ┌───────────── day of the week (0 - 6 or SUN-SAT)
+    #        │  │ │ │ │
+    #        │  │ │ │ │
+    #        │  │ │ │ │
+    #        *  * * * *
+    - cron: '30 1 * * 0'
+
+jobs:
+  CodeQL-Build:
+    # CodeQL runs on ubuntu-latest, windows-latest, and macos-latest
+    runs-on: ubuntu-latest
+
+    permissions:
+      # required for all workflows
+      security-events: write
+
+      # only required for workflows in private repositories
+      actions: read
+      contents: read
+
+    steps:
+
+      # Checkout.
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Initialize.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: cpp
+          config: |
+
+            # Flag security-and-quality also has all of the security-extended attributes.
+            # But also adds maintainability and reliability queries.
+            queries:
+              - uses: security-extended
+            
+            # Exclude certain queries.
+            # Some queries make a lot of mistakes or are not necessary.
+            filter-queries: 
+
+              # Not important.
+              - exclude: 
+                query id: cpp/poorly-documented-function
+
+              # Loop variable is allowed to be changed inside a for loop.
+              - exclude:
+                query id: cpp/loop-variable-changed
+
+              # Exclude unused local variable since it makes mistakes.
+              - exclude:
+                query id: cpp/unused-local-variable
+
+      # Build.
+      - name: Building files
+        run: |
+          mkdir -p ${{ github.workspace }}/build
+          git clone https://github.com/vandenberghinc/vlib.git ./vlib
+          g++ -std=c++2a dev/codeql/main.cpp -o ${{ github.workspace }}/build/binary -Ivlib/include/ -lz -lssl -lcrypt -lcrypto
+
+      # Analyze.
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2

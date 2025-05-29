@@ -8,3 +8,4 @@ declare const Google: {
     };
 };
 export { Google };
+export { Google as google };

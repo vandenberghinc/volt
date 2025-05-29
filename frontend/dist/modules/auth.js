@@ -1,11 +1,17 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 // Imports.
-import { Utils } from "./utils";
-// Auth module.
-const Auth = {
+import { Utils } from "./utils.js";
+// Namespace.
+export var Auth;
+(function (Auth) {
+    ;
+    ;
+    ;
+    ;
+    ;
     // Sign in.
     /*	@docs:
         @nav: Frontend
@@ -25,10 +31,10 @@ const Auth = {
             @name: code
             @description The user's 2fa code. Only required when 2fa is enabled in the server.
      */
-    sign_in({ email = "", username = "", password = "", code = "", }) {
-        return Utils.request({
+    function sign_in({ email = "", username = "", password = "", code = "", }) {
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/auth/signin",
+            url: "/volt/auth/signin",
             data: {
                 email: email,
                 username: username,
@@ -36,7 +42,8 @@ const Auth = {
                 code: code,
             },
         });
-    },
+    }
+    Auth.sign_in = sign_in;
     // Sign up.
     /*	@docs:
         @nav: Frontend
@@ -44,10 +51,10 @@ const Auth = {
         @title: Sign Up
         @desc: Make a sign up request.
      */
-    sign_up({ username = "", email = "", first_name = "", last_name = "", password = "", verify_password = "", phone_number = "", code = "", }) {
-        return Utils.request({
+    function sign_up({ username = "", email = "", first_name = "", last_name = "", password = "", verify_password = "", phone_number = "", code = "", }) {
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/auth/signup",
+            url: "/volt/auth/signup",
             data: {
                 username,
                 email,
@@ -59,7 +66,8 @@ const Auth = {
                 code,
             },
         });
-    },
+    }
+    Auth.sign_up = sign_up;
     // Sign out.
     /*	@docs:
         @nav: Frontend
@@ -67,12 +75,13 @@ const Auth = {
         @title: Sign Out
         @desc: Make a sign out request.
      */
-    sign_out() {
-        return Utils.request({
+    function sign_out() {
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/auth/signout",
+            url: "/volt/auth/signout",
         });
-    },
+    }
+    Auth.sign_out = sign_out;
     // Send 2fa.
     /*	@docs:
         @nav: Frontend
@@ -83,15 +92,16 @@ const Auth = {
             @name: email
             @description The user's email.
      */
-    send_2fa(email) {
-        return Utils.request({
+    function send_2fa(email) {
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/auth/2fa",
+            url: "/volt/auth/2fa",
             data: {
                 email: email,
             },
         });
-    },
+    }
+    Auth.send_2fa = send_2fa;
     // Forgot password.
     /*	@docs:
         @nav: Frontend
@@ -111,10 +121,10 @@ const Auth = {
             @name: verify_password
             @description The user's new password.
      */
-    forgot_password({ email = "", code = "", password = "", verify_password = "", }) {
-        return Utils.request({
+    function forgot_password({ email = "", code = "", password = "", verify_password = "", }) {
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/auth/forgot_password",
+            url: "/volt/auth/forgot_password",
             data: {
                 email: email,
                 code: code,
@@ -122,7 +132,8 @@ const Auth = {
                 verify_password: verify_password,
             },
         });
-    },
-};
-// Export.
-export { Auth };
+    }
+    Auth.forgot_password = forgot_password;
+})(Auth || (Auth = {}));
+;
+export { Auth as auth }; // also export as lowercase for compatibility.

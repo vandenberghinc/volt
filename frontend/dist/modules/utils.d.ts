@@ -1,3 +1,4 @@
+import { AnyElement } from "../ui/any_element";
 declare const Utils: {
     is_apple: boolean;
     is_safari: boolean;
@@ -30,7 +31,26 @@ declare const Utils: {
         a: number;
     };
     deep_copy(obj: any): any;
-    request(options: {
+    /** New request method. */
+    request<Data = any>(options: {
+        method?: string;
+        url?: string | null;
+        data?: any;
+        json?: boolean;
+        credentials?: RequestCredentials;
+        headers?: Record<string, string>;
+    }): Promise<{
+        error?: {
+            message: string;
+            type?: string;
+            invalid_fields?: {
+                [name: string]: string;
+            };
+        };
+        status: number;
+        data?: Data;
+    }>;
+    request_v1(options: {
         method?: string;
         url?: string | null;
         data?: any;
@@ -38,21 +58,30 @@ declare const Utils: {
         credentials?: "include" | "same-origin" | "omit";
         headers?: Record<string, string>;
     }): Promise<any>;
-    on_load(func: () => HTMLElement | Promise<HTMLElement> | null): Promise<void>;
+    on_load(func: () => HTMLElement | AnyElement | Promise<HTMLElement | AnyElement> | null | undefined): Promise<void>;
+    /**
+     * @deprecated Use vlib.VDate instead.
+     * @docs:
+     
+        @nav: Frontend
+        @chapter: Utils
+        @title: Unix to Date
+        @desc: Convert a Unix timestamp in seconds or milliseconds to the user's date format.
+        @param:
+            @name: unix
+            @desc: The Unix timestamp.
+            @type: number
+            @name: mseconds
+            @desc: Optional. Whether the Unix timestamp is in milliseconds.
+            @type: boolean | null
+        @return:
+            @desc: The formatted date string.
+            @type: string
+    */
     unix_to_date(unix: number, mseconds?: boolean | null): string;
-    fuzzy_search({ query, targets, limit, case_match, allow_exceeding_chars, get_matches, key, nested_key, }: {
-        query: string;
-        targets?: Array<string | object | any[]>;
-        limit?: number;
-        case_match?: boolean;
-        allow_exceeding_chars?: boolean;
-        get_matches?: boolean;
-        key?: string | string[] | null;
-        nested_key?: string | null;
-    }): Array<any> | Array<[number, any]>;
-    fuzzy_match(search: string, target: string, allow_exceeding_chars?: boolean): number | null;
     debounce(delay: number, func: (...args: any[]) => void): (...args: any[]) => void;
     on_render_observer: ResizeObserver;
     on_resize_observer: ResizeObserver;
 };
 export { Utils };
+export { Utils as utils };

@@ -36,47 +36,60 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
+// External imports.
+import { fuzzy } from "@vandenberghinc/vlib/frontend";
 // Imports.
-import { Elements } from "../modules/elements";
-import { Utils } from "../modules/utils";
-import { CreateVElementClass } from "./element";
+import { Elements, VElementTagMap } from "../elements/module.js";
+import { Utils } from "../modules/utils.js";
+import { HStack, VStack, VStackElement } from "./stack";
+import { Text } from "./text";
+import { ImageMask } from "./image";
+import { GradientBorder } from "./gradient";
+import { Scroller } from "./scroller";
+import { Divider } from "./divider";
 // Input.
 let InputElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "InputElement",
+            default_style: {
+                "margin": "0px 0px 0px 0px",
+                "padding": "2.5px 5px 2.5px 5px",
+                "font": "inherit",
+                "color": "inherit",
+                "background": "none",
+                "outline": "none",
+                "border": "none",
+                "border-radius": "10px",
+                "text-align": "start",
+                "white-space": "nowrap",
+            },
+            default_attributes: {
+                "spellcheck": "false",
+                "autocorrect": "off",
+                "autocapitalize": "none",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Input",
-        tag: "input",
-        default_style: {
-            "margin": "0px 0px 0px 0px",
-            "padding": "2.5px 5px 2.5px 5px",
-            "font": "inherit",
-            "color": "inherit",
-            "background": "none",
-            "outline": "none",
-            "border": "none",
-            "border-radius": "10px",
-            "text-align": "start",
-            "white-space": "nowrap",
-        },
-        default_attributes: {
-            "spellcheck": "false",
-            "autocorrect": "off",
-            "autocapitalize": "none",
-        },
-    });
-    var InputElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.input;
+    var InputElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            InputElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        _e;
         // Constructor.
-        constructor(placeholder, type = "text", value = null) {
+        constructor(placeholder, type = "text", value) {
             // Initialize base class.
-            super();
+            super({
+                derived: InputElement,
+            });
             // Safari does not render images correctly for custom elements.
             if (Utils.is_safari) {
                 this.attachShadow({ mode: 'open' });
@@ -86,43 +99,47 @@ let InputElement = (() => {
                 this._e.style.background = "none";
                 this._e.style.border = "none";
                 this._e.style.outline = "none";
-                this._e.style.whitespace = "nowrap";
+                this._e.style.whiteSpace = "nowrap";
                 this._e.style.width = "100%";
                 this._e.style.padding = InputElement.default_style.padding;
                 this.shadowRoot.appendChild(this._e);
                 this.padding("0");
             }
             // Set src.
-            this.placeholder(placeholder);
-            this.type(type || "text");
-            this.value(value);
+            this.placeholder(placeholder ?? "");
+            this.type(type ?? "text");
+            this.value(value ?? "");
         }
-        // Alias functions.
         value(val) { if (this._e === undefined) {
             return super.value(val);
         } if (val == null) {
-            return this._e.value;
-        } this._e.value = val; return this; }
+            return this._e.getAttribute("value") ?? "";
+        } this._e.setAttribute("value", val.toString()); return this; }
         required(val) { if (this._e === undefined) {
             return super.required(val);
         } if (val == null) {
-            return this._e.required;
-        } this._e.required = val; return this; }
+            return this._e.getAttribute("required") === "true";
+        } if (!val) {
+            this._e.removeAttribute("required");
+        }
+        else {
+            this._e.setAttribute("required", val);
+        } return this; }
         type(val) { if (this._e === undefined) {
             return super.type(val);
         } if (val == null) {
-            return this._e.type;
-        } this._e.type = val; return this; }
+            return this._e.getAttribute("type") ?? "";
+        } this._e.setAttribute("type", val); return this; }
         placeholder(val) { if (this._e === undefined) {
             return super.placeholder(val);
         } if (val == null) {
-            return this._e.placeholder;
-        } this._e.placeholder = val; return this; }
+            return this._e.getAttribute("placeholder") ?? "";
+        } this._e.setAttribute("placeholder", val); return this; }
         resize(val) { if (this._e === undefined) {
             return super.resize(val);
         } if (val == null) {
-            return this._e.resize;
-        } this._e.resize = val; return this; }
+            return this._e.getAttribute("resize") ?? "";
+        } this._e.setAttribute("resize", val); return this; }
         padding(...values) {
             if (this._e === undefined) {
                 return super.padding(...values);
@@ -165,53 +182,56 @@ let InputElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "InputElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        InputElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return InputElement = _classThis;
 })();
 export { InputElement };
 export const Input = Elements.wrapper(InputElement);
+export const NullInput = Elements.create_null(InputElement);
 // InputBox.
 let InputBoxElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "InputBoxElement",
+            default_style: {
+                "margin": "0px 0px 0px 0px",
+                "padding": "2.5px 5px 2.5px 5px",
+                "height": "20px",
+                "font": "inherit",
+                "color": "inherit",
+                "background": "none",
+                "outline": "none",
+                "border": "none",
+                "border-radius": "10px",
+                "text-align": "start",
+                "white-space": "wrap",
+                "resize": "none",
+            },
+            default_attributes: {
+                "spellcheck": "false",
+                "autocorrect": "off",
+                "autocapitalize": "none",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "InputBox",
-        tag: "textarea",
-        default_style: {
-            "margin": "0px 0px 0px 0px",
-            "padding": "2.5px 5px 2.5px 5px",
-            "height": "20px",
-            "font": "inherit",
-            "color": "inherit",
-            "background": "none",
-            "outline": "none",
-            "border": "none",
-            "border-radius": "10px",
-            "text-align": "start",
-            "white-space": "wrap",
-            "resize": "none",
-        },
-        default_attributes: {
-            "spellcheck": "false",
-            "autocorrect": "off",
-            "autocapitalize": "none",
-        },
-    });
-    var InputBoxElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.textarea;
+    var InputBoxElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            InputBoxElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        _e;
         // Constructor.
         constructor(placeholder) {
             // Initialize base class.
-            super();
+            super({
+                derived: InputBoxElement,
+            });
             // Safari does not render images correctly for custom elements.
             if (Utils.is_safari) {
                 this.attachShadow({ mode: 'open' });
@@ -229,37 +249,41 @@ let InputBoxElement = (() => {
                 this.padding("0");
             }
             // Set src.
-            this.placeholder(placeholder);
+            this.placeholder(placeholder ?? "");
         }
-        // Alias functions.
         value(val) { if (this._e === undefined) {
             return super.value(val);
         } if (val == null) {
-            return this._e.value;
-        } this._e.value = val; return this; }
+            return this._e.getAttribute("value") ?? "";
+        } this._e.setAttribute("value", val.toString()); return this; }
         required(val) { if (this._e === undefined) {
             return super.required(val);
         } if (val == null) {
-            return this._e.required;
-        } this._e.required = val; return this; }
+            return this._e.getAttribute("required") === "true";
+        } if (!val) {
+            this._e.removeAttribute("required");
+        }
+        else {
+            this._e.setAttribute("required", val);
+        } return this; }
         type(val) { if (this._e === undefined) {
             return super.type(val);
         } if (val == null) {
-            return this._e.type;
-        } this._e.type = val; return this; }
+            return this._e.getAttribute("type") ?? "";
+        } this._e.setAttribute("type", val); return this; }
         placeholder(val) { if (this._e === undefined) {
             return super.placeholder(val);
         } if (val == null) {
-            return this._e.placeholder;
-        } this._e.placeholder = val; return this; }
+            return this._e.getAttribute("placeholder") ?? "";
+        } this._e.setAttribute("placeholder", val); return this; }
         resize(val) { if (this._e === undefined) {
             return super.resize(val);
         } if (val == null) {
-            return this._e.resize;
-        } this._e.resize = val; return this; }
+            return this._e.getAttribute("resize") ?? "";
+        } this._e.setAttribute("resize", val); return this; }
         padding(...values) {
             if (this._e === undefined) {
-                return super.padding(values);
+                return super.padding(...values);
             }
             if (values.length === 0) {
                 return this._e.style.padding;
@@ -299,49 +323,86 @@ let InputBoxElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "InputBoxElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        InputBoxElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return InputBoxElement = _classThis;
 })();
 export { InputBoxElement };
 export const InputBox = Elements.wrapper(InputBoxElement);
+export const NullInputBox = Elements.create_null(InputBoxElement);
 // Extended input.
 let ExtendedInputElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "ExtendedInputElement",
+            default_style: {
+                ...VStackElement.default_style,
+                "color": "inherit",
+                "font-size": "16px",
+                // Custom.
+                "--input-padding": "12px 6px",
+                "--input-border-radius": "5px",
+                "--input-border-color": "gray",
+                "--input-hover-border-color": "gray",
+                "--input-background": "transparent",
+                "--image-mask-color": "#000",
+                "--image-size": "20px",
+                "--image-margin-right": "10px",
+                "--image-margin-left": "5px",
+                "--image-alt": "VWeb",
+                "--focus-color": "#8EB8EB",
+                "--missing-color": "#E8454E",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var ExtendedInputElement = _classThis = class extends _classSuper {
+    var ExtendedInputElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            ExtendedInputElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        _focus_color;
+        _missing_color;
+        _mask_color;
+        _initial_border_color;
+        _hover_border_color;
+        // @ts-expect-error
+        label;
+        image;
+        input;
+        input_border;
+        container;
+        error;
+        is_missing = false;
+        is_focused = false;
+        // @todo add readonly func
         // Constructor.
-        constructor({ label = null, image = null, alt = "", placeholder = "Input", id = null, readonly = false, required = false, type = "text", value = null, } = {}) {
+        constructor({ label = undefined, image = undefined, alt = undefined, placeholder = "Input", id = undefined, readonly = false, required = false, type = "text", value = undefined, }) {
             // Initialize super.
             super();
+            this._init({
+                derived: ExtendedInputElement,
+            });
             // Set id.
             if (id != null) {
                 this.id(id);
             }
             // Attributes.
-            this.element_type = "ExtendedInput";
             this._focus_color = ExtendedInputElement.default_style["--focus-color"];
             this._missing_color = ExtendedInputElement.default_style["--missing-color"];
             this._mask_color = ExtendedInputElement.default_style["--image-mask-color"];
-            this._initial_border_color = "black";
-            this._missing = false;
+            this._initial_border_color = ExtendedInputElement.default_style["--input-border-color"];
+            this._hover_border_color = ExtendedInputElement.default_style["--input-hover-border-color"];
             // Set default styling.
             this.styles(ExtendedInputElement.default_style);
             // Title element.
             this.label = Text(label)
                 .parent(this)
                 .font_size("inherit")
-                .margin(0, 0, 5, 0)
+                .margin(0, 0, 7.5, 0)
                 .color("inherit")
                 .width("fit-content")
                 .ellipsis_overflow(true);
@@ -356,7 +417,7 @@ let ExtendedInputElement = (() => {
                 .margin(0)
                 .margin_right(ExtendedInputElement.default_style["--image-margin-right"])
                 .margin_left(ExtendedInputElement.default_style["--image-margin-left"])
-                .alt(alt !== "" ? alt : ExtendedInputElement.default_style["--image-alt"]);
+                .alt(alt ? alt : ExtendedInputElement.default_style["--image-alt"]);
             if (image == null) {
                 this.image.hide();
             }
@@ -383,28 +444,18 @@ let ExtendedInputElement = (() => {
                 .outline("none")
                 .z_index(1)
                 .border_radius(0) // is required.
-                // .on_focus(() => {
-                // 	if (this._missing !== true) {
-                // 		this.container.outline(`"1px" solid ${this._focus_color}`)
-                // 		this.container.box_shadow(`0 0 0 "3px" ${this._focus_color}80`)
-                // 	}
-                // })
-                // .on_blur(() => {
-                // 	if (this._missing !== true) {
-                // 		this.container.outline("0px solid transparent")
-                // 		this.container.box_shadow(`0 0 0 "0px" transparent`)
-                // 	}
-                // })
                 .on_focus(() => {
-                if (this._missing !== true) {
+                if (!this.is_missing) {
+                    this.is_focused = true;
                     this.input_border.border_color(this._focus_color);
-                    this.container.box_shadow(`0 0 0 "3px" ${this._focus_color}80`);
+                    this.container.box_shadow(`0 0 0 3px ${this._focus_color}80`);
                 }
             })
                 .on_blur(() => {
-                if (this._missing !== true) {
+                if (!this.is_missing) {
+                    this.is_focused = false;
                     this.input_border.border_color(this._initial_border_color);
-                    this.container.box_shadow(`0 0 0 "0px" transparent`);
+                    this.container.box_shadow(`0 0 0 0px transparent`);
                 }
             });
             // The input border to support gradients.
@@ -415,10 +466,11 @@ let ExtendedInputElement = (() => {
                 .border_width(1)
                 .border_color(ExtendedInputElement.default_style["--input-border-color"])
                 .border_color("0px solid transparent")
-                .box_shadow(`0 0 0 "0px" transparent`)
+                .box_shadow(`0 0 0 0px transparent`)
                 .transition("background 200ms ease-in-out");
             // The hstack container.
             this.container = HStack(VStack(this.image)
+                .width("fit-content")
                 .height("1.6em")
                 .center_vertical(), this.input_border, this.input)
                 .parent(this)
@@ -427,8 +479,17 @@ let ExtendedInputElement = (() => {
                 .padding(ExtendedInputElement.default_style["--input-padding"])
                 .transition("box-shadow 0.2s ease-in-out")
                 .outline("0px solid transparent")
-                .box_shadow(`0 0 0 "0px" transparent`)
-                .width("100%");
+                .box_shadow(`0 0 0 0px transparent`)
+                .width("100%")
+                .on_mouse_over_out((e) => {
+                if (!this.is_missing && !this.is_focused) {
+                    this.input_border.border_color(this._hover_border_color);
+                }
+            }, (e) => {
+                if (!this.is_missing && !this.is_focused) {
+                    this.input_border.border_color(this._initial_border_color);
+                }
+            });
             // The error message.
             this.error = Text("Incomplete field")
                 .color(this._missing_color)
@@ -452,8 +513,6 @@ let ExtendedInputElement = (() => {
                 this.value(value);
             }
         }
-        // Get the styling attributes.
-        // The values of the children that may have been changed by the custom funcs should be added.
         styles(style_dict) {
             if (style_dict == null) {
                 let styles = super.styles();
@@ -461,10 +520,11 @@ let ExtendedInputElement = (() => {
                 styles["--input-padding"] = this.container.padding();
                 styles["--input-border-radius"] = this.container.border_radius();
                 styles["--input-border-color"] = this.container.border_color();
+                styles["--input-hover-border-color"] = this._hover_border_color;
                 styles["--image-mask-color"] = this._mask_color;
-                styles["--image-size"] = this.image.width();
-                styles["--image-margin-right"] = this.image.margin_right();
-                styles["--image-margin-left"] = this.image.margin_left();
+                styles["--image-size"] = this.image.width().toString();
+                styles["--image-margin-right"] = this.image.margin_right().toString();
+                styles["--image-margin-left"] = this.image.margin_left().toString();
                 styles["--image-alt"] = this.image.alt() || "VWeb";
                 styles["--focus-color"] = this._focus_color;
                 styles["--missing-color"] = this._missing_color;
@@ -478,33 +538,30 @@ let ExtendedInputElement = (() => {
         set_default() {
             return super.set_default(ExtendedInputElement);
         }
-        // Set the focus color.
         focus_color(val) {
             if (val == null) {
-                return this._focus_color;
+                return this._focus_color ?? "";
             }
             this._focus_color = val;
             return this;
         }
-        // Set the missing color.
         missing_color(val) {
             if (val == null) {
-                return this._missing_color;
+                return this._missing_color ?? "";
             }
             this._missing_color = val;
             this.error.color(this._missing_color);
             return this;
         }
-        // Set missing.
-        missing(to = null, err = "Incomplete field") {
+        missing(to, err = "Incomplete field") {
             if (to == null) {
-                return this._missing;
+                return this.is_missing;
             }
             else if (to === true) {
-                this._missing = true;
+                this.is_missing = true;
                 this.input_border.border_color(this._missing_color);
-                // this.container.outline(`"1px" solid ${this._missing_color}`)
-                this.container.box_shadow(`0 0 0 "3px" ${this._missing_color}80`);
+                // this.container.outline(`1px solid ${this._missing_color}`)
+                this.container.box_shadow(`0 0 0 3px ${this._missing_color}80`);
                 // this.image.mask_color(this._missing_color)
                 this.error.show();
                 if (err) {
@@ -512,10 +569,10 @@ let ExtendedInputElement = (() => {
                 }
             }
             else {
-                this._missing = false;
+                this.is_missing = false;
                 this.input_border.border_color(this._initial_border_color);
                 // this.container.outline("0px solid transparent")
-                this.container.box_shadow(`0 0 0 "0px" transparent`);
+                this.container.box_shadow(`0 0 0 0px transparent`);
                 // this.image.mask_color(this._mask_color)
                 this.error.hide();
             }
@@ -527,6 +584,7 @@ let ExtendedInputElement = (() => {
         // Submit the item, throws an error when the item is not defined.
         submit() {
             const value = this.value();
+            console.log("id:", this.id(), "value:", value);
             if (value == null || value === "") {
                 this.missing(true);
                 throw Error("Fill in all the required fields.");
@@ -534,10 +592,9 @@ let ExtendedInputElement = (() => {
             this.missing(false);
             return value;
         }
-        // Set or get the mask color.
         mask_color(val) {
             if (val == null) {
-                return this._mask_color;
+                return this._mask_color ?? "";
             }
             this._mask_color = val;
             this.image.mask_color(this._mask_color);
@@ -553,8 +610,9 @@ let ExtendedInputElement = (() => {
             this.missing(false);
             return this;
         }
-        // ---------------------------------------------------------
-        // Relay functions.
+        readonly(val) { if (val == null) {
+            return this.input.readonly();
+        } this.input.readonly(val); return this; }
         text(val) { if (val == null) {
             return this.label.text();
         } this.label.text(val); return this; }
@@ -564,12 +622,20 @@ let ExtendedInputElement = (() => {
         required(val) { if (val == null) {
             return this.input.required();
         } this.input.required(val); return this; }
-        on_enter(val) { if (val == null) {
-            return this.input.on_enter();
-        } this.input.on_enter(val); return this; }
-        on_input(val) { if (val == null) {
-            return this.input.on_input();
-        } this.input.on_input(val); return this; }
+        on_enter(val) {
+            if (val == null) {
+                return this.input.on_enter();
+            }
+            this.input.on_enter((x, y) => val(this, y));
+            return this;
+        }
+        on_input(val) {
+            if (val == null) {
+                return this.input.on_input();
+            }
+            this.input.on_input((x, y) => val(this, y));
+            return this;
+        }
         border_radius(val) { if (val == null) {
             return this.container.border_radius();
         } this.container.border_radius(val); this.input_border.border_radius(val); return this; }
@@ -582,6 +648,13 @@ let ExtendedInputElement = (() => {
             this.input_border.border_color(val);
             return this;
         }
+        hover_border_color(val) {
+            if (val == null) {
+                return this._hover_border_color;
+            }
+            this._hover_border_color = val;
+            return this;
+        }
         border_width(val) { if (val == null) {
             return this.container.border_width();
         } this.container.border_width(val); this.input_border.border_width(val); return this; }
@@ -591,11 +664,11 @@ let ExtendedInputElement = (() => {
         background(val) { if (val == null) {
             return this.container.background();
         } this.container.background(val); return this; }
-        padding(...args) {
-            if (args.length === 0 || (args.length === 1 && args[0] == null)) {
+        padding(...values) {
+            if (values.length === 0 || (values.length === 1 && values[0] == null)) {
                 return this.container.padding();
             }
-            this.container.padding(...args);
+            this.container.padding(...values);
             return this;
         }
         border(...args) {
@@ -606,72 +679,90 @@ let ExtendedInputElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "ExtendedInputElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        ExtendedInputElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-    })();
-    // Default styling.
-    // static default_style = Object.assign({}, HStackElement.default_style, {
-    _classThis.default_style = {
-        ...VStackElement.default_style,
-        "color": "inherit",
-        "font-size": "16px",
-        // Custom.
-        "--input-padding": "12px 6px",
-        "--input-border-radius": "5px",
-        "--input-border-color": "gray",
-        "--input-background": "transparent",
-        "--image-mask-color": "#000",
-        "--image-size": "20px",
-        "--image-margin-right": "10px",
-        "--image-margin-left": "5px",
-        "--image-alt": "VWeb",
-        "--focus-color": "#8EB8EB",
-        "--missing-color": "#E8454E",
-    };
-    (() => {
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return ExtendedInputElement = _classThis;
 })();
 export { ExtendedInputElement };
 export const ExtendedInput = Elements.wrapper(ExtendedInputElement);
+export const NullExtendedInput = Elements.create_null(ExtendedInputElement);
 // Extended input.
 let ExtendedSelectElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "ExtendedSelectElement",
+            default_style: {
+                ...VStackElement.default_style,
+                "color": "inherit",
+                "font-size": "16px",
+                "background": "#FFFFFF",
+                // Custom.
+                "--input-padding": "12px 6px",
+                "--input-border-radius": "5px",
+                "--input-border-color": "gray",
+                "--image-mask-color": "#000",
+                "--image-size": "20px",
+                "--image-margin-right": "10px",
+                "--image-margin-left": "5px",
+                "--image-alt": "VWeb",
+                "--hover-bg": "#00000007",
+                "--focus-color": "#8EB8EB",
+                "--missing-color": "#E8454E",
+            }
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var ExtendedSelectElement = _classThis = class extends _classSuper {
+    var ExtendedSelectElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            ExtendedSelectElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        _focus_color;
+        _missing_color;
+        _mask_color;
+        _border_color;
+        _hover_bg;
+        items;
+        // @ts-expect-error
+        label;
+        image;
+        input;
+        container;
+        error;
+        dropdown;
+        is_missing = false;
+        _on_change_callback;
+        _on_dropdown_close;
+        _dropdown_height;
+        _value;
         // Constructor.
-        constructor({ label = null, image = null, alt = "", placeholder = "Placeholder", id = null, required = false, items = [{ id: "option", text: "Option", image: null }], // may also be an array with strings which will be used as the item's id and text.
-         } = {}) {
+        constructor({ label = undefined, image = undefined, alt = "", placeholder = "Placeholder", id = undefined, required = false, items = [{ id: "option", text: "Option", image: undefined }], // may also be an array with strings which will be used as the item's id and text.
+         }) {
             // Initialize super.
             super();
+            this._init({
+                derived: ExtendedSelectElement,
+            });
             // Arguments.
             if (Array.isArray(items)) {
-                if (typeof items[0] === "string") {
-                    this.items = [];
-                    items.iterate((item) => {
+                this.items = [];
+                items.iterate((item) => {
+                    if (typeof item === "string") {
                         this.items.append({
                             id: item,
                             text: item,
                         });
-                    });
-                }
-                else {
-                    this.items = items;
-                    this.items.iterate((item) => {
+                    }
+                    else {
                         if (item.text == null) {
                             item.text = item.id;
                         }
-                    });
-                }
+                        this.items.append(item);
+                    }
+                });
             }
             else if (typeof items === "object" && items != null) {
                 this.items = [];
@@ -684,8 +775,8 @@ let ExtendedSelectElement = (() => {
                     }
                     else {
                         this.items.append({
+                            ...items[key],
                             id: key,
-                            ...items[key]
                         });
                     }
                 });
@@ -693,22 +784,19 @@ let ExtendedSelectElement = (() => {
             else {
                 throw Error(`Parameter "items" should be a defined value of type "array" or "object".`);
             }
-            // Default attributes.
-            this.element_type = "ExtendedSelect";
             // Attributes.
             this._focus_color = ExtendedSelectElement.default_style["--focus-color"];
             this._missing_color = ExtendedSelectElement.default_style["--missing-color"];
             this._mask_color = ExtendedSelectElement.default_style["--image-mask-color"];
             this._border_color = ExtendedSelectElement.default_style["--input-border-color"];
             this._hover_bg = ExtendedSelectElement.default_style["--hover-bg"];
-            this._missing = false;
             // Set default styling.
             this.styles(ExtendedSelectElement.default_style);
             // Title element.
             this.label = Text(label)
                 .parent(this)
                 .font_size("inherit")
-                .margin(0, 0, 5, 0)
+                .margin(0, 0, 7.5, 0)
                 .color("inherit")
                 .width("fit-content")
                 .ellipsis_overflow(true);
@@ -723,7 +811,7 @@ let ExtendedSelectElement = (() => {
                 .margin(0)
                 .margin_right(ExtendedSelectElement.default_style["--image-margin-right"])
                 .margin_left(ExtendedSelectElement.default_style["--image-margin-left"])
-                .alt(alt !== "" ? alt : ExtendedSelectElement.default_style["--image-alt"]);
+                .alt(alt ? alt : ExtendedSelectElement.default_style["--image-alt"]);
             if (image == null) {
                 this.image.hide();
             }
@@ -742,20 +830,9 @@ let ExtendedSelectElement = (() => {
                 .box_shadow("none")
                 .cursor("pointer")
                 .border_radius(0); // is required
-            // .on_focus(() => {
-            // 	if (this._missing !== true) {
-            // 		this.container.outline(`"1px" solid ${this._focus_color}`)
-            // 		this.container.box_shadow(`0 0 0 "3px" ${this._focus_color}80`)
-            // 	}
-            // })
-            // .on_blur(() => {
-            // 	if (this._missing !== true) {
-            // 		this.container.outline("0px solid transparent")
-            // 		this.container.box_shadow(`0 0 0 "0px" transparent`)
-            // 	}
-            // })
             // The hstack container.
             this.container = HStack(VStack(this.image)
+                .width("fit-content")
                 .height("1.6em")
                 .center_vertical(), this.input)
                 .parent(this)
@@ -767,7 +844,7 @@ let ExtendedSelectElement = (() => {
                 .border_color(this._border_color)
                 .transition("outline 0.2s ease-in-out, box-shadow 0.2s ease-in-out")
                 .outline("0px solid transparent")
-                .box_shadow(`0 0 0 "0px" transparent`)
+                .box_shadow(`0 0 0 0px transparent`)
                 .width("100%")
                 .on_click(() => {
                 if (this.dropdown.is_hidden()) {
@@ -829,7 +906,6 @@ let ExtendedSelectElement = (() => {
                 }
             };
         }
-        // Set dropdown height.
         dropdown_height(val) {
             if (val === undefined) {
                 return this._dropdown_height;
@@ -837,8 +913,6 @@ let ExtendedSelectElement = (() => {
             this._dropdown_height = val;
             return this;
         }
-        // Get the styling attributes.
-        // The values of the children that may have been changed by the custom funcs should be added.
         styles(style_dict) {
             if (style_dict == null) {
                 let styles = super.styles();
@@ -846,9 +920,9 @@ let ExtendedSelectElement = (() => {
                 styles["--input-border-radius"] = this.container.border_radius();
                 styles["--input-border-color"] = this._border_color;
                 styles["--image-mask-color"] = this._mask_color;
-                styles["--image-size"] = this.image.width();
-                styles["--image-margin-right"] = this.image.margin_right();
-                styles["--image-margin-left"] = this.image.margin_left();
+                styles["--image-size"] = this.image.width().toString();
+                styles["--image-margin-right"] = this.image.margin_right().toString();
+                styles["--image-margin-left"] = this.image.margin_left().toString();
                 styles["--image-alt"] = this.image.alt() || "VWeb";
                 styles["--focus-color"] = this._focus_color;
                 styles["--missing-color"] = this._missing_color;
@@ -862,32 +936,29 @@ let ExtendedSelectElement = (() => {
         set_default() {
             return super.set_default(ExtendedSelectElement);
         }
-        // Set the focus color.
         focus_color(val) {
             if (val == null) {
-                return this._focus_color;
+                return this._focus_color ?? "";
             }
             this._focus_color = val;
             return this;
         }
-        // Set the missing color.
         missing_color(val) {
             if (val == null) {
-                return this._missing_color;
+                return this._missing_color ?? "";
             }
             this._missing_color = val;
             this.error.color(this._missing_color);
             return this;
         }
-        // Set missing.
-        missing(to = null, err = "Incomplete field") {
+        missing(to, err = "Incomplete field") {
             if (to == null) {
-                return this._missing;
+                return this.is_missing;
             }
             else if (to === true) {
-                this._missing = true;
-                this.container.outline(`"1px" solid ${this._missing_color}`);
-                this.container.box_shadow(`0 0 0 "3px" ${this._missing_color}80`);
+                this.is_missing = true;
+                this.container.outline(`1px solid ${this._missing_color}`);
+                this.container.box_shadow(`0 0 0 3px ${this._missing_color}80`);
                 this.image.mask_color(this._missing_color);
                 this.error.show();
                 if (err) {
@@ -895,9 +966,9 @@ let ExtendedSelectElement = (() => {
                 }
             }
             else {
-                this._missing = false;
+                this.is_missing = false;
                 this.container.outline("0px solid transparent");
-                this.container.box_shadow(`0 0 0 "0px" transparent`);
+                this.container.box_shadow(`0 0 0 0px transparent`);
                 this.image.mask_color(this._mask_color);
                 this.error.hide();
             }
@@ -944,10 +1015,10 @@ let ExtendedSelectElement = (() => {
                     });
                 }
                 else {
-                    const results = Utils.fuzzy_search({
+                    const results = fuzzy.search({
                         query,
                         targets: this.items,
-                        limit: null,
+                        limit: undefined,
                         case_match: false,
                         allow_exceeding_chars: true,
                         key: ["id", "text"],
@@ -965,7 +1036,7 @@ let ExtendedSelectElement = (() => {
             // Add children.
             let i = 0;
             let min_height;
-            this.dropdown.items = [];
+            // this.dropdown.items = [];
             this.items.iterate((item) => {
                 // Image.
                 let img;
@@ -976,7 +1047,7 @@ let ExtendedSelectElement = (() => {
                         .margin(0)
                         .margin_right(ExtendedSelectElement.default_style["--image-margin-right"])
                         .margin_left(ExtendedSelectElement.default_style["--image-margin-left"])
-                        .alt(alt !== "" ? alt : ExtendedSelectElement.default_style["--image-alt"])
+                        .alt(ExtendedSelectElement.default_style["--image-alt"])
                         .pointer_events("none"); // so target element of mouse down is easier.
                 }
                 // Text.
@@ -997,7 +1068,7 @@ let ExtendedSelectElement = (() => {
                     .on_click(() => {
                     this.dropdown.hide();
                     this._value = item.id;
-                    this.input.value(item.text);
+                    this.input.value(item.text ?? item.id);
                     if (this._on_change_callback != null) {
                         this._on_change_callback(this, item.id);
                     }
@@ -1041,15 +1112,14 @@ let ExtendedSelectElement = (() => {
             // Response.
             return this;
         }
-        // Get or set the value, when it is being set it should be the id of one of the items otherwise nothing happens.
         value(val) {
             if (val == null) {
-                return this._value;
+                return this._value ?? "";
             }
             this.items.iterate((item) => {
                 if (item.id === val) {
                     this._value = val;
-                    this.input.value(item.text);
+                    this.input.value(item.text ?? item.id);
                     if (this._on_change_callback != null) {
                         this._on_change_callback(this, val);
                     }
@@ -1057,7 +1127,6 @@ let ExtendedSelectElement = (() => {
             });
             return this;
         }
-        // Styling.
         mask_color(val) {
             if (val == null) {
                 return this._mask_color;
@@ -1107,12 +1176,12 @@ let ExtendedSelectElement = (() => {
             this.dropdown.border_style(val);
             return this;
         }
-        padding(...args) {
-            if (args.length === 0 || (args.length === 1 && args[0] == null)) {
+        padding(...values) {
+            if (values.length === 0 || (values.length === 1 && values[0] == null)) {
                 return this.container.padding();
             }
-            this.container.padding(...args);
-            this.dropdown.padding(...args);
+            this.container.padding(...values);
+            this.dropdown.padding(...values);
             return this;
         }
         border(...args) {
@@ -1123,7 +1192,7 @@ let ExtendedSelectElement = (() => {
             this.dropdown.border(...args);
             return this;
         }
-        // On change event.
+        // @ts-expect-error
         on_change(callback) {
             if (callback == null) {
                 return this._on_change_callback;
@@ -1131,8 +1200,6 @@ let ExtendedSelectElement = (() => {
             this._on_change_callback = callback;
             return this;
         }
-        // ---------------------------------------------------------
-        // Relay functions.
         text(val) { if (val == null) {
             return this.label.text();
         } this.label.text(val); return this; }
@@ -1140,37 +1207,8 @@ let ExtendedSelectElement = (() => {
             return this.input.required();
         } this.input.required(val); return this; }
     };
-    __setFunctionName(_classThis, "ExtendedSelectElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        ExtendedSelectElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-    })();
-    // Default styling.
-    // static default_style = Object.assign({}, HStackElement.default_style, {
-    _classThis.default_style = {
-        ...VStackElement.default_style,
-        "color": "inherit",
-        "font-size": "16px",
-        "background": "#FFFFFF",
-        // Custom.
-        "--input-padding": "12px 6px",
-        "--input-border-radius": "5px",
-        "--input-border-color": "gray",
-        "--image-mask-color": "#000",
-        "--image-size": "20px",
-        "--image-margin-right": "10px",
-        "--image-margin-left": "5px",
-        "--image-alt": "VWeb",
-        "--hover-bg": "#00000007",
-        "--focus-color": "#8EB8EB",
-        "--missing-color": "#E8454E",
-    };
-    (() => {
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return ExtendedSelectElement = _classThis;
 })();
 export { ExtendedSelectElement };
 export const ExtendedSelect = Elements.wrapper(ExtendedSelectElement);
+export const NullExtendedSelect = Elements.create_null(ExtendedSelectElement);

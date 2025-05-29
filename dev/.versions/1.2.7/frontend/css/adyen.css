@@ -1,0 +1,92 @@
+/* Payment method container */
+.adyen-checkout__payment-method {
+	border-radius: var(--vpayments_border_radius);
+	margin: 5px 0px;
+}
+
+/* Buttons */
+.adyen-checkout__button {
+    background: var(--vpayments_button_bg);
+    color: var(--vpayments_button_fg);
+    border-radius: var(--vpayments_button_border_radius);
+    transition: filter 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.adyen-checkout__button:hover {
+    background: var(--vpayments_button_bg);
+    color: var(--vpayments_button_fg);
+    filter: brightness(1.1);
+}
+
+/* Selected item circle */
+.adyen-checkout__payment-method__radio {
+	border: 1px solid var(--vpayments_border_bg);
+	transition: outline 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.adyen-checkout__payment-method__radio--selected {
+	background: var(--vpayments_button_bg);
+}
+.adyen-checkout__payment-method__radio--selected::after {
+	background: var(--vpayments_button_fg);
+}
+
+/* Input label names. */
+.adyen-checkout__label > .adyen-checkout__label__text {
+	color: var(--vpayments_fg);
+}
+.adyen-checkout__label--focused > .adyen-checkout__label__text {
+	color: var(--vpayments_theme_fg);
+}
+
+/* Input fields */
+.adyen-checkout__input,
+.adyen-checkout__input--text,
+.adyen-checkout__dropdown__button {
+	border-radius: var(--vpayments_border_radius);
+	border: 1px solid var(--vpayments_border_bg);
+	/*box-shadow: 0 0 0 0px transparent; causes the custom inputs like card holder when invalid to stop enabling box-shadow */
+	transition: outline 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.adyen-checkout__input:hover,
+.adyen-checkout__input--text:hover,
+.adyen-checkout__dropdown__button:hover {
+	border: 1px solid var(--vpayments_border_bg);
+}
+.adyen-checkout__input:focus,
+.adyen-checkout__input:focus:hover,
+.adyen-checkout__input:active,
+.adyen-checkout__input:active:hover,
+.adyen-checkout__input--focus,
+.adyen-checkout__input--focus:hover,
+.adyen-checkout__dropdown__button--active,
+.adyen-checkout__dropdown__button--active:hover {
+	border: 1px solid var(--vpayments_theme_fg);
+	box-shadow: 0 0 0 2px var(--vpayments_theme_fg_80);
+}
+.adyen-checkout__input--error,
+.adyen-checkout__input--error:hover,
+.adyen-checkout__input--error:required,
+.adyen-checkout__input--invalid,
+.adyen-checkout__input--invalid:hover,
+.adyen-checkout__input--invalid:required,
+.adyen-checkout__dropdown__button--invalid,
+.adyen-checkout__dropdown__button--invalid:hover,
+.adyen-checkout__dropdown__button--invalid:required {
+	border: 1px solid var(--vpayments_missing_fg);
+	box-shadow: 0 0 0 2px var(--vpayments_missing_fg_80);
+}
+
+/* Dropdown list */
+.adyen-checkout__dropdown__list {
+    /* Dropdown list */
+    color: var(--vpayments_fg);
+}
+
+/* Checkout status container */
+.adyen-checkout__status {
+	border: none;
+}
+
+/* Adyen checkout dropin */
+.adyen-checkout__dropin {
+	width: 100%; /* since the container centers the content. */
+}

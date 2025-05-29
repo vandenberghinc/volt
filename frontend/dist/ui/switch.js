@@ -36,36 +36,52 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
+import { Elements } from "../elements/module.js";
 import { VStack, VStackElement } from "./stack";
 // Switch button.
 let SwitchElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "SwitchElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var SwitchElement = _classThis = class extends _classSuper {
+    var SwitchElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            SwitchElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // export class SwitchElement extends (VStackElement as any as VElementBaseSignature) {
+        // Attributes.
+        on_change_handler;
+        _enabled;
+        _enabled_color;
+        _disabled_color;
+        enabled;
+        slider;
+        button;
+        _value_timeout;
         // Constructor.
         constructor(enabled = false) {
             // Initialize base class.
             super();
-            // Set element type.
-            this.element_type = "Switch";
+            this._init({
+                derived: SwitchElement,
+            });
             // The slider background.
             this.slider = VStack()
                 .background("white")
-                // .border(`"1px" solid ${SETTINGS.theme.lightest_widget_background}90`)
+                // .border(`1px solid ${SETTINGS.theme.lightest_widget_background}90`)
                 .frame(35, 12.5)
                 .border_radius(10)
                 .overflow("visible")
-                .box_shadow(`"0px" "0px" "2px" "#00000030"`)
+                .box_shadow(`0px 0px 2px #00000030`)
                 .parent(this);
             // The button.
             this.button = VStack()
@@ -75,7 +91,7 @@ let SwitchElement = (() => {
                 .position("absolute")
                 .left(0)
                 .transition("left 0.15s ease-out")
-                .box_shadow(`"0px" "0px" "2px" "#00000060"`)
+                .box_shadow(`0px 0px 2px #00000060`)
                 .on_click(() => this.toggle())
                 .parent(this);
             // Append.
@@ -181,6 +197,13 @@ let SwitchElement = (() => {
             }
             return this;
         }
+        background(value) {
+            if (value == null) {
+                return this.slider.background();
+            }
+            this.slider.background(value);
+            return this;
+        }
         enabled_color(value) {
             if (value == null) {
                 return this._enabled_color;
@@ -257,7 +280,7 @@ let SwitchElement = (() => {
             }
             return this;
         }
-        // @ts-expect-error
+        // @ts-ignore
         on_change(handler) {
             if (handler == null) {
                 return this.on_change_handler;
@@ -266,15 +289,8 @@ let SwitchElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "SwitchElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        SwitchElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return SwitchElement = _classThis;
 })();
 export { SwitchElement };
 export const Switch = Elements.wrapper(SwitchElement);
+export const NullSwitch = Elements.create_null(SwitchElement);

@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 // Meta module.
 export const Meta = {
@@ -43,3 +43,4 @@ export const Meta = {
         }
     },
 };
+export { Meta as meta }; // also export as lowercase for compatibility.

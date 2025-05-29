@@ -1,10 +1,18 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
-// Google wrapper module.
-const Statics = {
-    aspect_ratios: {},
+// Static module
+if (window.volt_statics_aspect_ratios === undefined) {
+    window.volt_statics_aspect_ratios = {};
+}
+export const Statics = {
+    get aspect_ratios() {
+        return window.volt_statics_aspect_ratios;
+    },
+    set aspect_ratios(aspect_ratios) {
+        window.volt_statics_aspect_ratios = aspect_ratios;
+    },
     /*  @docs:
         @nav: Frontend
         @chapter: Static
@@ -35,5 +43,4 @@ const Statics = {
         return this.aspect_ratios[endpoint];
     }
 };
-// Export.
-export { Statics };
+export { Statics as statics }; // also export as lowercase for compatibility.

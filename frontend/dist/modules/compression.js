@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 /*! pako 2.1.0 https://github.com/nodeca/pako @license (MIT AND Zlib) */
 // @ts-ignore
@@ -948,7 +948,7 @@
     t.Deflate = ba, t.Inflate = va, t.constants = Aa, t.default = Ea, t.deflate = ga, t.deflateRaw = pa, t.gzip = ka, t.inflate = ya, t.inflateRaw = xa, t.ungzip = za, Object.defineProperty(t, "__esModule", { value: !0 });
 }));
 // Imports.
-import { Utils } from "./utils";
+import { Utils } from "./utils.js";
 export const Compression = {
     // Compress.
     /*  @docs:

@@ -1,11 +1,24 @@
 /*
  * @author: Daan van den Bergh
- * @copyright: © 2022 - 2023 Daan van den Bergh.
+ * @copyright: © 2022 - 2024 Daan van den Bergh.
  */
 // Imports.
-import { Utils } from "./utils";
-import { User } from "./user";
-import { HStack, VStack, Text, Title, ForEach, Image, ImageMask, RingLoader, BorderButton, LoaderButton, Divider, Input, Spacer, Form, ExtendedSelect, ExtendedInput, Popup, } from "../ui/ui";
+import { Utils } from "./utils.js";
+import { User } from "./user.js";
+import { HStack, VStack, } from "../ui/stack";
+import { Text } from "../ui/text";
+import { Title } from "../ui/title";
+import { ForEach } from "../ui/for_each";
+import { Image, ImageMask } from "../ui/image";
+import { RingLoader } from "../ui/loaders";
+import { BorderButton } from "../ui/border_button";
+import { LoaderButton } from "../ui/loader_button";
+import { Divider } from "../ui/divider";
+import { Input, ExtendedSelect, ExtendedInput } from "../ui/input";
+import { Spacer } from "../ui/spacer";
+import { Form } from "../ui/form";
+import { YesNoPopup } from "../ui/popup";
+import { Span } from "../ui/span.js";
 // ---------------------------------------------------------
 // Payments Object.
 const Payments = {
@@ -381,9 +394,9 @@ const Payments = {
             if (this._sign_in_redirect != null && !User.is_authenticated()) {
                 Utils.redirect(this._sign_in_redirect);
             }
-            const response = await Utils.request({
+            const response = await Utils.request_v1({
                 method: "POST",
-                url: "/vweb/payments/init",
+                url: "/volt/payments/init",
                 data: {
                     items: this.cart.items,
                 }
@@ -516,7 +529,7 @@ const Payments = {
         // Shortcuts.
         const style = this._style;
         // The previous step button.
-        this._prev_step_button = HStack(ImageMask("/vweb_static/payments/arrow.long.webp")
+        this._prev_step_button = HStack(ImageMask("/volt_static/payments/arrow.long.webp")
             .frame(15, 15)
             .mask_color(this._style.fg_1)
             .transition_mask("background 300ms ease-in-out")
@@ -573,7 +586,7 @@ const Payments = {
              * Select the current step index and update UI accordingly.
              * @param index - The index of the step to select.
              */
-            select: function (index) {
+            select(index) {
                 let e = this.child(this.selected_index);
                 e.child(0)
                     .color(style.fg_1)
@@ -587,7 +600,8 @@ const Payments = {
                     .background(style.selected.bg);
                 e.child(1)
                     .color(style.fg);
-            }
+                return this;
+            },
         });
         // Append the steps element to the steps container.
         this._steps_container.append(this._steps_element);
@@ -645,7 +659,7 @@ const Payments = {
             .border_radius(this._style.button.border_radius)
             .border(this._style.button.border_inset ? `${this._style.button.border_width} inset ${this._style.button.border_color}` : `${this._style.button.border_width} solid ${this._style.button.border_color}`)
             .hover_brightness(...this._style.button.hover_brightness)
-            .loader
+            .nodes.loader
             .background(this._style.button.fg)
             .update()
             .parent()
@@ -788,13 +802,12 @@ const Payments = {
      * Render the order element in the UI.
      */
     _render_order_element: function () {
-        // Render.
         this._order_element = VStack()
             .extend({
             /**
              * Refresh the order element by updating the cart and UI elements.
              */
-            refresh: function () {
+            refresh() {
                 // Refresh the cart.
                 Payments.cart.refresh();
                 // Shortcuts.
@@ -840,7 +853,7 @@ const Payments = {
                         .assign_to_parent_as("text_e")
                         .white_space("pre")
                         .line_height("1.4em")
-                        .center(), ImageMask("/vweb_static/payments/shopping_cart.webp")
+                        .center(), ImageMask("/volt_static/payments/shopping_cart.webp")
                         .frame(35, 35)
                         .margin_top(20)
                         .mask_color(style.theme_fg))
@@ -873,16 +886,16 @@ const Payments = {
                             .padding(2.5, 7.5)
                             .margin_right(25)
                             .flex_shrink(0)
-                            .width(`calc(${item.quantity.toString().length}ch + "17.5px")`) // add padding.
+                            .width(`calc(${item.quantity.toString().length}ch + 17.5px)`) // add padding.
                             .background(style.bg_1)
                             .display("inline")
                             .transition("color 300ms ease-in-out")
                             .center()
                             .on_input((_, event) => {
                             const value = quantity_input.value();
-                            quantity_input.width(`calc(${value.length}ch + "17.5px")`); // add padding.
-                            clearTimeout(quantity_input.timeout);
-                            quantity_input.timeout = setTimeout(() => {
+                            quantity_input.width(`calc(${value.length}ch + 17.5px)`); // add padding.
+                            clearTimeout(quantity_input._timeout);
+                            quantity_input._timeout = setTimeout(() => {
                                 const quantity = parseInt(value);
                                 if (isNaN(quantity)) {
                                     console.error(`Specified quantity "${value}" is not a number.`);
@@ -957,7 +970,7 @@ const Payments = {
                             // .line_height(style.font_size)
                             .margin(0, 10, 2, 0)
                             .padding(0)
-                            .flex_shrink(0), quantity_input, ImageMask("/vweb_static/payments/minus.webp")
+                            .flex_shrink(0), quantity_input, ImageMask("/volt_static/payments/minus.webp")
                             .frame(20, 20)
                             .padding(5)
                             .margin_right(5)
@@ -977,7 +990,7 @@ const Payments = {
                                 await cart.remove(item.product.id, 1);
                                 this.refresh();
                             }
-                        }), ImageMask("/vweb_static/payments/plus.webp")
+                        }), ImageMask("/volt_static/payments/plus.webp")
                             .frame(20, 20)
                             .padding(5)
                             .margin_right(5)
@@ -991,7 +1004,7 @@ const Payments = {
                             .on_click(async () => {
                             await cart.add(item.product.id, 1);
                             this.refresh();
-                        }), ImageMask("/vweb_static/payments/trash.webp")
+                        }), ImageMask("/volt_static/payments/trash.webp")
                             .frame(20, 20)
                             .padding(5)
                             .margin_right(5)
@@ -1064,7 +1077,7 @@ const Payments = {
             /**
              * Refresh the refunds element by fetching and displaying refundable, refunding, and refunded payments.
              */
-            refresh: async function () {
+            async refresh() {
                 // Reset.
                 this.inner_html("");
                 // Create containers.
@@ -1188,9 +1201,9 @@ const Payments = {
                     .margin_bottom(30)
                     .flex_shrink(0);
                 // Assign to parent.
-                this.refundable_option = option_bar.child(0);
-                this.refunding_option = option_bar.child(1);
-                this.refunded_option = option_bar.child(2);
+                const refundable_option = option_bar.child(0);
+                const refunding_option = option_bar.child(1);
+                const refunded_option = option_bar.child(2);
                 // Add elements.
                 this.append(option_bar, refundable_container, refunding_container, refunded_container);
                 // Separate payments.
@@ -1215,7 +1228,7 @@ const Payments = {
                             .assign_to_parent_as("text_e")
                             .white_space("pre")
                             .line_height("1.4em")
-                            .center(), Image("/vweb_static/payments/check.webp")
+                            .center(), Image("/volt_static/payments/check.webp")
                             .frame(30, 30)
                             .margin_top(15)
                             .assign_to_parent_as("success_image_e"))
@@ -1301,12 +1314,12 @@ const Payments = {
                                 .hover_brightness(...style.button.hover_brightness)
                                 .font_weight("bold")
                                 .on_click(() => {
-                                document.body.appendChild(Popup({
+                                document.body.appendChild(YesNoPopup({
                                     title: "Request Refund",
                                     text: `You are about to request a refund for payment <span style='border-radius: 7px; background: ${style.bg_1}; padding: 1px 4px; font-size: 0.9em;'>${payment.id}</span>, do you wish to proceed?`,
                                     no: "No",
                                     yes: "Yes",
-                                    image: "/vweb_static/payments/error.webp",
+                                    image: "/volt_static/payments/error.webp",
                                     blur: 5,
                                     animation_duration: 300,
                                     on_yes: async () => {
@@ -1319,7 +1332,7 @@ const Payments = {
                                             return null;
                                         }
                                         this.refresh().then(() => {
-                                            this.refunding_option.click();
+                                            refunding_option.click();
                                         });
                                     },
                                 })
@@ -1378,11 +1391,10 @@ const Payments = {
                                 .frame(20, 20)
                                 .background(style.theme_fg)
                                 .margin(0, 5, 0, 0)
-                                .update(), !container.is_refunded ? null : Image("/vweb_static/payments/check.webp")
+                                .update(), !container.is_refunded ? null : Image("/volt_static/payments/check.webp")
                                 .frame(20, 20)
                                 .margin(0, 5, 0, 0))
-                                .min_height(30), Text()
-                                .inner_html(`Purchased at ${Utils.unix_to_date(payment.timestamp / 1000)} <span style='font-size: 0.8em'>${payment.id}<span>.`)
+                                .min_height(30), Text().append(`Purchased at ${Utils.unix_to_date(payment.timestamp / 1000)} `, Span(payment.id).font_size("0.8em"))
                                 .color(style.fg_1)
                                 .font_size(style.font_size - 6)
                                 .line_height(style.font_size - 4)
@@ -1534,7 +1546,7 @@ const Payments = {
             label: "Full Name",
             placeholder: "John Doe",
         })
-            .value(User.first_name() == null ? "" : (User.first_name() + " " + User.last_name()))
+            .value(User.first_name() === undefined ? "" : (User.first_name() + " " + User.last_name()))
             .margin_top(input_spacing)
             .required(true)
             .id("name")
@@ -1558,7 +1570,7 @@ const Payments = {
             label: "Email",
             placeholder: "my@email.com",
         })
-            .value(User.email() || "")
+            .value(User.email() ?? "")
             .margin_top(input_spacing)
             .required(true)
             .id("email"), CreateInput({
@@ -1737,13 +1749,13 @@ const Payments = {
             .assign_to_parent_as("text_e")
             .white_space("pre")
             .line_height("1.4em")
-            .center(), ImageMask("/vweb_static/payments/error.webp")
+            .center(), ImageMask("/volt_static/payments/error.webp")
             .hide()
             .frame(40, 40)
             .padding(5)
             .mask_color(this._style.missing_fg)
             .margin_top(15)
-            .assign_to_parent_as("error_image_e"), Image("/vweb_static/payments/party.webp")
+            .assign_to_parent_as("error_image_e"), Image("/volt_static/payments/party.webp")
             .hide()
             .frame(40, 40)
             .margin_top(15)
@@ -1762,9 +1774,9 @@ const Payments = {
              * Set the processing element to display an error message.
              * @param message - The error message to display.
              */
-            set_error: function (message = "The payment has failed, please check your information and try again.\n If the problem persists, contact support for assistance.") {
+            set_error(message = "The payment has failed, please check your information and try again.\n If the problem persists, contact support for assistance.") {
                 this.loader_e.hide();
-                this.error_image_e.src("/vweb_static/payments/error.webp");
+                this.error_image_e.src("/volt_static/payments/error.webp");
                 this.error_image_e.show();
                 this.success_image_e.hide();
                 this.title_e.text("Error");
@@ -1774,9 +1786,9 @@ const Payments = {
              * Set the processing element to display a cancelled message.
              * @param message - The cancellation message to display.
              */
-            set_cancelled: function (message = "The payment has been cancelled.") {
+            set_cancelled(message = "The payment has been cancelled.") {
                 this.loader_e.hide();
-                this.error_image_e.src("/vweb_static/payments/cancelled.webp");
+                this.error_image_e.src("/volt_static/payments/cancelled.webp");
                 this.error_image_e.show();
                 this.success_image_e.hide();
                 this.title_e.text("Cancelled");
@@ -1786,7 +1798,7 @@ const Payments = {
              * Set the processing element to display a success message.
              * @param message - The success message to display.
              */
-            set_success: function (message = "The payment has succeeded and is currently processing.\n Thank you for your purchase!") {
+            set_success(message = "The payment has succeeded and is currently processing.\n Thank you for your purchase!") {
                 this.loader_e.hide();
                 this.error_image_e.hide();
                 this.success_image_e.show();
@@ -1797,7 +1809,7 @@ const Payments = {
              * Set the processing element to display a processing message.
              * @param message - The processing message to display.
              */
-            set_processing: function (message = "Processing your payment, please wait.") {
+            set_processing(message = "Processing your payment, please wait.") {
                 this.loader_e.show();
                 this.error_image_e.hide();
                 this.success_image_e.hide();
@@ -1877,7 +1889,7 @@ const Payments = {
                 border_radius: null,
                 border_color: null,
                 border_width: 1,
-                hover_brightness: null,
+                hover_brightness: [1, 1],
                 border_inset: false,
             };
         }
@@ -2188,9 +2200,9 @@ const Payments = {
             if (this._products !== undefined) {
                 return resolve(this._products);
             }
-            Utils.request({
+            Utils.request_v1({
                 method: "GET",
-                url: "/vweb/payments/products",
+                url: "/volt/payments/products",
             })
                 .then((products) => {
                 this._products = products;
@@ -2256,9 +2268,9 @@ const Payments = {
      *   @desc: The id of the payment.
      */
     get_payment: async function (id) {
-        return Utils.request({
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/payments/payment",
+            url: "/volt/payments/payment",
             data: {
                 id: id,
             }
@@ -2294,9 +2306,9 @@ const Payments = {
      *     @desc: Payments that are paid.
      */
     get_payments: async function ({ days = 30, limit = null, status = null, } = {}) {
-        return Utils.request({
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/payments/payments",
+            url: "/volt/payments/payments",
             data: {
                 days,
                 limit,
@@ -2321,9 +2333,9 @@ const Payments = {
      *   @desc: Limit the amount of response payment objects.
      */
     get_refundable_payments: async function ({ days = 30, limit = null, } = {}) {
-        return Utils.request({
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/payments/payments/refundable",
+            url: "/volt/payments/payments/refundable",
             data: {
                 days,
                 limit,
@@ -2347,9 +2359,9 @@ const Payments = {
      *   @desc: Limit the amount of response payment objects.
      */
     get_refunded_payments: async function ({ days = 30, limit = null, } = {}) {
-        return Utils.request({
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/payments/payments/refunded",
+            url: "/volt/payments/payments/refunded",
             data: {
                 days,
                 limit,
@@ -2373,9 +2385,9 @@ const Payments = {
      *   @desc: Limit the amount of response payment objects.
      */
     get_refunding_payments: async function ({ days = null, limit = null, } = {}) {
-        return Utils.request({
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/payments/payments/refunding",
+            url: "/volt/payments/payments/refunding",
             data: {
                 days,
                 limit,
@@ -2406,9 +2418,9 @@ const Payments = {
      *   @desc: The refund reason.
      */
     create_refund: async function (payment, line_items = null, reason = "refund") {
-        return Utils.request({
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/payments/refund",
+            url: "/volt/payments/refund",
             data: {
                 payment,
                 line_items,
@@ -2431,9 +2443,9 @@ const Payments = {
      *   @desc: The product id.
      */
     cancel_subscription: async function (product) {
-        return Utils.request({
+        return Utils.request_v1({
             method: "DELETE",
-            url: "/vweb/payments/subscription",
+            url: "/volt/payments/subscription",
             data: {
                 product,
             }
@@ -2453,9 +2465,9 @@ const Payments = {
      *   @desc: The product id.
      */
     is_subscribed: async function (product) {
-        return Utils.request({
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/payments/subscribed",
+            url: "/volt/payments/subscribed",
             data: {
                 product,
             }
@@ -2470,9 +2482,9 @@ const Payments = {
      * @desc: Get the active subscriptions of the authenticated user.
      */
     get_active_subscriptions: async function () {
-        return Utils.request({
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/payments/active_subscriptions",
+            url: "/volt/payments/active_subscriptions",
         });
     },
     // Shopping cart.
@@ -2493,7 +2505,7 @@ const Payments = {
         refresh: function () {
             // Load from local storage.
             try {
-                this.items = JSON.parse(localStorage.getItem("vweb_shopping_cart")) || [];
+                this.items = JSON.parse(localStorage.getItem("volt_shopping_cart")) || [];
             }
             catch (err) {
                 this.items = [];
@@ -2514,7 +2526,7 @@ const Payments = {
          */
         save: function () {
             // Save to local storage.
-            localStorage.setItem("vweb_shopping_cart", JSON.stringify(this.items));
+            localStorage.setItem("volt_shopping_cart", JSON.stringify(this.items));
             // Reset the charge objects.
             Payments._reset();
         },
@@ -2627,3 +2639,4 @@ const Payments = {
 };
 // Exports.
 export { Payments };
+export { Payments as payments }; // also export as lowercase for compatibility.

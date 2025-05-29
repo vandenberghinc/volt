@@ -36,50 +36,68 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { Utils } from "../modules/utils";
-import { CreateVElementClass } from "./element";
-// @todo convert to TS
+import { Elements, VElementTagMap } from "../elements/module.js";
+import { Utils } from "../modules/utils.js";
+import { VStack, VStackElement } from "./stack";
 // Scroller.
 // - Warning: Setting padding on element attribute "content" may cause undefined behaviour.
 let ScrollerElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "ScrollerElement",
+            default_style: {
+                "position": "relative", // is required for attribute "track" 
+                "margin": "0px",
+                "padding": "0px",
+                // "clear": "both",
+                "display": "flex", // to support vertical spacers.
+                "overflow": "hidden",
+                // "flex": "1", // disabled to support horizontal spacers in VStacks.
+                "align-content": "flex-start", // align items at start, do not stretch / space when inside HStack.
+                "flex-direction": "column",
+                // "text-align": "start",
+                "scroll-behavior": "auto",
+                "overscroll-behavior": "auto", // relay to parent to resume scroll when local scroll has ended.
+                "height": "fit-content", // set height to max compared to parents non overflow, so scrolling can take effect.
+                "content-visibility": "auto", // improve rendering.
+                // "align-content": "flex-start", // align items at start, do not stretch / space when inside HStack.
+                // "align-items": "flex-start", // align items at start, do not stretch / space when inside HStack.
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Scroller",
-        tag: "div",
-        default_style: {
-            "position": "relative", // is required for attribute "track" 
-            "margin": "0px",
-            "padding": "0px",
-            // "clear": "both",
-            "display": "flex", // to support vertical spacers.
-            "overflow": "hidden",
-            // "flex": "1", // disabled to support horizontal spacers in VStacks.
-            "align-content": "flex-start", // align items at start, do not stretch / space when inside HStack.
-            "flex-direction": "column",
-            // "text-align": "start",
-            "scroll-behavior": "auto",
-            "overscroll-behavior": "auto", // relay to parent to resume scroll when local scroll has ended.
-            "height": "fit-content", // set height to max compared to parents non overflow, so scrolling can take effect.
-            "content-visibility": "auto", // improve rendering.
-            // "align-content": "flex-start", // align items at start, do not stretch / space when inside HStack.
-            // "align-items": "flex-start", // align items at start, do not stretch / space when inside HStack.
-        },
-    });
-    var ScrollerElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.div;
+    var ScrollerElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            ScrollerElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // @ts-expect-error
+        content;
+        thumb;
+        track;
+        on_scroll_callbacks;
+        iterate;
+        iterate_nodes;
+        m_delay;
+        _h_alignment;
+        _current_h_alignment;
+        _v_alignment;
+        _current_v_alignment;
+        _alignment_callback_activated;
+        _alignment_callback;
+        _fadeout_timeout;
         // Constructor.
         constructor(...children) {
             // Initialize base class.
-            super();
+            super({
+                derived: ScrollerElement,
+            });
             // Style.
             if (this.position() != "absolute") {
                 this.position("relative"); // is required for attribute "track" 
@@ -133,18 +151,20 @@ let ScrollerElement = (() => {
             // Set default delay.
             this.m_delay = 1000;
             // Overwrite track background functions to keep the background color.
-            this.track.__background__ = this.track.background;
-            this.track.__background_color__ = this.background_color;
+            // this.track.__background__ = this.track.background;
+            // this.track.__background_color__ = this.background_color;
             this.track.background = function (value) {
-                if (value != null) {
-                    this.__background_value__ = value;
+                if (value == null) {
+                    return this.__background_value__ ?? "";
                 }
+                this.__background_value__ = value;
                 return this;
             };
             this.track.background_color = function (value) {
-                if (value != null) {
-                    this.__background_value__ = value;
+                if (value == null) {
+                    return this.__background_value__ ?? "";
                 }
+                this.__background_value__ = value;
                 return this;
             };
             // Mouse enter event.
@@ -153,8 +173,8 @@ let ScrollerElement = (() => {
                     return null;
                 }
                 this.track.style.backgroundColor = this.track.__background_value__;
-                clearTimeout(this.fadeout_timeout);
-                this.thumb.style.opacity = 1; // keep as opacity for box shadow.
+                clearTimeout(this._fadeout_timeout);
+                this.thumb.style.opacity = "1"; // keep as opacity for box shadow.
             });
             // Mouse leave event.
             this.track.addEventListener("mouseleave", (event) => {
@@ -163,7 +183,7 @@ let ScrollerElement = (() => {
                 }
                 if (!this.thumb.dragging) {
                     this.track.style.backgroundColor = "transparent";
-                    this.thumb.style.opacity = 0; // keep as opacity for box shadow.
+                    this.thumb.style.opacity = "0"; // keep as opacity for box shadow.
                 }
             });
             // Scroll event.
@@ -190,13 +210,13 @@ let ScrollerElement = (() => {
                 this.thumb.style.transform = `translateY(${relative_top}px)`;
                 // Fade in.
                 // this.track.style.backgroundColor = this.track.__background_value__;
-                clearTimeout(this.fadeout_timeout);
-                this.thumb.style.opacity = 1;
+                clearTimeout(this._fadeout_timeout);
+                this.thumb.style.opacity = "1";
                 // Fade out.
-                clearTimeout(this.fadeout_timeout);
-                this.fadeout_timeout = setTimeout(() => {
+                clearTimeout(this._fadeout_timeout);
+                this._fadeout_timeout = setTimeout(() => {
                     this.track.style.backgroundColor = "transparent"; // also hide track so that when the user drags the thumb and the track becomes visible, the track and the thumb fade out simultaneously when the dragging ends.
-                    this.thumb.style.opacity = 0;
+                    this.thumb.style.opacity = "0";
                 }, this.m_delay);
             });
             // Set scroll by dragging thumb.
@@ -224,8 +244,8 @@ let ScrollerElement = (() => {
                 this.thumb.dragging = true;
                 // Show track.
                 this.track.style.backgroundColor = this.track.__background_value__;
-                clearTimeout(this.fadeout_timeout);
-                this.thumb.style.opacity = 1; // keep as opacity for box shadow.
+                clearTimeout(this._fadeout_timeout);
+                this.thumb.style.opacity = "1"; // keep as opacity for box shadow.
                 // Add mouse up handler to body.
                 document.body.addEventListener("mouseup", mouse_up_handler);
             };
@@ -321,7 +341,6 @@ let ScrollerElement = (() => {
         child(index) {
             return this.content.child(index);
         }
-        // Replace overflow.
         overflow(value) {
             if (value == null) {
                 return this.content.overflow();
@@ -369,7 +388,6 @@ let ScrollerElement = (() => {
             this.content.overflow("auto");
             return this;
         }
-        // Set the opactiy delay when finished scrolling.
         delay(msec) {
             if (msec == null) {
                 return this.m_delay;
@@ -377,20 +395,18 @@ let ScrollerElement = (() => {
             this.m_delay = msec;
             return this;
         }
-        // Get the scroll top.
         scroll_top(value) {
             if (value == null) {
-                return this.content.scrollTop;
+                return this._try_parse_float(this.content.scrollTop, this.content.scrollTop);
             }
-            this.content.scrollTop = value;
+            this.content.scrollTop = this.pad_numeric(value);
             return this;
         }
-        // Get the scroll left.
         scroll_left(value) {
             if (value == null) {
-                return this.content.scrollLeft;
+                return this._try_parse_float(this.content.scrollLeft, this.content.scrollLeft);
             }
-            this.content.scrollLeft = value;
+            this.content.scrollLeft = this.pad_numeric(value);
             return this;
         }
         // Get the scroll height.
@@ -401,15 +417,15 @@ let ScrollerElement = (() => {
         scroll_width() {
             return this.content.scrollWidth;
         }
-        // Add a on scroll callback.
+        // @ts-expect-error
         on_scroll(opts_or_callback = { callback: null, delay: null }) {
             if (opts_or_callback == null) {
                 return this.on_scroll_callbacks;
             }
             let callback;
             if (Utils.is_func(opts_or_callback)) {
-                const e = this;
-                callback = (event) => opts_or_callback(e, event);
+                const element = this;
+                callback = (event) => opts_or_callback(element, event);
                 this.on_scroll_callbacks.push({ callback, user_callback: opts_or_callback });
             }
             else {
@@ -418,10 +434,10 @@ let ScrollerElement = (() => {
                 }
                 else {
                     let timer;
-                    const e = this;
-                    callback = function (t) {
+                    const element = this;
+                    callback = function (event) {
                         clearTimeout(timer);
-                        setTimeout(() => opts_or_callback.callback(e, t), opts_or_callback.delay);
+                        setTimeout(() => opts_or_callback.callback(element, event), opts_or_callback.delay);
                     };
                 }
                 this.on_scroll_callbacks.push({ callback, user_callback: opts_or_callback.callback });
@@ -449,10 +465,10 @@ let ScrollerElement = (() => {
         }
         // Small wrapper to set scroll left without triggering a certain on scroll handler.
         set_scroll_left_without_event(left) {
-            return this.set_scroll_position_without_event(null, left);
+            return this.set_scroll_position_without_event(undefined, left);
         }
         // Small wrapper to set scroll top / left without triggering a certain on scroll handler.
-        set_scroll_position_without_event(top = null, left = null) {
+        set_scroll_position_without_event(top, left) {
             this.on_scroll_callbacks.iterate((item) => {
                 this.content.removeEventListener("scroll", item.callback);
             });
@@ -467,12 +483,9 @@ let ScrollerElement = (() => {
             });
             return this;
         }
-        // Alignments.
-        // When the alignment is set to not leading, and the content can scroll, then it is temporarily set to leading till the content is no longer scrollable.
-        // @warning: This only works when a max width has been set on the content attribute.
         align(value) {
-            if (value === null) {
-                return this._h_alignment;
+            if (value == null) {
+                return this._h_alignment ?? "";
             }
             super.align(value);
             this._h_alignment = value;
@@ -496,8 +509,8 @@ let ScrollerElement = (() => {
             return this;
         }
         align_vertical(value) {
-            if (value === null) {
-                return this._v_alignment;
+            if (value == null) {
+                return this._v_alignment ?? "";
             }
             super.align_vertical(value);
             this._v_alignment = value;
@@ -521,18 +534,11 @@ let ScrollerElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "ScrollerElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        ScrollerElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return ScrollerElement = _classThis;
 })();
 export { ScrollerElement };
 export const Scroller = Elements.wrapper(ScrollerElement);
+export const NullScroller = Elements.create_null(ScrollerElement);
 // Scroller.
 /*  @docs:
     @nav: Frontend
@@ -558,257 +564,250 @@ export const Scroller = Elements.wrapper(ScrollerElement);
         @description: The elements children.
         @type: array[Node]
  */
-let VirtualScrollerElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
-    let _classDescriptor;
-    let _classExtraInitializers = [];
-    let _classThis;
-    let _classSuper = ScrollerElement;
-    var VirtualScrollerElement = _classThis = class extends _classSuper {
-        // Constructor.
-        constructor(...children) {
-            // Initialize base class.
-            super();
-            // Set element type.
-            this.element_type = "VirtualScroller";
-            // Virtual children.
-            this._v_children = [];
-            // Attributes.
-            this.top_diff = 0;
-            this.scroll_top_value = 0;
-            this._last_v_children = 0;
-            // Append children.
-            this.append(...children);
-            // The visible container with the scroll dimensions and positioned children inside.
-            this.visible_container = VStack()
-                .position("relative")
-                .overflow_x("visible")
-                .overflow_y("hidden")
-                .styles({
-                "content-visibility": "auto",
-            });
-            this.content.append(this.visible_container);
-            // The height measurer.
-            this.height_measurer = Span()
-                .visibility("hidden");
-            this.content.append(this.height_measurer);
-            // Render.
-            this.render(true);
-            // Set scroll event listener.
-            // @todo set_scroll_top_without event wont work with this new scroll event.
-            this.content.addEventListener("scroll", () => this.render());
-        }
-        // Set default since it inherits HStackElement.
-        set_default() {
-            return super.set_default(VirtualScrollerElement);
-        }
-        // Replace overflow.
-        overflow(value) {
-            if (value == null) {
-                return this.content.overflow();
-            }
-            this.content.overflow(value);
-            this.visible_container.overflow_x(value.split(" ")[0]);
-            return this;
-        }
-        overflow_x(value) {
-            if (value == null) {
-                return this.content.overflow_x();
-            }
-            this.content.overflow_x(value);
-            this.visible_container.overflow_x(value);
-            return this;
-        }
-        // keep overflow y on this.visible_container always hidden otherwise it may mess with expanding this.content and cause an infinite scroll event.
-        // Set remove children to content.
-        remove_children() {
-            this._v_children = [];
-            this.visible_container.min_height(0);
-            this.visible_container.max_height(0);
-            this.visible_container.inner_html("");
-            return this;
-        }
-        // Render the visible content.
-        render() {
-            // Do not use a clearTimeout setTimout structure cause that will cause some elements to be appended too late on a very fast sroll.
-            // Get scroll direction.
-            const last_scroll_top = this.scroll_top_value;
-            this.scroll_top_value = this.content.scrollTop;
-            const last_v_children = this._last_v_children;
-            this._last_v_children = this._v_children.length;
-            let scrolling_down = true;
-            if (this.scroll_top_value > last_scroll_top) {
-                scrolling_down = true;
-            }
-            else if (this.scroll_top_value < last_scroll_top) {
-                scrolling_down = false;
-            }
-            // Disable forced behaviour because when height edits are made it should also be updated, but this is easily forgotten by the user.
-            // else if (!forced && this.last_v_children == last_v_children) {
-            //     return null; // horizontal scroll.
-            // }
-            // Get the start and end y.
-            const start_y = this.content.scrollTop;
-            const end_y = start_y + this.content.offsetHeight + this.top_diff;
-            // Iterate.
-            let is_first = true;
-            let is_visible = false;
-            let total_height = 0;
-            let visible_height = 0;
-            this._v_children.iterate((child) => {
-                // Child vars.
-                const height = child.v_height !== undefined ? child.v_height : this.get_height(child);
-                if (height == 0) {
-                    return null; // no fixed height or no height.
-                }
-                const child_start_y = total_height;
-                const child_end_y = total_height + height; // Adjust as needed
-                total_height += height;
-                // First item.
-                if (is_first && child_end_y >= start_y) {
-                    child.transform(`translateY(${child_start_y}px)`); // also update when still visible but height changes may have been made to an element.
-                    visible_height += height;
-                    is_first = false;
-                    is_visible = true;
-                    if (!child.rendered) {
-                        if (scrolling_down) {
-                            this.visible_container.appendChild(child);
-                        }
-                        else {
-                            this.visible_container.insertBefore(child, this.visible_container.firstChild);
-                        }
-                        child.rendered = true;
-                    }
-                }
-                // Last visible element.
-                else if (is_visible && child_start_y >= end_y) {
-                    child.transform(`translateY(${child_start_y - visible_height}px)`); // also update when still visible but height changes may have been made to an element.
-                    visible_height += height;
-                    is_visible = false;
-                    if (!child.rendered) {
-                        if (scrolling_down) {
-                            this.visible_container.appendChild(child);
-                        }
-                        else {
-                            this.visible_container.insertBefore(child, this.visible_container.firstChild);
-                        }
-                        child.rendered = true;
-                    }
-                }
-                // Visible elements.
-                else if (is_visible) {
-                    child.transform(`translateY(${child_start_y - visible_height}px)`); // also update when still visible but height changes may have been made to an element.
-                    visible_height += height;
-                    if (!child.rendered) {
-                        if (scrolling_down) {
-                            this.visible_container.appendChild(child);
-                        }
-                        else {
-                            this.visible_container.insertBefore(child, this.visible_container.firstChild);
-                        }
-                        child.rendered = true;
-                    }
-                }
-                // Invisible elements.
-                else if (child.rendered) {
-                    child.remove();
-                    child.rendered = false;
-                }
-            });
-            // Set scroll dimension.
-            this.visible_container.min_height(total_height);
-            this.visible_container.max_height(total_height);
-            // Return this.
-            return this;
-        }
-        // Update heights.
-        update_heights() {
-            this._v_children.iterate((child) => {
-                child.v_height = this.get_height(child, false);
-            });
-        }
-        // Update height of a certain child.
-        update_height(child) {
-            child.v_height = this.get_height(child, false);
-        }
-        // Get the height of an element.
-        get_height(element, fixed = true) {
-            let height;
-            // Get fixed height.
-            if (fixed) {
-                height = parseFloat(element.style.height);
-                if (isNaN(height)) {
-                    console.error("Every element in the virtual scroller must have a fixed height, ignoring element: " + element);
-                    element.style.display = "none";
-                    return 0;
-                }
-            }
-            // Append to document and get height.
-            // Does not require fixed heights but is slow.
-            else {
-                element.rendered = false; // set rendered to false because this will remove the child from this.visible_container when it was rendered.
-                this.height_measurer.appendChild(element);
-                height = element.offsetHeight;
-                this.height_measurer.removeChild(element);
-            }
-            // Add margin.
-            const margin_top = parseFloat(element.style.marginTop);
-            if (!isNaN(margin_top)) {
-                height += margin_top;
-            }
-            const margin_bottom = parseFloat(element.style.marginBottom);
-            if (!isNaN(margin_bottom)) {
-                height += margin_bottom;
-            }
-            // Handler.
-            return height;
-        }
-        // Custom append function.
-        append(...children) {
-            for (let i = 0; i < children.length; i++) {
-                const child = children[i];
-                if (child != null) {
-                    // VWeb element.
-                    if (child.element_type != null) {
-                        if (child.element_type == "ForEach" ||
-                            child.element_type == "If" ||
-                            child.element_type == "IfDeviceWith") {
-                            child.append_children_to(this);
-                        }
-                        else {
-                            this._v_children.push(child);
-                        }
-                    }
-                    // Execute function.
-                    else if (Utils.is_func(child)) {
-                        this.append(child());
-                    }
-                    // Node element.
-                    else if (child instanceof Node) {
-                        this._v_children.push(child);
-                    }
-                    // Append text.
-                    else if (Utils.is_string(child)) {
-                        this._v_children.push(document.createTextNode(child));
-                    }
-                }
-            }
-            return this;
-        }
-    };
-    __setFunctionName(_classThis, "VirtualScrollerElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        VirtualScrollerElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
-    return VirtualScrollerElement = _classThis;
-})();
-export { VirtualScrollerElement };
-export const VirtualScroller = Elements.wrapper(VirtualScrollerElement);
+// @Elements.register
+// export class VirtualScrollerElement extends (ScrollerElement as any as VElementBaseSignature) {
+//     public _v_children: any[];
+//     public top_diff: number;
+//     public scroll_top_value: number;
+//     public _last_v_children: number;
+//     public visible_container: VStackElement;
+//     public height_measurer: any;
+//     // Constructor.
+//     constructor(...children: AppendType[]) {
+//         // Initialize base class.
+//         super();
+//         this._init_derived({ derived: VirtualScrollerElement, })
+//         // Virtual children.
+//         this._v_children = [];
+//         // Attributes.
+//         this.top_diff = 0;
+//         this.scroll_top_value = 0;
+//         this._last_v_children = 0;
+//         // Append children.
+//         this.append(...children);
+//         // The visible container with the scroll dimensions and positioned children inside.
+//         this.visible_container = VStack()
+//             .position("relative")
+//             .overflow_x("visible")
+//             .overflow_y("hidden")
+//             .styles({
+//                 "content-visibility": "auto",
+//             })
+//         this.content.append(this.visible_container)
+//         // The height measurer.
+//         this.height_measurer = Span()
+//             .visibility("hidden")
+//         this.content.append(this.height_measurer)
+//         // Render.
+//         this.render();
+//         // Set scroll event listener.
+//         // @todo set_scroll_top_without event wont work with this new scroll event.
+//         this.content.addEventListener("scroll", () => this.render())
+//     }
+//     // Set default since it inherits HStackElement.
+//     set_default(): this {
+//         return super.set_default(VirtualScrollerElement);
+//     }
+//     // Replace overflow.
+//     overflow(): string;
+//     overflow(value: string): this;
+//     overflow(value?: string): string | this {
+//         if (value == null) {
+//             return this.content.overflow();
+//         }
+//         this.content.overflow(value);
+//         this.visible_container.overflow_x(value.split(" ")[0]);
+//         return this;
+//     }
+//     overflow_x(): string;
+//     overflow_x(value: string): this;
+//     overflow_x(value?: string): string | this {
+//         if (value == null) {
+//             return this.content.overflow_x();
+//         }
+//         this.content.overflow_x(value);
+//         this.visible_container.overflow_x(value);
+//         return this;
+//     }
+//     // keep overflow y on this.visible_container always hidden otherwise it may mess with expanding this.content and cause an infinite scroll event.
+//     // Set remove children to content.
+//     remove_children(): this {
+//         this._v_children = [];
+//         this.visible_container.min_height(0);
+//         this.visible_container.max_height(0);
+//         this.visible_container.inner_html("");
+//         return this;
+//     }
+//     // Render the visible content.
+//     render(): this {
+//         // Do not use a clearTimeout setTimout structure cause that will cause some elements to be appended too late on a very fast sroll.
+//         // Get scroll direction.
+//         const last_scroll_top = this.scroll_top_value;
+//         this.scroll_top_value = this.content.scrollTop;
+//         const last_v_children = this._last_v_children;
+//         this._last_v_children = this._v_children.length;
+//         let scrolling_down = true;
+//         if (this.scroll_top_value > last_scroll_top) {
+//             scrolling_down = true;
+//         } else if (this.scroll_top_value < last_scroll_top) {
+//             scrolling_down = false;
+//         }
+//         // Disable forced behaviour because when height edits are made it should also be updated, but this is easily forgotten by the user.
+//         // else if (!forced && this.last_v_children == last_v_children) {
+//         //     return null; // horizontal scroll.
+//         // }
+//         // Get the start and end y.
+//         const start_y = this.content.scrollTop;
+//         const end_y = start_y + this.content.offsetHeight + this.top_diff;
+//         // Iterate.
+//         let is_first = true;
+//         let is_visible = false; 
+//         let total_height = 0;
+//         let visible_height = 0;
+//         this._v_children.iterate((child) => {
+//             // Child vars.
+//             const height = child.v_height !== undefined ? child.v_height : this.get_height(child);
+//             if (height == 0) {
+//                 return null; // no fixed height or no height.
+//             }
+//             const child_start_y = total_height;
+//             const child_end_y = total_height + height; // Adjust as needed
+//             total_height += height;
+//             // First item.
+//             if (is_first && child_end_y >= start_y) {
+//                 child.transform(`translateY(${child_start_y}px)`); // also update when still visible but height changes may have been made to an element.
+//                 visible_height += height;
+//                 is_first = false;
+//                 is_visible = true;
+//                 if (!child.rendered) {
+//                     if (scrolling_down) {
+//                         this.visible_container.appendChild(child);
+//                     } else {
+//                         this.visible_container.insertBefore(child, this.visible_container.firstChild);
+//                     }
+//                     child.rendered = true;
+//                 }
+//             }
+//             // Last visible element.
+//             else if (is_visible && child_start_y >= end_y) {
+//                 child.transform(`translateY(${child_start_y - visible_height}px)`); // also update when still visible but height changes may have been made to an element.
+//                 visible_height += height;
+//                 is_visible = false;
+//                 if (!child.rendered) {
+//                     if (scrolling_down) {
+//                         this.visible_container.appendChild(child);
+//                     } else {
+//                         this.visible_container.insertBefore(child, this.visible_container.firstChild);
+//                     }
+//                     child.rendered = true;
+//                 }
+//             }
+//             // Visible elements.
+//             else if (is_visible) {
+//                 child.transform(`translateY(${child_start_y - visible_height}px)`); // also update when still visible but height changes may have been made to an element.
+//                 visible_height += height;
+//                 if (!child.rendered) {
+//                     if (scrolling_down) {
+//                         this.visible_container.appendChild(child);
+//                     } else {
+//                         this.visible_container.insertBefore(child, this.visible_container.firstChild);
+//                     }
+//                     child.rendered = true;
+//                 }
+//             }
+//             // Invisible elements.
+//             else if (child.rendered) {
+//                 child.remove();
+//                 child.rendered = false;
+//             }
+//         })
+//         // Set scroll dimension.
+//         this.visible_container.min_height(total_height);
+//         this.visible_container.max_height(total_height);
+//         // Return this.
+//         return this;
+//     }
+//     // Update heights.
+//     update_heights(): this {
+//         this._v_children.iterate((child) => {
+//             child.v_height = this.get_height(child, false);
+//         })
+//         return this;
+//     }
+//     // Update height of a certain child.
+//     update_height(child: any): this {
+//         child.v_height = this.get_height(child, false);
+//         return this;
+//     }
+//     // Get the height of an element.
+//     get_height(element, fixed = true): number {
+//         let height;
+//         // Get fixed height.
+//         if (fixed) {
+//             height = parseFloat(element.style.height);
+//             if (isNaN(height)) {
+//                 console.error("Every element in the virtual scroller must have a fixed height, ignoring element: " + element);
+//                 element.style.display = "none";
+//                 return 0;
+//             }
+//         }
+//         // Append to document and get height.
+//         // Does not require fixed heights but is slow.
+//         else {
+//             element.rendered = false; // set rendered to false because this will remove the child from this.visible_container when it was rendered.
+//             this.height_measurer.appendChild(element);
+//             height = element.offsetHeight;
+//             this.height_measurer.removeChild(element);
+//         }
+//         // Add margin.
+//         const margin_top = parseFloat(element.style.marginTop);
+//         if (!isNaN(margin_top)) {
+//             height += margin_top;
+//         }
+//         const margin_bottom = parseFloat(element.style.marginBottom);
+//         if (!isNaN(margin_bottom)) {
+//             height += margin_bottom;
+//         }
+//         // Handler.
+//         return height;
+//     }
+//     // Custom append function.
+//     append(...children: AppendType[]): this {
+//         for (let i = 0; i < children.length; i++) {
+//             const child = children[i];
+//             if (child != null) {
+//                 // VWeb element.
+//                 if (child.element_name != null) {
+//                     if (
+//                         child.element_name == "ForEachElement" ||
+//                         child.element_name == "IfElement" ||
+//                         child.element_name == "IfDeviceWithElement"
+//                     ) {
+//                         child.append_children_to(this);
+//                     } else {
+//                         this._v_children.push(child);
+//                     }
+//                 }
+//                 // Execute function.
+//                 else if (Utils.is_func(child)) {
+//                     this.append(child());
+//                 }
+//                 // Node element.
+//                 else if (child instanceof Node) {
+//                     this._v_children.push(child);
+//                 }
+//                 // Append text.
+//                 else if (Utils.is_string(child)) {
+//                     this._v_children.push(document.createTextNode(child));   
+//                 }
+//             }
+//         }
+//         return this;
+//     }
+// }
+// export const VirtualScroller = Elements.wrapper(VirtualScrollerElement);
+// export const NullVirtualScroller = Elements.create_null(VirtualScrollerElement);
+// declare module './any_element.d.ts' { interface AnyElementMap { VirtualScrollerElement: VirtualScrollerElement }}
 /*  @docs:
     @nav: Frontend
     @chapter: Elements
@@ -821,18 +820,29 @@ export const VirtualScroller = Elements.wrapper(VirtualScrollerElement);
         This class is still experimental.
  */
 let SnapScrollerElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "SnapScrollerElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var SnapScrollerElement = _classThis = class extends _classSuper {
+    var SnapScrollerElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            SnapScrollerElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Constructor.
         constructor(...children) {
             // Base.
             super();
-            // Element type.
-            this.element_type = "SnapScroller";
+            this._init({
+                derived: SnapScrollerElement,
+            });
             // Style.
             this.overflow_y("scroll");
             this.scroll_snap_type("y mandatory");
@@ -840,6 +850,7 @@ let SnapScrollerElement = (() => {
             this.append(...children);
         }
         // Append.
+        // @ts-ignore base type accepts more input types, this one only accepts velements
         append(...children) {
             for (let i = 0; i < children.length; i++) {
                 const win = children[i];
@@ -891,23 +902,16 @@ let SnapScrollerElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "SnapScrollerElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        SnapScrollerElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return SnapScrollerElement = _classThis;
 })();
 export { SnapScrollerElement };
 export const SnapScroller = Elements.wrapper(SnapScrollerElement);
+export const NullSnapScroller = Elements.create_null(SnapScrollerElement);
 // Window Scroller.
 /*
 @constructor_wrapper
 @Elements.register
-class WindowScrollerElement extends CreateVElementClass({
+class WindowScrollerElement extends Elements.create({
     type: "WindowScroller",
     tag: "div",
     default_style: {
@@ -1052,7 +1056,7 @@ class WindowScrollerElement extends CreateVElementClass({
         // Add the on hash change listener for any direct children id's.
         window.addEventListener("hashchange", (e) => {
             const hash = window.location.hash.substr(1);
-            if (hash !== null && hash !== "") {
+            if (hash != null && hash !== "") {
                 this.windows.iterate((win) => {
                     if (hash === win.id()) {
                         console.log("Select", win.id())
@@ -1135,7 +1139,7 @@ class WindowScrollerElement extends CreateVElementClass({
 
         // Check if the href hash is set on this windows id.
         const hash = window.location.hash.substr(1);
-        if (hash !== null && hash !== "" && hash === win.id()) {
+        if (hash != null && hash !== "" && hash === win.id()) {
             this.on_render(() => {
                 this.next(win.index, true);
             })
@@ -1159,7 +1163,7 @@ class WindowScrollerElement extends CreateVElementClass({
                 // Slide out.
                 const current = this.windows[this.index];
                 current.style.opacity = 0;
-                current.style.transform = 'translateY(-"100%")';
+                current.style.transform = 'translateY(-100%)';
                 
                 // Update index.
                 this.index = index;
@@ -1211,7 +1215,7 @@ class WindowScrollerElement extends CreateVElementClass({
                 // Slide out.
                 const current = this.windows[this.index];
                 current.style.opacity = 0;
-                current.style.transform = 'translateY("100%")';
+                current.style.transform = 'translateY(100%)';
                 
                 // Update index.
                 this.index = index;

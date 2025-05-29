@@ -1,17 +1,25 @@
-export declare class FrameNodesType extends Array {
-    constructor(...children: any[]);
+import { VElement } from "../elements/module.js";
+export declare class FrameNodes extends Array<VElement> {
+    constructor(...children: VElement[]);
 }
-export declare const FrameNodes: (...args: any[]) => any;
-export declare class FrameModesType {
-    modes: string[];
+type OnSet = (mode: string, nodes: FrameNodes) => any;
+export declare class FrameModes {
+    modes: Record<string, FrameNodes>;
     active?: string;
-    _on_set?: ((mode: string, nodes: FrameNodesType) => any);
+    _on_set?: OnSet;
     constructor(...modes: string[]);
+    get(mode: string): FrameNodes;
     set(mode: string): this;
     switch(mode: string): this;
-    on_set(): undefined | ((mode: string, nodes: FrameNodesType) => any);
-    on_set(callback: ((mode: string, nodes: FrameNodesType) => any)): this;
-    on_switch(): undefined | ((mode: string, nodes: FrameNodesType) => any);
-    on_switch(callback: ((mode: string, nodes: FrameNodesType) => any)): this;
+    on_set(): undefined | OnSet;
+    on_set(callback: OnSet): this;
+    on_switch(): undefined | OnSet;
+    on_switch(callback: OnSet): this;
 }
-export declare const FramesMode: (...args: any[]) => any;
+declare global {
+    interface VElementExtensions {
+        frame_mode(frame_mode: FrameNodes): this;
+        frame_mode(frame_modes: FrameModes, mode_name: string): this;
+    }
+}
+export {};

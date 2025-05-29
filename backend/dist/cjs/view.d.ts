@@ -1,0 +1,56 @@
+import * as vlib from "@vandenberghinc/vlib";
+import Meta from "./meta.js";
+export declare class View {
+    static includes: Array<string | Record<string, any>>;
+    static links: Array<string | Record<string, any>>;
+    static body_style: string | null;
+    static splash_screen: any;
+    private static _volt_css?;
+    private static _vhighlight_css?;
+    source: string | null;
+    source_path?: vlib.Path;
+    callback: Function | null;
+    includes: Array<string | Record<string, any>>;
+    links: Array<string | Record<string, any>>;
+    templates: Record<string, any>;
+    meta: Meta;
+    jquery: boolean;
+    lang: string;
+    body_style: string | null;
+    splash_screen: any;
+    tree_shaking: boolean;
+    mangle: boolean;
+    _src?: string;
+    _embedded_sources: Array<string>;
+    is_js_ts_view: boolean;
+    html?: string | Buffer;
+    raw_html?: string | Buffer;
+    _bundle: any;
+    payments?: string | undefined;
+    min_device_width?: number;
+    _server?: any;
+    _endpoint?: any;
+    constructor({ source, callback, includes, links, templates, meta, jquery, lang, body_style, splash_screen, tree_shaking, mangle, min_device_width, _src, }: {
+        source?: string | null;
+        callback?: Function | null;
+        includes?: Array<string | Record<string, any>>;
+        links?: Array<string | Record<string, any>>;
+        templates?: Record<string, any>;
+        meta?: Meta;
+        jquery?: boolean;
+        lang?: string;
+        body_style?: string | null;
+        splash_screen?: any;
+        tree_shaking?: boolean;
+        mangle?: boolean;
+        min_device_width?: number;
+        _src?: string;
+    });
+    _initialize(server: any, endpoint: any): void;
+    private _dynamic_bundle;
+    /** Ensure the view is bundled when required. */
+    ensure_bundle(): Promise<void>;
+    _build_html(): Promise<void>;
+    _serve(stream: any, status_code?: number): void;
+}
+export default View;

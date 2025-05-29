@@ -36,98 +36,105 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { CreateVElementClass } from "./element";
+import { Elements, VElementTagMap } from "../elements/module.js";
 // Link.
 let AnchorElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "AnchorElement",
+            default_style: {
+                "font-family": "inherit",
+                "font-size": "inherit",
+                "color": "inherit",
+                "text-decoration": "none",
+                "text-underline-position": "none",
+                "cursor": "pointer",
+                "outline": "none",
+                "border": "none",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Anchor",
-        tag: "a",
-        default_style: {
-            "font-family": "inherit",
-            "font-size": "inherit",
-            "color": "inherit",
-            "text-decoration": "none",
-            "text-underline-position": "none",
-            "cursor": "pointer",
-            "outline": "none",
-            "border": "none",
-        },
-    });
-    var AnchorElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.a;
+    var AnchorElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            AnchorElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
-        constructor(href, alt, text) {
+        constructor(text, href, alt) {
             // Initialize base class.
-            super();
+            super({
+                derived: AnchorElement,
+            });
             // Set href.
-            this.href(href);
+            if (href !== undefined) {
+                this.href(href);
+            }
             // Set alt.
-            this.alt(alt);
+            if (alt !== undefined) {
+                this.alt(alt);
+            }
             // Set text.
-            this.text(text ?? alt);
+            if (text !== undefined || alt !== undefined) {
+                this.text((text ?? alt));
+            }
         }
     };
-    __setFunctionName(_classThis, "AnchorElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        AnchorElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return AnchorElement = _classThis;
 })();
 export { AnchorElement };
 export const Anchor = Elements.wrapper(AnchorElement);
+export const NullAnchor = Elements.create_null(AnchorElement);
 // Link.
 let LinkElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "LinkElement",
+            default_style: {
+                "font-family": "inherit",
+                "font-size": "1em",
+                "color": "rgb(85, 108, 214)",
+                "text-decoration": "underline",
+                "text-underline-position": "auto",
+                "cursor": "pointer",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Link",
-        tag: "a",
-        default_style: {
-            "font-family": "inherit",
-            "font-size": "1em",
-            "color": "rgb(85, 108, 214)",
-            "text-decoration": "underline",
-            "text-underline-position": "auto",
-            "cursor": "pointer",
-        },
-    });
-    var LinkElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.a;
+    var LinkElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            LinkElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(text, href) {
             // Initialize base class.
-            super();
+            super({
+                derived: LinkElement,
+            });
             // Set text.
-            this.text(text);
+            if (text !== undefined) {
+                this.text(text);
+            }
             // Set href.
-            this.href(href);
+            if (href !== undefined) {
+                this.href(href);
+            }
         }
     };
-    __setFunctionName(_classThis, "LinkElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        LinkElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return LinkElement = _classThis;
 })();
 export { LinkElement };
 export const Link = Elements.wrapper(LinkElement);
+export const NullLink = Elements.create_null(LinkElement);

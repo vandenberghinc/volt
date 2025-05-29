@@ -16,3 +16,4 @@ declare const Support: {
     get_pin(): Promise<any>;
 };
 export { Support };
+export { Support as support };

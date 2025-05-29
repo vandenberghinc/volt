@@ -1,9 +1,9 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 // Imports.
-import { Utils } from "./utils";
+import { Utils } from "./utils.js";
 // Support module.
 const Support = {
     /* 	@docs:
@@ -71,9 +71,9 @@ const Support = {
      *		@type: object
      */
     submit(data = {}) {
-        return Utils.request({
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/support/submit",
+            url: "/volt/support/submit",
             data: data,
         });
     },
@@ -92,11 +92,12 @@ const Support = {
      *			@type: string
      */
     get_pin() {
-        return Utils.request({
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/support/pin",
+            url: "/volt/support/pin",
         });
     }
 };
 // Export.
 export { Support };
+export { Support as support }; // also export as lowercase for compatibility.

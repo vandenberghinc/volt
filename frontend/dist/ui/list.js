@@ -36,64 +36,62 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { Scheme } from "../modules/scheme";
-import { CreateVElementClass } from "./element";
+import { Elements, VElementTagMap } from "../elements/module.js";
+import { Scheme } from "@vandenberghinc/vlib/frontend";
 // List item.
 let ListItemElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "ListItemElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "ListItem",
-        tag: "li",
-        default_style: {},
-    });
-    var ListItemElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.li;
+    var ListItemElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            ListItemElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...content) {
             // Initialize base class.
-            super();
+            super({ derived: ListItemElement });
             // Append content.
             this.append(...content);
         }
     };
-    __setFunctionName(_classThis, "ListItemElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        ListItemElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return ListItemElement = _classThis;
 })();
 export { ListItemElement };
 export const ListItem = Elements.wrapper(ListItemElement);
+export const NullListItem = Elements.create_null(ListItemElement);
 // Unordered List.
 let UnorderedListElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "UnorderedListElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "UnorderedList",
-        tag: "ul",
-        default_style: {},
-    });
-    var UnorderedListElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.ul;
+    var UnorderedListElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            UnorderedListElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(items = []) {
             // Initialize base class.
-            super();
+            super({ derived: UnorderedListElement });
             // Add items.
             if (Array.isArray(items)) {
                 items.iterate(node => { this.append_item(node); });
@@ -111,35 +109,33 @@ let UnorderedListElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "UnorderedListElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        UnorderedListElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return UnorderedListElement = _classThis;
 })();
 export { UnorderedListElement };
 export const UnorderedList = Elements.wrapper(UnorderedListElement);
+export const NullUnorderedList = Elements.create_null(UnorderedListElement);
 // Ordered List.
 let OrderedListElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "OrderedListElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "OrderedList",
-        tag: "ol",
-        default_style: {},
-    });
-    var OrderedListElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.ol;
+    var OrderedListElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            OrderedListElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(items = []) {
             // Initialize base class.
-            super();
+            super({ derived: OrderedListElement });
             // Add items.
             if (Array.isArray(items)) {
                 items.iterate(node => { this.append_item(node); });
@@ -157,15 +153,8 @@ let OrderedListElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "OrderedListElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        OrderedListElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return OrderedListElement = _classThis;
 })();
 export { OrderedListElement };
 export const OrderedList = Elements.wrapper(OrderedListElement);
+export const NullOrderedList = Elements.create_null(OrderedListElement);

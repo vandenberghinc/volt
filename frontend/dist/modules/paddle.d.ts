@@ -1100,7 +1100,7 @@ declare const Payments: {
             border_radius: null | number;
             border_width: null | number | string;
             border_inset: boolean;
-            hover_brightness: null | number[];
+            hover_brightness: number[];
         } | undefined;
     }) => void;
     create_checkout_dropin: ({ steps_container, order_container, billing_container, payment_container, processing_container, overview_container, sign_in_redirect, on_error, }: {
@@ -1401,3 +1401,4 @@ declare const Payments: {
     };
 };
 export { Payments };
+export { Payments as payments };

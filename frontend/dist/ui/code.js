@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -36,73 +36,101 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
+// @exports: CodeBlockElement, CodeBlock, CodePreElement, CodePre, CodeLineElement, CodeLine, MultiLanguageCodeBlockElement, MultiLanguageCodeBlock
 // Imports.
-import { Utils } from "../modules/utils";
-import { Elements } from "../modules/elements";
-import { CreateVElementClass, VDiv } from "./element";
+import { Utils } from "../modules/utils.js";
+import { Elements, VElementTagMap, VDiv } from "../elements/module.js";
+import { Span } from "./span";
+import { VStack, VStackElement, HStack } from "./stack";
+import { ImageMask } from "./image";
+import { ForEach } from "./for_each";
+import { Spacer } from "./spacer";
+import { Divider } from "./divider";
+// import * as vhighlight from "/Users/administrator/persistance/private/dev/vinc/vhighlight"
+import * as vhighlight from "@vandenberghinc/vhighlight";
 // All codeblocks using languages.
 const language_codeblocks = [];
 // CodeBlock.
 let CodeBlockElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "CodeBlockElement",
+            default_style: {
+                "display": "flex",
+                "flex-direction": "column",
+                "margin": "0px 0px 0px 0px",
+                "padding": "15px 20px 15px 20px",
+                "text-align": "start",
+                "white-space": "pre",
+                "font-family": "'Menlo', 'Consolas', monospace",
+                "font-size": "13px",
+                "font-weight": "500",
+                "line-height": "18px",
+                "border-radius": "15px",
+                "color": "#FFFFFF",
+                "background": "#262F3D",
+                "overflow": "hidden", // only the content should scroll so the header remains fixed.
+                "width": "100%",
+                "min-width": "100%",
+                "--header-color": "inherit",
+                "--header-border": "#00000010",
+                "--header-background": "inherit",
+                "--selected-language-color": "inherit",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "CodeBlock",
-        tag: "code",
-        default_style: {
-            "display": "flex",
-            "flex-direction": "column",
-            "margin": "0px 0px 0px 0px",
-            "padding": "15px 20px 15px 20px",
-            "color": "inherit",
-            "text-align": "start",
-            "white-space": "pre",
-            "font-family": "'Menlo', 'Consolas', monospace",
-            "font-size": "13px",
-            "font-weight": "500",
-            "line-height": "18px",
-            "border-radius": "15px",
-            "color": "#FFFFFF",
-            "background": "#262F3D",
-            "overflow": "hidden", // only the content should scroll so the header remains fixed.
-            "width": "100%",
-            "min-width": "100%",
-            "--header-color": "inherit",
-            "--header-border": "#00000010",
-            "--header-background": "inherit",
-            "--selected-language-color": "inherit",
-        },
-    });
-    var CodeBlockElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.code;
+    var CodeBlockElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            CodeBlockElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        language;
+        line_numbers;
+        line_divider;
+        // @ts-expect-error
+        animate;
+        // @ts-expect-error
+        delay;
+        // @ts-expect-error
+        duration;
+        already_highlighted;
+        opts;
+        pre;
+        lines;
+        lines_divider;
+        // @ts-expect-error
+        content;
         // Constructor.
         constructor(code_or_opts = {
-            code: "", // the code or @deprecated: an object with code per language
-            language: null, // the language.
+            code: "", // the code data.
+            language: undefined, // the language.
             line_numbers: false, // enable line numbers.
             line_divider: true, // enable the line divider, only an option when line numbers are enabled.
             animate: false, // animate code writing.
             delay: 25, // animation delay in milliseconds, only used when animatinos are enabled.
-            duration: null, // animation duration in milliseconds, only used when animatinos are enabled.
+            duration: undefined, // animation duration in milliseconds, only used when animatinos are enabled.
             already_highlighted: false, // can be used to indicate the code is already highlighted.
             opts: {}, // special args of the language's tokenizer constructor.
         }) {
             // Initialize base class.
-            super();
+            super({
+                derived: CodeBlockElement,
+            });
             // Attributes.
             let code = code_or_opts;
-            this.language = null;
+            this.language = undefined;
             this.line_numbers = false;
             this.line_divider = true;
             this.animate = false;
             this.delay = 25;
-            this.duration = null;
+            this.duration = undefined;
             this.already_highlighted = false;
             this.opts = {};
             if (typeof code_or_opts === "object") {
@@ -136,256 +164,11 @@ let CodeBlockElement = (() => {
             }
             // Code per language.
             if (typeof code === "object") {
-                this.languages = Object.keys(code);
-                this.languages_code = code;
-                this.languages.iterate((lang) => {
-                    this.languages_code[lang] = this.languages_code[lang].trim();
-                });
+                console.warn("This behaviour is deprecated., use MultiLanguageCodeBlock instead.");
+                code = "";
             }
             else {
                 code = code.trim();
-            }
-            // Create the header for when multiple languages are passed.
-            if (this.languages !== undefined) {
-                // Vars.
-                const code_pres = {};
-                const opacity_duration = 100;
-                const height_duration = 400;
-                const lang_font_size = 10;
-                const _this = this;
-                // Styling.
-                this._selected_language_color = CodeBlockElement.default_style["--selected-language-color"];
-                this._header_color = CodeBlockElement.default_style["--header-color"];
-                this._header_border = CodeBlockElement.default_style["--header-border"];
-                this._header_background = CodeBlockElement.default_style["--header-background"];
-                let background = this._header_background;
-                if (this._header_background == null || this._header_background === "inherit") {
-                    this._header_background = "inherit";
-                    background = this.background();
-                }
-                let header_color = this._header_color; // required for image masks.
-                if (this._header_color == null || this._header_color === "inherit") {
-                    header_color = this.color();
-                }
-                // The header element.
-                this.clipboard = ImageMask("https://raw.githubusercontent.com/vandenberghinc/public-storage/master/libris/copy.png")
-                    .parent(this)
-                    .frame(15, 15)
-                    .flex_shrink(0)
-                    .margin(null, null, null, 10)
-                    .mask_color(header_color)
-                    .transform("rotate(90deg)")
-                    .hover_brightness(0.8, 0.9)
-                    .on_click(async () => {
-                    Utils.copy_to_clipboard(_this.pre.textContent)
-                        .then(() => {
-                        // RESPONSE_STATUS.success("Copied to clipboard");
-                    })
-                        .catch((error) => {
-                        console.error(error);
-                        // RESPONSE_STATUS.error("Failed to the code to the clipboard");
-                    });
-                });
-                this.arrow = ImageMask("https://raw.githubusercontent.com/vandenberghinc/public-storage/master/libris/arrow.png")
-                    .parent(this)
-                    .frame(8, 8)
-                    .flex_shrink(0)
-                    .mask_color(header_color)
-                    .transform("rotate(90deg)")
-                    .parent(this);
-                this.header = HStack(Span("")
-                    .font_size(12)
-                    .line_height(12)
-                    .font_weight("bold")
-                    .assign_to_parent_as("title")
-                    .color("inherit")
-                    .wrap(false)
-                    .overflow("hidden")
-                    .text_overflow("ellipsis"), this.clipboard, VStack(HStack(Span()
-                    .color("inherit")
-                    .margin_right(5)
-                    .font_size(lang_font_size)
-                    .line_height(lang_font_size)
-                    .assign_to_parent_as("value"), this.arrow)
-                    .opacity(1)
-                    .center_vertical()
-                    .transition(`opacity ${opacity_duration}ms ease-in-out`)
-                    .center()
-                    .hover_brightness(0.8, 0.9)
-                    .on_click(() => {
-                    this.header.popup();
-                })
-                    .assign_to_parent_as("minimized"), VStack()
-                    .opacity(0)
-                    .max_height(lang_font_size)
-                    .max_width("none")
-                    .width("100%")
-                    .center()
-                    .overflow("hidden")
-                    .transition(`max-height ${height_duration}ms ease-in-out, max-width ${height_duration}ms ease-in-out, opacity ${opacity_duration}ms ease-in-out`)
-                    .assign_to_parent_as("maximized"))
-                    .position(7.5, 7.5, null, null)
-                    .center_vertical()
-                    .padding(7.5, 10)
-                    .border_radius(15)
-                    .border(1, this._header_border)
-                    .background(background)
-                    .z_index(2)
-                    .transition(`min-width ${height_duration}ms ease-in-out`)
-                    .assign_to_parent_as("content")
-                // .min_width("100%")
-                // .min_height("100%")
-                )
-                    .parent(this)
-                    .position("relative")
-                    .color(this._header_color)
-                    .height(42.5)
-                    .padding(7.5, 15)
-                    .center_vertical()
-                    .z_index(2)
-                    .border_bottom(`1px solid ${this._header_border}`)
-                    .background(background)
-                    .extend({
-                    selected: null,
-                    set_selected: function (val) {
-                        // Shortcuts.
-                        const minimized = this.content.minimized;
-                        const maximized = this.content.maximized;
-                        // Set vars.
-                        minimized.value.text(val);
-                        this.title.text(val);
-                        this.selected = val;
-                        _this.language = val;
-                        // Set initial max width of the maximized view for a smooth transition also on the first time.
-                        if (maximized.max_width() === "none") {
-                            const width_measurer = document.createElement("canvas").getContext("2d");
-                            width_measurer.font = window.getComputedStyle(minimized.value).font;
-                            const initial_width = width_measurer.measureText(this.selected).width;
-                            maximized.max_width(initial_width + 10 + 10 + 7.5 * 2);
-                        }
-                    },
-                    close_handler: function (event) {
-                        _this.header.close_popup();
-                    },
-                    close_popup: function () {
-                        // Shortcuts.
-                        const minimized = this.content.minimized;
-                        const maximized = this.content.maximized;
-                        // Get new width of the selected text.
-                        const width_measurer = document.createElement("canvas").getContext("2d");
-                        width_measurer.font = window.getComputedStyle(minimized.value).font;
-                        const width = width_measurer.measureText(minimized.value.textContent).width;
-                        // Set max frame.
-                        maximized.max_height(lang_font_size);
-                        maximized.max_width(width + 10 + 10);
-                        // Handle minimized.
-                        setTimeout(() => {
-                            minimized.show();
-                            setTimeout(() => {
-                                this.content.min_width(0);
-                                minimized.opacity(1);
-                            }, 25);
-                        }, height_duration - opacity_duration - 25 + 125);
-                        // Handle maximized opacity.
-                        setTimeout(() => {
-                            maximized.opacity(0);
-                        }, height_duration - opacity_duration - 200);
-                        // Handle maximized children.
-                        setTimeout(() => {
-                            maximized.inner_html("");
-                        }, height_duration);
-                        // Post.
-                        window.removeEventListener("mousedown", this.close_handler);
-                        // ACTIVE_LANG_POPUP = null;
-                    },
-                    popup: function () {
-                        // Shortcuts.
-                        const minimized = this.content.minimized;
-                        const maximized = this.content.maximized;
-                        // Already open.
-                        if (parseFloat(maximized.max_height()) !== lang_font_size) {
-                            return null;
-                        }
-                        // Close and set active language popup.
-                        // if (ACTIVE_LANG_POPUP != null) {
-                        // 	ACTIVE_LANG_POPUP.close_popup();
-                        // }
-                        // ACTIVE_LANG_POPUP = this;
-                        // Build element.
-                        maximized.inner_html("");
-                        const stack = VStack()
-                            .padding(0, 10);
-                        maximized.append(stack);
-                        let height = 0;
-                        let width = 0;
-                        _this.languages.iterate((lang) => {
-                            const span = Span(lang)
-                                .color(lang === this.selected ? _this._selected_language_color : _this._header_color)
-                                .font_size(lang_font_size + 1)
-                                .line_height(lang_font_size + 1)
-                                .margin(6, 0, 6, 0)
-                                .on_click(() => {
-                                this.select(lang);
-                                this.close_popup();
-                            });
-                            stack.append(span);
-                            width = Math.max(width, span.clientWidth);
-                            height += (lang_font_size + 1) + 6 * 2;
-                        });
-                        width += 20;
-                        // Add remove event listener.
-                        window.addEventListener("mousedown", this.close_handler);
-                        // Start animation.
-                        minimized.hide();
-                        maximized.max_width(width);
-                        maximized.max_height(height);
-                        setTimeout(() => maximized.opacity(1), 100);
-                    },
-                    select: function (id, recursive = true) {
-                        if (recursive) {
-                            localStorage.setItem("vweb_code_lang", id);
-                            language_codeblocks.iterate((item) => item.header.select(id, false));
-                        }
-                        else {
-                            if (_this.languages.includes(id) === false) {
-                                return;
-                            }
-                            this.set_selected(id);
-                            _this.languages.iterate((lang) => {
-                                if (lang === id) {
-                                    if (_this.already_highlighted) {
-                                        _this.pre.innerHTML = _this.languages_code[lang];
-                                    }
-                                    else {
-                                        _this.highlight({
-                                            code: _this.languages_code[lang],
-                                            language: lang,
-                                            animate: _this.animate,
-                                            delay: _this.delay,
-                                            duration: _this.duration,
-                                            opts: _this.opts,
-                                        });
-                                    }
-                                    return true;
-                                }
-                            });
-                        }
-                    }
-                });
-                // Add to all language code blocks so when a user changes the language it changes everywhere.
-                language_codeblocks.push(this);
-            }
-            // Select the default code language or the first code language.
-            if (this.languages !== undefined) {
-                const def = localStorage.getItem("vweb_code_lang");
-                if (this.languages.includes(def)) {
-                    code = this.languages_code[def];
-                    this.language = def;
-                }
-                else {
-                    code = this.languages_code[this.languages[0]];
-                    this.language = this.languages[0];
-                }
             }
             // Code pre.
             this.pre = CodePre(code)
@@ -420,27 +203,14 @@ let CodeBlockElement = (() => {
             // The content.
             this.content = HStack(this.lines, this.lines_divider, this.pre)
                 .parent(this)
-                .padding(CodeBlockElement.default_style.padding)
+                // .padding(CodeBlockElement.default_style.padding)
                 .flex_wrap("nowrap")
-                // .min_height("100%")
                 .overflow("auto visible");
-            // .align_items("stretch"); // required for lines divider.
             // Append code pre.
-            this.append(this.header, this.content);
+            this.append(this.content);
             // Set padding.
-            this.padding(0);
-            // if (this.languages !== undefined) {
-            // 	// this.pre.padding(CodeBlockElement.default_style.padding);
-            // 	// this.pre.padding(0, null, 0, null);
-            // 	// this.content.padding_bottom(0);
-            // 	this.content.padding(CodeBlockElement.default_style.padding);
-            // 	// this.content.padding(null, 0, null, 0);
-            // }
-            // this.content.padding(CodeBlockElement.default_style.padding);
-            // Select the default code language or the first code language.
-            if (this.languages !== undefined) {
-                this.header.select(this.language, false);
-            }
+            // this.padding(0)
+            this.padding(CodeBlockElement.default_style.padding);
         }
         // Hide/show the scrollbar.
         hide_scrollbar() {
@@ -451,92 +221,20 @@ let CodeBlockElement = (() => {
             this.content.classList.remove("hide_scrollbar");
             return this;
         }
-        // Get the styling attributes.
-        // The values of the children that may have been changed by the custom funcs should be added.
-        styles(style_dict) {
-            if (style_dict == null) {
-                let styles = super.styles();
-                styles["--header-color"] = this._header_color;
-                styles["--header-border"] = this._header_border;
-                styles["--header-background"] = this._header_background;
-                styles["--selected-language-color"] = this._selected_language_color;
-                return styles;
-            }
-            else {
-                return super.styles(style_dict);
-            }
-        }
         // Show.
         show() {
             this.style.display = "flex";
             return this;
         }
-        // Select a language when multiple languages exist.
-        select(language) {
-            if (this.languages === undefined) {
-                throw Error("This function is only allowed when the code block was defined with different code per language.");
-            }
-            this.header.select(language);
-            return this;
-        }
-        // Retrieve the selected language.
-        selected() {
-            return this.language;
-        }
-        // Set the foreground color of the selected language.
-        selected_language_color(value) {
-            if (value === null) {
-                return this._selected_language_color;
-            }
-            this._selected_language_color = value;
-            return this;
-        }
-        // Set the foreground color of the header.
-        header_color(value) {
-            if (value === null) {
-                return this._header_color;
-            }
-            this._header_color = value;
-            if (this.header !== undefined) {
-                this.clipboard.mask_color(this._header_color);
-                this.arrow.mask_color(this._header_color);
-                this.header.color(this._header_color);
-            }
-            return this;
-        }
-        // Set the background color of the header borders.
-        header_border_color(value) {
-            if (value === null) {
-                return this._header_border;
-            }
-            this._header_border = value;
-            if (this.header !== undefined) {
-                this.header.content.border(1, this._header_border);
-                this.header.border_bottom(`1px solid ${this._header_border}`);
-            }
-            return this;
-        }
-        // Set the background color of the header.
-        header_background(value) {
-            if (value === null) {
-                return this._header_background;
-            }
-            this._header_background = value;
-            if (this.header !== undefined) {
-                this.header.background(this._header_background);
-                this.header.content.background(this._header_background);
-            }
-            return this;
-        }
         // Highlight code.
-        highlight({ code = null, // only required if the code was not provided by the constructor.
-        language = null, // code language, precedes element attribute "language".
-        line_numbers = null, // show line numbers.
-        line_divider = null, // show line numbers divider.
-        animate = null, // animate code writing.
-        delay = null, // animation delay in milliseconds, only used when animatinos are enabled.
-        duration = null, // animation duration in milliseconds, only used when animatinos are enabled.
-        opts = null, // special args of the language's tokenizer constructor.
+        highlight({ code, // only required if the code was not provided by the constructor.
+        language, // code language, precedes element attribute "language".
+        line_numbers, // show line numbers.
+        line_divider, // show line numbers divider.
+        animate, // animate code writing.
+        delay, // animation delay in milliseconds, only used when animatinos are enabled.
+        duration, // animation duration in milliseconds, only used when animatinos are enabled.
+        opts, // special args of the language's tokenizer constructor.
          } = {}) {
             // Update attributes.
             if (language == null) {
@@ -568,7 +266,7 @@ let CodeBlockElement = (() => {
                 delay: delay,
                 duration: duration,
                 opts: opts,
-                _post_tokenized_callback: !line_numbers ? null : (tokens) => {
+                _post_tokenized_callback: !line_numbers ? undefined : (tokens) => {
                     // Set line numbers.
                     this.lines.show();
                     this.lines_divider.show();
@@ -592,53 +290,59 @@ let CodeBlockElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "CodeBlockElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        CodeBlockElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return CodeBlockElement = _classThis;
 })();
 export { CodeBlockElement };
 export const CodeBlock = Elements.wrapper(CodeBlockElement);
+export const NullCodeBlock = Elements.create_null(CodeBlockElement);
 // CodePre.
 let CodePreElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "CodePreElement",
+            default_style: {
+                "margin": "0px 0px 0px 0px",
+                "padding": "15px 20px 15px 20px",
+                "text-align": "start",
+                "white-space": "pre",
+                "font-family": "'Menlo', 'Consolas', monospace",
+                "font-size": "13px",
+                "font-weight": "500",
+                "line-height": "16px",
+                "border-radius": "15px",
+                "color": "#FFFFFF",
+                "background": "#262F3D",
+                "tab-size": 4,
+                "overflow": "scroll visible",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "CodePre",
-        tag: "pre",
-        default_style: {
-            "margin": "0px 0px 0px 0px",
-            "padding": "15px 20px 15px 20px",
-            "color": "inherit",
-            "text-align": "start",
-            "white-space": "pre",
-            "font-family": "'Menlo', 'Consolas', monospace",
-            "font-size": "13px",
-            "font-weight": "500",
-            "line-height": "16px",
-            "border-radius": "15px",
-            "color": "#FFFFFF",
-            "background": "#262F3D",
-            "tab-size": 4,
-            "overflow": "scroll visible",
-        },
-    });
-    var CodePreElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.pre;
+    var CodePreElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            CodePreElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        code;
+        tokens = null;
+        allow_animation;
+        animate_promise;
+        tokenizer;
+        language = "";
         // Constructor.
-        constructor(code) {
+        constructor(code = "") {
             // Initialize base class.
-            super();
+            super({
+                derived: CodePreElement,
+            });
             // Attributes.
             this.code = code;
-            this.tokens = null;
             // Set code.
             if (this.code != null) {
                 while (this.code.length > 0 && this.code[this.code.length - 1] == "\n") {
@@ -648,8 +352,9 @@ let CodePreElement = (() => {
             }
         }
         // Animate writing.
+        /** @warning This function may cause security issues if the code is unsafe provided by the user, since this assigns to innerHTML in order to perform animations. */
         // @note cant use attribute for highlighted code since that may be edited inside `highlight()` while the animation is still busy and otherwise highlight would need to be an sync func, but it has to return this, not a promise.
-        async animate_writing({ code = null, delay = 25, duration = null } = {}) {
+        async animate_writing({ code, delay = 25, duration = undefined, }) {
             // Check highlighted code.
             if (code == null) {
                 throw Error(`The code must be highlighted first using "highlight()".`);
@@ -685,11 +390,13 @@ let CodePreElement = (() => {
                 const add_char = (index) => {
                     // Stop.
                     if (this.allow_animation !== true) {
-                        return resolve();
+                        resolve(undefined);
+                        return;
                     }
                     // Animation finished.
                     else if (index >= code.length) {
-                        return resolve();
+                        resolve(undefined);
+                        return;
                     }
                     // Animate.
                     else {
@@ -760,7 +467,7 @@ let CodePreElement = (() => {
                                 }
                             }
                             if (recursive === false && span_index === code.length) {
-                                resolve();
+                                resolve(undefined);
                             }
                         }
                         // Non span code.
@@ -785,7 +492,7 @@ let CodePreElement = (() => {
                 add_char(0);
             });
             // Response.
-            return this.promise;
+            return this.animate_promise;
         }
         // Cancel animation.
         async cancel_animation() {
@@ -796,13 +503,15 @@ let CodePreElement = (() => {
             }
         }
         // Highlight.
-        highlight({ code = null, // only required if the code was not provided by the constructor.
-        language = null, // code language, precedes element attribute "language".
+        /** @warning This function may cause security issues if the code is unsafe provided by the user, since this assigns to innerHTML in order to perform animations. */
+        highlight({ code = undefined, // only required if the code was not provided by the constructor.
+        language = undefined, // code language, precedes element attribute "language".
         animate = false, // animate code writing.
         delay = 25, // animation delay in milliseconds, only used when animatinos are enabled.
-        duration = null, // animation duration in milliseconds, only used when animatinos are enabled.
+        duration = undefined, // animation duration in milliseconds, only used when animatinos are enabled.
         opts = {}, // special args of the language's tokenizer constructor.
-        _post_tokenized_callback = null, } = {}) {
+        _post_tokenized_callback = undefined, } = {}) {
+            console.log("> Highlight");
             // Vars.
             if (code != null) {
                 this.code = code;
@@ -822,6 +531,7 @@ let CodePreElement = (() => {
             // Cancel previous animation.
             this.cancel_animation()
                 .then(() => {
+                console.log("> Cancelled animation");
                 // Get tokenizer.
                 this.tokenizer = vhighlight.init_tokenizer(this.language, opts);
                 if (this.tokenizer == null) {
@@ -832,6 +542,7 @@ let CodePreElement = (() => {
                 this.tokens = this.tokenizer.tokenize();
                 // Build the html.
                 const highlighted_code = this.tokenizer.build_html(this.tokens);
+                console.log("> Highlighted:", highlighted_code);
                 // Post tokenize callback.
                 if (_post_tokenized_callback != null) {
                     _post_tokenized_callback(this.tokens);
@@ -848,18 +559,11 @@ let CodePreElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "CodePreElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        CodePreElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return CodePreElement = _classThis;
 })();
 export { CodePreElement };
 export const CodePre = Elements.wrapper(CodePreElement);
+export const NullCodePre = Elements.create_null(CodePreElement);
 // CodeLine.
 /*	@docs:
     @nav: Frontend
@@ -872,33 +576,44 @@ export const CodePre = Elements.wrapper(CodePreElement);
         @descr: The code line content.
  */
 let CodeLineElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "CodeLineElement",
+            default_style: {
+                "font-family": "\"Menlo\", \"Consolas\", monospace",
+                "font-size": "0.90em",
+                "font-style": "italic",
+                "background": "#000000",
+                "color": "#FFFFFF",
+                "border-radius": "10px",
+                "white-space": "pre",
+                "padding": "2.5px 7.5px 2.5px 7.5px",
+            }
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "CodeLine",
-        tag: "span",
-        default_style: {
-            "font-family": "\"Menlo\", \"Consolas\", monospace",
-            "font-size": "0.90em",
-            "font-style": "italic",
-            "background": "#000000",
-            "color": "#FFFFFF",
-            "border-radius": "10px",
-            "white-space": "pre",
-            "padding": "2.5px 7.5px 2.5px 7.5px",
-        },
-    });
-    var CodeLineElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.span;
+    var CodeLineElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            CodeLineElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(text) {
             // Initialize base class.
-            super();
+            super({
+                derived: CodeLineElement,
+            });
             // Set text.
-            this.inner_html(text);
+            if (text) {
+                this.text(text);
+            } // never use inner html also because the text may content html entities.
         }
+        /** @warning This function may cause security issues if the input is unsafe provided by the user, since this assigns to innerHTML. */
         /*	@docs:
             @title: Fill
             @descr: Fill a string with markdown style codeline elements.
@@ -911,7 +626,7 @@ let CodeLineElement = (() => {
                 let filled = "";
                 for (let i = 0; i < split.length; i++) {
                     if (is_code) {
-                        filled += codeline_callback().text(split[i]);
+                        filled += codeline_callback().inner_html(split[i]);
                     }
                     else {
                         filled += split[i];
@@ -923,18 +638,11 @@ let CodeLineElement = (() => {
             return text;
         }
     };
-    __setFunctionName(_classThis, "CodeLineElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        CodeLineElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return CodeLineElement = _classThis;
 })();
 export { CodeLineElement };
 export const CodeLine = Elements.wrapper(CodeLineElement);
+export const NullCodeLine = Elements.create_null(CodeLineElement);
 // Build a code pre that optionally has different code per navigation.
 /*	@docs:
     @nav: Frontend
@@ -961,42 +669,85 @@ export const CodeLine = Elements.wrapper(CodeLineElement);
         @descr: Highlight the code content.
  */
 let MultiLanguageCodeBlockElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "MultiLanguageCodeBlockElement",
+            default_style: {
+                ...VStackElement.default_style,
+                "font-family": "'Menlo', 'Consolas', monospace",
+                "background": "black",
+                "color": "white",
+                "box-shadow": "0px 0px 5px #00000005",
+                "font-size": "13px",
+                "line-height": "18px",
+                "border-radius": "10px",
+                "tab-size": 4,
+                "--mlcb-tint": "white",
+                "--mlcb-div-bg": "grey",
+                "--mlcb-title-opac": 0.7,
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var MultiLanguageCodeBlockElement = _classThis = class extends _classSuper {
+    var MultiLanguageCodeBlockElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            MultiLanguageCodeBlockElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        _fg;
+        _tint;
+        _div_bg;
+        _title_opac;
+        _pre_nodes = [];
+        _title_nodes = [];
+        header;
+        _copy_img;
+        // @ts-expect-error
+        content;
+        divider;
         // Constructor.
-        constructor({ content, highlight = true }) {
+        constructor(args) {
             // Inherit.
             super();
-            this.element_type = "Steps";
-            this.styles(StepsElement.default_style);
-            // Assigned content from non obj params.
-            if (content === undefined && arguments.length === 1) {
-                content = arguments[0];
+            this._init({
+                derived: MultiLanguageCodeBlockElement,
+            });
+            // Specify.
+            let content, highlight = true;
+            if (typeof args === "object" && !Array.isArray(args) && args.content) {
+                ({ content, highlight = true } = args);
+            }
+            else {
+                content = args;
             }
             // Check code.
-            let code = content;
-            if (typeof code === "string") {
-                code = { language: "__unknown__", title: null, data: code };
+            let code = [];
+            if (typeof content === "string") {
+                code = [{ language: "__unknown__", title: undefined, data: content }];
             }
-            else if (typeof code === "object" && !Array.isArray(code)) {
-                code = [code];
+            else if (typeof content === "object" && !Array.isArray(content)) {
+                code = [content];
             }
-            else if (!Array.isArray(code)) {
-                console.error(`Invalid value type of code block "${typeof code}".`);
+            else if (Array.isArray(content)) {
+                code = content;
+            }
+            else {
+                console.error(`Invalid value type of code block "${typeof content}".`);
             }
             // Vars.
             const main_this = this;
             this._fg = MultiLanguageCodeBlockElement.default_style.color;
             this._tint = MultiLanguageCodeBlockElement.default_style["--mlcb-tint"];
             this._div_bg = MultiLanguageCodeBlockElement.default_style["--mlcb-div-bg"];
-            this._title_opac = MultiLanguageCodeBlockElement.default_style["--mlcb-title-opac"];
-            this._pre_nodes = [];
-            this._title_nodes = [];
+            this._title_opac = typeof MultiLanguageCodeBlockElement.default_style["--mlcb-title-opac"] === "number"
+                ? MultiLanguageCodeBlockElement.default_style["--mlcb-title-opac"]
+                : parseInt(MultiLanguageCodeBlockElement.default_style["--mlcb-title-opac"]);
             // The header element.
             this.header = HStack(
             // Titles.
@@ -1049,7 +800,7 @@ let MultiLanguageCodeBlockElement = (() => {
             // Spacer.
             code.length > 1 ? null : Spacer(), 
             // Copy image.
-            this._copy_img = ImageMask("/vweb_static/icons/copy.webp")
+            this._copy_img = ImageMask("/volt_static/icons/copy.webp")
                 .frame(15, 15)
                 .flex_shrink(0)
                 .margin(null, null, null, 10)
@@ -1060,18 +811,24 @@ let MultiLanguageCodeBlockElement = (() => {
                 .on_mouse_over(e => e.opacity(1))
                 .on_mouse_out(e => e.opacity(this._title_opac))
                 .on_click(async () => {
-                Utils.copy_to_clipboard(this.header.selected_code_pre.textContent)
-                    .then(() => {
-                    if (typeof RESPONSE_STATUS !== "undefined") {
-                        RESPONSE_STATUS.message("Copied to clipboard");
-                    }
-                })
-                    .catch((error) => {
-                    console.error(error);
-                    if (typeof RESPONSE_STATUS !== "undefined") {
-                        RESPONSE_STATUS.error("Failed to the code to the clipboard");
-                    }
-                });
+                if (this.header?.selected_code_pre?.textContent) {
+                    Utils.copy_to_clipboard(this.header.selected_code_pre.textContent)
+                        .then(() => {
+                        // @ts-expect-error
+                        if (typeof RESPONSE_STATUS !== "undefined") {
+                            // @ts-expect-error
+                            RESPONSE_STATUS.message("Copied to clipboard");
+                        }
+                    })
+                        .catch((error) => {
+                        console.error(error);
+                        // @ts-expect-error
+                        if (typeof RESPONSE_STATUS !== "undefined") {
+                            // @ts-expect-error
+                            RESPONSE_STATUS.error("Failed to the code to the clipboard");
+                        }
+                    });
+                }
             }))
                 .width("100%")
                 .overflow("hidden")
@@ -1083,11 +840,11 @@ let MultiLanguageCodeBlockElement = (() => {
                 selected: null,
                 selected_lang: null,
                 selected_code_pre: null,
-                set_selected: function (index) {
+                set_selected(index) {
                     // Do not check for already selected since it is used in func tint() to set divider tint.
                     // Set selected index.
                     this.selected = index;
-                    this.selected_lang = code[index].language || "__unknown__";
+                    this.selected_lang = code[index].language ?? "__unknown__";
                     this.selected_code_pre = main_this._pre_nodes[index];
                     // Set title.
                     main_this._title_nodes.iterate((i) => {
@@ -1103,8 +860,9 @@ let MultiLanguageCodeBlockElement = (() => {
                     if (code.length > 1) {
                         main_this._title_nodes[index].divider.background(main_this._tint);
                     }
+                    return this;
                 },
-                select: function (lang_or_index, recursive = true) {
+                select(lang_or_index, recursive = true) {
                     // Extract lang and index.
                     let lang;
                     let index;
@@ -1149,6 +907,7 @@ let MultiLanguageCodeBlockElement = (() => {
                             }
                         }
                     }
+                    return this;
                 }
             });
             // LibrisUI.codeblock_lang_headers.push(header);
@@ -1194,29 +953,25 @@ let MultiLanguageCodeBlockElement = (() => {
                 .background(this._div_bg)
                 .margin(0, 0, 0, 0), this.content);
             // Select first item.
+            // @ts-ignore
             this.header.select(0, false);
         }
         // Set default since it inherits another element.
         set_default() {
-            return super.set_default(TabsElement);
+            return super.set_default(MultiLanguageCodeBlockElement);
         }
-        // Get the styling attributes.
         styles(style_dict) {
             if (style_dict == null) {
                 let styles = super.styles();
                 styles["--mlcb-tint"] = this._tint;
                 styles["--mlcb-div-bg"] = this._div_bg;
-                styles["--mlcb-title-opac"] = this._title_opac;
+                styles["--mlcb-title-opac"] = this._title_opac.toString();
                 return styles;
             }
             else {
                 return super.styles(style_dict);
             }
         }
-        /*	@docs:
-            @title: Set color
-            @description: Set or get foreground tint color.
-         */
         color(value) {
             if (value == null) {
                 return this._fg;
@@ -1226,10 +981,6 @@ let MultiLanguageCodeBlockElement = (() => {
             this._copy_img.mask_color(value);
             return this;
         }
-        /*	@docs:
-            @title: Set tint color
-            @description: Set or get the tint color, mainly used for the divider below the active tab.
-         */
         tint(value) {
             if (value == null) {
                 return this._tint;
@@ -1238,10 +989,6 @@ let MultiLanguageCodeBlockElement = (() => {
             this.header.set_selected(this.header.selected); // set tint again.
             return this;
         }
-        /*	@docs:
-            @title: Set divider background
-            @description: Set the background of the divider.
-         */
         divider_background(value) {
             if (value == null) {
                 return this._div_bg;
@@ -1251,32 +998,8 @@ let MultiLanguageCodeBlockElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "MultiLanguageCodeBlockElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        MultiLanguageCodeBlockElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-    })();
-    // Default styling.
-    _classThis.default_style = {
-        ...VStackElement.default_style,
-        "font-family": "'Menlo', 'Consolas', monospace",
-        "background": "black",
-        "color": "white",
-        "box-shadow": "0px 0px 5px #00000005",
-        "font-size": "13px",
-        "line-height": "18px",
-        "border-radius": "10px",
-        "tab-size": 4,
-        "--mlcb-tint": "white",
-        "--mlcb-div-bg": "grey",
-        "--mlcb-title-opac": 0.7,
-    };
-    (() => {
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return MultiLanguageCodeBlockElement = _classThis;
 })();
 export { MultiLanguageCodeBlockElement };
 export const MultiLanguageCodeBlock = Elements.wrapper(MultiLanguageCodeBlockElement);
+export const NullMultiLanguageCodeBlock = Elements.create_null(MultiLanguageCodeBlockElement);

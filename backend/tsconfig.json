@@ -1,18 +1,21 @@
 {
-  "compilerOptions": {
-    "target": "es2023",
-    "module": "node16",
-    "declaration": true,
-    "declarationDir": "./dist",
-    "outDir": "./dist",
-    "rootDir": "./",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "allowJs": true,
-    "noImplicitAny": false,
-    "skipLibCheck": true,
-  },
-  "include": ["*.ts", "*/*.ts"],
-  "exclude": ["dist/**/*"],
+    "compilerOptions": {
+        "target": "es2023",
+        "module": "node18",
+        "moduleResolution": "nodenext",
+        "declaration": true,
+        "declarationDir": "./dist/esm",
+        "outDir": "./dist/esm",
+        "rootDir": "./src/",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "allowJs": true,
+        "checkJs": false,
+        "noImplicitAny": false,
+        "baseUrl": ".",
+    },
+    "include": [
+        "./src/**/*",
+    ]
 }

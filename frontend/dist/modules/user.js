@@ -1,12 +1,13 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 // Imports.
-import { Utils } from "./utils";
+import { Utils } from "./utils.js";
 import { Cookies } from "./cookies";
 // User module.
-const User = {
+export var User;
+(function (User) {
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -15,10 +16,11 @@ const User = {
      *	@type: null, string
      *	@return: Returns the user id when the user is authenticated and `null` when the user is not authenticated.
      */
-    uid() {
+    function uid() {
         const uid = Cookies.get("UserID");
-        return uid == "-1" ? null : uid;
-    },
+        return typeof uid !== "string" || uid == "-1" ? undefined : uid;
+    }
+    User.uid = uid;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -27,10 +29,11 @@ const User = {
      *	@type: null, string
      *	@return: Returns the user's username when the user is authenticated and `null` when the user is not authenticated.
      */
-    username() {
+    function username() {
         const username = Cookies.get("UserName");
-        return username === "" ? null : username;
-    },
+        return typeof username !== "string" || username === "" ? undefined : username;
+    }
+    User.username = username;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -39,10 +42,11 @@ const User = {
      *	@type: null, string
      *	@return: Returns the user's email when the user is authenticated and `null` when the user is not authenticated.
      */
-    email() {
+    function email() {
         const email = Cookies.get("UserEmail");
-        return email === "" ? null : email;
-    },
+        return typeof email !== "string" || email === "" ? undefined : email;
+    }
+    User.email = email;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -51,10 +55,11 @@ const User = {
      *	@type: null, string
      *	@return: Returns the user's first name when the user is authenticated and `null` when the user is not authenticated.
      */
-    first_name() {
+    function first_name() {
         const first_name = Cookies.get("UserFirstName");
-        return first_name === "" ? null : first_name;
-    },
+        return typeof first_name !== "string" || first_name === "" ? undefined : first_name;
+    }
+    User.first_name = first_name;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -63,10 +68,11 @@ const User = {
      *	@type: null, string
      *	@return: Returns the user's last name when the user is authenticated and `null` when the user is not authenticated.
      */
-    last_name() {
+    function last_name() {
         const last_name = Cookies.get("UserLastName");
-        return last_name === "" ? null : last_name;
-    },
+        return typeof last_name !== "string" || last_name === "" ? undefined : last_name;
+    }
+    User.last_name = last_name;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -75,9 +81,10 @@ const User = {
      *	@type: boolean
      *	@return: Returns a boolean indicating whether the current user is authenticated.
      */
-    is_authenticated() {
-        return this.uid() != null;
-    },
+    function is_authenticated() {
+        return User.uid() != undefined;
+    }
+    User.is_authenticated = is_authenticated;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -86,9 +93,10 @@ const User = {
      *	@type: boolean
      *	@return: Returns a boolean indicating whether the current user is activated.
      */
-    is_activated() {
+    function is_activated() {
         return Cookies.get("UserActivated") === "true";
-    },
+    }
+    User.is_activated = is_activated;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -101,15 +109,16 @@ const User = {
      *		@desc: Retrieve the detailed user information as well.
      *		@type: boolean
      */
-    async get(detailed = false) {
-        return Utils.request({
+    async function get() {
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/user/",
+            url: "/volt/user/",
             data: {
-                detailed: detailed,
+            // detailed: detailed,
             },
         });
-    },
+    }
+    User.get = get;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -118,13 +127,14 @@ const User = {
      *	@type: Promise
      *	@return: Returns a promise with a successful update response or a request error on a failed request.
      */
-    async set(user) {
-        return Utils.request({
+    async function set(user) {
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/user/",
+            url: "/volt/user/",
             data: user,
         });
-    },
+    }
+    User.set = set;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -133,15 +143,16 @@ const User = {
      *	@type: Promise
      *	@return: Returns a promise with a successful update response or a request error on a failed request.
      */
-    async activate(code = "") {
-        return Utils.request({
+    async function activate(code = "") {
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/auth/activate",
+            url: "/volt/auth/activate",
             data: {
                 code: code,
             },
         });
-    },
+    }
+    User.activate = activate;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -150,17 +161,18 @@ const User = {
      *	@type: Promise
      *	@return: Returns a promise with a successful update response or a request error on a failed request.
      */
-    async change_password({ current_password = "", password = "", verify_password = "", }) {
-        return Utils.request({
+    async function change_password({ current_password = "", password = "", verify_password = "", }) {
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/user/change_password",
+            url: "/volt/user/change_password",
             data: {
                 current_password: current_password,
                 password: password,
                 verify_password: verify_password,
             },
         });
-    },
+    }
+    User.change_password = change_password;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -169,12 +181,13 @@ const User = {
      *	@type: Promise
      *	@return: Returns a promise with a successful update response or a request error on a failed request.
      */
-    async delete_account() {
-        return Utils.request({
+    async function delete_account() {
+        return Utils.request_v1({
             method: "DELETE",
-            url: "/vweb/user",
+            url: "/volt/user",
         });
-    },
+    }
+    User.delete_account = delete_account;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -183,12 +196,13 @@ const User = {
      *	@type: Promise
      *	@return: Returns a promise with a successful update response with the newly generated API key as an attribute or a request error on a failed request.
      */
-    async generate_api_key() {
-        return Utils.request({
+    async function generate_api_key() {
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/user/api_key",
+            url: "/volt/user/api_key",
         });
-    },
+    }
+    User.generate_api_key = generate_api_key;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -197,12 +211,13 @@ const User = {
      *	@type: Promise
      *	@return: Returns a promise with a successful update response or a request error on a failed request.
      */
-    async revoke_api_key() {
-        return Utils.request({
+    async function revoke_api_key() {
+        return Utils.request_v1({
             method: "DELETE",
-            url: "/vweb/user/api_key",
+            url: "/volt/user/api_key",
         });
-    },
+    }
+    User.revoke_api_key = revoke_api_key;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -211,16 +226,17 @@ const User = {
      *	@type: Promise
      *	@return: Returns a promise with the loaded user's data or a request error on a failed request.
      */
-    async load(path, def = "") {
-        return Utils.request({
+    async function load(path, def = "") {
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/user/data",
+            url: "/volt/user/data",
             data: {
                 path: path,
                 def: def,
             },
         });
-    },
+    }
+    User.load = load;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -229,16 +245,17 @@ const User = {
      *	@type: Promise
      *	@return: Returns a promise with a successful update response or a request error on a failed request.
      */
-    async save(path = "", data = {}) {
-        return Utils.request({
+    async function save(path = "", data = {}) {
+        return Utils.request_v1({
             method: "POST",
-            url: "/vweb/user/data",
+            url: "/volt/user/data",
             data: {
                 path: path,
                 data: data,
             },
         });
-    },
+    }
+    User.save = save;
     /* 	@docs:
      * 	@nav: Frontend
      *	@chapter: User
@@ -247,16 +264,17 @@ const User = {
      *	@type: Promise
      *	@return: Returns a promise with the loaded user's data or a request error on a failed request.
      */
-    async load_protected(path, def = "") {
-        return Utils.request({
+    async function load_protected(path, def = "") {
+        return Utils.request_v1({
             method: "GET",
-            url: "/vweb/user/data/protected",
+            url: "/volt/user/data/protected",
             data: {
                 path: path,
                 def: def,
             },
         });
     }
-};
-// Export.
-export { User };
+    User.load_protected = load_protected;
+})(User || (User = {}));
+;
+export { User as user }; // also export as lowercase for compatibility.

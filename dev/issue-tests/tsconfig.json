@@ -1,0 +1,37 @@
+{
+    "compilerOptions": {
+        // Target and module settings
+        "target": "ES2022",
+        "module": "es2022",
+        // "moduleResolution": "bundler",
+        
+        // Include DOM lib in addition to ES2022
+        "lib": ["ES2022", "DOM"],
+
+        // Generate .d.ts files
+        "declaration": true,
+        
+        // Strict settings and interop
+        "strict": true,
+        "esModuleInterop": true,
+
+        // Allow JS in your project
+        "allowJs": true,
+        "checkJs": false,
+        "noImplicitAny": false,
+
+        // Base settings
+        "baseUrl": ".",
+        // "types": ["node"],
+        "skipLibCheck": true,
+
+        // Output directory
+        "outDir": "./dist"
+    },
+    "include": [
+        // "./test.ts",
+        // "./mixin.ts",
+        "./test_derived.ts",
+    ],
+  }
+  

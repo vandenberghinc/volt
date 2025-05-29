@@ -4,3 +4,4 @@
 .npmrc
 .DS_Store
 /demo
+node_modules

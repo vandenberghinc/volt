@@ -36,13 +36,9 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { Scheme } from "../modules/scheme";
+import { Elements } from "../elements/module.js";
+import { Scheme } from "@vandenberghinc/vlib/frontend";
 import { VStack, VStackElement, HStack, ZStack } from "./stack";
 import { ForEach } from "./for_each";
 import { Text } from "./text";
@@ -62,7 +58,7 @@ import { Divider } from "./divider";
             @descr: The tab title.
         @attr:
             @name: content
-            @descr: The vweb node to be presented when the tab is selected.
+            @descr: The volt node to be presented when the tab is selected.
         @attr:
             @name: on_header
             @descr:
@@ -70,19 +66,51 @@ import { Divider } from "./divider";
                 The callback takes the arguments local header node and parent tabs node as `(header_node, tabs_node)`.
  */
 let TabsElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "TabsElement",
+            default_style: {
+                ...VStackElement.default_style,
+                "font-size": "16px",
+                "font-weight": "500",
+                "overflow-x": "hidden",
+                "width": "100%",
+                "--tabs-tint": "blue",
+                "--tabs-tab-opac": 0.8,
+                "--tabs-div-bg": "gray",
+                "--tabs-div-opac": 0.5,
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var TabsElement = _classThis = class extends _classSuper {
+    var TabsElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            TabsElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        _tint;
+        _tab_opac;
+        _div_bg;
+        _div_opac;
+        _selected_node;
+        _tab_nodes;
+        _on_tab_header;
+        _div;
+        _animate;
+        _duration;
         // Constructor.
         constructor({ content = [], animate = true, duration = 300, }) {
             // Inherit.
             super();
-            this.element_type = "Tabs";
-            this.styles(TabsElement.default_style);
+            this._init({
+                derived: TabsElement,
+            });
             // Params.
             this._animate = animate;
             this._duration = duration;
@@ -127,7 +155,7 @@ let TabsElement = (() => {
             // Convert conent object to array.
             if (content && typeof content === "object" && !Array.isArray(content)) {
                 const old = content;
-                content = Object.keys(old).iterate_append(key => ({
+                content = Object.keys(old).map(key => ({
                     title: key,
                     content: old[key],
                 }));
@@ -136,6 +164,7 @@ let TabsElement = (() => {
                 console.error(`Invalid parameter type "${Scheme.value_type(content)}" for parameter "content", the valid type is "array" or "object".`);
                 return this;
             }
+            content = content;
             // Build.
             this.remove_children();
             const main_this = this;
@@ -344,7 +373,7 @@ let TabsElement = (() => {
                 return this._div_bg;
             }
             this._div_bg = value;
-            this._div.background(this._div_bg);
+            this._div?.background(this._div_bg);
             return this;
         }
         divider_opacity(value) {
@@ -362,30 +391,8 @@ let TabsElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "TabsElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        TabsElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-    })();
-    // Macros.
-    // Default styling.
-    _classThis.default_style = {
-        ...VStackElement.default_style,
-        "font-size": "16px",
-        "font-weight": "500",
-        "overflow-x": "hidden",
-        "width": "100%",
-        "--tabs-tint": "blue",
-        "--tabs-tab-opac": 0.8,
-        "--tabs-div-bg": "gray",
-        "--tabs-div-opac": 0.5,
-    };
-    (() => {
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return TabsElement = _classThis;
 })();
 export { TabsElement };
 export const Tabs = Elements.wrapper(TabsElement);
+export const NullTabs = Elements.create_null(TabsElement);

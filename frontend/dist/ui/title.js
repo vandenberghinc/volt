@@ -36,88 +36,86 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { CreateVElementClass } from "./element";
+import { Elements, VElementTagMap } from "../elements/module.js";
 // Title.
 let TitleElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "TitleElement",
+            default_style: {
+                "margin": "0px 0px 0px 0px",
+                "color": "inherit",
+                "white-space": "wrap",
+                "text-align": "inherit",
+                "font-weight": "700", // for safari since it inherits HTMLElement only.
+            }
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Title",
-        tag: "h1",
-        default_style: {
-            "margin": "0px 0px 0px 0px",
-            "color": "inherit",
-            "white-space": "wrap",
-            "text-align": "inherit",
-            "font-weight": "700", // for safari since it inherits HTMLElement only.
-        },
-    });
-    var TitleElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.h1;
+    var TitleElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            TitleElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
-        constructor(text) {
+        constructor(text = "") {
             // Initialize base class.
-            super();
+            super({
+                derived: TitleElement,
+            });
             // Set text.
             this.text(text); // do not use inner_html since the text might contain "<" etc.
         }
     };
-    __setFunctionName(_classThis, "TitleElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        TitleElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return TitleElement = _classThis;
 })();
 export { TitleElement };
 export const Title = Elements.wrapper(TitleElement);
+export const NullTitle = Elements.create_null(TitleElement);
 // Subtitle.
 let SubtitleElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "SubtitleElement",
+            tag: "h2",
+            default_style: {
+                "margin": "0px 0px 0px 0px",
+                "color": "inherit",
+                "white-space": "wrap",
+                "text-align": "inherit",
+                "font-weight": "700", // for safari since it inherits HTMLElement only.
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Subtitle",
-        tag: "h1",
-        default_style: {
-            "margin": "0px 0px 0px 0px",
-            "color": "inherit",
-            "white-space": "wrap",
-            "text-align": "inherit",
-            "font-weight": "700", // for safari since it inherits HTMLElement only.
-        },
-    });
-    var SubtitleElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.h1;
+    var SubtitleElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            SubtitleElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
-        constructor(text) {
+        constructor(text = "") {
             // Initialize base class.
-            super();
+            super({
+                derived: SubtitleElement,
+            });
             // Set text.
             this.text(text); // do not use inner_html since the text might contain "<" etc.
         }
     };
-    __setFunctionName(_classThis, "SubtitleElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        SubtitleElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return SubtitleElement = _classThis;
 })();
 export { SubtitleElement };
 export const Subtitle = Elements.wrapper(SubtitleElement);
+export const NullSubtitle = Elements.create_null(SubtitleElement);

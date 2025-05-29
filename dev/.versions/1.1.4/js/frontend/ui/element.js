@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 
 // Elements that use the "width" etc attribute instead of the "style.width".

@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    // "module": "node16",
+    "declaration": true,
+    "declarationDir": "./dist",
+    "outDir": "./dist",
+    "rootDir": "./",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "noImplicitAny": false,
+
+    "module": "NodeNext",                        // Use ESNext modules
+    "moduleResolution": "NodeNext",            // Align with Node.js ESM resolution
+  },
+  "include": [
+    // "*.ts", "*/*/*.ts", "*/**.ts",
+    "**/*.ts"
+  ],
+  "exclude": ["dist/**/*", "../vhighlight/vhighlight.js"],
+}

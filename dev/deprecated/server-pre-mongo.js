@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 
 // ---------------------------------------------------------
@@ -590,7 +590,8 @@ class Server {
                 "Referrer-Policy": "same-origin",
                 "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
                 "X-XSS-Protection": "1; mode=block",
-                "X-Content-Type-Options": "frame-ancestors 'none'; nosniff;",
+                // "X-Content-Type-Options": "frame-ancestors 'none'; nosniff;",
+                "X-Content-Type-Options": "frame-ancestors nosniff;",
                 "X-Frame-Options": "DENY",
                 "Strict-Transport-Security": "max-age=31536000",
             }
@@ -2337,7 +2338,7 @@ class Server {
         }
 
         // Master.
-        if (this.production && libcluster.isMaster) {
+        if (this.production && libcluster.isPrimary) {
             // Fork workers
             const numCPUs = libos.cpus().length;
 

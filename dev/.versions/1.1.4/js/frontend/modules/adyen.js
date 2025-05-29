@@ -1,6 +1,6 @@
 /*
  * @author: Daan van den Bergh
- * @copyright: © 2022 - 2023 Daan van den Bergh.
+ * @copyright: © 2022 - 2024 Daan van den Bergh.
  */
 
 // ---------------------------------------------------------

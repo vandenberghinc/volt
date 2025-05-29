@@ -1,20 +1,31 @@
+/* Dummy tsconfig file for vscode. */
 {
-  "compilerOptions": {
-    "target": "ES2021",
-    "module": "es6",
-    "lib": ["ES2021", "DOM"],
-    "declaration": true,
-    "declarationDir": "./dist",
-    "outDir": "./dist",
-    // "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "allowJs": true,
-    "noImplicitAny": false,
-    "types": [
-      "modules/global_extensions.d.ts"
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ES2022",
+        "moduleResolution": "bundler",
+        "lib": [
+            "ES2022",
+            "DOM"
+        ],
+        "declaration": true,
+        "strict": true,
+        "esModuleInterop": true,
+        "allowJs": true,
+        "checkJs": false,
+        "noImplicitAny": false,
+        "baseUrl": ".",
+        "skipLibCheck": true,
+        "paths": {},
+        "outDir": "./dist",
+    },
+    "include": [
+        "src/**/*",
+        "src/ui/**/*",
     ],
-  },
-  "include": ["vweb.js", "modules/**/*", "ui/**/*"],
-  "exclude": ["ui/element.v1.ts", "uiX/", "./compile.js"]
+    "exclude": [
+        "node_modules",
+        "dist",
+        "./examples",
+    ]
 }

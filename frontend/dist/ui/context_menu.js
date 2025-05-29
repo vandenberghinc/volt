@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -36,36 +36,45 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { CreateVElementClass } from "./element";
-// Button.
+import { Elements } from "../elements/module.js";
+import { Button } from "./button";
+import { VStackElement } from "./stack";
+// Context Menu.
 let ContextMenuElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "ContextMenuElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var ContextMenuElement = _classThis = class extends _classSuper {
+    var ContextMenuElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            ContextMenuElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        remove_child_callback;
         // Constructor.
         // The content may either be an array with nodes, or an array with object like {label: ..., on_click: (element, event) => {}, on_render: (element) => {}}.
         // A node / object may also be "null" and it will be ignored.
         constructor(content) {
             // Initialize base classes.
             super();
-            // Set element type.
-            this.element_type = "ContextMenu";
+            this._init({
+                derived: ContextMenuElement,
+            });
             // Append content.
             content.iterate((item) => {
                 if (item == null) {
                     return null;
                 }
-                else if (typeof item === "object") {
+                else if (!(item instanceof HTMLElement)) {
                     const button = Button(item.label)
                         .padding(5, 10, 5, 10)
                         .margin(0)
@@ -95,7 +104,7 @@ let ContextMenuElement = (() => {
                 .border_radius(10)
                 .min_width(150);
             // Remove child callback.
-            this.remove_child_callback = () => {
+            this.remove_child_callback = (event) => {
                 if (!this.contains(event.target)) {
                     this.remove();
                 }
@@ -103,9 +112,9 @@ let ContextMenuElement = (() => {
             };
         }
         // Set default since it inherits an element.
-        set_default() {
-            return super.set_default(ContextMenuElement);
-        }
+        // set_default() : this {
+        // 	return super.set_default(ContextMenuElement);
+        // }
         // Popup the context menu by a event.
         popup(event) {
             // Prevent default.
@@ -113,11 +122,13 @@ let ContextMenuElement = (() => {
             // Show.
             super.show();
             // Set position.
-            this.position(event.clientY, null, null, event.clientX);
+            this.position(event.clientY, undefined, undefined, event.clientX);
             // Add child.
             document.body.appendChild(this);
             // Add event listener to body.
             document.body.addEventListener("mousedown", this.remove_child_callback);
+            // Response.
+            return this;
         }
         // Close the context menu.
         close() {
@@ -125,23 +136,75 @@ let ContextMenuElement = (() => {
             super.remove();
             // Remove event listener from body.
             document.body.removeEventListener("mousedown", this.remove_child_callback);
+            // Response.
+            return this;
         }
+        // @ts-ignore
         remove() {
             // Remove from content.
             super.remove();
             // Remove event listener from body.
             document.body.removeEventListener("mousedown", this.remove_child_callback);
+            // Response.
+            return this;
         }
     };
-    __setFunctionName(_classThis, "ContextMenuElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        ContextMenuElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return ContextMenuElement = _classThis;
 })();
 export { ContextMenuElement };
 export const ContextMenu = Elements.wrapper(ContextMenuElement);
+export const NullContextMenu = Elements.create_null(ContextMenuElement);
+Elements.extend({
+    _context_menu: undefined,
+    /**
+     * @docs:
+     * @parent: VElement
+     * @title: On Context Menu
+     * @desc:
+     *     Script to be run when a context menu is triggered. This function can set or get the context menu callback.
+     * @param:
+     *     @name: callback
+     *     @descr:
+     *         The parameter may either be a callback function, a ContextMenu object, or an Array as the ContextMenu parameter.
+     * @return:
+     *     @description Returns the `VElement` object. If `callback` is `null`, then the attribute's value is returned.
+     * @funcs: 2
+     */
+    on_context_menu(callback) {
+        if (callback == null) {
+            if (this._context_menu !== undefined) {
+                return this._context_menu;
+            }
+            else {
+                return this.oncontextmenu ?? undefined;
+            }
+        }
+        if (callback instanceof ContextMenuElement || callback.element_name === "ContextMenuElement") {
+            this._context_menu = callback;
+            const _this_ = this;
+            this.oncontextmenu = (event) => {
+                if (this._context_menu instanceof ContextMenuElement) {
+                    this._context_menu.popup(event);
+                }
+            };
+        }
+        else if (Array.isArray(callback)) {
+            this._context_menu = ContextMenu(callback);
+            const _this_ = this;
+            this.oncontextmenu = (event) => {
+                if (this._context_menu instanceof ContextMenuElement) {
+                    this._context_menu.popup(event);
+                }
+            };
+        }
+        else {
+            const _this_ = this;
+            this.oncontextmenu = (event) => callback(_this_, event);
+        }
+        return this;
+    },
+});
+// @test
+// new VStackElement().on_context_menu();
+// VStack().on_context_menu();
+// VStack().on_context_menu_UNKNOWN();

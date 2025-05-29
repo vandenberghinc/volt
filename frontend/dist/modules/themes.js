@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 // Themes module.
 export const Themes = {
@@ -15,3 +15,4 @@ export const Themes = {
         });
     }
 };
+export { Themes as themes }; // also export as lowercase for compatibility.

@@ -36,120 +36,50 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { Utils } from "../modules/utils";
-import { CreateVElementClass } from "./element";
-// Gradient.
-/*	@docs:
- *	@nav: Frontend
- *	@chapter: Styling
- *	@title: Gradient
- *	@description:
- *		Create a gradient object.
- *
- *		Can also be constructed with wrapper function `Gradient`.
- *	@return:
- *		Returns the `GradientType` object.
- *	@parameter:
- *		@name: ...args
- *		@description:
- *			The arguments can either be of length 1, containing the full gradient string `new GradientType ("linear-gradient(...)")`.
- *			Or the arguments can be as `new GradientType("linear", "black", "0%", "white", "100%")`.
- */
-export class GradientType {
-    constructor(...args) {
-        if (args.length === 1) {
-            this.gradient = args[0];
-        }
-        else if (args.length > 1) {
-            this.type = args[0];
-            this.colors = [];
-            for (let i = 1; i < args.length; i++) {
-                if (args[i].endsWith("deg")) {
-                    this.degree = args[i];
-                    continue;
-                }
-                if (typeof args[i + 1] === "string" && args[i + 1].includes("%")) {
-                    this.colors.push({
-                        color: args[i],
-                        stop: args[i + 1],
-                    });
-                    i++;
-                }
-                else {
-                    this.colors.push({
-                        color: args[i],
-                        stop: undefined,
-                    });
-                }
-            }
-        }
-        else {
-            console.error("Invalid number of arguments for class \"Gradient()\".");
-        }
-    }
-    // Cast to string.
-    toString() {
-        if (this.gradient == null && this.colors !== undefined) {
-            this.gradient = `${this.type}-gradient(`;
-            if (this.degree) {
-                this.gradient += this.degree + ", ";
-            }
-            for (let i = 0; i < this.colors.length; i++) {
-                this.gradient += this.colors[i].color;
-                this.gradient += " ";
-                let stop = this.colors[i].stop;
-                if (Utils.is_numeric(stop) && stop <= 1.0) {
-                    stop = (stop * 100) + "%";
-                }
-                this.gradient += stop;
-                if (i + 1 < this.colors.length) {
-                    this.gradient += ", ";
-                }
-            }
-            this.gradient += ")";
-            return this.gradient;
-        }
-        return this.gradient ?? "";
-    }
-}
-;
+import { Elements, VElementTagMap } from "../elements/module.js";
+import { GradientType } from "../types/gradient.js";
+export { GradientType };
 export const Gradient = Elements.wrapper(GradientType);
+export const NullGradient = Elements.create_null(GradientType);
 // Gradient border.
 let GradientBorderElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "GradientBorderElement",
+            default_style: {
+                "--child-border-width": "1px",
+                "--child-border-radius": "10px",
+                "--child-border-color": "black",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "GradientBorder",
-        tag: "div",
-        default_style: {
-            "border-width": "1px",
-            "border-radius": "10px",
-            // "border-color": "black",
-        },
-    });
-    var GradientBorderElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.div;
+    var GradientBorderElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            GradientBorderElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
-        constructor(text) {
+        constructor() {
             // Initialize base classes.
-            super();
+            super({
+                derived: GradientBorderElement,
+            });
             // Styling.
             this
                 .content("")
                 .position("absolute")
                 // .z_index(-1)
                 .inset(0)
-                .padding(BorderButtonElement.default_style["--child-border-width"])
-                .border_radius(BorderButtonElement.default_style["--child-border-radius"])
-                .background(BorderButtonElement.default_style["--child-background"])
+                .padding(GradientBorderElement.default_style["--child-border-width"] ?? "")
+                .border_radius(GradientBorderElement.default_style["--child-border-radius"] ?? "")
+                .background(GradientBorderElement.default_style["--child-border-color"] ?? "")
                 .mask("linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)")
                 .mask_composite("exclude")
                 // .mask_composite((navigator.userAgent.includes("Firefox") || navigator.userAgent.includes("Mozilla")) ? "exclude" : "xor")
@@ -173,15 +103,8 @@ let GradientBorderElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "GradientBorderElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        GradientBorderElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return GradientBorderElement = _classThis;
 })();
 export { GradientBorderElement };
 export const GradientBorder = Elements.wrapper(GradientBorderElement);
+export const NullGradientBorder = Elements.create_null(GradientBorderElement);

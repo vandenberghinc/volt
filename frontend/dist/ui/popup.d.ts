@@ -1,18 +1,21 @@
-import { MutexType } from "../modules/mutex";
+import { VElementBaseSignature } from "../elements/module.js";
+import { Mutex } from "../modules/mutex";
 import { HStackElement, VStackElement } from "./stack";
 import { TextElement } from "./text";
 import { TitleElement } from "./title";
-import { LoaderButtonElement } from "./button";
+import { LoaderButtonElement } from "./loader_button";
 import { ImageMaskElement } from "./image";
-export declare class PopupElement extends VStackElement {
-    p_mutex: MutexType;
+export type OnYesNoPopup = ((element: YesNoPopupElement) => Promise<any> | void);
+declare const YesNoPopupElement_base: VElementBaseSignature;
+export declare class YesNoPopupElement extends YesNoPopupElement_base {
+    p_mutex: Mutex;
     p_auto_hide: boolean;
     p_auto_remove: boolean;
     p_animation_duration: number;
     p_blur: number;
-    p_on_no_handler: ((element: PopupElement) => Promise<any> | void);
-    p_on_yes_handler: ((element: PopupElement) => Promise<any> | void);
-    p_on_popup_handler: ((element: PopupElement) => Promise<any> | void);
+    p_on_no_handler: OnYesNoPopup;
+    p_on_yes_handler: OnYesNoPopup;
+    p_on_popup_handler: OnYesNoPopup;
     p_escape_handler: any;
     image: ImageMaskElement;
     title: TitleElement;
@@ -22,22 +25,23 @@ export declare class PopupElement extends VStackElement {
     buttons: HStackElement;
     content: VStackElement;
     widget: VStackElement;
+    _on_no_called: boolean;
     constructor({ title, text, no, yes, image, image_color, content, auto_hide, auto_remove, animation_duration, // in ms.
     blur, on_no, on_yes, on_popup, }: {
         title: string;
         text: string;
-        no: string;
-        yes: string;
-        image: boolean;
-        image_color: string;
-        content: any[];
-        auto_hide: boolean;
-        auto_remove: boolean;
-        animation_duration: number;
-        blur: number;
-        on_no: ((element: PopupElement) => Promise<any> | void);
-        on_yes: ((element: PopupElement) => Promise<any> | void);
-        on_popup: ((element: PopupElement) => Promise<any> | void);
+        no?: string;
+        yes?: string;
+        image?: boolean | string;
+        image_color?: string;
+        content?: any[];
+        auto_hide?: boolean;
+        auto_remove?: boolean;
+        animation_duration?: number;
+        blur?: number;
+        on_no?: OnYesNoPopup;
+        on_yes?: OnYesNoPopup;
+        on_popup?: OnYesNoPopup;
     });
     set_default(): this;
     await(): Promise<void>;
@@ -51,11 +55,33 @@ export declare class PopupElement extends VStackElement {
         text?: string;
         no?: string;
         yes?: string;
-        image?: boolean;
+        image?: boolean | string;
         image_color?: string;
         content?: any[];
-        on_no?: ((element: PopupElement) => Promise<any> | void);
-        on_yes?: ((element: PopupElement) => Promise<any> | void);
+        on_no?: OnYesNoPopup;
+        on_yes?: OnYesNoPopup;
     }): Promise<void>;
 }
-export declare const Popup: (...args: any[]) => any;
+export declare const YesNoPopup: <Extensions extends object = {}>(args_0: {
+    title: string;
+    text: string;
+    no?: string;
+    yes?: string;
+    image?: boolean | string;
+    image_color?: string;
+    content?: any[];
+    auto_hide?: boolean;
+    auto_remove?: boolean;
+    animation_duration?: number;
+    blur?: number;
+    on_no?: OnYesNoPopup;
+    on_yes?: OnYesNoPopup;
+    on_popup?: OnYesNoPopup;
+}) => YesNoPopupElement & Extensions;
+export declare const NullYesNoPopup: <Extensions extends object = {}>() => YesNoPopupElement & Extensions;
+declare module './any_element.d.ts' {
+    interface AnyElementMap {
+        YesNoPopupElement: YesNoPopupElement;
+    }
+}
+export {};

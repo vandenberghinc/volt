@@ -36,36 +36,46 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Utils } from "../modules/utils";
-import { Elements } from "../modules/elements";
-import { Statics } from "../modules/statics";
-import { CreateVElementClass } from "./element";
+import { Utils } from "../modules/utils.js";
+import { Elements, VElementTagMap } from "../elements/module.js";
+import { Statics } from "../modules/statics.js";
+import { Settings } from "../modules/settings.js";
+import { AnchorElement } from "./link.js";
+import { VStack } from "./stack.js";
 // Image.
 let ImageElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "ImageElement",
+            default_style: {
+                "margin": "0px",
+                "padding": "0px",
+                "object-fit": "cover",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Image",
-        tag: "img",
-        default_style: {
-            "margin": "0px",
-            "padding": "0px",
-            "object-fit": "cover",
-        },
-    });
-    var ImageElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.img;
+    var ImageElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            ImageElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        ;
+        // Static attributes.
+        static default_alt;
+        _e;
         // Constructor.
         constructor(src, alt) {
             // Initialize base class.
-            super();
+            super({
+                derived: ImageElement,
+            });
             // Safari does not render images correctly for custom elements.
             if (Utils.is_safari) {
                 this.attachShadow({ mode: 'open' });
@@ -74,7 +84,7 @@ let ImageElement = (() => {
                 this._e.style.width = "100%";
                 this._e.style.height = "100%";
                 this.shadowRoot.appendChild(this._e);
-                this.position("relative"); // for img width height "100%"
+                this.position("relative"); // for img width height 100%
                 this.overflow("hidden"); // for border radius.
                 // Set resize event otherwise when the item resizes the shadow image does not.
                 // this.on_resize(() => {
@@ -84,8 +94,6 @@ let ImageElement = (() => {
                 // 	// this._e.style.height = "100%";
                 // })
             }
-            // Set src.
-            this.src(src);
             // Set alt.
             if (alt != null) {
                 this.alt(alt);
@@ -95,12 +103,13 @@ let ImageElement = (() => {
             }
             // Set default aspect ratio.
             if (src) {
+                this.src(src);
                 const aspect_ratio = Statics.aspect_ratio(src);
                 if (aspect_ratio != null) {
                     this.aspect_ratio(aspect_ratio);
                 }
-                else if (!vweb.production && Object.keys(Statics.aspect_ratios).length > 0 && src.charAt(0) === "/") {
-                    console.error(new Error(`[vweb development] Unable to find the aspect ratio for source "${src}".`));
+                else if (!Settings.production && Object.keys(Statics.aspect_ratios).length > 0 && src.charAt(0) === "/") {
+                    console.error(new Error(`[volt development] Unable to find the aspect ratio for source "${src}".`));
                 }
             }
         }
@@ -113,18 +122,27 @@ let ImageElement = (() => {
             }
             return this;
         }
-        // Source, purely for safari.
-        src(value) {
+        src(value, set_aspect_ratio = false) {
             if (this._e === undefined) {
-                return super.src(value);
+                return super.src(value, set_aspect_ratio);
             }
             if (value == null) {
                 return this._e.src;
             }
-            this._e.src = src;
+            this._e.src = value;
+            console.log("Set aspect ratio?", set_aspect_ratio, "from src", value);
+            if (set_aspect_ratio) {
+                const aspect_ratio = Statics.aspect_ratio(value);
+                if (aspect_ratio != null) {
+                    console.log("Set aspect ratio", aspect_ratio, "from src", value);
+                    this.aspect_ratio(aspect_ratio);
+                }
+                else {
+                    console.log("Unknown aspect ratio from src", value);
+                }
+            }
             return this;
         }
-        // Alt, purely for safari.
         alt(value) {
             if (this._e === undefined) {
                 return super.alt(value);
@@ -135,31 +153,12 @@ let ImageElement = (() => {
             this._e.alt = value;
             return this;
         }
-        // Completed, purely for safari.
-        completed(value) {
-            if (this._e === undefined) {
-                return super.completed;
-            }
-            return this._e.completed;
-        }
-        // Source, purely for safari.
-        src(value) {
-            if (this._e === undefined) {
-                return super.src(value);
-            }
-            if (value == null) {
-                return this._e.src;
-            }
-            this._e.src = value;
-            return this;
-        }
-        // Height, purely for safari.
         height(value, check_attribute = true) {
             if (this._e === undefined) {
                 return super.height(value, check_attribute);
             }
             if (value == null) {
-                return this._e.height;
+                return this._e.height.toString();
             }
             // Assign percentage values to the root.
             if (typeof value === "string" && value.includes("%")) {
@@ -167,7 +166,7 @@ let ImageElement = (() => {
             }
             else {
                 this._e.style.height = this.pad_numeric(value, "px");
-                this._e.height = this.pad_numeric(value, "");
+                this._e.height = value;
             }
             return this;
         }
@@ -203,13 +202,12 @@ let ImageElement = (() => {
             }
             return this;
         }
-        // Width, purely for safari.
         width(value, check_attribute = true) {
             if (this._e === undefined) {
                 return super.width(value, check_attribute);
             }
             if (value == null) {
-                return this._e.width;
+                return this._e.width.toString();
             }
             // Assign percentage values to the root.
             if (typeof value === "string" && value.includes("%")) {
@@ -253,38 +251,27 @@ let ImageElement = (() => {
             }
             return this;
         }
-        // Loading "eager" or "lazy", purely for safari.
+        // @ts-ignore
         loading(value) {
             if (this._e === undefined) {
                 if (value == null) {
-                    return this.loading;
+                    return this.getAttribute("loading") ?? "";
                 }
-                this.loading = value;
+                this.setAttribute("loading", value);
                 return this;
             }
             if (value == null) {
-                return this._e.loading;
+                return this._e.getAttribute("loading") ?? "";
             }
-            this._e.loading = value;
+            this._e.setAttribute("loading", value);
             return this;
         }
     };
-    __setFunctionName(_classThis, "ImageElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        ImageElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-    })();
-    // Static attributes.
-    _classThis.default_alt = null;
-    (() => {
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return ImageElement = _classThis;
 })();
 export { ImageElement };
 export const Image = Elements.wrapper(ImageElement);
+export const NullImage = Elements.create_null(ImageElement);
 // function Image(...args) {
 // 	if (Utils.is_safari) {
 // 		const e = document.createElement(ImageElement.element_tag, {is: "v-" + ImageElement.name.toLowerCase()})
@@ -297,19 +284,31 @@ export const Image = Elements.wrapper(ImageElement);
 // }
 // AnchorImage.
 let AnchorImageElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "AnchorImageElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = AnchorElement;
-    var AnchorImageElement = _classThis = class extends _classSuper {
+    var AnchorImageElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            AnchorImageElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Default styling.
+        image;
         // Constructor.
         constructor(href, src, alt) {
             // Initialize base classes.
-            super();
-            // Href.
-            this.href(href);
+            super(href, alt);
+            this._init({
+                derived: AnchorImageElement,
+            });
             // image.
             this.image = Image(src, alt)
                 .parent(this);
@@ -320,89 +319,81 @@ let AnchorImageElement = (() => {
         set_default() {
             return super.set_default(AnchorImage);
         }
-        // ImageElement alias functions.
         src(value) { if (value == null) {
             return this.image.src();
         } this.image.src(value); return this; }
         alt(value) { if (value == null) {
             return this.image.alt();
         } this.image.alt(value); return this; }
-        completed(value) { if (value == null) {
-            return this.image.completed();
-        } this.image.completed(value); return this; }
-        src(value) { if (value == null) {
-            return this.image.src();
-        } this.image.src(value); return this; }
-        height(value, ...args) { if (value == null) {
+        height(value) { if (value == null) {
             return this.image.height();
-        } this.image.height(value, ...args); return this; }
+        } this.image.height(value); return this; }
         min_height(value) { if (value == null) {
             return this.image.min_height();
         } this.image.min_height(value); return this; }
         max_height(value) { if (value == null) {
             return this.image.max_height();
         } this.image.max_height(value); return this; }
-        width(value, ...args) { if (value == null) {
+        width(value) { if (value == null) {
             return this.image.width();
-        } this.image.width(value, ...args); return this; }
+        } this.image.width(value); return this; }
         min_width(value) { if (value == null) {
             return this.image.min_width();
         } this.image.min_width(value); return this; }
         max_width(value) { if (value == null) {
             return this.image.max_width();
         } this.image.max_width(value); return this; }
+        // @ts-ignore
         loading(value) { if (value == null) {
             return this.image.loading();
         } this.image.loading(value); return this; }
     };
-    __setFunctionName(_classThis, "AnchorImageElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        AnchorImageElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-    })();
-    // Default styling.
-    _classThis.default_style = {
-        ...AnchorElement.default_style,
-    };
-    (() => {
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return AnchorImageElement = _classThis;
 })();
 export { AnchorImageElement };
 export const AnchorImage = Elements.wrapper(AnchorImageElement);
+export const NullAnchorImage = Elements.create_null(AnchorImageElement);
 // ImageMask.
 let ImageMaskElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "ImageMaskElement",
+            default_style: {
+                "margin": "0px",
+                "padding": "0px",
+                "object-fit": "cover",
+                "display": "inline-block",
+                // Anchor.
+                "font-family": "inherit",
+                "font-size": "inherit",
+                "color": "inherit",
+                "text-decoration": "none",
+                "text-underline-position": "none",
+                "outline": "none",
+                "border": "none",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "ImageMask",
-        tag: "div",
-        default_style: {
-            "margin": "0px",
-            "padding": "0px",
-            "object-fit": "cover",
-            "display": "inline-block",
-            // Anchor.
-            "font-family": "inherit",
-            "font-size": "inherit",
-            "color": "inherit",
-            "text-decoration": "none",
-            "text-underline-position": "none",
-            "outline": "none",
-            "border": "none",
-        },
-    });
-    var ImageMaskElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.div;
+    var ImageMaskElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            ImageMaskElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        mask_child;
+        _img_src;
         // Constructor.
         constructor(src) {
             // Initialize base class.
-            super();
+            super({
+                derived: ImageMaskElement,
+            });
             // Append child.
             this.mask_child = VStack()
                 .parent(this)
@@ -415,20 +406,19 @@ let ImageMaskElement = (() => {
             }
             // this.position("relative");
             this.append(this.mask_child);
-            // Set src.
-            this.src(src);
-            // Set default aspect ratio.
             if (src) {
+                // Set src.
+                this.src(src);
+                // Set default aspect ratio.
                 const aspect_ratio = Statics.aspect_ratio(src);
                 if (aspect_ratio != null) {
                     this.aspect_ratio(aspect_ratio);
                 }
-                else if (!vweb.production && Object.keys(Statics.aspect_ratios).length > 0 && src.charAt(0) === "/") {
-                    console.error(new Error(`[vweb development] Unable to find the aspect ratio for source "${src}".`));
+                else if (!Settings.production && Object.keys(Statics.aspect_ratios).length > 0 && src.charAt(0) === "/") {
+                    console.error(new Error(`[volt development] Unable to find the aspect ratio for source "${src}".`));
                 }
             }
         }
-        // Image color.
         mask_color(value) {
             if (value == null) {
                 return this.mask_child.style.background;
@@ -439,24 +429,31 @@ let ImageMaskElement = (() => {
         color(value) {
             return this.mask_color(value);
         }
-        // Transition mask.
         transition_mask(value) {
             if (value == null) {
-                return this.mask_child.transition();
+                return this.mask_child.transition() ?? "";
             }
             this.mask_child.transition(value);
             return this;
         }
-        // Override src.
-        src(value) {
+        src(value, set_aspect_ratio = false) {
             if (value == null) {
-                return this._src;
+                return this._img_src ?? "";
             }
             this.mask_child.mask("url('" + value + "') no-repeat center/contain");
-            this._src = value;
+            this._img_src = value;
+            if (set_aspect_ratio) {
+                const aspect_ratio = Statics.aspect_ratio(value);
+                if (aspect_ratio != null) {
+                    // console.log("Set aspect ratio", aspect_ratio, "from src", value)
+                    this.aspect_ratio(aspect_ratio);
+                }
+                // else {
+                //     console.log("Unknown aspect ratio from src", value)
+                // }
+            }
             return this;
         }
-        // Override mask.
         mask(value) {
             if (value == null) {
                 return this.mask_child.mask();
@@ -465,49 +462,53 @@ let ImageMaskElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "ImageMaskElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        ImageMaskElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return ImageMaskElement = _classThis;
 })();
 export { ImageMaskElement };
 export const ImageMask = Elements.wrapper(ImageMaskElement);
+export const NullImageMask = Elements.create_null(ImageMaskElement);
 // Exact copy of image mask.
 let AnchorImageMaskElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "AnchorImageMaskElement",
+            default_style: {
+                "margin": "0px",
+                "padding": "0px",
+                "object-fit": "cover",
+                "display": "inline-block",
+                // Anchor.
+                "font-family": "inherit",
+                "font-size": "inherit",
+                "color": "inherit",
+                "text-decoration": "none",
+                "text-underline-position": "none",
+                "cursor": "pointer",
+                "outline": "none",
+                "border": "none",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "AnchorImageMask",
-        tag: "a",
-        default_style: {
-            "margin": "0px",
-            "padding": "0px",
-            "object-fit": "cover",
-            "display": "inline-block",
-            // Anchor.
-            "font-family": "inherit",
-            "font-size": "inherit",
-            "color": "inherit",
-            "text-decoration": "none",
-            "text-underline-position": "none",
-            "cursor": "pointer",
-            "outline": "none",
-            "border": "none",
-        },
-    });
-    var AnchorImageMaskElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.a;
+    var AnchorImageMaskElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            AnchorImageMaskElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        mask_child;
+        _img_src;
         // Constructor.
         constructor(src) {
             // Initialize base class.
-            super();
+            super({
+                derived: AnchorImageMaskElement,
+            });
             // Append child.
             this.mask_child = VStack()
                 // .position(0, 0, 0, 0)
@@ -519,20 +520,19 @@ let AnchorImageMaskElement = (() => {
             }
             // this.position("relative");
             this.append(this.mask_child);
-            // Set src.
-            this.src(src);
-            // Set default aspect ratio.
             if (src) {
+                // Set src.
+                this.src(src);
+                // Set default aspect ratio.
                 const aspect_ratio = Statics.aspect_ratio(src);
                 if (aspect_ratio != null) {
                     this.aspect_ratio(aspect_ratio);
                 }
-                else if (!vweb.production && Object.keys(Statics.aspect_ratios).length > 0 && src.charAt(0) === "/") {
-                    console.error(new Error(`[vweb development] Unable to find the aspect ratio for source "${src}".`));
+                else if (!Settings.production && Object.keys(Statics.aspect_ratios).length > 0 && src.charAt(0) === "/") {
+                    console.error(new Error(`[volt development] Unable to find the aspect ratio for source "${src}".`));
                 }
             }
         }
-        // Image color.
         mask_color(value) {
             if (value == null) {
                 return this.mask_child.style.background;
@@ -543,16 +543,24 @@ let AnchorImageMaskElement = (() => {
         color(value) {
             return this.mask_color(value);
         }
-        // Override src.
-        src(value) {
+        src(value, set_aspect_ratio = false) {
             if (value == null) {
-                return this._src;
+                return this._img_src ?? "";
             }
             this.mask_child.mask("url('" + value + "') no-repeat center/contain");
-            this._src = value;
+            this._img_src = value;
+            if (set_aspect_ratio) {
+                const aspect_ratio = Statics.aspect_ratio(value);
+                if (aspect_ratio != null) {
+                    // console.log("Set aspect ratio", aspect_ratio, "from src", value)
+                    this.aspect_ratio(aspect_ratio);
+                }
+                // else {
+                //     console.log("Unknown aspect ratio from src", value)
+                // }
+            }
             return this;
         }
-        // Override mask.
         mask(value) {
             if (value == null) {
                 return this.mask_child.mask();
@@ -561,15 +569,8 @@ let AnchorImageMaskElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "AnchorImageMaskElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        AnchorImageMaskElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return AnchorImageMaskElement = _classThis;
 })();
 export { AnchorImageMaskElement };
 export const AnchorImageMask = Elements.wrapper(AnchorImageMaskElement);
+export const NullAnchorImageMask = Elements.create_null(AnchorImageMaskElement);

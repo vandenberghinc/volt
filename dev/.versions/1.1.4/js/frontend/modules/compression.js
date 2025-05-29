@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 
 /*! pako 2.1.0 https://github.com/nodeca/pako @license (MIT AND Zlib) */

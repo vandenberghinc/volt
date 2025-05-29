@@ -55,16 +55,16 @@ const embed_script = (input, output) => {
 embed_script(`${process.env.PERSISTANCE}/private/dev/vinc/vlib/js/include/types/global/scheme.js`, frontend+"/modules/scheme.js")
 embed_script(`${process.env.PERSISTANCE}/private/dev/vinc/vlib/js/include/types/global/date.js`, frontend+"/modules/date.js")
 
-// Compile vweb.js.
+// Compile volt.js.
 const version = JSON.parse(new vlib.Path(`${__dirname}/../package.json`).load_sync()).version;
 compiler._bundle_library({
     source: `${frontend}/min/`,
-    name: "vweb.js",
+    name: "volt.js",
     author: "VInc.",
     start_year: 2023,
     version,
     includes: [
-        // `${frontend}/modules/vweb.js`,
+        // `${frontend}/modules/volt.js`,
         `${frontend}/modules/utils.ts`,
         `${frontend}/modules/elements.ts`,
         `${frontend}/modules/google.ts`,
@@ -81,13 +81,13 @@ compiler._bundle_library({
 });
 
 // Extract globals.
-const globals = compiler.extract_globals(new vlib.Path(`${frontend}/min/vweb.js`).load_sync());
+const globals = compiler.extract_globals(new vlib.Path(`${frontend}/min/volt.js`).load_sync());
 new vlib.Path(`${frontend}/../backend/frontend_globals.js`).save_sync(
     "module.exports = " + JSON.stringify(globals) + ";"
 )
 
 // Bundle seperate modules.
-if (!process.argv.includes("--vweb")) {
+if (!process.argv.includes("--volt")) {
     seperate_modules.iterate((name) => {
         if (name === "compression.js") {return null;}
         compiler._bundle_library({

@@ -1,0 +1,70 @@
+/*
+Author: Daan van den Bergh
+Copyright: © 2022 Daan van den Bergh.
+*/
+
+/* On all elements. */
+* {
+	
+	/* Box sizing on all elements. */
+	box-sizing: border-box;
+	-webkit-box-sizing: border-box;
+	-mos-box-sizing: border-box;
+	-ms-box-sizing: border-box;
+	
+	/* Hide scrollbar. 
+	-webkit-scrollbar::display: none;
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+	*/
+	
+}
+
+/*kill the transitions on any descendant elements of .notransition*/
+.notransition * {
+    transition: none !important;
+}
+
+/* Hide the scrollbar */
+.hide_scrollbar {
+	-ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.hide_scrollbar::-webkit-scrollbar {
+	display: none;
+	background: transparent;
+	width: 0 !important
+}
+.hide_scrollbar::-webkit-scrollbar:horizontal {
+	height: 0;
+  width: 0;
+  display: none;
+}
+/* */
+.hide_scrollbar::-webkit-scrollbar-thumb { 
+  display: none;
+	background: transparent;
+}
+.hide_scrollbar::-webkit-scrollbar-horizontal { 
+  height: 0.5em;
+  display: none;
+	background: transparent;
+}
+.hide_scrollbar::-webkit-scrollbar-horizontal-track { 
+  display: none;
+	background: transparent;
+}
+.hide_scrollbar::-webkit-scrollbar-thumb-horizontal { 
+  display: none;
+	background: transparent;
+}
+
+/* Ring loader keyframe. */
+@keyframes RingLoader {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}

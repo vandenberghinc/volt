@@ -2,11 +2,11 @@
  * Author: Daan van den Bergh
  * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
-// Imports.
-import { Elements } from "../modules/elements";
 // ---------------------------------------------------------
 // Mutex class.
-export class MutexType {
+export class Mutex {
+    locked;
+    queue;
     constructor() {
         this.locked = false;
         this.queue = [];
@@ -49,4 +49,3 @@ export class MutexType {
         }
     }
 }
-export const Mutex = Elements.wrapper(MutexType);

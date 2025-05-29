@@ -1,5 +1,5 @@
-declare const Statics: {
-    aspect_ratios: {};
+export declare const Statics: {
+    aspect_ratios: any;
     aspect_ratio(endpoint: string): any;
 };
-export { Statics };
+export { Statics as statics };

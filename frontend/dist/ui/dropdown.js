@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -36,13 +36,13 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { CreateVElementClass } from "./element";
+import { Elements } from "../elements/module.js";
+import { Utils } from "../modules/utils.js";
+import { VStackElement, HStack, AnchorHStack } from "./stack";
+import { ForEach } from "./for_each";
+import { ImageMask } from "./image";
+import { Text } from "./text";
 // Dropdown element. 
 /*	@docs:
     @nav: Frontend
@@ -126,39 +126,82 @@ import { CreateVElementClass } from "./element";
             @default: false
  */
 let DropdownElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "DropdownElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var DropdownElement = _classThis = class extends _classSuper {
-        constructor({ target = null, animate = true, duration = 300, side = "left", auto_remove = false, min_width = null, max_width = null, min_height = null, max_height = null, use_target_min = false, below_target = false, x_offset = null, y_offset = null, content = null, } = {}) {
+    var DropdownElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            DropdownElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+        }
+        // Static attributes.
+        static element_name = "DropdownElement";
+        _target;
+        _animate;
+        _duration;
+        _side;
+        _use_target_min;
+        _auto_remove;
+        _min_width;
+        _max_width;
+        _min_height;
+        _max_height;
+        _below_target;
+        // Keep as public so they can be edited later.
+        x_offset;
+        y_offset;
+        content_items;
+        on_expand_callback;
+        on_minimize_callback;
+        mouse_over_background;
+        mouse_out_opacity;
+        _content_padding;
+        _content_margin;
+        _frame_min_width = 0;
+        _frame_min_height = 0;
+        _frame_max_width = 0;
+        _frame_max_height = 0;
+        next_toggle_allowed;
+        expanded = false;
+        animation_timeout;
+        close_handler;
+        constructor({ target, animate = true, duration = 300, side = "left", auto_remove = false, min_width = undefined, max_width = undefined, min_height = undefined, max_height = undefined, use_target_min = false, below_target = false, x_offset = undefined, y_offset = undefined, content = undefined, }) {
             // Base.
             super();
+            this._init({
+                derived: DropdownElement,
+            });
             // Parameters.
-            this.target = target;
-            this.animate = animate;
-            this.duration = duration;
-            this.side = side;
-            this.use_target_min = use_target_min;
-            this.auto_remove = auto_remove;
+            this._target = target;
+            this._animate = animate;
+            this._duration = duration;
+            this._side = side;
+            this._use_target_min = use_target_min;
+            this._auto_remove = auto_remove;
             this._min_width = min_width;
             this._max_width = max_width;
             this._min_height = min_height;
             this._max_height = max_height;
-            this.below_target = below_target;
-            this.x_offset = typeof x_offset !== "number" ? 0 : x_offset;
-            this.y_offset = typeof y_offset !== "number" ? 0 : y_offset;
-            if (!this.animate) {
-                this.duration = 0;
+            this._below_target = below_target;
+            this.x_offset = x_offset ?? 0;
+            this.y_offset = y_offset ?? 0;
+            if (!this._animate) {
+                this._duration = 0;
             }
-            if (this.below_target && y_offset == null) {
+            if (this._below_target && y_offset == null) {
                 this.y_offset = 10;
             }
             // Styling.
             this
                 .hide()
+                .fit_content()
                 .overflow("hidden")
                 .background("black")
                 .border_radius(10)
@@ -168,16 +211,16 @@ let DropdownElement = (() => {
                 .position("absolute")
                 .box_shadow("0px 0px 5px #00000030")
                 .opacity(0)
-                .transition(this.animate ? `opacity ${this.duration * 0.8}ms ease-in, max-height ${this.duration}ms ease-in-out, max-width ${this.duration}ms ease-in-out` : "")
+                .transition(this._animate ? `opacity ${this._duration * 0.8}ms ease-in, max-height ${this._duration}ms ease-in-out, max-width ${this._duration}ms ease-in-out` : "")
                 .max_width(0)
                 .max_height(0);
             // Add content.
+            this.mouse_over_background = "#FFFFFF10";
+            this.mouse_out_opacity = 0.8;
+            this._content_padding = [7.5, 20];
+            this._content_margin = [2.5, 0];
             this.content_items = [];
             if (content) {
-                this.mouse_over_background = "#FFFFFF10";
-                this.mouse_out_opacity = 0.8;
-                this._content_padding = [7.5, 20];
-                this._content_margin = [2.5, 0];
                 this.padding(10, 0);
                 this.append(ForEach(content, (item) => {
                     const element = (item.href || item.on_click_redirect || item.anchor) ? AnchorHStack() : HStack();
@@ -187,21 +230,26 @@ let DropdownElement = (() => {
                         .margin_right("1em")
                         .flex_shrink(0)
                         .padding(item.image_padding == null ? 0 : item.image_padding)
-                        .margin_top(item.image_top == null ? 0 : item.image_top), Text(item.text)
+                        .margin_top(item.image_top == null ? 0 : item.image_top)
+                        .assign_to_parent_as("image"), Text(item.text)
                         .color("white")
                         .font_size("inherit")
                         .wrap(false)
-                    // .ellipsis_overflow(true)
-                    )
+                        .margin(0)
+                        .exec(e => {
+                        if (item.ellipsis_overflow) {
+                            e.ellipsis_overflow(item.ellipsis_overflow);
+                        }
+                    }))
                         .text_decoration("none")
                         .border("none")
                         .outline("none")
                         .padding(...this._content_padding)
                         .margin(...this._content_margin)
                         .transition("background 250ms ease-in-out, opacity 250ms ease-in-out")
-                        .on_mouse_over(e => e.background(this.mouse_over_background).opacity(1))
-                        .on_mouse_out(e => e.background("transparent").opacity(this.mouse_out_opacity))
-                        .parent(this);
+                        .on_mouse_over(e => e.background(this.mouse_over_background).opacity(1));
+                    element.on_mouse_out(e => e.background("transparent").opacity(this.mouse_out_opacity));
+                    element.parent(this);
                     if (item.href) {
                         element.href(item.href);
                     }
@@ -229,19 +277,19 @@ let DropdownElement = (() => {
             this.max_width("none");
             this.max_height("none");
             this.getBoundingClientRect();
-            if (this.use_target_min) {
-                this._frame_min_width = this.target.clientWidth;
-                this._frame_min_height = this.target.clientHeight;
+            if (this._use_target_min) {
+                this._frame_min_width = this._target.clientWidth;
+                this._frame_min_height = this._target.clientHeight;
             }
             else {
-                this._frame_min_width = this.min_width();
+                this._frame_min_width = parseFloat(this.min_width());
                 if (typeof this._frame_min_width !== "number") {
                     this._frame_min_width = 0;
                 }
                 if (this._min_width) {
                     this._frame_min_width = Math.max(this._frame_min_width, this._min_width);
                 }
-                this._frame_min_height = this.min_height();
+                this._frame_min_height = parseFloat(this.min_height());
                 if (typeof this._frame_min_height !== "number") {
                     this._frame_min_height = 0;
                 }
@@ -282,27 +330,32 @@ let DropdownElement = (() => {
             clearTimeout(this.animation_timeout);
             this.transition("");
             this._get_frame();
+            this.hide();
             this.max_width(this._frame_min_width);
             this.max_height(this._frame_min_height);
             this.opacity(0);
-            this.transition(this.animate ? `opacity ${this.duration * 0.8}ms ease-in, max-height ${this.duration}ms ease-in-out, max-width ${this.duration}ms ease-in-out` : "");
-            this.show().getBoundingClientRect();
-            const rect = this.target.getBoundingClientRect();
-            this
-                .position(rect.top + this.y_offset + (this.below_target ? rect.height : 0), this.side !== "left" ? (window.innerWidth - rect.right - this.x_offset) : null, null, this.side === "left" ? (rect.left + this.x_offset) : null)
-                .opacity(1)
-                .max_width(this._frame_max_width)
-                .max_height(this._frame_max_height);
+            this.transition(this._animate ? `opacity ${this._duration * 0.8}ms ease-in, max-height ${this._duration}ms ease-in-out, max-width ${this._duration}ms ease-in-out` : "").getBoundingClientRect();
+            this.show();
+            const rect = this._target.getBoundingClientRect();
+            this.position(rect.top + this.y_offset + (this._below_target ? rect.height : 0), this._side !== "left" ? (window.innerWidth - rect.right - this.x_offset) : undefined, undefined, this._side === "left" ? (rect.left + this.x_offset) : undefined);
+            this.getBoundingClientRect();
+            setTimeout(() => {
+                this
+                    .opacity(1)
+                    .max_width(this._frame_max_width)
+                    .max_height(this._frame_max_height);
+            }, 25);
             // Close handler.
             if (this.close_handler == null) {
+                const _this_ = this;
                 this.close_handler = (event) => {
-                    if (this.expanded && !this.is_nested_child(event.target) && !this.target.is_nested_child(event.target)) { // also prevent on click on target element, otherwise it does this open close buggy thing
+                    if (this.expanded && !this.is_nested_child(event.target) && !Utils.is_nested_child(this._target, event.target)) { // also prevent on click on target element, otherwise it does this open close buggy thing
                         this.minimize();
                     }
                 };
             }
             document.body.addEventListener("mousedown", this.close_handler);
-            this.next_toggle_allowed = Date.now() + Math.max(100, this.duration);
+            this.next_toggle_allowed = Date.now() + Math.max(100, this._duration);
             // Callback.
             if (this.on_expand_callback) {
                 this.on_expand_callback(this);
@@ -325,22 +378,21 @@ let DropdownElement = (() => {
                 .max_height(this._frame_min_height)
                 .opacity(0);
             this.animation_timeout = setTimeout(() => {
-                if (this.auto_remove) {
+                if (this._auto_remove) {
                     this.remove();
                 }
                 else {
                     this.hide();
                 }
-            }, this.duration);
+            }, this._duration);
             document.body.removeEventListener("mousedown", this.close_handler);
-            this.next_toggle_allowed = Date.now() + Math.max(100, this.duration);
+            this.next_toggle_allowed = Date.now() + Math.max(100, this._duration);
             // Callback.
             if (this.on_minimize_callback) {
                 this.on_minimize_callback(this);
             }
             return this;
         }
-        // On expand.
         on_expand(callback) {
             if (callback == null) {
                 return this.on_expand_callback;
@@ -348,7 +400,6 @@ let DropdownElement = (() => {
             this.on_expand_callback = callback;
             return this;
         }
-        // On minimize.
         on_minimize(callback) {
             if (callback == null) {
                 return this.on_minimize_callback;
@@ -356,10 +407,6 @@ let DropdownElement = (() => {
             this.on_minimize_callback = callback;
             return this;
         }
-        /*	@docs:
-            @title: Get or set font size.
-            @description: Should mainly be used to set the font size and image size on the content nodes created by the `content` parameter.
-        */
         font_size(value) {
             if (value == null) {
                 return super.font_size();
@@ -368,10 +415,6 @@ let DropdownElement = (() => {
             // all font sizes are inherited or Xem based
             return this;
         }
-        /*	@docs:
-            @title: Get or set color.
-            @description: Should mainly be used to set the foreground color's on the content nodes created by the `content` parameter.
-        */
         color(value) {
             if (value == null) {
                 return super.color();
@@ -390,37 +433,27 @@ let DropdownElement = (() => {
             @description: Iterate content nodes created by the `content` parameter. When the callback returns any non null value the iteration will be stopped.
         */
         iterate_content(callback) {
-            this.content_items.iterate((node) => callback(node));
+            this.content_items.iterate((node) => { callback(node); });
             return this;
         }
-        /*	@docs:
-            @title: Set padding on content nodes.
-            @description: Set padding on the content nodes created by the `content` parameter.
-        */
         content_padding(...args) {
-            if (args.length === 0) {
+            if (args == null || args.length === 0) {
                 return this._content_padding;
             }
-            this._content_padding = [...args];
+            this._content_padding = args;
             this.content_items.iterate((node) => { node.padding(...args); });
+            // this.content_items.iterate((node) => { node.padding(...(args as [number, string])); })
             return this;
         }
-        /*	@docs:
-            @title: Set margin on content nodes.
-            @description: Set margin on the content nodes created by the `content` parameter.
-        */
         content_margin(...args) {
-            if (args.length === 0) {
+            if (args == null || args.length === 0) {
                 return this._content_margin;
             }
-            this._content_margin = [...args];
+            this._content_margin = args;
             this.content_items.iterate((node) => { node.margin(...args); });
+            // this.content_items.iterate((node) => { node.margin(...(args as [number, string])); })
             return this;
         }
-        /*	@docs:
-            @title: Set background on content nodes.
-            @description: Set the mouse over background from the content nodes created by the `content` parameter. In the mouse out event the background will always be `transparent`.
-        */
         content_background(value) {
             if (value == null) {
                 return this.mouse_over_background;
@@ -428,10 +461,6 @@ let DropdownElement = (() => {
             this.mouse_over_background = value;
             return this;
         }
-        /*	@docs:
-            @title: Set opacity content nodes.
-            @description: Set opacity on the content nodes created by the `content` parameter. In the mouse over event the opacity will always be `1`.
-        */
         content_opacity(value) {
             if (value == null) {
                 return this.mouse_out_opacity;
@@ -440,16 +469,12 @@ let DropdownElement = (() => {
             this.content_items.iterate((node) => { node.opacity(value); });
             return this;
         }
+        static {
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
     };
-    __setFunctionName(_classThis, "DropdownElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        DropdownElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return DropdownElement = _classThis;
 })();
 export { DropdownElement };
 export const Dropdown = Elements.wrapper(DropdownElement);
+export const NullDropdown = Elements.create_null(DropdownElement);

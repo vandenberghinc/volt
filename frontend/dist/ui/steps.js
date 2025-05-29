@@ -36,12 +36,8 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
+import { Elements, isVElement } from "../elements/module.js";
 import { VStack, VStackElement, HStack } from "./stack";
 import { Divider } from "./divider";
 import { Span } from "./span";
@@ -80,25 +76,55 @@ import { ForEach } from "./for_each";
         @default: "1.25em"
  */
 let StepsElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "StepsElement",
+            default_style: {
+                ...VStackElement.default_style,
+                "--steps-tint": "gray",
+                "--steps-tint-opac": 1,
+                "--steps-step-bg": "gray",
+                "--steps-step-border": "gray",
+                "--steps-step-border-radius": "50%",
+                "--steps-div-bg": "gray",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var StepsElement = _classThis = class extends _classSuper {
+    var StepsElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            StepsElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        _tint;
+        _tint_opac;
+        _step_bg;
+        _step_border;
+        _step_border_radius;
+        _step_margin_right = "1em";
+        _div_bg;
+        _step_nr_nodes = [];
+        _step_nodes = [];
+        _div_nodes = [];
+        _content_nodes = [];
         // Constructor.
-        constructor({ content = [], spacing = "1.25em", }) {
+        constructor({ content = [], }) {
             // Inherit.
             super();
-            this.element_type = "Steps";
-            this.styles(StepsElement.default_style);
+            this._init({
+                derived: StepsElement,
+            });
             // Assign single array argument to content.
             if (Array.isArray(arguments[0])) {
                 content = arguments[0];
             }
             for (let i = 0; i < content.length; i++) {
-                if (Array.isArray(content[i])) {
+                if (Array.isArray(content[i]) || isVElement(content[i])) {
                     content[i] = {
                         content: content[i],
                     };
@@ -111,18 +137,15 @@ let StepsElement = (() => {
             this._step_border = StepsElement.default_style["--steps-step-border"];
             this._step_border_radius = StepsElement.default_style["--steps-step-border-radius"];
             this._div_bg = StepsElement.default_style["--steps-div-bg"];
-            this._step_nr_nodes = [];
-            this._step_nodes = [];
-            this._div_nodes = [];
-            this._content_nodes = [];
             // Build.
+            const spacing = "1.25em";
             this.append(ForEach(content, (item, index, is_last) => {
                 // Build divider.
                 const divider = is_last ? null : Divider()
                     .margin(0)
                     .font_size("0.7em") // for relative distances.
                     .position("2em", null, 0, "0.875em")
-                    .frame(1.5, `calc("100%" + ${spacing} - "0.6em")`)
+                    .frame(1.5, `calc(100% + ${spacing} - 0.6em)`)
                     .background(this._div_bg)
                     .z_index(0)
                     .exec(e => this._div_nodes.append(e));
@@ -164,7 +187,7 @@ let StepsElement = (() => {
                     .font_size("0.7em")
                     .flex_shrink(0)
                     .frame("1.8em", "1.8em")
-                    .margin("0.2em", "1em", null, null)
+                    .margin("0.2em", this._step_margin_right, null, null)
                     // .border_radius(this._step_border_radius)
                     .border_radius(5)
                     .border(1, this._step_border)
@@ -262,6 +285,16 @@ let StepsElement = (() => {
             });
             return this;
         }
+        step_number_margin_right(value) {
+            if (value == null) {
+                return this._step_margin_right;
+            }
+            this._step_margin_right = value;
+            this._step_nr_nodes.iterate(node => {
+                node.margin_right(value);
+            });
+            return this;
+        }
         /*	@docs:
             @title: Iterate step number nodes
             @description: Iterate the step number nodes. When the callback returns any non null value the iteration will be stopped.
@@ -279,27 +312,8 @@ let StepsElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "StepsElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        StepsElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-    })();
-    // Default styling.
-    _classThis.default_style = {
-        ...VStackElement.default_style,
-        "--steps-tint": "gray",
-        "--steps-tint-opac": 1,
-        "--steps-step-bg": "gray",
-        "--steps-step-border": "gray",
-        "--steps-step-border-radius": "50%",
-        "--steps-div-bg": "gray",
-    };
-    (() => {
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return StepsElement = _classThis;
 })();
 export { StepsElement };
 export const Steps = Elements.wrapper(StepsElement);
+export const NullSteps = Elements.create_null(StepsElement);

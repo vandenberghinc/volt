@@ -36,291 +36,306 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { CreateVElementClass } from "./element";
+import { Elements, VElementTagMap } from "../elements/module.js";
+// Div element
+// export const VDivElement = Elements.create({type: "Div", tag: "div"}); // should always remain a "div" since some elements like LoaderButton rely on the behaviour of a div.
+// export type VDivElement = InstanceType<typeof VDivElement>;
+// export const VDiv = Elements.wrapper(VDivElement);
+// export const NullVDiv = Elements.create_null(VDivElement);
+// declare module './any_element.d.ts' { interface AnyElementMap { VDivElement: VDivElement }}
 // VStack.
 let FrameElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "FrameElement",
+            default_style: {
+                // "position": "relative",
+                "margin": "0px",
+                "padding": "0px",
+                // "clear": "both",
+                "display": "block",
+                "overflow": "hidden",
+                "width": "100%", // to ensure its passed along all children.
+            }
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Frame",
-        tag: "div",
-        default_style: {
-            // "position": "relative",
-            "margin": "0px",
-            "padding": "0px",
-            // "clear": "both",
-            "display": "block",
-            "overflow": "visible",
-        },
-    });
-    var FrameElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.div;
+    var FrameElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            FrameElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...children) {
             // Initialize base class.
-            super();
+            super({
+                derived: FrameElement,
+            });
             // Add children.
             this.append(...children);
         }
     };
-    __setFunctionName(_classThis, "FrameElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        FrameElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return FrameElement = _classThis;
 })();
 export { FrameElement };
 export const Frame = Elements.wrapper(FrameElement);
+export const NullFrame = Elements.create_null(FrameElement);
 // VStack.
 let VStackElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "VStackElement",
+            default_style: {
+                // "position": "relative",
+                "margin": "0px",
+                "padding": "0px",
+                // "clear": "both",
+                "display": "flex", // to support vertical spacers.
+                "overflow": "visible",
+                // "flex": "1", // disabled to support horizontal spacers in VStacks.
+                "align-content": "flex-start", // align items at start, do not stretch / space when inside HStack.
+                // "align-items": "flex-start", // otherwise the children automatically expand width to match the vstacks width.
+                "flex-direction": "column",
+                // "text-align": "start",
+                "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
+                "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
+                "width": "100%", // to ensure its passed along all children.
+            }
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "VStack",
-        tag: "div",
-        default_style: {
-            // "position": "relative",
-            "margin": "0px",
-            "padding": "0px",
-            // "clear": "both",
-            "display": "flex", // to support vertical spacers.
-            "overflow": "visible",
-            // "flex": "1", // disabled to support horizontal spacers in VStacks.
-            "align-content": "flex-start", // align items at start, do not stretch / space when inside HStack.
-            // "align-items": "flex-start", // otherwise the children automatically expand width to match the vstacks width.
-            "flex-direction": "column",
-            // "text-align": "start",
-            "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-            "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-        },
-    });
-    var VStackElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.div;
+    var VStackElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            VStackElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...children) {
             // Initialize base class.
-            super();
+            super({
+                derived: VStackElement,
+            });
             // Add children.
             this.append(...children);
         }
     };
-    __setFunctionName(_classThis, "VStackElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        VStackElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return VStackElement = _classThis;
 })();
 export { VStackElement };
 export const VStack = Elements.wrapper(VStackElement);
+export const NullVStack = Elements.create_null(VStackElement);
 // AnchorVStack.
 let AnchorVStackElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "AnchorVStackElement",
+            default_style: {
+                // "position": "relative",
+                "margin": "0px",
+                "padding": "0px",
+                // "clear": "both",
+                "display": "flex", // to support vertical spacers.
+                "overflow": "visible",
+                // "flex": "1", // disabled to support horizontal spacers in VStacks.
+                "align-content": "flex-start", // align items at start, do not stretch / space when inside HStack.
+                // "align-items": "flex-start", // otherwise the children automatically expand width to match the vstacks width.
+                "flex-direction": "column",
+                // "text-align": "start",
+                "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
+                "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
+                "text-decoration": "none",
+                "width": "100%", // to ensure its passed along all children.
+                // After extending VStack.
+                "color": "inherit", // inherit colors since <a> does not have that and a <div> does.
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "AnchorVStack",
-        tag: "a",
-        default_style: {
-            // "position": "relative",
-            "margin": "0px",
-            "padding": "0px",
-            // "clear": "both",
-            "display": "flex", // to support vertical spacers.
-            "overflow": "visible",
-            // "flex": "1", // disabled to support horizontal spacers in VStacks.
-            "align-content": "flex-start", // align items at start, do not stretch / space when inside HStack.
-            // "align-items": "flex-start", // otherwise the children automatically expand width to match the vstacks width.
-            "flex-direction": "column",
-            // "text-align": "start",
-            "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-            "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-            "text-decoration": "none",
-            // After extending VStack.
-            "color": "inherit", // inherit colors since <a> does not have that and a <div> does.
-        },
-    });
-    var AnchorVStackElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.a;
+    var AnchorVStackElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            AnchorVStackElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...children) {
             // Initialize base class.
-            super();
+            super({
+                derived: AnchorVStackElement,
+            });
             // Add children.
             this.append(...children);
         }
     };
-    __setFunctionName(_classThis, "AnchorVStackElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        AnchorVStackElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return AnchorVStackElement = _classThis;
 })();
 export { AnchorVStackElement };
 export const AnchorVStack = Elements.wrapper(AnchorVStackElement);
+export const NullAnchorVStack = Elements.create_null(AnchorVStackElement);
+// const stack: VElement = new AnchorVStackElement();
 // HStack.
 let HStackElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "HStackElement",
+            default_style: {
+                // "position": "relative",
+                "margin": "0px",
+                "padding": "0px",
+                // "clear": "both",
+                "overflow-x": "visible",
+                "overflow-y": "visible",
+                // "text-align": "start",
+                "display": "flex",
+                "flex-direction": "row",
+                "align-items": "flex-start", // disable the auto extending of the childs height to the max child height.
+                // "flex": "1", // disabled to support horizontal spacers in VStacks.
+                "flex:": "1 1 auto", // prevent children from exceeding its max width, @warning do not remove this cause it can produce some nasty overflow bugs, so if you want to remove it create an function to optionally remove it.
+                "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
+                "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
+                "width": "100%", // to ensure its passed along all children.
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "HStack",
-        tag: "div",
-        default_style: {
-            // "position": "relative",
-            "margin": "0px",
-            "padding": "0px",
-            // "clear": "both",
-            "overflow-x": "visible",
-            "overflow-y": "visible",
-            // "text-align": "start",
-            "display": "flex",
-            "flex-direction": "row",
-            "align-items": "flex-start", // disable the auto extending of the childs height to the max child height.
-            // "flex": "1", // disabled to support horizontal spacers in VStacks.
-            "flex:": "1 1 auto", // prevent children from exceeding its max width, @warning do not remove this cause it can produce some nasty overflow bugs, so if you want to remove it create an function to optionally remove it.
-            "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-            "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-        },
-    });
-    var HStackElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.div;
+    var HStackElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            HStackElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        ;
         // Constructor.
         constructor(...children) {
             // Initialize base class.
-            super();
+            super({
+                derived: HStackElement,
+            });
             // Add children.
             this.append(...children);
         }
     };
-    __setFunctionName(_classThis, "HStackElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        HStackElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return HStackElement = _classThis;
 })();
 export { HStackElement };
 export const HStack = Elements.wrapper(HStackElement);
-// AnchorHStack.
+export const NullHStack = Elements.create_null(HStackElement);
+// AnchorHStack
 let AnchorHStackElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "AnchorHStackElement",
+            default_style: {
+                // "position": "relative",
+                "margin": "0px",
+                "padding": "0px",
+                // "clear": "both",
+                "overflow-x": "visible",
+                "overflow-y": "visible",
+                // "text-align": "start",
+                "display": "flex",
+                "flex-direction": "row",
+                "align-items": "flex-start", // disable the auto extending of the childs height to the max child height.
+                // "flex": "1", // disabled to support horizontal spacers in VStacks.
+                "flex:": "1 1 auto", // prevent children from exceeding its max width, @warning do not remove this cause it can produce some nasty overflow bugs, so if you want to remove it create an function to optionally remove it.
+                "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
+                "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
+                "text-decoration": "none",
+                "width": "100%", // to ensure its passed along all children.
+                // After extending VStack.
+                "color": "inherit", // inherit colors since <a> does not have that and a <div> does.
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "AnchorHStack",
-        tag: "a",
-        default_style: {
-            // "position": "relative",
-            "margin": "0px",
-            "padding": "0px",
-            // "clear": "both",
-            "overflow-x": "visible",
-            "overflow-y": "visible",
-            // "text-align": "start",
-            "display": "flex",
-            "flex-direction": "row",
-            "align-items": "flex-start", // disable the auto extending of the childs height to the max child height.
-            // "flex": "1", // disabled to support horizontal spacers in VStacks.
-            "flex:": "1 1 auto", // prevent children from exceeding its max width, @warning do not remove this cause it can produce some nasty overflow bugs, so if you want to remove it create an function to optionally remove it.
-            "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-            "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-            "text-decoration": "none",
-            // After extending VStack.
-            "color": "inherit", // inherit colors since <a> does not have that and a <div> does.
-        },
-    });
-    var AnchorHStackElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.a;
+    var AnchorHStackElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            AnchorHStackElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...children) {
             // Initialize base class.
-            super();
+            super({
+                derived: AnchorHStackElement,
+            });
             // Add children.
             this.append(...children);
         }
     };
-    __setFunctionName(_classThis, "AnchorHStackElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        AnchorHStackElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return AnchorHStackElement = _classThis;
 })();
 export { AnchorHStackElement };
 export const AnchorHStack = Elements.wrapper(AnchorHStackElement);
+export const NullAnchorHStack = Elements.create_null(AnchorHStackElement);
 // ZStack.
 let ZStackElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "ZStackElement",
+            default_style: {
+                // "position": "relative",
+                "margin": "0px",
+                "padding": "0px",
+                "display": "grid",
+                // "text-align": "start",
+                "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
+                "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
+                "width": "100%", // to ensure its passed along all children.
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "ZStack",
-        tag: "div",
-        default_style: {
-            // "position": "relative",
-            "margin": "0px",
-            "padding": "0px",
-            "display": "grid",
-            // "text-align": "start",
-            "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-            "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-        },
-    });
-    var ZStackElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.div;
+    var ZStackElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            ZStackElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...children) {
             // Initialize base class.
-            super();
+            super({
+                derived: ZStackElement,
+            });
             // Add children.
-            this.zstack_append(...children);
+            this.zstack_append(children);
         }
         // Override append.
         append(...children) {
-            return this.zstack_append(...children);
+            return this.zstack_append(children);
         }
     };
-    __setFunctionName(_classThis, "ZStackElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        ZStackElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return ZStackElement = _classThis;
 })();
 export { ZStackElement };
 export const ZStack = Elements.wrapper(ZStackElement);
+export const NullZStack = Elements.create_null(ZStackElement);

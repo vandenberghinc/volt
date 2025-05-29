@@ -1,0 +1,81 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "build",
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "silent",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": "$tsc"
+        },
+        {
+            "label": "Test",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "test"
+            ],
+            // "command": "node",
+            // "args": [
+            //     "./dist/libris/libris/unit_tests/run.js"
+            // ],
+            "group": {
+                "kind": "test",
+                "isTestCommand": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "start"
+            ],
+            "group": {
+                "kind": "test",
+                "isTestCommand": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Build and Test",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Build",
+                "Test"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}

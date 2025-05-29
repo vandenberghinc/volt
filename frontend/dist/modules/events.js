@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 // Events module.
 const Events = {
@@ -82,5 +82,10 @@ const Events = {
         this.events.set(id, filtered);
     }
 };
+// Fire the onload event.
+window.onload = () => {
+    Events.emit("volt.on_load");
+};
 // Export.
 export { Events };
+export { Events as events }; // also export as lowercase for compatibility.

@@ -7,3 +7,4 @@ export declare const Meta: {
         favicon?: string;
     }): void;
 };
+export { Meta as meta };

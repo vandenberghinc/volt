@@ -36,27 +36,49 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
+import { Elements } from "../elements/module.js";
 import { VStackElement, VStack } from "./stack";
 // Slider.
 let SliderElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "SliderElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var SliderElement = _classThis = class extends _classSuper {
+    var SliderElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            SliderElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        _type;
+        _value;
+        _enabled_color;
+        _disabled_color;
+        slider;
+        button;
+        dragging = false;
+        slider_on_mouse_down_handler;
+        on_mouse_down_handler;
+        on_mouse_move_handler;
+        on_mouse_up_handler;
+        on_change_handler;
+        rect;
+        button_rect;
+        slider_rect;
         constructor(value = 0.0) {
             // Initialize base class.
             super();
-            // Set element type.
-            this.element_type = "Slider";
+            this._init({
+                derived: SliderElement,
+            });
             // Attributes.
             this._type = "SliderElement";
             this._value = value;
@@ -72,11 +94,11 @@ let SliderElement = (() => {
                 .transition("left 0.05s ease-out"))
                 .background("white")
                 .position("relative")
-                // .border(`"1px" solid ${SETTINGS.theme.lightest_widget_background}90`)
+                // .border(`1px solid ${SETTINGS.theme.lightest_widget_background}90`)
                 .frame("100%", 5)
                 .border_radius(10)
                 .overflow("hidden")
-                .box_shadow(`"0px" "0px" "2px" "#00000030"`)
+                .box_shadow(`0px 0px 2px #00000030`)
                 .on_click((element, event) => this.slider_on_mouse_down_handler(event))
                 .parent(this)
                 .abs_parent(this);
@@ -89,7 +111,7 @@ let SliderElement = (() => {
                 .left(0)
                 .top(0)
                 .transition("left 0.05s ease-out")
-                .box_shadow(`"0px" "0px" "2px" "#00000060"`)
+                .box_shadow(`0px 0px 2px #00000060`)
                 .cursor("pointer")
                 .on_mouse_down(() => this.on_mouse_down_handler())
                 .parent(this)
@@ -188,15 +210,8 @@ let SliderElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "SliderElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        SliderElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return SliderElement = _classThis;
 })();
 export { SliderElement };
 export const Slider = Elements.wrapper(SliderElement);
+export const NullSlider = Elements.create_null(SliderElement);

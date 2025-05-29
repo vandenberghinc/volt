@@ -1,0 +1,267 @@
+{
+    "modules/array.ts": [],
+    "modules/auth.ts": [
+        "Auth"
+    ],
+    "modules/colors.ts": [
+        "Colors"
+    ],
+    "modules/compression.ts": [
+        "Compression"
+    ],
+    "modules/cookies.ts": [
+        "Cookies"
+    ],
+    "modules/date.js": [
+        "Date"
+    ],
+    "modules/elements.ts": [
+        "Elements"
+    ],
+    "modules/events.ts": [
+        "Events"
+    ],
+    "modules/google.ts": [
+        "Google"
+    ],
+    "modules/meta.ts": [
+        "Meta"
+    ],
+    "modules/mutex.ts": [
+        "MutexType",
+        "Mutex"
+    ],
+    "modules/number.ts": [],
+    "modules/object.ts": [],
+    "modules/paddle.ts": [
+        "Payments"
+    ],
+    "modules/scheme.js": [
+        "Scheme"
+    ],
+    "modules/settings.ts": [
+        "Settings"
+    ],
+    "modules/statics.ts": [
+        "Statics"
+    ],
+    "modules/string.ts": [],
+    "modules/support.ts": [
+        "Support"
+    ],
+    "modules/themes.ts": [
+        "Themes"
+    ],
+    "modules/user.ts": [
+        "User"
+    ],
+    "modules/utils.ts": [
+        "Utils"
+    ],
+    "ui/button.ts": [
+        "ButtonElement",
+        "Button",
+        "BorderButtonElement",
+        "BorderButton",
+        "LoaderButtonElement",
+        "LoaderButton"
+    ],
+    "ui/canvas.ts": [
+        "CanvasElement",
+        "Canvas"
+    ],
+    "ui/checkbox.ts": [
+        "CheckBoxElement",
+        "CheckBox"
+    ],
+    "ui/code.ts": [
+        "CodeBlockElement",
+        "CodeBlock",
+        "CodePreElement",
+        "CodePre",
+        "CodeLineElement",
+        "CodeLine",
+        "MultiLanguageCodeBlockElement",
+        "MultiLanguageCodeBlock"
+    ],
+    "ui/color.ts": [
+        "ColorRangeClass",
+        "ColorRange"
+    ],
+    "ui/context_menu.ts": [
+        "ContextMenuElement",
+        "ContextMenu"
+    ],
+    "ui/css.ts": [
+        "CSSElement",
+        "CSS"
+    ],
+    "ui/divider.ts": [
+        "DividerElement",
+        "Divider"
+    ],
+    "ui/dropdown.ts": [
+        "DropdownElement",
+        "Dropdown"
+    ],
+    "ui/element.ts": [
+        "CreateVElementClass",
+        "VElement",
+        "is_velement",
+        "isVElement",
+        "VDivElement",
+        "VDiv",
+        "StyleElement",
+        "Style"
+    ],
+    "ui/for_each.ts": [
+        "ForEachElement",
+        "ForEach"
+    ],
+    "ui/form.ts": [
+        "FormElement",
+        "Form"
+    ],
+    "ui/frame_modes.ts": [
+        "FrameNodesType",
+        "FrameNodes",
+        "FrameModesType",
+        "FramesMode"
+    ],
+    "ui/google_map.ts": [
+        "GoogleMapElement",
+        "GoogleMap"
+    ],
+    "ui/gradient.ts": [
+        "GradientType",
+        "Gradient",
+        "GradientBorderElement",
+        "GradientBorder"
+    ],
+    "ui/image.ts": [
+        "ImageElement",
+        "Image",
+        "AnchorImageElement",
+        "AnchorImage",
+        "ImageMaskElement",
+        "ImageMask",
+        "AnchorImageMaskElement",
+        "AnchorImageMask"
+    ],
+    "ui/input.ts": [
+        "InputElement",
+        "Input",
+        "InputBoxElement",
+        "InputBox",
+        "ExtendedInputElement",
+        "ExtendedInput",
+        "ExtendedSelectElement",
+        "ExtendedSelect"
+    ],
+    "ui/link.ts": [
+        "AnchorElement",
+        "Anchor",
+        "LinkElement",
+        "Link"
+    ],
+    "ui/list.ts": [
+        "ListItemElement",
+        "ListItem",
+        "UnorderedListElement",
+        "UnorderedList",
+        "OrderedListElement",
+        "OrderedList"
+    ],
+    "ui/loaders.ts": [
+        "RingLoaderElement",
+        "RingLoader"
+    ],
+    "ui/popup.ts": [
+        "PopupElement",
+        "Popup"
+    ],
+    "ui/pseudo.ts": [
+        "PseudoElement",
+        "Pseudo"
+    ],
+    "ui/scroller.ts": [
+        "ScrollerElement",
+        "Scroller",
+        "VirtualScrollerElement",
+        "VirtualScroller",
+        "SnapScrollerElement",
+        "SnapScroller"
+    ],
+    "ui/slider.ts": [
+        "SliderElement",
+        "Slider"
+    ],
+    "ui/spacer.ts": [
+        "SpacerElement",
+        "Spacer"
+    ],
+    "ui/span.ts": [
+        "SpanElement",
+        "Span"
+    ],
+    "ui/stack.ts": [
+        "FrameElement",
+        "Frame",
+        "VStackElement",
+        "VStack",
+        "AnchorVStackElement",
+        "AnchorVStack",
+        "HStackElement",
+        "HStack",
+        "AnchorHStackElement",
+        "AnchorHStack",
+        "ZStackElement",
+        "ZStack"
+    ],
+    "ui/steps.ts": [
+        "StepsElement",
+        "Steps"
+    ],
+    "ui/switch.ts": [
+        "SwitchElement",
+        "Switch"
+    ],
+    "ui/table.ts": [
+        "TableHeadElement",
+        "TableHead",
+        "TableHeaderElement",
+        "TableHeader",
+        "TableBodyElement",
+        "TableBody",
+        "TableRowElement",
+        "TableRow",
+        "TableDataElement",
+        "TableData",
+        "InnerTableElement",
+        "InnerTable",
+        "TableElement",
+        "Table"
+    ],
+    "ui/tabs.ts": [
+        "TabsElement",
+        "Tabs"
+    ],
+    "ui/text.ts": [
+        "TextElement",
+        "Text"
+    ],
+    "ui/theme.ts": [
+        "ThemeClass",
+        "Theme"
+    ],
+    "ui/title.ts": [
+        "TitleElement",
+        "Title",
+        "SubtitleElement",
+        "Subtitle"
+    ],
+    "ui/view.ts": [
+        "ViewElement",
+        "View"
+    ]
+}

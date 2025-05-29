@@ -36,57 +36,53 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { CreateVElementClass } from "./element";
+import { Elements, VElementTagMap } from "../elements/module.js";
 // Scroller.
 let ViewElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "ViewElement",
+            default_style: {
+                "position": "absolute",
+                "top": "0",
+                "right": "0",
+                "bottom": "0",
+                "left": "0",
+                "padding": "0px",
+                "overflow": "hidden",
+                "overflow-y": "none",
+                "background": "none",
+                "display": "flex", // to support vertical spacers.
+                // "text-align": "start",
+                "align-content": "flex-start", // align items at start, do not stretch / space when inside HStack.
+                "flex-direction": "column",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "View",
-        tag: "div",
-        default_style: {
-            "position": "absolute",
-            "top": "0",
-            "right": "0",
-            "bottom": "0",
-            "left": "0",
-            "padding": "0px",
-            "overflow": "hidden",
-            "overflow-y": "none",
-            "background": "none",
-            "display": "flex", // to support vertical spacers.
-            // "text-align": "start",
-            "align-content": "flex-start", // align items at start, do not stretch / space when inside HStack.
-            "flex-direction": "column",
-        },
-    });
-    var ViewElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.div;
+    var ViewElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            ViewElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...children) {
             // Initialize base class.
-            super();
+            super({
+                derived: ViewElement,
+            });
             // Append children.
             this.append(...children);
         }
     };
-    __setFunctionName(_classThis, "ViewElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        ViewElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return ViewElement = _classThis;
 })();
 export { ViewElement };
 export const View = Elements.wrapper(ViewElement);
+export const NullView = Elements.create_null(ViewElement);

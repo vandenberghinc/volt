@@ -1,30 +1,30 @@
 ---
 name: getting_started
-description: Getting started with vweb.
+description: Getting started with volt.
 navigation: JS
 chapter: Getting Started
 title: Getting Started
 ---
 
 # Getting started
-Building a simple hello world website with vweb.
+Building a simple hello world website with volt.
 
 ## Hierarchy
 Create the a directory with the following hierarchy:
  - my_website/
- - my_website/.vweb
+ - my_website/.volt
  - my_website/start.cpp
  - my_website/my_view.h
  
 ```
 $ mkdir my_website
-$ touch my_website/.vweb
+$ touch my_website/.volt
 $ touch my_website/start.cpp
 $ touch my_website/my_view.h
 ```
 
-## File my_website/.vweb
-Create the vweb configuration file. See <Type>vweb::server::Config</Type> for more information. 
+## File my_website/.volt
+Create the volt configuration file. See <Type>volt::server::Config</Type> for more information. 
 ```cpp
 {
 
@@ -85,12 +85,12 @@ Create the server file that starts the server. This file must be named `server.c
 
 // Include libraries.
 #include <vlib/vlib.h>
-#include <vweb/vweb.h>
+#include <volt/volt.h>
 
 // Shortcuts.
 using namespace vlib::types::shortcuts;
-using namespace vweb::shortcuts;
-using namespace vweb::ui::shortcuts;
+using namespace volt::shortcuts;
+using namespace volt::ui::shortcuts;
 
 // Include UI endpoints.
 #include "my_view.h"
@@ -99,7 +99,7 @@ using namespace vweb::ui::shortcuts;
 int main () {
 
     // Initialize server.
-    Server server = vweb::server::Config(Path(__FILE__).base().join(".vweb"));
+    Server server = volt::server::Config(Path(__FILE__).base().join(".volt"));
 
     // Add endpoints.
     server.add_endpoints(
@@ -116,7 +116,7 @@ int main () {
 Run the website with the following command.
 ```
 $ cd my_website
-$ vweb --start
+$ volt --start
 ```
 
 ## Open the website

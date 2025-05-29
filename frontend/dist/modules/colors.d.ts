@@ -1,2 +1,1 @@
-declare const Colors: any;
-export { Colors };
+/** @deprecated Use `Color` from modules/color.ts instead */

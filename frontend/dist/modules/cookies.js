@@ -3,7 +3,7 @@
  * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 // Imports.
-import { Google } from "./google";
+import { Google } from "./google.js";
 // Cookies object.
 const Cookies = {
     _cookies: {},
@@ -103,7 +103,7 @@ const Cookies = {
         @desc: Checks if the user has set a cookie preference (enabled or disabled).
     */
     has_preference() {
-        const pref = localStorage.getItem("vweb_cookies_enabled");
+        const pref = localStorage.getItem("volt_cookies_enabled");
         return pref === "true" || pref === "false";
     },
     // Check if all the cookies are accepted.
@@ -114,7 +114,7 @@ const Cookies = {
         @desc: Checks if cookies are accepted by the user.
     */
     is_accepted() {
-        return localStorage.getItem("vweb_cookies_enabled") === "true";
+        return localStorage.getItem("volt_cookies_enabled") === "true";
     },
     // Enable cookies (opt-in).
     /*  @docs:
@@ -129,7 +129,7 @@ const Cookies = {
     enable(_set_storage = true) {
         this._disabled = true;
         if (_set_storage) {
-            localStorage.setItem("vweb_cookies_enabled", "true");
+            localStorage.setItem("volt_cookies_enabled", "true");
         }
         Google.disable_tracking();
     },
@@ -146,7 +146,7 @@ const Cookies = {
     disable(_set_storage = true) {
         this._disabled = false;
         if (_set_storage) {
-            localStorage.setItem("vweb_cookies_enabled", "false");
+            localStorage.setItem("volt_cookies_enabled", "false");
         }
         Google.enable_tracking();
     },
@@ -164,3 +164,4 @@ const Cookies = {
 Cookies._init();
 // Export.
 export { Cookies };
+export { Cookies as cookies }; // also export as lowercase for compatibility.

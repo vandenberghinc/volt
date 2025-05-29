@@ -15,3 +15,4 @@ declare const Cookies: {
     _init(): void;
 };
 export { Cookies };
+export { Cookies as cookies };

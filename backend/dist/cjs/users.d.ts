@@ -1,0 +1,111 @@
+import { Stream } from "./stream.js";
+import { Server } from "./server.js";
+import { Collection } from "./database/collection.js";
+export type User = {
+    uid: string;
+    first_name: string;
+    last_name: string;
+    username: string;
+    email: string;
+    password: string;
+    phone_number?: string;
+    created: number;
+    api_key: string | null;
+    support_pin: string;
+    is_activated: boolean;
+};
+export type Token = {
+    expiration: number;
+    token: string;
+    active: boolean;
+};
+export declare class Users {
+    private server;
+    private avg_send_2fa_time;
+    private _tokens_db;
+    private _users_db;
+    public: Collection;
+    protected: Collection;
+    private: Collection;
+    constructor(_server: Server);
+    _generate_code(length?: number): string;
+    _generate_str(length?: number): string;
+    _generate_uid(): Promise<string>;
+    _generate_api_key(uid: string): string;
+    _generate_token(uid: string): string;
+    _verify_new_pass(pass: string, verify_pass: string): {
+        error: string | null;
+        invalid_fields: {
+            [key: string]: string;
+        } | null;
+    };
+    _create_token(uid: string): Promise<string>;
+    _deactivate_token(uid: string): Promise<void>;
+    _create_2fa_token(uid_or_email: string, expiration: number): Promise<string>;
+    _deactivate_2fa_token(uid_or_email: string): Promise<void>;
+    _authenticate(stream: Stream): Promise<{
+        status: number;
+        headers?: {
+            [key: string]: string;
+        };
+        data: string;
+    } | null>;
+    _sign_in_response(stream: Stream, uid: string): Promise<void>;
+    _create_token_cookie(stream: Stream, token: string | Token): void;
+    _create_user_cookie(stream: Stream, uid: string): Promise<void>;
+    _create_detailed_user_cookie(stream: Stream, uid: string): Promise<void>;
+    _reset_cookies(stream: Stream): void;
+    _initialize(): Promise<void>;
+    uid_exists(uid: string): Promise<boolean>;
+    username_exists(username: string): Promise<boolean>;
+    email_exists(email: string): Promise<boolean>;
+    is_activated(uid: string): Promise<boolean>;
+    set_activated(uid: string, is_activated: boolean): Promise<void>;
+    create({ first_name, last_name, username, email, password, phone_number, is_activated, _check_username_email, }: {
+        first_name: string;
+        last_name: string;
+        username: string;
+        email: string;
+        password: string;
+        phone_number?: string;
+        is_activated?: boolean | null;
+        _check_username_email?: boolean;
+    }): Promise<string>;
+    delete(uid: string): Promise<void>;
+    set_first_name(uid: string, first_name: string): Promise<void>;
+    set_last_name(uid: string, last_name: string): Promise<void>;
+    set_username(uid: string, username: string): Promise<void>;
+    set_email(uid: string, email: string): Promise<void>;
+    set_password(uid: string, password: string): Promise<void>;
+    set(uid: string, data: Record<string, any>): Promise<Record<string, any>>;
+    _sys_set(uid: string, data: Record<string, any>): Promise<Record<string, any>>;
+    get(uid: string): Promise<User>;
+    get_by_username(username: string): Promise<User>;
+    get_by_email(email: string): Promise<User>;
+    get_by_api_key(api_key: string): Promise<User>;
+    get_by_token(token: string): Promise<User>;
+    get_uid(username: string): Promise<string | null>;
+    get_uid_by_username(username: string): Promise<string | null>;
+    get_uid_by_email(email: string): Promise<string | null>;
+    get_uid_by_api_key(api_key: string): Promise<string | null>;
+    get_uid_by_token(token: string): Promise<string | null>;
+    get_support_pin(uid: string): Promise<string>;
+    generate_api_key(uid: string): Promise<string>;
+    revoke_api_key(uid: string): Promise<void>;
+    verify_password(uid: string, password: string): Promise<boolean>;
+    verify_api_key(api_key: string): Promise<boolean>;
+    verify_api_key_by_uid(uid: string, api_key: string): Promise<boolean>;
+    verify_token(token: string): Promise<boolean>;
+    verify_token_by_uid(uid: string, token: string): Promise<boolean>;
+    verify_2fa(uid: string, code: string): Promise<string | null>;
+    send_2fa({ uid, stream, expiration, _device, _username, _email, }: {
+        uid: string;
+        stream: Stream;
+        expiration?: number;
+        _device?: string | null;
+        _username?: string | null;
+        _email?: string | null;
+    }): Promise<void>;
+    list(): Promise<User[]>;
+}
+export default Users;

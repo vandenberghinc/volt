@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -36,48 +36,79 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { CreateVElementClass } from "./element";
+import { Elements } from "../elements/module.js";
+import { VStack, VStackElement, HStack } from "./stack";
+import { Text } from "./text";
 // Extended input.
 let CheckBoxElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "CheckBoxElement",
+            default_style: {
+                ...VStackElement.default_style,
+                "color": "inherit",
+                "font-size": "16px",
+                // Custom.
+                "--circle-border-color": "gray",
+                "--circle-inner-bg": "#FFFFFF",
+                "--focus-color": "#8EB8EB",
+                "--missing-color": "#E8454E",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var CheckBoxElement = _classThis = class extends _classSuper {
+    var CheckBoxElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            CheckBoxElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        _border_color;
+        _inner_bg;
+        _focus_color;
+        _missing_color;
+        _missing;
+        _required;
+        _circle;
+        // @ts-expect-error
+        text;
+        // @ts-expect-error
+        content;
+        error;
         // Constructor.
         constructor(text_or_obj = {
             text: "",
             required: false,
-            id: null,
+            id: undefined,
         }) {
-            let text = text_or_obj, required = false, id = null;
-            if (typeof text_or_obj === "object" && text_or_obj !== null) {
-                text = text_or_obj.text;
-                required = text_or_obj.required == null ? false : text_or_obj.required;
-                id = text_or_obj.id == null ? null : text_or_obj.id;
-            }
             // Initialize super.
             super();
+            this._init({
+                derived: CheckBoxElement,
+            });
+            // Args.
+            let text = text_or_obj, required = false, id = undefined;
+            if (typeof text_or_obj === "object" && text_or_obj != null) {
+                text = text_or_obj.text;
+                required = text_or_obj.required == null ? false : text_or_obj.required;
+                id = text_or_obj.id == null ? undefined : text_or_obj.id;
+            }
             // Attributes.
-            this.element_type = "CheckBox";
             this._border_color = CheckBoxElement.default_style["--circle-border-color"];
             this._inner_bg = CheckBoxElement.default_style["--circle-inner-bg"];
             this._focus_color = CheckBoxElement.default_style["--focus-color"];
             this._missing_color = CheckBoxElement.default_style["--missing-color"];
             this._missing = false;
-            // Set default styling.
-            this.styles(CheckBoxElement.default_style);
+            this._required = false;
             // Circle element.
             const _this = this;
-            this.circle = VStack(VStack()
+            this._circle = VStack(VStack()
                 .assign_to_parent_as("inner")
                 .border_radius("50%")
                 .frame("35%", "35%")
@@ -92,19 +123,19 @@ let CheckBoxElement = (() => {
                 .frame(15, 15)
                 .margin(2.5, 10, 0, 0)
                 .background("transparent")
-                .box_shadow(`0 0 0 "0px" transparent`)
+                .box_shadow(`0 0 0 0px transparent`)
                 .transition("background 0.3s ease-in-out, box-shadow 0.2s ease-in-out")
                 .center()
                 .center_vertical()
-                .on_mouse_over((e) => e.box_shadow(`0 0 0 "2px" ${this._focus_color}`))
-                .on_mouse_out((e) => e.box_shadow(`0 0 0 "0px" transparent`))
+                .on_mouse_over((e) => e.box_shadow(`0 0 0 2px ${this._focus_color}`))
+                .on_mouse_out((e) => e.box_shadow(`0 0 0 0px transparent`))
                 .on_click((e) => e.toggle())
                 .extend({
                 enabled: false,
-                toggle: function () {
+                toggle() {
                     return this.value(!this.enabled);
                 },
-                value: function (to = null) {
+                value(to = null) {
                     if (to == null) {
                         return this.enabled;
                     }
@@ -121,14 +152,13 @@ let CheckBoxElement = (() => {
                 },
             });
             // Text element.
-            this.text = Text()
-                .inner_html(text) // so links can be added to the text.
+            this.text = Text(text) // dont use innerHTML
                 .font_size("inherit")
                 .color("inherit")
                 .padding(0)
                 .margin(0);
             // The content.
-            this.content = HStack(this.circle, this.text)
+            this.content = HStack(this._circle, this.text)
                 .width("100%");
             // The error message.
             this.error = Text("Incomplete field")
@@ -140,7 +170,7 @@ let CheckBoxElement = (() => {
             // Append.
             this.append(this.content, this.error);
             // Set id.
-            if (id != null) {
+            if (id !== undefined) {
                 this.id(id);
             }
             // Set required.
@@ -148,26 +178,22 @@ let CheckBoxElement = (() => {
                 this.required(required);
             }
         }
-        // Set the focus color.
         border_color(val) {
             if (val == null) {
                 return this._border_color;
             }
             this._border_color = val;
-            this.circle.border_color(this._border_color);
+            this._circle.border_color(this._border_color);
             return this;
         }
-        // Set the focus color.
         inner_bg(val) {
             if (val == null) {
                 return this._inner_bg;
             }
             this._inner_bg = val;
-            this.circle.inner.background(this._inner_bg);
+            this._circle.inner.background(this._inner_bg);
             return this;
         }
-        // Get the styling attributes.
-        // The values of the children that may have been changed by the custom funcs should be added.
         styles(style_dict) {
             if (style_dict == null) {
                 let styles = super.styles();
@@ -183,30 +209,28 @@ let CheckBoxElement = (() => {
         }
         // Set default since it inherits an element.
         set_default() {
-            return super.set_default(ExtendedInputElement);
+            return super.set_default(CheckBoxElement);
         }
         // Toggle value.
         toggle() {
-            this.circle.toggle();
+            this._circle.toggle();
             return this;
         }
-        // Get or set the value.
-        value(to = null) {
+        // @ts-expect-error
+        value(to) {
             if (to == null) {
-                return this.circle.enabled;
+                return this._circle.enabled;
             }
-            this.circle.value(to);
+            this._circle.value(to);
             return this;
         }
-        // Get or set the value.
-        required(to = null) {
+        required(to) {
             if (to == null) {
                 return this._required;
             }
             this._required = to;
             return this;
         }
-        // Set the focus color.
         focus_color(val) {
             if (val == null) {
                 return this._focus_color;
@@ -214,7 +238,6 @@ let CheckBoxElement = (() => {
             this._focus_color = val;
             return this;
         }
-        // Set the missing color.
         missing_color(val) {
             if (val == null) {
                 return this._missing_color;
@@ -222,22 +245,21 @@ let CheckBoxElement = (() => {
             this._missing_color = val;
             return this;
         }
-        // Set missing.
         missing(to = true) {
             if (to == null) {
                 return this._missing;
             }
             else if (to === true) {
                 this._missing = true;
-                this.circle.outline(`"1px" solid ${this._missing_color}`);
-                this.circle.box_shadow(`0 0 0 "3px" ${this._missing_color}80`);
+                this._circle.outline(`1px solid ${this._missing_color}`);
+                this._circle.box_shadow(`0 0 0 3px ${this._missing_color}80`);
                 this.error.color(this._missing_color);
                 this.error.show();
             }
             else {
                 this._missing = false;
-                this.circle.outline("0px solid transparent");
-                this.circle.box_shadow(`0 0 0 "0px" transparent`);
+                this._circle.outline("0px solid transparent");
+                this._circle.box_shadow(`0 0 0 0px transparent`);
                 this.error.hide();
             }
             return this;
@@ -253,29 +275,8 @@ let CheckBoxElement = (() => {
             return value;
         }
     };
-    __setFunctionName(_classThis, "CheckBoxElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        CheckBoxElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-    })();
-    // Default styling.
-    // static default_style = Object.assign({}, HStackElement.default_style, {
-    _classThis.default_style = {
-        ...VStackElement.default_style,
-        "color": "inherit",
-        "font-size": "16px",
-        // Custom.
-        "--circle-border-color": "gray",
-        "--circle-inner-bg": "#FFFFFF",
-        "--focus-color": "#8EB8EB",
-        "--missing-color": "#E8454E",
-    };
-    (() => {
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return CheckBoxElement = _classThis;
 })();
 export { CheckBoxElement };
 export const CheckBox = Elements.wrapper(CheckBoxElement);
+export const NullCheckBox = Elements.create_null(CheckBoxElement);

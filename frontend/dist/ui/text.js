@@ -36,50 +36,48 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { CreateVElementClass } from "./element";
+import { Elements, VElementTagMap } from "../elements/module.js";
 // Text.
 let TextElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "TextElement",
+            default_style: {
+                "margin": "0px 0px 0px 0px",
+                "padding": "0", // 2.5px
+                "font-size": "20px",
+                "color": "inherit",
+                "text-align": "inherit",
+                "white-space": "wrap",
+            }
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Text",
-        tag: "p",
-        default_style: {
-            "margin": "0px 0px 0px 0px",
-            "padding": "0", // "2.5px"
-            "font-size": "20px",
-            "color": "inherit",
-            "text-align": "inherit",
-            "white-space": "wrap",
-        },
-    });
-    var TextElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.p;
+    var TextElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            TextElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(text) {
             // Initialize base class.
-            super();
+            super({
+                derived: TextElement,
+            });
             // Set text.
-            this.text(text); // do not use inner_html since the text might contain "<" etc.
+            if (text) {
+                this.text(text); // do not use inner_html since the text might contain "<" etc.
+            }
         }
     };
-    __setFunctionName(_classThis, "TextElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        TextElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return TextElement = _classThis;
 })();
 export { TextElement };
 export const Text = Elements.wrapper(TextElement);
+export const NullText = Elements.create_null(TextElement);

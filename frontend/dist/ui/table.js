@@ -36,251 +36,263 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { Scheme } from "../modules/scheme";
-import { CreateVElementClass } from "./element";
+import { Elements, VElementTagMap } from "../elements/module.js";
+import { Scheme } from "@vandenberghinc/vlib/frontend";
 // Table head element.
 let TableHeadElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "TableHeadElement",
+            default_style: {
+                "padding": "0px",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "TableHead",
-        tag: "thead",
-        default_style: {
-            "padding": "0px",
-        },
-    });
-    var TableHeadElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.thead;
+    var TableHeadElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            TableHeadElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...content) {
             // Initialize base class.
-            super();
+            super({
+                derived: TableHeadElement,
+            });
             // Append content.
             this.append(...content);
         }
     };
-    __setFunctionName(_classThis, "TableHeadElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        TableHeadElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return TableHeadElement = _classThis;
 })();
 export { TableHeadElement };
 export const TableHead = Elements.wrapper(TableHeadElement);
+export const NullTableHead = Elements.create_null(TableHeadElement);
 // Table header element.
 let TableHeaderElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "TableHeaderElement",
+            default_style: {
+                "text-align": "left",
+                "padding": "0px 10px",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "TableHeader",
-        tag: "th",
-        default_style: {
-            "text-align": "left",
-            "padding": "0px 10px",
-        },
-    });
-    var TableHeaderElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.th;
+    var TableHeaderElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            TableHeaderElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...content) {
             // Initialize base class.
-            super();
+            super({
+                derived: TableHeadElement,
+            });
             // Append content.
             this.append(...content);
         }
     };
-    __setFunctionName(_classThis, "TableHeaderElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        TableHeaderElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return TableHeaderElement = _classThis;
 })();
 export { TableHeaderElement };
 export const TableHeader = Elements.wrapper(TableHeaderElement);
+export const NullTableHeader = Elements.create_null(TableHeaderElement);
 // Table body element.
 let TableBodyElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "TableBodyElement",
+            default_style: {
+                "padding": "0px",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "TableBody",
-        tag: "tbody",
-        default_style: {
-            "padding": "0px",
-        },
-    });
-    var TableBodyElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.tbody;
+    var TableBodyElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            TableBodyElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...content) {
             // Initialize base class.
-            super();
+            super({
+                derived: TableBodyElement,
+            });
             // Append content.
             this.append(...content);
         }
     };
-    __setFunctionName(_classThis, "TableBodyElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        TableBodyElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return TableBodyElement = _classThis;
 })();
 export { TableBodyElement };
 export const TableBody = Elements.wrapper(TableBodyElement);
+export const NullTableBody = Elements.create_null(TableBodyElement);
 // Table row element.
 let TableRowElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "TableRowElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "TableRow",
-        tag: "tr",
-        default_style: {},
-    });
-    var TableRowElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.tr;
+    var TableRowElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            TableRowElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...content) {
             // Initialize base class.
-            super();
+            super({
+                derived: TableRowElement,
+            });
             // Append content.
             this.append(...content);
         }
     };
-    __setFunctionName(_classThis, "TableRowElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        TableRowElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return TableRowElement = _classThis;
 })();
 export { TableRowElement };
 export const TableRow = Elements.wrapper(TableRowElement);
+export const NullTableRow = Elements.create_null(TableRowElement);
 // Table data element.
 let TableDataElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "TableDataElement",
+            default_style: {
+                "text-align": "left",
+                "padding": "0px 10px",
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "TableData",
-        tag: "td",
-        default_style: {
-            "text-align": "left",
-            "padding": "0px 10px",
-        },
-    });
-    var TableDataElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.td;
+    var TableDataElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            TableDataElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...content) {
             // Initialize base class.
-            super();
+            super({
+                derived: TableDataElement,
+            });
             // Append content.
             this.append(...content);
         }
     };
-    __setFunctionName(_classThis, "TableDataElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        TableDataElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return TableDataElement = _classThis;
 })();
 export { TableDataElement };
 export const TableData = Elements.wrapper(TableDataElement);
+export const NullTableData = Elements.create_null(TableDataElement);
 // Inner Table element.
 // Use a container for the Table element so a border color + border radius can be set.
 // Since border-collapse collapse prevents a border radius but is required for different background for the table head.
 let InnerTableElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "InnerTableElement",
+            default_style: {
+                "border-collapse": "collapse", /* Ensures there is no spacing between table cells */
+                "padding": "0",
+                "margin": 0,
+                "border-spacing": 0, /* Removes any default spacing between cells */
+            },
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "InnerTable",
-        tag: "table",
-        default_style: {
-            "border-collapse": "collapse", /* Ensures there is no spacing between table cells */
-            "padding": "0",
-            "margin": 0,
-            "border-spacing": 0, /* Removes any default spacing between cells */
-        },
-    });
-    var InnerTableElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.table;
+    var InnerTableElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            InnerTableElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
         // Constructor.
         constructor(...content) {
             // Initialize base class.
-            super();
+            super({
+                derived: InnerTableElement,
+            });
             // Append content.
             this.append(...content);
         }
     };
-    __setFunctionName(_classThis, "InnerTableElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        InnerTableElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return InnerTableElement = _classThis;
 })();
 export { InnerTableElement };
 export const InnerTable = Elements.wrapper(InnerTableElement);
+export const NullInnerTable = Elements.create_null(InnerTableElement);
 // Table data element.
 let TableElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "TableElement",
+            default_style: {},
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Table",
-        tag: "div",
-        default_style: {
-            "color": "black",
-        },
-    });
-    var TableElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.div;
+    var TableElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            TableElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        table_rows;
+        show_columns;
+        table = NullInnerTable();
+        table_head = NullTableHead();
+        table_body = NullTableBody();
         // Constructor.
         constructor({ rows = [
-            [0, 1],
-            [2, 3],
+            ["a", "b"],
+            ["c", "d"],
         ], columns = ["Column 1", "Column 2"], show_columns = true, }) {
             // Initialize base class.
-            super();
+            super({
+                derived: TableElement,
+            });
             // Attributes.
             this.table_rows = [];
             this.show_columns = show_columns === true && columns !== false;
@@ -321,21 +333,23 @@ let TableElement = (() => {
         }
         // Create the table.
         create({ rows, columns }) {
-            if (!Array.isArray(rows)) {
-                console.error(`Invalid type "${Scheme.value_type(rows)}" for parameter "rows" the valid type is "array".`);
-                return this;
-            }
+            // if (!Array.isArray(rows)) {
+            // 	console.error(`Invalid type "${Scheme.value_type(rows)}" for parameter "rows" the valid type is "array".`)
+            // 	return this;
+            // }
             if (!Array.isArray(columns)) {
                 console.error(`Invalid type "${Scheme.value_type(columns)}" for parameter "columns" the valid type is "array".`);
                 return this;
             }
             // console.log(columns, rows)
             return this.append(this.table = InnerTable(this.show_columns
-                ? this.table_head = TableHead(TableRow(columns.iterate_append(column => TableHeader(column)))
+                ? this.table_head = TableHead(TableRow(columns.map(column => TableHeader(column).padding(0).text_leading()))
                     .exec(e => this.table_rows.append(e)))
                     .parent(this)
-                : null, this.table_body = TableBody(rows.iterate_append(row => TableRow(row.iterate_append(column => TableData(column)))
-                .exec(e => this.table_rows.append(e))))
+                : null, this.table_body = TableBody(!Array.isArray(rows)
+                ? null
+                : rows.map(row => TableRow(row.map(column => TableData(column).padding(0)))
+                    .exec(e => this.table_rows.append(e))))
                 .parent(this))
                 .width("100%"));
         }
@@ -371,6 +385,11 @@ let TableElement = (() => {
                 column.padding(...args);
             });
         }
+        row_padding(...args) {
+            return this.iterate_rows((row) => {
+                row.padding(...args);
+            });
+        }
         // Set column widths.
         column_widths(...widths) {
             this.table.style.tableLayout = "fixed";
@@ -382,15 +401,8 @@ let TableElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "TableElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        TableElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return TableElement = _classThis;
 })();
 export { TableElement };
 export const Table = Elements.wrapper(TableElement);
+export const NullTable = Elements.create_null(TableElement);

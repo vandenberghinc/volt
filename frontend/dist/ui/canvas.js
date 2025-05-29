@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -36,15 +36,10 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Utils } from "../modules/utils";
-import { Elements } from "../modules/elements";
-import { CreateVElementClass } from "./element";
-import { GradientType } from "./gradient";
+import { Utils } from "../modules/utils.js";
+import { Elements, VElementTagMap } from "../elements/module.js";
+import { GradientType } from "../types/gradient.js";
 // Canvas.
 /*	@docs:
  *	@nav: Frontend
@@ -57,27 +52,38 @@ import { GradientType } from "./gradient";
  *		This class is still experimental and may be subject to future change.
  */
 let CanvasElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "CanvasElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
-    let _classSuper = CreateVElementClass({
-        type: "Canvas",
-        tag: "canvas",
-    });
-    var CanvasElement = _classThis = class extends _classSuper {
+    let _classSuper = VElementTagMap.canvas;
+    var CanvasElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            CanvasElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        _e;
+        ctx_2d;
         // ---------------------------------------------------------
         // Constructors.
         constructor() {
-            super();
+            super({
+                derived: CanvasElement,
+            });
             // Safari does not render images correctly for custom elements.
             if (Utils.is_safari) {
                 this.attachShadow({ mode: 'open' });
                 this._e = document.createElement("canvas");
                 this._e.style.objectFit = "cover";
                 this.shadowRoot?.appendChild(this._e);
-                this.position("relative"); // for img width height "100%"
+                this.position("relative"); // for img width height 100%
                 this.overflow("hidden"); // for border radius.
                 // Set resize event otherwise when the item resizes the shadow image does not.
                 this.on_resize(() => {
@@ -159,6 +165,7 @@ let CanvasElement = (() => {
             if (Utils.is_safari) {
                 return this._e.getContext(...args);
             }
+            // @ts-ignore
             return super.getContext(...args);
         }
         // Draw lines.
@@ -386,19 +393,12 @@ let CanvasElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "CanvasElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        CanvasElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return CanvasElement = _classThis;
 })();
 export { CanvasElement };
 ;
 export const Canvas = Elements.wrapper(CanvasElement);
+export const NullCanvas = Elements.create_null(CanvasElement);
 // function Canvas(...args) {
 // 	if (Utils.is_safari) {
 // 		const e = document.createElement(CanvasElement.element_tag, {is: "v-" + CanvasElement.name.toLowerCase()})

@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -36,31 +36,40 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 // Imports.
-import { Elements } from "../modules/elements";
-import { isVElement } from "./element";
+import { Elements, isVElement } from "../elements/module.js";
 import { VStackElement } from "./stack";
 // Extended input.
 let FormElement = (() => {
-    var _a;
-    let _classDecorators = [(_a = Elements).register.bind(_a)];
+    let _classDecorators = [Elements.create({
+            name: "FormElement",
+        })];
     let _classDescriptor;
     let _classExtraInitializers = [];
     let _classThis;
     let _classSuper = VStackElement;
-    var FormElement = _classThis = class extends _classSuper {
+    var FormElement = class extends _classSuper {
+        static { _classThis = this; }
+        static {
+            const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
+            __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
+            FormElement = _classThis = _classDescriptor.value;
+            if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
+            __runInitializers(_classThis, _classExtraInitializers);
+        }
+        // Attributes.
+        _button;
+        fields;
+        _on_submit;
+        _on_submit_error;
+        _on_append_callback;
         // Constructor.
         constructor(...children) {
             // Initialize super.
             super();
-            // Attributes.
-            this.element_type = "Form";
-            // Set default styling.
-            this.styles(FormElement.default_style);
+            this._init({
+                derived: FormElement,
+            });
             // Attributes.
             this._button = undefined;
             this.fields = {};
@@ -68,7 +77,7 @@ let FormElement = (() => {
             const _this = this;
             this._on_append_callback = (child) => {
                 // Initialize field.
-                if (child.element_type === "ExtendedInput" || child.element_type === "ExtendedSelect" || child.element_type === "CheckBox") {
+                if (child.element_name === "ExtendedInputElement" || child.element_name === "ExtendedSelectElement" || child.element_name === "CheckBoxElement") {
                     const id = child.id();
                     if (id != null && id !== "") {
                         _this.fields[id] = child;
@@ -81,7 +90,7 @@ let FormElement = (() => {
                     }
                 }
                 // Initialize button.
-                else if ( /*_this._button === undefined &&*/(child.element_type === "Button" || child.element_type === "LoaderButton") && child.on_click() == null) { //  && child.attr("submit_button") != "false"
+                else if ( /*_this._button === undefined &&*/(child.element_name === "ButtonElement" || child.element_name === "LoaderButtonElement") && child.on_click() == null) { //  && child.attr("submit_button") != "false"
                     if (_this._button !== undefined) {
                         _this._button.on_click(() => { });
                     }
@@ -105,7 +114,7 @@ let FormElement = (() => {
         // @ts-expect-error
         data() {
             const params = {};
-            let error;
+            let first_error;
             const ids = Object.keys(this.fields);
             for (let i = 0; i < ids.length; i++) {
                 try {
@@ -119,11 +128,14 @@ let FormElement = (() => {
                     }
                 }
                 catch (e) {
-                    error = e;
+                    // always use a try catch to call submit on all inputs to set invalid/missing fields.
+                    if (first_error === undefined) {
+                        first_error = e;
+                    }
                 }
             }
-            if (error) {
-                throw error;
+            if (first_error) {
+                throw first_error;
             }
             return params;
         }
@@ -151,6 +163,9 @@ let FormElement = (() => {
             }
             // Handle rror.
             catch (error) {
+                if (!(error instanceof Error)) {
+                    error = new Error(error.toString());
+                }
                 // Defined callback.
                 if (this._on_submit_error !== undefined) {
                     const res = this._on_submit_error(this, error);
@@ -208,23 +223,8 @@ let FormElement = (() => {
             return this;
         }
     };
-    __setFunctionName(_classThis, "FormElement");
-    (() => {
-        const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-        __esDecorate(null, _classDescriptor = { value: _classThis }, _classDecorators, { kind: "class", name: _classThis.name, metadata: _metadata }, null, _classExtraInitializers);
-        FormElement = _classThis = _classDescriptor.value;
-        if (_metadata) Object.defineProperty(_classThis, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
-    })();
-    // Macros.
-    // Default styling.
-    // static default_style = Object.assign({}, HStackElement.default_style, {
-    _classThis.default_style = {
-        ...VStackElement.default_style,
-    };
-    (() => {
-        __runInitializers(_classThis, _classExtraInitializers);
-    })();
     return FormElement = _classThis;
 })();
 export { FormElement };
 export const Form = Elements.wrapper(FormElement);
+export const NullForm = Elements.create_null(FormElement);

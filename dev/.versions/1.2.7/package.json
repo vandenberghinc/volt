@@ -1,0 +1,44 @@
+{
+    "author": "Daan van den Bergh",
+    "name": "@vandenberghinc/vweb",
+    "version": "1.2.7",
+    "description": "",
+    "publishConfig": {
+        "access": "public"
+    },
+    "main": "backend/vweb.js",
+    "scripts": {
+        "start": "node start.js",
+        "bundle-backend": "tsc --project backend/tsconfig.json",
+        "bundle-frontend": "tsc --project backend/tsconfig.json && node frontend/compile.js"
+    },
+    "bin": {
+        "vweb": "./backend/cli.js"
+    },
+    "dependencies": {
+        "@adyen/api-library": "^15.1.0",
+        "@rollup/plugin-commonjs": "^28.0.0",
+        "@rollup/plugin-node-resolve": "^15.3.0",
+        "@rollup/plugin-typescript": "^12.1.0",
+        "@vandenberghinc/vhighlight": "^1.2.2",
+        "@vandenberghinc/vlib": "^1.3.0",
+        "blob-stream": "^0.1.3",
+        "clean-css": "^5.3.3",
+        "esbuild": "^0.24.0",
+        "jspdf": "^2.5.1",
+        "mongodb": "^6.8.0",
+        "nodemailer": "^6.9.14",
+        "pdfkit": "^0.14.0",
+        "playwright": "^1.47.2",
+        "rollup": "^2.79.2",
+        "rollup-plugin-terser": "^7.0.2",
+        "rollup-plugin-typescript2": "^0.36.0",
+        "sharp": "^0.33.5"
+    },
+    "live_version": "1.2.6",
+    "devDependencies": {
+        "axios": "^1.7.7",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.6.3"
+    }
+}

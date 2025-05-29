@@ -1,6 +1,6 @@
 /*
  * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
 // Utils module.
 const Utils = {
@@ -162,20 +162,20 @@ const Utils = {
     */
     make_immutable(object) {
         if (Array.isArray(object)) {
-            Object.freeze(object);
             object.forEach((item, index) => {
                 if (item !== null && typeof item === "object") {
                     object[index] = Utils.make_immutable(item);
                 }
             });
+            Object.freeze(object);
         }
         else if (object !== null && typeof object === "object") {
-            Object.freeze(object);
             Object.keys(object).forEach((key) => {
                 if (object[key] !== null && typeof object[key] === "object") {
                     object[key] = Utils.make_immutable(object[key]);
                 }
             });
+            Object.freeze(object);
         }
         return object;
     },
@@ -524,6 +524,97 @@ const Utils = {
             return obj;
         }
     },
+    /** New request method. */
+    async request(options) {
+        const { method = 'GET', url = null, data = null, json = true, credentials = "same-origin", headers = {}, } = options;
+        // — prepare headers —
+        if (json && data != null && !headers['Content-Type']) {
+            headers['Content-Type'] = 'application/json';
+        }
+        // — build URL + body —
+        let finalUrl = url;
+        let body;
+        if (data != null && typeof data === 'object') {
+            if (method.toUpperCase() === 'GET') {
+                finalUrl = `${url}?${new URLSearchParams(data).toString()}`;
+            }
+            else {
+                body = JSON.stringify(data);
+            }
+        }
+        else if (data != null) {
+            body = String(data);
+        }
+        const init = { method, credentials, headers };
+        if (body !== undefined)
+            init.body = body;
+        try {
+            const response = await fetch(finalUrl, init);
+            const status = response.status;
+            // — parse payload once —
+            let payload;
+            const clone = response.clone(); // @dev.
+            if (json) {
+                try {
+                    payload = await response.json();
+                }
+                catch (e) {
+                    // malformed JSON still counts as a “success” fetch
+                    console.log("[debug] Unable to parse a json from response:", await clone.text(), "- Error: ", JSON.stringify(e, null, 4));
+                    console.log("[debug] Response:", response);
+                    return {
+                        status,
+                        error: { message: `Failed to parse JSON response: ${e.message}` },
+                    };
+                }
+            }
+            else {
+                try {
+                    payload = await response.text();
+                }
+                catch (e) {
+                    return {
+                        status,
+                        error: { message: `Failed to parse text response: ${e.message}` },
+                    };
+                }
+            }
+            // console.log("Payload", json, payload)
+            // — handle HTTP errors (4xx/5xx) by resolving with an error object —
+            if (!response.ok) {
+                // if server wrapped its error in { error: { message, type?, invalid_fields? }, … }
+                if (payload &&
+                    typeof payload === 'object' &&
+                    typeof payload.error === 'object' &&
+                    typeof payload.error.message === 'string') {
+                    return {
+                        status,
+                        error: {
+                            message: payload.error.message,
+                            type: payload.error.type,
+                            invalid_fields: payload.error.invalid_fields,
+                        },
+                        data: payload.data,
+                    };
+                }
+                // otherwise fall back to a generic single‐message error
+                const msg = typeof payload === 'string'
+                    ? payload
+                    : payload?.error?.toString() ?? JSON.stringify(payload);
+                return {
+                    status,
+                    error: { message: msg },
+                };
+            }
+            // — 2xx: success —
+            return { status, data: payload };
+        }
+        catch (networkErr) {
+            // genuine network / system failure
+            throw networkErr;
+        }
+    },
+    // @deprecated.
     /* @docs:
         @nav: Frontend
         @chapter: Utils
@@ -544,7 +635,7 @@ const Utils = {
             @desc: A Promise that resolves with the response data.
             @type: Promise<any>
     */
-    request(options) {
+    request_v1(options) {
         const { method = "GET", url = null, data = null, json = true, credentials = "same-origin", headers = {}, } = options;
         // Set headers.
         // Host and User-Agent headers are restricted and set by the browser itself.
@@ -666,7 +757,7 @@ const Utils = {
     */
     async on_load(func) {
         // document.addEventListener("DOMContentLoaded", async () => {
-        const splash = document.getElementById("__vweb_splash_screen");
+        const splash = document.getElementById("__volt_splash_screen");
         if (splash != null) {
             splash.remove();
         }
@@ -685,7 +776,10 @@ const Utils = {
         }
         // });
     },
-    /* @docs:
+    /**
+     * @deprecated Use vlib.VDate instead.
+     * @docs:
+     
         @nav: Frontend
         @chapter: Utils
         @title: Unix to Date
@@ -748,337 +842,6 @@ const Utils = {
     /* @docs:
         @nav: Frontend
         @chapter: Utils
-        @title: Fuzzy Search
-        @description:
-            Perform a fuzzy similarity match between a query and an array of targets.
-        @type: number
-        @return:
-            Returns an array with the targets sorted from best match to lowest match, unless parameter `get_matches` is enabled.
-        @param:
-            @name: query
-            @description: The search query.
-            @type: string
-            @name: targets
-            @description:
-                The targets to search through.
-                When the nested items are objects, define the parameter `key` to specify the query string key.
-                When the nested items are arrays, the first value of the array will be used as the query string.
-            @type: Array<string | object | any[]>
-            @name: limit
-            @description: Limit the number of results. Define the limit as `null` or `-1` to set no limit.
-            @type: number
-            @name: case_match
-            @description:
-                When the `case_match` flag is enabled, the similarity match is case sensitive.
-            @type: boolean
-            @name: allow_exceeding_chars
-            @description:
-                Allow matches where the single character count of the search query exceeds that of the target.
-                For example, when the query is "aa" and the target is "a", no match will be given since the "a" count of the target (2) is higher than the query (1).
-            @type: boolean
-            @name: get_matches
-            @description:
-                When the `get_matches` flag is enabled, the function returns an array with nested arrays containing the similarity match `[similarity <number>, <target>]`.
-            @type: boolean
-            @name: key
-            @description: The key for the query string when the array's target items are objects. The key may also be an array with keys to use the best match of the key's value.
-            @type: string | string[] | null
-            @name: nested_key
-            @description:
-                When the target items are objects and the object may have nested children that also should be searched, define the `nested_key` parameter to specify the key used for the nested children.
-                The value for the nested key should also be an array of objects and use the same structure for the `key` parameter, otherwise it will cause undefined behavior.
-                The nested key will be ignored if the nested key does not exist in a target object.
-            @type: string | null
-    */
-    fuzzy_search({ query, targets = [], limit = 25, case_match = false, allow_exceeding_chars = true, get_matches = false, key = null, nested_key = null, }) {
-        // Checks.
-        if (query == null) {
-            throw new Error("Define parameter \"query\".");
-        }
-        // Vars.
-        const is_obj = targets.length > 0 && typeof targets[0] === "object" && !Array.isArray(targets[0]);
-        const is_array = targets.length > 0 && Array.isArray(targets[0]);
-        if (is_obj && key == null) {
-            key = "query";
-        }
-        const is_key_array = Array.isArray(key);
-        const results = [];
-        if (!case_match) {
-            query = query.toLowerCase();
-        }
-        // Calculate the similarities.
-        const calc_sims = (current_targets = []) => {
-            current_targets.forEach(target => {
-                let match;
-                if (is_array) {
-                    match = Utils.fuzzy_match(query, case_match ? target[0] : (typeof target[0] === 'string' ? target[0].toLowerCase() : target[0]), allow_exceeding_chars);
-                }
-                else if (is_obj) {
-                    if (is_key_array && Array.isArray(key)) {
-                        let min_match = null;
-                        key.forEach(k => {
-                            if (target[k] == null) {
-                                return;
-                            }
-                            const current_match = Utils.fuzzy_match(query, case_match ? target[k] : (typeof target[k] === 'string' ? target[k].toLowerCase() : target[k]), allow_exceeding_chars);
-                            if (current_match != null && (min_match === null || current_match < min_match)) {
-                                min_match = current_match;
-                            }
-                        });
-                        match = min_match;
-                    }
-                    else {
-                        if (target[key] == null) {
-                            return;
-                        }
-                        match = Utils.fuzzy_match(query, case_match ? target[key] : (typeof target[key] === 'string' ? target[key].toLowerCase() : target[key]), allow_exceeding_chars);
-                    }
-                    if (nested_key !== null && target[nested_key] != null) {
-                        calc_sims(target[nested_key]);
-                    }
-                }
-                else {
-                    if (target == null) {
-                        return;
-                    }
-                    match = Utils.fuzzy_match(query, case_match ? target : (typeof target === 'string' ? target.toLowerCase() : target), allow_exceeding_chars);
-                }
-                if (match !== null) {
-                    results.push([match, target]);
-                }
-            });
-        };
-        // Calculate the similarities.
-        calc_sims(targets);
-        // Sort the results.
-        results.sort((a, b) => a[0] - b[0]); // Lower score is better
-        // Limit the results.
-        if (limit !== null && limit >= 0 && results.length > limit) {
-            results.length = limit;
-        }
-        // Convert the results to targets only.
-        if (!get_matches) {
-            return results.map(item => item[1]);
-        }
-        // Return the results.
-        return results;
-    },
-    /* @docs:
-        @nav: Frontend
-        @chapter: Utils
-        @title: Fuzzy Match
-        @desc: Perform a fuzzy similarity match between a query and a target.
-        @param:
-            @name: search
-            @desc: The search query.
-            @type: string
-            @name: target
-            @desc: The target string.
-            @type: string
-            @name: allow_exceeding_chars
-            @desc:
-                Allow matches where the single character count of the search query exceeds that of the target.
-                So when the query is "aa" and the target is "a" then no match will be given since the "a" count of the target (2) is higher than the query (1).
-                The function returns `null` when this flag is enabled and detected.
-            @type: boolean
-        @return:
-            @desc: Returns a floating number indicating the similarity; a lower value represents a better match.
-            @type: number | null
-    */
-    fuzzy_match(search, target, allow_exceeding_chars = true) {
-        // Check exceeding chars.
-        if (!allow_exceeding_chars) {
-            // Exceeding length.
-            if (search.length > target.length) {
-                return null;
-            }
-            // Create the target count.
-            const text_count = {};
-            for (let i = 0; i < target.length; i++) {
-                const c = target.charAt(i);
-                text_count[c] = (text_count[c] || 0) + 1;
-            }
-            // Create the query count.
-            const query_count = {};
-            for (let i = 0; i < search.length; i++) {
-                const c = search.charAt(i);
-                query_count[c] = (query_count[c] || 0) + 1;
-                if (text_count[c] == null || query_count[c] > text_count[c]) {
-                    return null;
-                }
-            }
-        }
-        // Wrappers.
-        const get_search_code = (index) => {
-            if (index >= 0 && index < search.length) {
-                return search.charCodeAt(index);
-            }
-            return -1;
-        };
-        const get_target_code = (index) => {
-            if (index >= 0 && index < target.length) {
-                return target.charCodeAt(index);
-            }
-            return -1;
-        };
-        const prepareBeginningIndexes = (targetStr) => {
-            const targetLen = targetStr.length;
-            const beginningIndexes = [];
-            let wasUpper = false;
-            let wasAlphanum = false;
-            for (let i = 0; i < targetLen; ++i) {
-                const targetCode = targetStr.charCodeAt(i);
-                const isUpper = targetCode >= 65 && targetCode <= 90;
-                const isAlphanum = isUpper || (targetCode >= 97 && targetCode <= 122) || (targetCode >= 48 && targetCode <= 57);
-                const isBeginning = (isUpper && !wasUpper) || !wasAlphanum || !isAlphanum;
-                wasUpper = isUpper;
-                wasAlphanum = isAlphanum;
-                if (isBeginning)
-                    beginningIndexes.push(i);
-            }
-            return beginningIndexes;
-        };
-        const prepareNextBeginningIndexes = (targetStr) => {
-            const targetLen = targetStr.length;
-            const beginningIndexes = prepareBeginningIndexes(targetStr);
-            const nextBeginningIndexes = [];
-            let lastIsBeginning = beginningIndexes[0];
-            let lastIsBeginningI = 0;
-            for (let i = 0; i < targetLen; ++i) {
-                if (lastIsBeginning > i) {
-                    nextBeginningIndexes[i] = lastIsBeginning;
-                }
-                else {
-                    lastIsBeginning = beginningIndexes[++lastIsBeginningI];
-                    nextBeginningIndexes[i] = lastIsBeginning === undefined ? targetLen : lastIsBeginning;
-                }
-            }
-            return nextBeginningIndexes;
-        };
-        // Vars.
-        let searchI = 0;
-        const searchLen = search.length;
-        let searchCode = get_search_code(searchI);
-        let searchLower = search.toLowerCase();
-        let targetI = 0;
-        const targetLen = target.length;
-        let targetCode = get_target_code(targetI);
-        const targetLower = target.toLowerCase();
-        const matchesSimple = [];
-        let matchesSimpleLen = 0;
-        let successStrict = false;
-        const matchesStrict = [];
-        let matchesStrictLen = 0;
-        // Very basic fuzzy match; to remove non-matching targets ASAP!
-        // Walk through target. Find sequential matches.
-        // If all chars aren't found then exit
-        while (true) {
-            const isMatch = searchCode === get_target_code(targetI);
-            if (isMatch) {
-                matchesSimple[matchesSimpleLen++] = targetI;
-                searchI++;
-                if (searchI === searchLen)
-                    break;
-                searchCode = get_search_code(searchI);
-            }
-            targetI++;
-            if (targetI >= targetLen) {
-                return null; // Failed to find searchI
-            }
-        }
-        searchI = 0;
-        targetI = 0;
-        const nextBeginningIndexes = prepareNextBeginningIndexes(target);
-        targetI = matchesSimple[0] === 0 ? 0 : (nextBeginningIndexes[matchesSimple[0] - 1] || 0);
-        // More advanced and strict test to improve the score
-        let backtrackCount = 0;
-        if (targetI !== targetLen) {
-            while (true) {
-                if (targetI >= targetLen) {
-                    // We failed to find a good spot for this search char, go back to the previous search char and force it forward
-                    if (searchI <= 0)
-                        break; // We failed to push chars forward for a better match
-                    backtrackCount++;
-                    if (backtrackCount > 200)
-                        break; // Prevent excessive backtracking
-                    searchI--;
-                    const lastMatch = matchesStrict[--matchesStrictLen];
-                    targetI = nextBeginningIndexes[lastMatch] || 0;
-                }
-                else {
-                    const isMatch = get_search_code(searchI) === get_target_code(targetI);
-                    if (isMatch) {
-                        matchesStrict[matchesStrictLen++] = targetI;
-                        searchI++;
-                        if (searchI === searchLen) {
-                            successStrict = true;
-                            break;
-                        }
-                        targetI++;
-                    }
-                    else {
-                        targetI = nextBeginningIndexes[targetI] || targetLen;
-                    }
-                }
-            }
-        }
-        // Check if it's a substring match
-        const substringIndex = targetLower.indexOf(searchLower, matchesSimple[0]); // Performance: this is slow
-        const isSubstring = substringIndex !== -1;
-        let isSubstringBeginning = false;
-        if (isSubstring && !successStrict) { // Rewrite the indexes from basic to the substring
-            for (let i = 0; i < matchesSimpleLen; ++i) {
-                matchesSimple[i] = substringIndex + i;
-            }
-        }
-        if (isSubstring) {
-            isSubstringBeginning = nextBeginningIndexes[substringIndex - 1] === substringIndex;
-        }
-        // Tally up the score & keep track of matches for highlighting later
-        let score = 0;
-        let matchesBest;
-        let matchesBestLen;
-        if (successStrict) {
-            matchesBest = matchesStrict;
-            matchesBestLen = matchesStrictLen;
-        }
-        else {
-            matchesBest = matchesSimple;
-            matchesBestLen = matchesSimpleLen;
-        }
-        let extraMatchGroupCount = 0;
-        for (let i = 1; i < searchLen; ++i) {
-            if (matchesBest[i] - matchesBest[i - 1] !== 1) {
-                score -= matchesBest[i];
-                extraMatchGroupCount++;
-            }
-        }
-        const unmatchedDistance = matchesBest[searchLen - 1] - matchesBest[0] - (searchLen - 1);
-        score -= (12 + unmatchedDistance) * extraMatchGroupCount; // Penalty for more groups
-        if (matchesBest[0] !== 0)
-            score -= Math.pow(matchesBest[0], 2) * 0.2; // Penalty for not starting near the beginning
-        if (!successStrict) {
-            score *= 1000;
-        }
-        else {
-            // successStrict on a target with too many beginning indexes loses points for being a bad target
-            let uniqueBeginningIndexes = 1;
-            for (let i = nextBeginningIndexes[0]; i < targetLen; i = nextBeginningIndexes[i]) {
-                uniqueBeginningIndexes++;
-            }
-            if (uniqueBeginningIndexes > 24)
-                score *= (uniqueBeginningIndexes - 24) * 10; // Arbitrary penalty
-        }
-        if (isSubstring)
-            score /= 1 + Math.pow(searchLen, 2); // Bonus for being a full substring
-        if (isSubstringBeginning)
-            score /= 1 + Math.pow(searchLen, 2); // Bonus for substring starting on a beginningIndex
-        score -= targetLen - searchLen; // Penalty for longer targets
-        return score;
-    },
-    /* @docs:
-        @nav: Frontend
-        @chapter: Utils
         @title: Debounce
         @desc: Create a debounced version of a function that delays invoking it until after a specified delay.
         @param:
@@ -1118,6 +881,43 @@ const Utils = {
             entry.target._on_resize_callbacks.iterate((func) => { func(entry.target); });
         });
     }),
+    // Aggregate multiple classes into a single class, can be used to extend more than one class.
+    // aggregate(
+    //     BaseClass: new (...args: any[]) => any,
+    //     ...Mixins: Array<new (...args: any[]) => any>
+    // ) {
+    //     class AggregatedClass extends BaseClass {
+    //         constructor(...args: any[]) {
+    //             super(...args);
+    //             // Additional initialization if needed
+    //         }
+    //     }
+    //     // Copy methods and properties from mixin classes to the AggregatedClass prototype
+    //     Mixins.forEach(MixinClass => {
+    //         // Copy instance methods and properties
+    //         Object.getOwnPropertyNames(MixinClass.prototype).forEach(name => {
+    //             if (name !== 'constructor') {
+    //                 Object.defineProperty(
+    //                     AggregatedClass.prototype,
+    //                     name,
+    //                     Object.getOwnPropertyDescriptor(MixinClass.prototype, name)!
+    //                 );
+    //             }
+    //         });
+    //         // Copy static methods and properties if needed
+    //         Object.getOwnPropertyNames(MixinClass).forEach(name => {
+    //             if (name !== 'prototype' && name !== 'name' && name !== 'length') {
+    //                 Object.defineProperty(
+    //                     AggregatedClass,
+    //                     name,
+    //                     Object.getOwnPropertyDescriptor(MixinClass, name)!
+    //                 );
+    //             }
+    //         });
+    //     });
+    //     return AggregatedClass;
+    // },
 };
 // Export.
 export { Utils };
+export { Utils as utils }; // also export as lowercase for compatibility.
