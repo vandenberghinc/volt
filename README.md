@@ -33,37 +33,81 @@ website/
 ###### config.js
 ```javascript
 // Imports.
-const volt = require("@vandenberghinc/volt");
+import * as volt from "@vandenberghinc/volt";
 
 // Initialize the server.
-const server = new volt.Server({
+export const server = new volt.Server({
     ...
 })
-
-// Exports.
-module.exports = {
-    server,
-};
 ```
 
 ###### endpoints.js
 ```javascript
 // Imports.
-const {server} = require("./config.js");
+import { server } from "./config.js"
 
 // Create an endpoint.
 server.endpoint({
-    ...
+    endpoint: "/",
+    view: { source: "./home.js" } // automatically bundled using esbuild.
 });
+
+// Create a restapi endpoint.
+server.endpoint({
+    endpoint: "/",
+    params: {
+        name: { type: "string", def: "World" },
+        opts: { type: "object", required: false, scheme: {
+            x: "string",
+        }},
+    },
+    authenticated: false,
+    callback(stream, params) {
+        if (...) {
+            return stream.error({ status: server.status.bad_request, message: "Bad request" });
+        }
+        return stream.send({
+            status: 200,
+            data: {
+                greeting: `Hello ${params.name}`,
+            }
+        })
+    }
+});
+
+export {}
+```
+
+###### home.js
+```javascript
+// Imports.
+import * as volt from "@vandenberghinc/volt/frontend";
+
+// Create page.
+volt.utils.on_load(() => {
+    return volt.View(
+        volt.Title("Hello world!")
+            .color("red"),
+        volt.Text("This is an example")
+            .on_render(e => {
+                e.color("blue");
+                console.log("volt.Text rendered.");
+            })
+            .on_resize(e => {
+                console.log("volt.Text resized.");
+            }),
+    )
+})
 ```
 
 ###### server.js
 ```javascript
 // Imports.
-const {server} = require("./config.js");
+import { server } from "./config.js"
 
 // Load endpoints.
-require("./endpoints.js");
+import "./endpoints.js";
 
-server.start().catch(console.error);
+// Start the server.
+await server.start();
 ```
