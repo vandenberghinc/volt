@@ -1,6 +1,6 @@
-<p align="center">
+<!--<p align="center">
   <img src="https://github.com/vandenberghinc/volt/blob/main/dev/media/icon/stroke.png?raw=true" alt="Volt Logo" width="200">
-</p>
+</p>-->
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.1.23-orange" alt="Version">
