@@ -1,34 +1,16 @@
-<p align="center">
-<img src="https://github.com/vandenberghinc/volt/blob/main/dev/media/icon/stroke.png?raw=true" alt="Volt" width="500">
-</p>  
-Creating websites with ease.
-<br><br>
-<p align="center">
-    <img src="https://img.shields.io/badge/version-{{VERSION}}-orange" alt="Bergh-Encryption">
-    <img src="https://img.shields.io/badge/std-c++20-orange" alt="Bergh-Encryption">
-    <img src="https://img.shields.io/badge/status-maintained-forestgreen" alt="Bergh-Encryption">
-    <img src="https://img.shields.io/badge/dependencies-vlib-yellow" alt="Bergh-Encryption">
-    <img src="https://img.shields.io/badge/OS-MacOS & Linux-blue" alt="Bergh-Encryption">
-</p> 
-<br><br>
-
-## In Development.
-This library is currently still in development.
-<br><br>
+# Volt
+TS library for creating a web server, including a SwiftUI inspired frontend module. 
 
 <!-- ## Documentation.
 Full documentation at [Github Pages](https://vandenberghinc.github.io/volt). -->
 
 ## Project hierarchy.
-When creating a website using volt it is advised to create the following project hierarchy. The `server.js` file must either reside at `./server/server.js` or at `./server.js`.
-```
-website/
-    server/
-        config.js - Use this file to define the Server object and export it in module.exports either under the attribute `server` or as the export itself.
-        endpoints.js - For example use this file to define your endpoints.
-        server.js - Use this file to import the server and require all endpoints. This file must be named server.js for the volt cli.
-    ...
-```
+When creating a project using volt it is advised to create the following project hierarchy.
+* `website/`
+    * `server/`
+        * `config.js` - Use this file to define and export the Server instance.
+        * `server.js` - A file that imports the server and all endpoints and optionall re-exports the server.
+        * `start.js` - A file that imports `server.js` and calls `server.start()`.
 
 ###### config.js
 ```javascript
@@ -111,3 +93,64 @@ import "./endpoints.js";
 // Start the server.
 await server.start();
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--
+<p align="center">
+<img src="https://github.com/vandenberghinc/volt/blob/main/dev/media/icon/stroke.png?raw=true" alt="Volt" width="500">
+</p>  
+Creating websites with ease.
+<br><br>
+<p align="center">
+    <img 
+        src="https://img.shields.io/badge/version-{{VERSION}}-orange" 
+        alt="@vandenberghinc/vlib"
+    >
+    <img
+        src="https://img.shields.io/badge/status-maintained-forestgreen" 
+        alt="@vandenberghinc/vlib"
+    >
+    <img src="https://img.shields.io/badge/std-c++20-orange" alt="B@vandenberghinc/vlib">
+    <img
+        src="https://img.shields.io/badge/dependencies-vlib-yellow" 
+        alt="@vandenberghinc/vlib"
+    >
+    <img
+        src="https://img.shields.io/badge/OS-MacOS & Linux-blue"
+        alt="@vandenberghinc/vlib"
+    >
+</p> 
+<br><br>
+-->
