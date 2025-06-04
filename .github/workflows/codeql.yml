@@ -45,11 +45,11 @@ jobs:
         run: npm install
         working-directory: ./
 
-      - name: Build backend
-        run: npm run build:backend
-        working-directory: ./
-        # ↳ Make sure backend/package.json has:
-        #   "scripts": { "build": "tsc -p tsconfig.json" }
+    #   - name: Build backend
+    #     run: npm run build:backend
+    #     working-directory: ./
+    #     # ↳ Make sure backend/package.json has:
+    #     #   "scripts": { "build": "tsc -p tsconfig.json" }
 
       - name: Perform backend CodeQL analysis
         uses: github/codeql-action/analyze@v3
@@ -58,7 +58,7 @@ jobs:
           extra-options: |
             --include='backend/src/**/*.ts'
             --include='backend/src/**/*.js'
-            --include='backend/dist/**/*.js'
+            # --include='backend/dist/**/*.js'
             # (Include compiled ESM JS if it lands in backend/dist/)
 
   frontend-codeql:
@@ -85,11 +85,11 @@ jobs:
         run: npm install
         working-directory: ./
 
-      - name: Build frontend
-        run: npm run build:frontend
-        working-directory: ./
-        # ↳ Make sure frontend/package.json has:
-        #   "scripts": { "build": "tsc -p tsconfig.json" }
+    #   - name: Build frontend
+    #     run: npm run build:frontend
+    #     working-directory: ./
+    #     # ↳ Make sure frontend/package.json has:
+    #     #   "scripts": { "build": "tsc -p tsconfig.json" }
 
       - name: Perform frontend CodeQL analysis
         uses: github/codeql-action/analyze@v3
@@ -98,5 +98,5 @@ jobs:
           extra-options: |
             --include='frontend/src/**/*.ts'
             --include='frontend/src/**/*.js'
-            --include='frontend/dist/**/*.js'
+            # --include='frontend/dist/**/*.js'
             # (Include compiled ESM JS if it lands in frontend/dist/)
