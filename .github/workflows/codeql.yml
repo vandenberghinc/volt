@@ -4,102 +4,97 @@ name: "CodeQL ESM TypeScript Scans"
 on:
   push:
     branches:
-      - main           # ← change this if your default branch is 'master' or something else
+      - main
     paths:
-      - 'src/**'       # backend ESM NodeJS TS
-      - 'lib/**'       # (if you have a lib folder for backend)
-      - 'web/**'       # frontend ESM Web TS
+      - 'backend/src/**'
+      - 'frontend/src/**'
       - '.github/workflows/codeql.yml'
   pull_request:
     branches:
       - main
     paths:
-      - 'src/**'
-      - 'lib/**'
-      - 'web/**'
+      - 'backend/src/**'
+      - 'frontend/src/**'
       - '.github/workflows/codeql.yml'
+
+permissions:
+  contents: read
+  security-events: write
 
 jobs:
   backend-codeql:
     name: "CodeQL Scan: Backend (NodeJS ESM TS)"
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
 
     steps:
-      - name: Check out repo
+      - name: "Checkout repository"
         uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+      - name: "Initialize CodeQL"
+        uses: github/codeql-action/init@v3
         with:
           languages: javascript,typescript
 
-      - name: Setup Node.js 18.x
+      - name: "Setup Node.js 18.x"
         uses: actions/setup-node@v4
         with:
           node-version: 18.x
-          cache: 'npm'
+          cache: npm
 
-      - name: Install dependencies
+      - name: "Install backend dependencies"
         run: npm ci
+        working-directory: ./backend
 
-      - name: Build Backend
-        run: npm run build:backend
-        # ↳ e.g. "build:backend": "tsc -p tsconfig.backend.json"
+      - name: "Build backend"
+        run: npm run build
+        working-directory: ./backend
+        # ↳ Assumes backend/package.json has "build": "tsc -p tsconfig.json" (ESM TS → dist)
 
-      - name: Perform Backend CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+      - name: "Perform backend CodeQL analysis"
+        uses: github/codeql-action/analyze@v3
         with:
           category: "codeql-backend-scan"
           extra-options: |
-            --include='src/**/*.ts'
-            --include='src/**/*.js'
-            --include='lib/**/*.ts'
-            --include='lib/**/*.js'
+            --include='backend/src/**/*.ts'
+            --include='backend/src/**/*.js'
+            --include='backend/dist/**/*.js'
+            # (If your compiled ESM JS lands in backend/dist/)
 
   frontend-codeql:
-    needs: backend-codeql
     name: "CodeQL Scan: Frontend (Web ESM TS)"
+    needs: backend-codeql
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
 
     steps:
-      - name: Check out repo
+      - name: "Checkout repository"
         uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+      - name: "Initialize CodeQL"
+        uses: github/codeql-action/init@v3
         with:
           languages: javascript,typescript
 
-      - name: Setup Node.js 18.x
+      - name: "Setup Node.js 18.x"
         uses: actions/setup-node@v4
         with:
           node-version: 18.x
-          cache: 'npm'
+          cache: npm
 
-      - name: Install Frontend Dependencies
-        run: |
-          cd web
-          npm ci
+      - name: "Install frontend dependencies"
+        run: npm ci
+        working-directory: ./frontend
 
-      - name: Build Frontend
-        run: |
-          cd web
-          npm run build
-        # ↳ e.g. "build": "tsc -p tsconfig.web.json" or whatever your web/ build command is.
+      - name: "Build frontend"
+        run: npm run build
+        working-directory: ./frontend
+        # ↳ Assumes frontend/package.json has "build": "tsc -p tsconfig.json" (ESM TS → dist)
 
-      - name: Perform Frontend CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+      - name: "Perform frontend CodeQL analysis"
+        uses: github/codeql-action/analyze@v3
         with:
           category: "codeql-frontend-scan"
           extra-options: |
-            --include='web/**/*.ts'
-            --include='web/**/*.js'
-
-
-            
+            --include='frontend/src/**/*.ts'
+            --include='frontend/src/**/*.js'
+            --include='frontend/dist/**/*.js'
+            # (If your compiled ESM JS lands in frontend/dist/)
