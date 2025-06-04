@@ -43,11 +43,11 @@ jobs:
 
       - name: Install backend dependencies
         run: npm install
-        working-directory: ./backend
+        working-directory: ./
 
       - name: Build backend
-        run: npm run build
-        working-directory: ./backend
+        run: npm run build:backend
+        working-directory: ./
         # ↳ Make sure backend/package.json has:
         #   "scripts": { "build": "tsc -p tsconfig.json" }
 
@@ -83,11 +83,11 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm install
-        working-directory: ./frontend
+        working-directory: ./
 
       - name: Build frontend
-        run: npm run build
-        working-directory: ./frontend
+        run: npm run build:frontend
+        working-directory: ./
         # ↳ Make sure frontend/package.json has:
         #   "scripts": { "build": "tsc -p tsconfig.json" }
 
