@@ -22,7 +22,7 @@ export class Blacklist {
     }) {
 
 		// Checks.
-		vlib.Scheme.verify({object: arguments[0], check_unknown: true, scheme: {
+        vlib.Scheme.validate(arguments[0], {strict: true, scheme: {
             api_key: "string",
         }});
 

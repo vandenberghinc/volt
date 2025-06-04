@@ -349,255 +349,116 @@ export class Users {
         // ---------------------------------------------------------
         // Default auth endpoints.
         
-        this.server.endpoint(
-
-            // Send 2fa.
-            {
-                method: "GET",
-                endpoint: "/volt/auth/2fa",
-                content_type: "application/json",
-                rate_limit: "global",
-                params: {
-                    email: "string",
-                },
-                callback: async (stream: Stream, params: Record<string, any>) => {
-                    // Get uid.
-                    let uid;
-                    if ((uid = await this.get_uid_by_email(params.email)) == null) {
-                        return stream.success({
-                            data: { message: "A 2FA code was sent if the specified email exists." },
-                        });
-                    }
-
-                    // Send.
-                    await this.send_2fa({ uid: uid, stream });
+        // Send 2fa.
+        this.server.endpoint({
+            method: "GET",
+            endpoint: "/volt/auth/2fa",
+            content_type: "application/json",
+            rate_limit: "global",
+            params: {
+                email: "string",
+            },
+            callback: async (stream: Stream, params: Record<string, any>) => {
+                // Get uid.
+                let uid;
+                if ((uid = await this.get_uid_by_email(params.email)) == null) {
                     return stream.success({
                         data: { message: "A 2FA code was sent if the specified email exists." },
                     });
                 }
+
+                // Send.
+                await this.send_2fa({ uid: uid, stream });
+                return stream.success({
+                    data: { message: "A 2FA code was sent if the specified email exists." },
+                });
+            }
+        });
+
+        // Sign in.
+        this.server.endpoint({
+            method: "POST",
+            endpoint: "/volt/auth/signin",
+            content_type: "application/json",
+            rate_limit: {
+                limit: 10,
+                interval: 60,
+                group: "volt.auth"
             },
+            callback: async (stream: Stream) => {
+                // Get params.
+                let email: string | undefined,
+                    email_err: Error | undefined,
+                    username: string | undefined,
+                    username_err: Error | undefined,
+                    password: string,
+                    uid: string | none,
+                    code: string;
+                try {
+                    email = stream.param("email");
+                } catch (err) {
+                    email_err = err as Error;
+                }
+                try {
+                    username = stream.param("username");
+                } catch (err) {
+                    username_err = err as Error;
+                }
+                if (email_err && username_err) {
+                    return stream.error({
+                        status: Status.bad_request, 
+                        type: "InvalidParams",
+                        message: email_err.message,
+                    });
+                }
+                try {
+                    password = stream.param("password");
+                } catch (err) {
+                    return stream.error({
+                        status: Status.bad_request, 
+                        type: "InvalidParams",
+                        message: (err as any).message,
+                    });
+                }
 
-            // Sign in.
-            {
-                method: "POST",
-                endpoint: "/volt/auth/signin",
-                content_type: "application/json",
-                rate_limit: {
-                    limit: 10,
-                    interval: 60,
-                    group: "volt.auth"
-                },
-                callback: async (stream: Stream) => {
-                    // Get params.
-                    let email: string | undefined,
-                        email_err: Error | undefined,
-                        username: string | undefined,
-                        username_err: Error | undefined,
-                        password: string,
-                        uid: string | none,
-                        code: string;
-                    try {
-                        email = stream.param("email");
-                    } catch (err) {
-                        email_err = err as Error;
-                    }
-                    try {
-                        username = stream.param("username");
-                    } catch (err) {
-                        username_err = err as Error;
-                    }
-                    if (email_err && username_err) {
+                // Get uid.
+                if (email) {
+                    if ((uid = await this.get_uid_by_email(email)) == null) {
                         return stream.error({
-                            status: Status.bad_request, 
-                            type: "InvalidParams",
-                            message: email_err.message,
+                            status: Status.unauthorized,
+                            type: "Unauthorized",
+                            message: "Unauthorized.",
+                            invalid_fields: {
+                                "email": "Invalid or unrecognized email",
+                                "password": "Invalid or unrecognized password",
+                            },
                         });
                     }
-                    try {
-                        password = stream.param("password");
-                    } catch (err) {
+                } else {
+                    if ((uid = await this.get_uid(username as string)) == null) {
                         return stream.error({
-                            status: Status.bad_request, 
-                            type: "InvalidParams",
-                            message: (err as any).message,
-                        });
-                    }
-
-                    // Get uid.
-                    if (email) {
-                        if ((uid = await this.get_uid_by_email(email)) == null) {
-                            return stream.error({
-                                status: Status.unauthorized,
-                                type: "Unauthorized",
-                                message: "Unauthorized.",
-                                invalid_fields: {
-                                    "email": "Invalid or unrecognized email",
-                                    "password": "Invalid or unrecognized password",
-                                },
-                            });
-                        }
-                    } else {
-                        if ((uid = await this.get_uid(username as string)) == null) {
-                            return stream.error({
-                                status: Status.unauthorized,
-                                type: "Unauthorized",
-                                message: "Unauthorized.",
-                                invalid_fields: {
-                                    "username": "Invalid or unrecognized username",
-                                    "password": "Invalid or unrecognized password",
-                                },
-                            });
-                        }
-                    }
-
-                    // Verify password.
-                    if (await this.verify_password(uid, password)) {
-                        // Verify 2fa.
-                        if (this.server.enable_2fa) {
-                            // Get 2FA.
-                            try {
-                                code = stream.param("code");
-                            } catch (err) {
-                                // Send 2fa and add to avg time tracking.
-                                const start_time = Date.now();
-                                await this.send_2fa({ uid: uid, stream });
-
-                                // Add to avg time tracking.
-                                if (this.avg_send_2fa_time.length >= 10000) {
-                                    this.avg_send_2fa_time.shift();
-                                }
-                                this.avg_send_2fa_time.push(Date.now() - start_time);
-
-                                // Send error.
-                                return stream.send({
-                                    status: Status.two_factor_auth_required,
-                                    data: { error: "2FA required." }
-                                });
-                            }
-
-                            // Verify 2FA.
-                            const err = await this.verify_2fa(uid, code);
-                            if (err) {
-                                return stream.send({
-                                    status: Status.unauthorized,
-                                    data: {
-                                        error: "Invalid 2FA code.",
-                                        invalid_fields: {
-                                            "code": err,
-                                        },
-                                    }
-                                });
-                            }
-                        }
-
-                        // Sign in.
-                        return await this._sign_in_response(stream, uid);
-                    }
-
-                    // Wait for the same time as it would time on avg to send a mail.
-                    if (this.avg_send_2fa_time.length >= 10) {
-                        const sorted = [...this.avg_send_2fa_time].sort((a, b) => a - b);
-                        const mid = Math.floor(sorted.length / 2);
-                        if (sorted.length % 2 === 0) {
-                            return (sorted[mid - 1] + sorted[mid]) / 2;
-                        }
-                        await new Promise(resolve => setTimeout(resolve, sorted[mid]));
-                    }
-
-                    // Unauthorized.
-                    return stream.send({
-                        status: Status.unauthorized,
-                        data: {
-                            error: "Unauthorized.",
+                            status: Status.unauthorized,
+                            type: "Unauthorized",
+                            message: "Unauthorized.",
                             invalid_fields: {
                                 "username": "Invalid or unrecognized username",
                                 "password": "Invalid or unrecognized password",
                             },
-                        }
-                    });
+                        });
+                    }
                 }
-            },
 
-            // Sign out.
-            {
-                method: "POST",
-                endpoint: "/volt/auth/signout",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                callback: async (stream: AuthStream) => {
-                    // Delete token.
-                    await this._deactivate_token(stream.uid);
-
-                    // Create headers.
-                    this._reset_cookies(stream);
-
-                    // Response.
-                    return stream.success({
-                        data: { message: "Successfully signed out." },
-                    });
-                }
-            },
-
-            // Sign up.
-            {
-                method: "POST",
-                endpoint: "/volt/auth/signup",
-                content_type: "application/json",
-                rate_limit: "global",
-                params: {
-                    username: "string",
-                    first_name: "string",
-                    last_name: "string",
-                    email: "string",
-                    password: "string",
-                    verify_password: "string",
-                    phone_number: { type: "string", required: false },
-                    code: { type: "string", required: false },
-                },
-                callback: async (stream: Stream, params: Record<string, any>) => {
-                    // Verify password.
-                    const { error, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
-                    if (error) {
-                        return stream.error({
-                            status: Status.bad_request,
-                            type: "InvalidParams",
-                            message: error,
-                            invalid_fields: invalid_fields ?? undefined,
-                        });
-                    }
-
-                    // Verify username and email.
-                    if (await this.username_exists(params.username)) {
-                        throw new ExternalError({
-                            type: "UsernameAlreadyExists",
-                            message: `Username "${params.username}" is already registered.`,
-                            status: Status.bad_request,
-                            invalid_fields: { "username": "Username is already registered" },
-                        });
-                    }
-                    if (await this.email_exists(params.email)) {
-                        throw new ExternalError({
-                            type: "EmailAlreadyExists",
-                            message: `Email "${params.email}" is already registered.`,
-                            status: Status.bad_request,
-                            invalid_fields: { "email": "Email is already registered" }
-                        });
-                    }
-
+                // Verify password.
+                if (await this.verify_password(uid, password)) {
                     // Verify 2fa.
                     if (this.server.enable_2fa) {
-                        // Send 2FA.
-                        if (params.code == null || params.code == "") {
-                            
+                        // Get 2FA.
+                        try {
+                            code = stream.param("code");
+                        } catch (err) {
                             // Send 2fa and add to avg time tracking.
                             const start_time = Date.now();
-                            await this.send_2fa({
-                                _email: params.email,
-                                _username: params.username,
-                                stream,
-                                uid: undefined as unknown as string, // keep uid required param but use _email sys arg here.
-                            });
+                            await this.send_2fa({ uid: uid, stream });
 
                             // Add to avg time tracking.
                             if (this.avg_send_2fa_time.length >= 10000) {
@@ -613,7 +474,7 @@ export class Users {
                         }
 
                         // Verify 2FA.
-                        const err = await this.verify_2fa(params.email, params.code);
+                        const err = await this.verify_2fa(uid, code);
                         if (err) {
                             return stream.send({
                                 status: Status.unauthorized,
@@ -627,474 +488,604 @@ export class Users {
                         }
                     }
 
-                    // Create.
-                    delete params.verify_password;
-                    delete params.code;
-                    params.is_activated = true; // already verified by 2fa or no 2fa is enabled.
-                    params._check_username_email = false; // already checked.
-                    let uid;
-                    try {
-                        uid = await this.create(params as any);
-                    } catch (err) {
-                        return stream.error({
-                            status: Status.bad_request,
-                            type: "InvalidParams",
-                            message: (err as Error).message,
-                            invalid_fields: (err as any).invalid_fields || {},
-                        });
-                    }
-
                     // Sign in.
                     return await this._sign_in_response(stream, uid);
                 }
+
+                // Wait for the same time as it would time on avg to send a mail.
+                if (this.avg_send_2fa_time.length >= 10) {
+                    const sorted = [...this.avg_send_2fa_time].sort((a, b) => a - b);
+                    const mid = Math.floor(sorted.length / 2);
+                    if (sorted.length % 2 === 0) {
+                        return (sorted[mid - 1] + sorted[mid]) / 2;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, sorted[mid]));
+                }
+
+                // Unauthorized.
+                return stream.send({
+                    status: Status.unauthorized,
+                    data: {
+                        error: "Unauthorized.",
+                        invalid_fields: {
+                            "username": "Invalid or unrecognized username",
+                            "password": "Invalid or unrecognized password",
+                        },
+                    }
+                });
+            }
+        });
+
+        // Sign out.
+        this.server.endpoint({
+            method: "POST",
+            endpoint: "/volt/auth/signout",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            callback: async (stream: AuthStream) => {
+                // Delete token.
+                await this._deactivate_token(stream.uid);
+
+                // Create headers.
+                this._reset_cookies(stream);
+
+                // Response.
+                return stream.success({
+                    data: { message: "Successfully signed out." },
+                });
+            }
+        });
+
+        // Sign up.
+        this.server.endpoint({
+            method: "POST",
+            endpoint: "/volt/auth/signup",
+            content_type: "application/json",
+            rate_limit: "global",
+            params: {
+                username: "string",
+                first_name: "string",
+                last_name: "string",
+                email: "string",
+                password: "string",
+                verify_password: "string",
+                phone_number: { type: "string", required: false },
+                code: { type: "string", required: false },
             },
+            callback: async (stream: Stream, params: Record<string, any>) => {
+                // Verify password.
+                const { error, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
+                if (error) {
+                    return stream.error({
+                        status: Status.bad_request,
+                        type: "InvalidParams",
+                        message: error,
+                        invalid_fields: invalid_fields ?? undefined,
+                    });
+                }
 
-            // Activate account.
-            {
-                method: "POST",
-                endpoint: "/volt/auth/activate",
-                content_type: "application/json",
-                rate_limit: "global",
-                params: {
-                    "code": "string",
-                },
-                callback: async (stream: Stream, params: Record<string, any>) => {
-                    // Vars.
-                    let uid = stream.uid;
+                // Verify username and email.
+                if (await this.username_exists(params.username)) {
+                    throw new ExternalError({
+                        type: "UsernameAlreadyExists",
+                        message: `Username "${params.username}" is already registered.`,
+                        status: Status.bad_request,
+                        invalid_fields: { "username": "Username is already registered" },
+                    });
+                }
+                if (await this.email_exists(params.email)) {
+                    throw new ExternalError({
+                        type: "EmailAlreadyExists",
+                        message: `Email "${params.email}" is already registered.`,
+                        status: Status.bad_request,
+                        invalid_fields: { "email": "Email is already registered" }
+                    });
+                }
 
-                    // Get uid by cookie.
-                    if (uid == null) {
-                        uid = stream.cookies["UserID"].value;
-                        if (uid === "null" || uid === "-1") {
-                            uid = null;
+                // Verify 2fa.
+                if (this.server.enable_2fa) {
+                    // Send 2FA.
+                    if (params.code == null || params.code == "") {
+                        
+                        // Send 2fa and add to avg time tracking.
+                        const start_time = Date.now();
+                        await this.send_2fa({
+                            _email: params.email,
+                            _username: params.username,
+                            stream,
+                            uid: undefined as unknown as string, // keep uid required param but use _email sys arg here.
+                        });
+
+                        // Add to avg time tracking.
+                        if (this.avg_send_2fa_time.length >= 10000) {
+                            this.avg_send_2fa_time.shift();
                         }
+                        this.avg_send_2fa_time.push(Date.now() - start_time);
+
+                        // Send error.
+                        return stream.send({
+                            status: Status.two_factor_auth_required,
+                            data: { error: "2FA required." }
+                        });
                     }
 
-                    // Check uid.
-                    if (uid == null) {
-                        return stream.error({ status: Status.forbidden, message: "Permission denied." });
-                    }
-
-                    // Verify.
-                    const err = await this.verify_2fa(uid, params.code);
+                    // Verify 2FA.
+                    const err = await this.verify_2fa(params.email, params.code);
                     if (err) {
-                        return stream.error({
-                            status: Status.forbidden,
-                            message: "Permission denied.",
-                            invalid_fields: {
-                                "code": err,
-                            },
+                        return stream.send({
+                            status: Status.unauthorized,
+                            data: {
+                                error: "Invalid 2FA code.",
+                                invalid_fields: {
+                                    "code": err,
+                                },
+                            }
                         });
                     }
-
-                    // Set activated.
-                    await this.set_activated(uid, true);
-
-                    // Response.
-                    await this._create_user_cookie(stream, uid);
-                    return stream.success({ data: { message: "Successfully verified the 2FA code." } });
                 }
-            },
 
-            // Forgot password.
-            {
-                method: "POST",
-                endpoint: "/volt/auth/forgot_password",
-                content_type: "application/json",
-                rate_limit: "global",
-                params: {
-                    email: "string",
-                    code: "string",
-                    password: "string",
-                    verify_password: "string",
-                },
-                callback: async (stream: Stream, params: Record<string, any>) => {
-                    // Verify password.
-                    const { error, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
-                    if (error) {
-                        return stream.error({
-                            status: Status.bad_request,
-                            message: error,
-                            invalid_fields: invalid_fields ?? undefined,
-                        });
-                    }
-
-                    // Get uid.
-                    let uid;
-                    if ((uid = await this.get_uid_by_email(params.email)) == null) {
-                        return stream.error({ status: Status.forbidden, message: "Invalid email." });
-                    }
-
-                    // Verify 2fa.
-                    const err = await this.verify_2fa(uid, params.code);
-                    if (err) {
-                        return stream.error({
-                            status: Status.forbidden,
-                            message: "Invalid 2FA code.",
-                            invalid_fields: {
-                                "code": "Invalid code"
-                            },
-                        });
-                    }
-
-                    // Set password.
-                    await this.set_password(uid, params.password);
-
-                    // Sign in.
-                    return await this._sign_in_response(stream, uid);
+                // Create.
+                delete params.verify_password;
+                delete params.code;
+                params.is_activated = true; // already verified by 2fa or no 2fa is enabled.
+                params._check_username_email = false; // already checked.
+                let uid;
+                try {
+                    uid = await this.create(params as any);
+                } catch (err) {
+                    return stream.error({
+                        status: Status.bad_request,
+                        type: "InvalidParams",
+                        message: (err as Error).message,
+                        invalid_fields: (err as any).invalid_fields || {},
+                    });
                 }
+
+                // Sign in.
+                return await this._sign_in_response(stream, uid);
+            }
+        });
+
+        // Activate account.
+        this.server.endpoint({
+            method: "POST",
+            endpoint: "/volt/auth/activate",
+            content_type: "application/json",
+            rate_limit: "global",
+            params: {
+                "code": "string",
             },
-        );
+            callback: async (stream: Stream, params: Record<string, any>) => {
+                // Vars.
+                let uid = stream.uid;
+
+                // Get uid by cookie.
+                if (uid == null) {
+                    uid = stream.cookies["UserID"].value;
+                    if (uid === "null" || uid === "-1") {
+                        uid = null;
+                    }
+                }
+
+                // Check uid.
+                if (uid == null) {
+                    return stream.error({ status: Status.forbidden, message: "Permission denied." });
+                }
+
+                // Verify.
+                const err = await this.verify_2fa(uid, params.code);
+                if (err) {
+                    return stream.error({
+                        status: Status.forbidden,
+                        message: "Permission denied.",
+                        invalid_fields: {
+                            "code": err,
+                        },
+                    });
+                }
+
+                // Set activated.
+                await this.set_activated(uid, true);
+
+                // Response.
+                await this._create_user_cookie(stream, uid);
+                return stream.success({ data: { message: "Successfully verified the 2FA code." } });
+            }
+        });
+
+        // Forgot password.
+        this.server.endpoint({
+            method: "POST",
+            endpoint: "/volt/auth/forgot_password",
+            content_type: "application/json",
+            rate_limit: "global",
+            params: {
+                email: "string",
+                code: "string",
+                password: "string",
+                verify_password: "string",
+            },
+            callback: async (stream: Stream, params: Record<string, any>) => {
+                // Verify password.
+                const { error, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
+                if (error) {
+                    return stream.error({
+                        status: Status.bad_request,
+                        message: error,
+                        invalid_fields: invalid_fields ?? undefined,
+                    });
+                }
+
+                // Get uid.
+                let uid;
+                if ((uid = await this.get_uid_by_email(params.email)) == null) {
+                    return stream.error({ status: Status.forbidden, message: "Invalid email." });
+                }
+
+                // Verify 2fa.
+                const err = await this.verify_2fa(uid, params.code);
+                if (err) {
+                    return stream.error({
+                        status: Status.forbidden,
+                        message: "Invalid 2FA code.",
+                        invalid_fields: {
+                            "code": "Invalid code"
+                        },
+                    });
+                }
+
+                // Set password.
+                await this.set_password(uid, params.password);
+
+                // Sign in.
+                return await this._sign_in_response(stream, uid);
+            }
+        });
 
         // ---------------------------------------------------------
         // Default user endpoints.
 
-        this.server.endpoint(
-
-            // Get user.
-            {
-                method: "GET",
-                endpoint: "/volt/user",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                params: {
-                    // detailed: { type: "boolean", default: false },
-                },
-                callback: async (stream: AuthStream, params: Record<string, any>) => {
-                    const user = await this.get(stream.uid);
-
-                    // Mask sensitive data.
-                    if (user.password) { user.password = "*".repeat(user.password.length); }
-                    if (user.api_key) { user.api_key = "*".repeat(user.api_key.length); }
-
-                    // Ensure string type for frontend scheme.
-                    user.first_name ??= "";
-                    user.last_name ??= "";
-                    user.username ??= "";
-                    user.email ??= "";
-                    user.password ??= "";
-                    user.api_key ??= "";
-                    user.support_pin ??= "";
-
-                    return stream.success({ data: user });
-                }
+        // Get user.
+        this.server.endpoint({
+            method: "GET",
+            endpoint: "/volt/user",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            params: {
+                // detailed: { type: "boolean", default: false },
             },
+            callback: async (stream: AuthStream, params: Record<string, any>) => {
+                const user = await this.get(stream.uid);
 
-            // Set user.
-            {
-                method: "POST",
-                endpoint: "/volt/user",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                callback: async (stream: AuthStream) => {
-                    await this.set(stream.uid, stream.params);
-                    await this._create_detailed_user_cookie(stream, stream.uid);
-                    return stream.success({ data: { message: "Successfully updated your account." } });
-                }
+                // Mask sensitive data.
+                if (user.password) { user.password = "*".repeat(user.password.length); }
+                if (user.api_key) { user.api_key = "*".repeat(user.api_key.length); }
+
+                // Ensure string type for frontend scheme.
+                user.first_name ??= "";
+                user.last_name ??= "";
+                user.username ??= "";
+                user.email ??= "";
+                user.password ??= "";
+                user.api_key ??= "";
+                user.support_pin ??= "";
+
+                return stream.success({ data: user });
+            }
+        });
+
+        // Set user.
+        this.server.endpoint({
+            method: "POST",
+            endpoint: "/volt/user",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            callback: async (stream: AuthStream) => {
+                await this.set(stream.uid, stream.params);
+                await this._create_detailed_user_cookie(stream, stream.uid);
+                return stream.success({ data: { message: "Successfully updated your account." } });
+            }
+        });
+
+        // Change password.
+        this.server.endpoint({
+            method: "POST",
+            endpoint: "/volt/user/change_password",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            params: {
+                current_password: "string",
+                password: "string",
+                verify_password: "string",
             },
-
-            // Change password.
-            {
-                method: "POST",
-                endpoint: "/volt/user/change_password",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                params: {
-                    current_password: "string",
-                    password: "string",
-                    verify_password: "string",
-                },
-                callback: async (stream: AuthStream, params: Record<string, any>) => {
-                    // Verify old password.
-                    if (await this.verify_password(stream.uid, params.current_password) !== true) {
-                        return stream.error({
-                            status: Status.unauthorized,
-                            message: "Incorrect password.",
-                            invalid_fields: {
-                                current_password: "Incorrect password.",
-                            }
-                        });
-                    }
-
-                    // Verify new password.
-                    const { error, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
-                    if (error) {
-                        return stream.error({
-                            status: Status.bad_request,
-                            message: error,
-                            invalid_fields: invalid_fields ?? undefined,
-                        });
-                    }
-
-                    // Set password.
-                    await this.set_password(stream.uid, params.password);
-
-                    // Success.
-                    return stream.success({
-                        status: Status.success,
-                        data: { message: "Successfully updated your password." },
-                    });
-                }
-            },
-
-            // Delete account.
-            {
-                method: "DELETE",
-                endpoint: "/volt/user",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                callback: async (stream: AuthStream) => {
-                    // Delete.
-                    await this.delete(stream.uid);
-
-                    // Reset cookies.
-                    this._reset_cookies(stream);
-
-                    // Success.
-                    return stream.success({
-                        status: Status.success,
-                        data: { message: "Successfully deleted your account." },
-                    });
-                }
-            },
-
-            // Generate API key.
-            {
-                method: "POST",
-                endpoint: "/volt/user/api_key",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                callback: async (stream: AuthStream) => {
-                    return stream.success({
-                        data: {
-                            message: "Successfully generated an API key.",
-                            api_key: await this.generate_api_key(stream.uid),
+            callback: async (stream: AuthStream, params: Record<string, any>) => {
+                // Verify old password.
+                if (await this.verify_password(stream.uid, params.current_password) !== true) {
+                    return stream.error({
+                        status: Status.unauthorized,
+                        message: "Incorrect password.",
+                        invalid_fields: {
+                            current_password: "Incorrect password.",
                         }
                     });
                 }
-            },
 
-            // Revoke API key.
-            {
-                method: "DELETE",
-                endpoint: "/volt/user/api_key",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                callback: async (stream: AuthStream) => {
-                    await this.revoke_api_key(stream.uid);
-                    return stream.send({
-                        status: Status.success,
-                        data: { message: "Successfully revoked your API key." },
+                // Verify new password.
+                const { error, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
+                if (error) {
+                    return stream.error({
+                        status: Status.bad_request,
+                        message: error,
+                        invalid_fields: invalid_fields ?? undefined,
                     });
                 }
-            },
 
-            // Load data.
-            {
-                method: "GET",
-                endpoint: "/volt/user/data",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                params: {
-                    path: "string",
-                    default: { type: "string", default: null },
-                },
-                callback: async (stream: AuthStream, params: Record<string, any>) => {
-                    return stream.send({
-                        status: Status.success,
-                        data: await this.public.load({ uid: stream.uid, path: params.path }, { default: params.default })
-                    });
-                }
-            },
+                // Set password.
+                await this.set_password(stream.uid, params.password);
 
-            // Save data.
-            {
-                method: "POST",
-                endpoint: "/volt/user/data",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                params: {
-                    path: "string",
-                    data: { type: undefined },
-                },
-                callback: async (stream: AuthStream, params: Record<string, any>) => {
-                    await this.public.save({ uid: stream.uid, path: params.path }, params.data);
-                    return stream.send({
-                        status: Status.success,
-                        data: { message: "Successfully saved." },
-                    });
-                }
-            },
+                // Success.
+                return stream.success({
+                    status: Status.success,
+                    data: { message: "Successfully updated your password." },
+                });
+            }
+        });
 
-            // Delete data.
-            {
-                method: "DELETE",
-                endpoint: "/volt/user/data",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                params: {
-                    path: "string",
-                    data: { type: undefined },
-                    recursive: { type: "string", default: false },
-                },
-                callback: async (stream: AuthStream, params: Record<string, any>) => {
-                    await this.public.delete({ uid: stream.uid, path: params.path }, params.recursive);
-                    return stream.send({
-                        status: Status.success,
-                        data: { message: "Successfully deleted." },
-                    });
-                }
-            },
+        // Delete account.
+        this.server.endpoint({
+            method: "DELETE",
+            endpoint: "/volt/user",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            callback: async (stream: AuthStream) => {
+                // Delete.
+                await this.delete(stream.uid);
 
-            // Load protected data.
-            {
-                method: "GET",
-                endpoint: "/volt/user/data/protected",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                params: {
-                    path: "string",
-                    default: { type: "string", default: null },
-                },
-                callback: async (stream: AuthStream, params: Record<string, any>) => {
-                    return stream.send({
-                        status: Status.success,
-                        data: await this.protected.load({ uid: stream.uid, path: params.path }, { default: params.default })
-                    });
-                }
+                // Reset cookies.
+                this._reset_cookies(stream);
+
+                // Success.
+                return stream.success({
+                    status: Status.success,
+                    data: { message: "Successfully deleted your account." },
+                });
+            }
+        });
+
+        // Generate API key.
+        this.server.endpoint({
+            method: "POST",
+            endpoint: "/volt/user/api_key",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            callback: async (stream: AuthStream) => {
+                return stream.success({
+                    data: {
+                        message: "Successfully generated an API key.",
+                        api_key: await this.generate_api_key(stream.uid),
+                    }
+                });
+            }
+        });
+
+        // Revoke API key.
+        this.server.endpoint({
+            method: "DELETE",
+            endpoint: "/volt/user/api_key",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            callback: async (stream: AuthStream) => {
+                await this.revoke_api_key(stream.uid);
+                return stream.send({
+                    status: Status.success,
+                    data: { message: "Successfully revoked your API key." },
+                });
+            }
+        });
+
+        // Load data.
+        this.server.endpoint({
+            method: "GET",
+            endpoint: "/volt/user/data",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            params: {
+                path: "string",
+                default: { type: "string", default: null },
             },
-        );
+            callback: async (stream: AuthStream, params: Record<string, any>) => {
+                return stream.send({
+                    status: Status.success,
+                    data: await this.public.load({ uid: stream.uid, path: params.path }, { default: params.default })
+                });
+            }
+        });
+
+        // Save data.
+        this.server.endpoint({
+            method: "POST",
+            endpoint: "/volt/user/data",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            params: {
+                path: "string",
+                data: { type: undefined },
+            },
+            callback: async (stream: AuthStream, params: Record<string, any>) => {
+                await this.public.save({ uid: stream.uid, path: params.path }, params.data);
+                return stream.send({
+                    status: Status.success,
+                    data: { message: "Successfully saved." },
+                });
+            }
+        });
+
+        // Delete data.
+        this.server.endpoint({
+            method: "DELETE",
+            endpoint: "/volt/user/data",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            params: {
+                path: "string",
+                data: { type: undefined },
+                recursive: { type: "string", default: false },
+            },
+            callback: async (stream: AuthStream, params: Record<string, any>) => {
+                await this.public.delete({ uid: stream.uid, path: params.path }, params.recursive);
+                return stream.send({
+                    status: Status.success,
+                    data: { message: "Successfully deleted." },
+                });
+            }
+        });
+
+        // Load protected data.
+        this.server.endpoint({
+            method: "GET",
+            endpoint: "/volt/user/data/protected",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            params: {
+                path: "string",
+                default: { type: "string", default: null },
+            },
+            callback: async (stream: AuthStream, params: Record<string, any>) => {
+                return stream.send({
+                    status: Status.success,
+                    data: await this.protected.load({ uid: stream.uid, path: params.path }, { default: params.default })
+                });
+            }
+        });
 
 
         // ---------------------------------------------------------
         // Default support endpoints.
 
-        this.server.endpoint(
+        // Get PIN.
+        this.server.endpoint({
+            method: "GET",
+            endpoint: "/volt/support/pin",
+            content_type: "application/json",
+            authenticated: true,
+            rate_limit: "global",
+            callback: async (stream: AuthStream) => {
+                // Sign in.
+                const pin = await this.get_support_pin(stream.uid);
+                return stream.success({
+                    data: {
+                        message: "Successfully retrieved your support PIN.",
+                        pin: pin,
+                    }
+                });
+            }
+        });
 
-            // Get PIN.
-            {
-                method: "GET",
-                endpoint: "/volt/support/pin",
-                content_type: "application/json",
-                authenticated: true,
-                rate_limit: "global",
-                callback: async (stream: AuthStream) => {
-                    // Sign in.
-                    const pin = await this.get_support_pin(stream.uid);
-                    return stream.success({
-                        data: {
-                            message: "Successfully retrieved your support PIN.",
-                            pin: pin,
-                        }
-                    });
+        // Support.
+        // Supported params are: `support_pin`, `subject`, `summary`, `detailed`, `attachments`, `recipient` and `type`.
+        this.server.endpoint({
+            method: "POST",
+            endpoint: "/volt/support/submit",
+            content_type: "application/json",
+            rate_limit: "global",
+            callback: async (stream: Stream) => {
+                
+                // Get params.
+                let params = stream.params as Record<string, any>;
+
+                // When unauthenticated get contact params.
+                let user: null | User = null, email: string, first_name: string, last_name: string;
+                if (stream.uid == null) {
+                    try {
+                        email = stream.param("email");
+                        first_name = stream.param("first_name");
+                        last_name = stream.param("last_name");
+                    } catch (err) {
+                        return stream.error({ status: Status.bad_request, message: (err as Error).message });
+                    }
+                } else {
+                    user = await this.get(stream.uid);
+                    email = user.email;
+                    first_name = user.first_name;
+                    last_name = user.last_name;
                 }
-            },
 
-            // Support.
-            // Supported params are: `support_pin`, `subject`, `summary`, `detailed`, `attachments`, `recipient` and `type`.
-            {
-                method: "POST",
-                endpoint: "/volt/support/submit",
-                content_type: "application/json",
-                rate_limit: "global",
-                callback: async (stream: Stream) => {
-                    
-                    // Get params.
-                    let params = stream.params as Record<string, any>;
+                // Create mail body.
+                let body = "";
+                const subject = params.subject || (params.type == null ? "Support" : `Support ${params.type}`);
+                body += `<h1>${subject}</h1>`;
+                if (params.subject) {
+                    delete params.subject;
+                }
+                if (params.type) {
+                    body += `<span style='font-weight: bold'>Type</span>: ${params.type}<br>`;
+                    delete params.type;
+                }
+                if (user) {
+                    body += `<span style='font-weight: bold'>UID</span>: ${stream.uid}<br>`;
+                    body += `<span style='font-weight: bold'>User</span>: ${user.username}<br>`;
+                }
+                body += `<span style='font-weight: bold'>Email</span>: ${email}<br>`;
+                body += `<span style='font-weight: bold'>First Name</span>: ${first_name}<br>`;
+                body += `<span style='font-weight: bold'>Last Name</span>: ${last_name}<br>`;
+                if (stream.uid != null) {
+                    const support_pin = await this.get_support_pin(stream.uid);
+                    body += `<span style='font-weight: bold'>Support PIN</span>: ${support_pin} <span style='color: green'>verified</span><br>`;
+                } else if (params.support_pin) {
+                    body += `<span style='font-weight: bold'>Support PIN</span>: ${params.support_pin} <span style='color: red'>not yet verified</span><br>`;
+                    delete params.support_pin;
+                } else {
+                    body += `<span style='font-weight: bold'>Support PIN</span>: Unknown<br>`;
+                }
+                if (params.summary) {
+                    body += `<br><span style='font-weight: bold'>Summary</span>:<br>${params.summary}<br>`;
+                    delete params.summary;
+                }
+                if (params.detailed) {
+                    body += `<br><span style='font-weight: bold'>Detailed</span>:<br>${params.detailed}<br>`;
+                    delete params.detailed;
+                }
+                Object.keys(params).forEach((key) => {
+                    if (key !== "attachments" && key !== "recipient") {
+                        body += `<br><span style='font-weight: bold'>${key}</span>: ${params[key]}<br>`;
+                    }
+                });
 
-                    // When unauthenticated get contact params.
-                    let user: null | User = null, email: string, first_name: string, last_name: string;
-                    if (stream.uid == null) {
-                        try {
-                            email = stream.param("email");
-                            first_name = stream.param("first_name");
-                            last_name = stream.param("last_name");
-                        } catch (err) {
-                            return stream.error({ status: Status.bad_request, message: (err as Error).message });
-                        }
-                    } else {
-                        user = await this.get(stream.uid);
-                        email = user.email;
-                        first_name = user.first_name;
-                        last_name = user.last_name;
-                    }
-
-                    // Create mail body.
-                    let body = "";
-                    const subject = params.subject || (params.type == null ? "Support" : `Support ${params.type}`);
-                    body += `<h1>${subject}</h1>`;
-                    if (params.subject) {
-                        delete params.subject;
-                    }
-                    if (params.type) {
-                        body += `<span style='font-weight: bold'>Type</span>: ${params.type}<br>`;
-                        delete params.type;
-                    }
-                    if (user) {
-                        body += `<span style='font-weight: bold'>UID</span>: ${stream.uid}<br>`;
-                        body += `<span style='font-weight: bold'>User</span>: ${user.username}<br>`;
-                    }
-                    body += `<span style='font-weight: bold'>Email</span>: ${email}<br>`;
-                    body += `<span style='font-weight: bold'>First Name</span>: ${first_name}<br>`;
-                    body += `<span style='font-weight: bold'>Last Name</span>: ${last_name}<br>`;
-                    if (stream.uid != null) {
-                        const support_pin = await this.get_support_pin(stream.uid);
-                        body += `<span style='font-weight: bold'>Support PIN</span>: ${support_pin} <span style='color: green'>verified</span><br>`;
-                    } else if (params.support_pin) {
-                        body += `<span style='font-weight: bold'>Support PIN</span>: ${params.support_pin} <span style='color: red'>not yet verified</span><br>`;
-                        delete params.support_pin;
-                    } else {
-                        body += `<span style='font-weight: bold'>Support PIN</span>: Unknown<br>`;
-                    }
-                    if (params.summary) {
-                        body += `<br><span style='font-weight: bold'>Summary</span>:<br>${params.summary}<br>`;
-                        delete params.summary;
-                    }
-                    if (params.detailed) {
-                        body += `<br><span style='font-weight: bold'>Detailed</span>:<br>${params.detailed}<br>`;
-                        delete params.detailed;
-                    }
-                    Object.keys(params).forEach((key) => {
-                        if (key !== "attachments" && key !== "recipient") {
-                            body += `<br><span style='font-weight: bold'>${key}</span>: ${params[key]}<br>`;
-                        }
-                    });
-
-                    // Attachments.
-                    body += "<br>";
-                    let attachments: MailAttachment[] = [];
-                    if (params.attachments) {
-                        Object.keys(params.attachments).forEach((key) => {
-                            attachments.push({
-                                filename: key,
-                                content: Buffer.from((params.attachments as any[])[key], 'utf-8'),
-                            });
+                // Attachments.
+                body += "<br>";
+                let attachments: MailAttachment[] = [];
+                if (params.attachments) {
+                    Object.keys(params.attachments).forEach((key) => {
+                        attachments.push({
+                            filename: key,
+                            content: Buffer.from((params.attachments as any[])[key], 'utf-8'),
                         });
-                    }
-
-                    // Send email.
-                    await this.server.send_mail({
-                        recipients: [params.recipient || this.server.smtp_sender],
-                        subject: subject,
-                        body: body,
-                        attachments: attachments,
                     });
-
-                    // Sign in.
-                    return stream.success({ data: { message: "Successfully sent your request." } });
                 }
-            },
-        );
+
+                // Send email.
+                await this.server.send_mail({
+                    recipients: [params.recipient || this.server.smtp_sender],
+                    subject: subject,
+                    body: body,
+                    attachments: attachments,
+                });
+
+                // Sign in.
+                return stream.success({ data: { message: "Successfully sent your request." } });
+            }
+        });
 
     }
 
@@ -1253,9 +1244,8 @@ export class Users {
         _check_username_email?: boolean;
     }): Promise<string> {
         // Verify params.
-        vlib.Scheme.verify({
-            object: arguments[0],
-            check_unknown: true,
+        vlib.Scheme.validate(arguments[0], {
+            strict: true,
             scheme: {
                 first_name: "string",
                 last_name: "string",

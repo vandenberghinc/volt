@@ -14,6 +14,8 @@ import Meta from "./meta.js";
 import logger from "./logger.js";
 import { Route } from './route.js';
 import Frontend from './frontend.js';
+import { Endpoint } from "./endpoint.js";
+import Server from "./server.js";
 
 const { log, error } = logger;
 const { debug } = vlib;
@@ -21,110 +23,85 @@ const { debug } = vlib;
 // ---------------------------------------------------------
 // View.
 // @todo add template vars for callback and css and js include files. 
-/*  @docs:
- *  @nav: Backend
- *  @chapter: Endpoints
- *  @title: View
- *  @description: The `View` class can be utilized from within the `Endpoint` parameter `view`.
- *  @parameter:
- *      @name: source
- *      @description: The file path to the client side javascript source code.
- *      @type: string
- *  @parameter:
- *      @name: callback
- *      @description: The client side callback function, this function will be executed at the client side. For this feature the `Content-Security-Policy:script-src` must be updated with for example `unsafe-inline`.
- *      @type: function
- *  @parameter:
- *      @name: includes
- *      @description:
- *          The included static js files.
+/**
+ * @nav Backend
+ * @chapter Endpoints
+ * @title View
+ * @class
  *
- *          By default the local includes will be embedded into the html page. However, this behaviour can be disabled by passing an include object with attribute `embed = false`.
- *      @type: array[string], array[InluceObject]
- *      @attributes_type: IncludeObject
- *      @attribute:
- *          @name: src
- *          @description: The source url of the script to include.
- *          @type: string
- *          @required: true
- *      @attribute:
- *          @name: embed
- *          @description: This attribute can be defined with the value of `false` to disable embedding the endpoint's content into the html page.
- *          @type: boolean
- *          @required: false
- *          @def: true
- *      @attribute:
- *          @name: **
- *          @description: Any other attributes will be assiged to the `<script>` line.
- *  @parameter:
- *      @name: links
- *      @description: 
- *          The included static css files.
+ * @param source
+ *   The file path to the client side JavaScript source code.
  *
- *          By default the local scripts will be embedded into the html page. However, this behaviour can be disabled by passing a link object with attribute `embed = false`.
- *      @type: array[string], array[LinkObject]
- *      @attributes_type: LinkObject
- *      @attribute:
- *          @name: href
- *          @description: The source url of the link to include.
- *          @type: string
- *          @required: true
- *      @attribute:
- *          @name: rel
- *          @description: The source url of the link to include.
- *          @type: string
- *          @required: false
- *          @def: stylesheet
- *      @attribute:
- *          @name: embed
- *          @description: This attribute can be defined with the value of `false` to disable embedding the endpoint's content into the html page.
- *          @type: boolean
- *          @required: false
- *          @def: true
- *      @attribute:
- *          @name: **
- *          @description: Any other attributes will be assiged to the `<script>` line.
- *  @parameter:
- *      @name: templates
- *      @description: 
- *          Templates that will be replace the `callback` code. Templates can be created using the `$TEMPLATE` template style.
- *      @warning: Templates will only be used on the code of the `callback` attribute.
- *  @parameter:
- *      @name: meta
- *      @description: The meta information object.
- *      @type: Meta
- *  @parameter:
- *      @name: jquery
- *      @description: Include jqeury by default.
- *      @type: boolean
- *  @parameter:
- *      @name: body_style
- *      @description: The style of the \<body> element. When left undefined, the static attribute `View.body_style` will be used.
- *      @type: null, string
- *  @parameter:
- *      @name: splash_screen
- *      @description: The splash screen settings. When left undefined, the static attribute `View.splash_screen` will be used.
- *      @type: null, SplashScreen
- *  @parameter:
- *      @name: tree_shaking
- *      @description: Optimize javascript source code by removing dead code.
- *      @type: boolean
- *  @parameter:
- *      @name: mangle
- *      @description: Optimize javascript source code by mangling function names.
- *      @type: boolean
- *  @parameter:
- *      @name: _src
- *      @ignore: true
+ * @param callback
+ *   The client side callback function; this function will be executed at the client side.
+ *   For this feature the `Content-Security-Policy: script-src` must be updated with, for example, `unsafe-inline`.
  *
- *  @attribute:
- *      @name: body_style
- *      @description: The style of the \<body> element. This static attribute will be used on all views when defined. However, it can be overridden for a single View by defining the parameter.
- *      @type: null, string
- *  @attribute:
- *      @name: splash_screen
- *      @description: The splash screen settings. This static attribute will be used on all views when defined. However, it can be overridden for a single View by defining the parameter.
- *      @type: null, SplashScreen
+ * @param includes
+ *   The included static JS files.
+ *
+ *   By default, the local includes will be embedded into the HTML page. However, this behaviour can be disabled by passing an object of type `IncludeObject` with the attribute `embed = false`.
+ *
+ * @param links
+ *   The included static CSS files.
+ *
+ *   By default, the local links will be embedded into the HTML page. However, this behaviour can be disabled by passing an object of type `LinkObject` with the attribute `embed = false`.
+ *
+ * @param templates
+ *   Templates that will replace the `callback` code. Templates can be created using the `$TEMPLATE` template style.
+ *
+ * @warning
+ *   Templates will only be used on the code of the `callback` attribute.
+ *
+ * @param meta
+ *   The meta information object.
+ *
+ * @param jquery
+ *   Include jQuery by default.
+ *
+ * @param body_style
+ *   The style of the `<body>` element. When left undefined, the static attribute `View.body_style` will be used.
+ *
+ * @param splash_screen
+ *   The splash screen settings. When left undefined, the static attribute `View.splash_screen` will be used.
+ *
+ * @param tree_shaking
+ *   Optimize JavaScript source code by removing dead code.
+ *
+ * @param mangle
+ *   Optimize JavaScript source code by mangling function names.
+ *
+ * @param _src
+ *   Internal parameter (ignored).
+ *
+ * @typedef IncludeObject
+ * @property src
+ *   The source URL of the script to include. (required)
+ * @property embed
+ *   When set to `false`, disables embedding the endpoint's content into the HTML page.
+ * @property attributes
+ *   Any other attributes will be assigned to the `<script>` tag.
+ *
+ * @typedef LinkObject
+ * @property href
+ *   The source URL of the link to include. (required)
+ * @property rel
+ *   The `rel` attribute of the link tag.
+ * @property embed
+ *   When set to `false`, disables embedding the endpoint's content into the HTML page.
+ * @property attributes
+ *   Any other attributes will be assigned to the `<link>` tag.
+ *
+ * @static
+ * @memberof View
+ * @member body_style
+ *   The style of the `<body>` element. This static attribute will be used on all Views when defined. However,
+ *   it can be overridden for a single View by defining the parameter.
+ *
+ * @static
+ * @memberof View
+ * @member splash_screen
+ *   The splash screen settings. This static attribute will be used on all Views when defined. However,
+ *   it can be overridden for a single View by defining the parameter.
  */
 export class View {
 
@@ -161,8 +138,8 @@ export class View {
     payments?: string | undefined;
     // vhighlight?: string | undefined;
     min_device_width?: number;
-    _server?: any;
-    _endpoint?: any;
+    _server?: Server;
+    _endpoint?: Endpoint;
 
     // Constructor.
     constructor({
@@ -183,8 +160,8 @@ export class View {
     }: {
         source?: string | null;
         callback?: Function | null;
-        includes?: Array<string | Record<string, any>>;
-        links?: Array<string | Record<string, any>>;
+        includes?: (string | Record<string, any>)[];
+        links?: (string | Record<string, any>)[];
         templates?: Record<string, any>;
         meta?: Meta;
         jquery?: boolean;
@@ -242,7 +219,7 @@ export class View {
     }
 
     // Initialize.
-    _initialize(server: any, endpoint: any): void {
+    _initialize(server: Server, endpoint: Endpoint): void {
         if (server === undefined) { throw Error("Invalid usage, define parameter \"server\"."); }
         if (endpoint === undefined) { throw Error("Invalid usage, define parameter \"endpoint\"."); }
         this._server = server;
@@ -264,7 +241,7 @@ export class View {
         debug(3, this._endpoint?.route?.id, `: Bundling entry path "${this.source_path?.str()}".`)
         this._bundle = await vts.bundle({
             entry_paths: [this.source_path?.str() ?? ""],
-            output: `/tmp/${this._endpoint.method}_${this.source_path!.str().replace(/\//g, "_") }.js`, // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
+            output: `/tmp/${this._endpoint.route.method}_${this.source_path!.str().replace(/\//g, "_") }.js`, // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
             minify: false,//this._server.production,
             platform: "browser",
             // format: "esm",
@@ -304,7 +281,7 @@ export class View {
     // Build html.
     async _build_html(): Promise<void> {
         // Server & endpoint.
-        if (this._server === undefined || this._endpoint === undefined) { throw Error("View has not been initialized with \"View._initialize()\" yet."); }
+        if (this._server == null || this._endpoint == null) { throw Error("View has not been initialized with \"View._initialize()\" yet."); }
 
         // Bundle js files automatically.
         if (this.is_js_ts_view && !this._bundle) {
@@ -342,9 +319,14 @@ export class View {
                 url != null &&
                 url.charAt(0) === "/"
             ) {
-                for (const endpoint of this._server.endpoints.values()) {
-                    if (url === endpoint.endpoint && (endpoint.raw_data != null || endpoint.data != null)) {
-                        embed = endpoint.raw_data || endpoint.data;
+                for (const endpoint of this._server!.endpoints.values()) {
+                    if (url === endpoint.route.endpoint_str) {
+                        if (typeof endpoint.raw_data === "string") {
+                            embed = endpoint.raw_data;
+                        } else if (typeof endpoint.data === "string") {
+                            embed = endpoint.data;
+                        }
+                        break;
                     }
                 }
             }
@@ -504,9 +486,9 @@ export class View {
         // Returns `false` when the endpoint is not found.
         const embed_script = (url: string): boolean => {
             let embed;
-            for (const endpoint of this._server.endpoints.values()) {
+            for (const endpoint of this._server!.endpoints.values()) {
                 if (
-                    url === endpoint.endpoint &&
+                    url === endpoint.route.endpoint_str &&
                     (endpoint.raw_data != null || endpoint.data != null)
                 ) {
                     embed = endpoint;
@@ -652,4 +634,6 @@ export class View {
         });
     }
 }
-export default View;
+export namespace View {
+    export type Opts = ConstructorParameters<typeof View>[0];
+}

@@ -146,9 +146,8 @@ export class RateLimitServer {
         _server: { _sys_db: Collection },
     }) {
         // Checks.
-        vlib.Scheme.verify({
-            object: arguments[0], 
-            check_unknown: true, 
+        vlib.Scheme.validate(arguments[0], {
+            strict: true, 
             scheme: {
                 port: {type: "number", default: RateLimitServer.default_port},
                 ip: {type: "string", default: null},
@@ -383,9 +382,8 @@ export class RateLimitClient {
         _server: any,
     }) {
         // Checks.
-        vlib.Scheme.verify({
-            object: arguments[0], 
-            check_unknown: true, 
+        vlib.Scheme.validate(arguments[0], {
+            strict: true, 
             scheme: {
                 ip: {type: "string", default: null},
                 port: {type: "number", default: RateLimitServer.default_port},

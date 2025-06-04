@@ -69,7 +69,6 @@ class ImageEndpoint extends Endpoint implements Endpoint {
         cache = true,
         _is_static = true,
         rate_limit = undefined,
-        _server,
     }: {
         endpoint: string,
         path: vlib.Path,
@@ -77,7 +76,6 @@ class ImageEndpoint extends Endpoint implements Endpoint {
         cache?: boolean | number,
         _is_static?: boolean,
         rate_limit?: string | RateLimitGroup,
-        _server: Server,
     }) {
         // Initialize base.
         super({
@@ -95,7 +93,6 @@ class ImageEndpoint extends Endpoint implements Endpoint {
             rate_limit,
             _static_path: path.str(),
             _is_static,
-            _server,
         })
 
         // Attributes.
