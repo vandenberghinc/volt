@@ -27,30 +27,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "Checkout repository"
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: "Initialize CodeQL"
+      - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: javascript,typescript
 
-      - name: "Setup Node.js 18.x"
+      - name: Setup Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 20.x
           cache: npm
 
-      - name: "Install backend dependencies"
-        run: npm ci
+      - name: Install backend dependencies
+        run: npm install
         working-directory: ./backend
 
-      - name: "Build backend"
+      - name: Build backend
         run: npm run build
         working-directory: ./backend
-        # ↳ Assumes backend/package.json has "build": "tsc -p tsconfig.json" (ESM TS → dist)
+        # ↳ Make sure backend/package.json has:
+        #   "scripts": { "build": "tsc -p tsconfig.json" }
 
-      - name: "Perform backend CodeQL analysis"
+      - name: Perform backend CodeQL analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "codeql-backend-scan"
@@ -58,7 +59,7 @@ jobs:
             --include='backend/src/**/*.ts'
             --include='backend/src/**/*.js'
             --include='backend/dist/**/*.js'
-            # (If your compiled ESM JS lands in backend/dist/)
+            # (Include compiled ESM JS if it lands in backend/dist/)
 
   frontend-codeql:
     name: "CodeQL Scan: Frontend (Web ESM TS)"
@@ -66,30 +67,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "Checkout repository"
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: "Initialize CodeQL"
+      - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: javascript,typescript
 
-      - name: "Setup Node.js 18.x"
+      - name: Setup Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 20.x
           cache: npm
 
-      - name: "Install frontend dependencies"
-        run: npm ci
+      - name: Install frontend dependencies
+        run: npm install
         working-directory: ./frontend
 
-      - name: "Build frontend"
+      - name: Build frontend
         run: npm run build
         working-directory: ./frontend
-        # ↳ Assumes frontend/package.json has "build": "tsc -p tsconfig.json" (ESM TS → dist)
+        # ↳ Make sure frontend/package.json has:
+        #   "scripts": { "build": "tsc -p tsconfig.json" }
 
-      - name: "Perform frontend CodeQL analysis"
+      - name: Perform frontend CodeQL analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "codeql-frontend-scan"
@@ -97,4 +99,4 @@ jobs:
             --include='frontend/src/**/*.ts'
             --include='frontend/src/**/*.js'
             --include='frontend/dist/**/*.js'
-            # (If your compiled ESM JS lands in frontend/dist/)
+            # (Include compiled ESM JS if it lands in frontend/dist/)
