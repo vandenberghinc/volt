@@ -86,9 +86,8 @@ class RateLimitServer {
   ws;
   clear_caches_interval;
   constructor({ port = RateLimitServer.default_port, ip = null, https = null, _server }) {
-    vlib.Scheme.verify({
-      object: arguments[0],
-      check_unknown: true,
+    vlib.Scheme.validate(arguments[0], {
+      strict: true,
       scheme: {
         port: { type: "number", default: RateLimitServer.default_port },
         ip: { type: "string", default: null },
@@ -250,9 +249,8 @@ class RateLimitClient {
   server;
   ws;
   constructor({ ip = null, port = RateLimitServer.default_port, https = false, url = null, _server }) {
-    vlib.Scheme.verify({
-      object: arguments[0],
-      check_unknown: true,
+    vlib.Scheme.validate(arguments[0], {
+      strict: true,
       scheme: {
         ip: { type: "string", default: null },
         port: { type: "number", default: RateLimitServer.default_port },

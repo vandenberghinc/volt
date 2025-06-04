@@ -331,7 +331,7 @@ class Server {
     // browser_preview = undefined,
     lightweight = false
   }) {
-    vlib.Scheme.verify({ object: arguments[0], err_prefix: "Server: ", check_unknown: true, scheme: {
+    vlib.Scheme.validate(arguments[0], { err_prefix: "Server: ", strict: true, scheme: {
       ip: { type: "string", required: false },
       port: { type: "number", required: false },
       domain: "string",
@@ -669,14 +669,18 @@ class Server {
   _set_header_defaults(stream) {
     stream.set_headers(this.default_headers);
   }
-  // ---------------------------------------------------------
-  // Endpoints (private).
-  // Find endpoint.
-  _find_endpoint(endpoint, method = null) {
+  _find_endpoint(endpoint, method) {
+    let route;
+    if (endpoint instanceof import_route.Route) {
+      route = endpoint;
+      endpoint = route.endpoint_str;
+      method = route.method;
+    }
     method ??= "GET";
     const result = this.endpoints.get(`${method}:${endpoint}`);
     if (!result) {
-      const route = new import_route.Route(method, endpoint);
+      if (!route)
+        route = new import_route.Route(method, endpoint);
       for (const e of this.endpoints.values()) {
         if (e.route.is_regex && e.route.match(route)) {
           return e;
@@ -720,7 +724,6 @@ class Server {
       params: {
         key: "string"
       },
-      _server: this,
       callback: async (stream, params) => {
         if (params.key !== status_key) {
           return stream.send({
@@ -985,8 +988,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
           path,
           cache,
           rate_limit: "global",
-          _is_static: true,
-          _server: this
+          _is_static: true
         });
         const aspect_ratio = await e.get_aspect_ratio();
         if (aspect_ratio != null) {
@@ -1002,8 +1004,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
           cache,
           rate_limit: "global",
           _static_path: path.str(),
-          _is_static: true,
-          _server: this
+          _is_static: true
         })._load_data_by_path(this));
       }
     };
@@ -1012,9 +1013,8 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         return;
       }
       if (typeof opts === "object") {
-        vlib.Scheme.verify({
-          object: opts,
-          check_unknown: true,
+        vlib.Scheme.validate(opts, {
+          strict: true,
           scheme: {
             path: "string",
             endpoint: { type: "string", default: null },
@@ -1224,6 +1224,12 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       if (this.company.icon != null && this.company.icon_path == null) {
         throw Error(`Unable to find the company's icon endpoint "${this.company.icon}".`);
       }
+    }
+    for (const endpoint of this.endpoints.values()) {
+      endpoint._initialize(this);
+    }
+    for (const endpoint of this.err_endpoints.values()) {
+      endpoint._initialize(this);
     }
     for (const callback of this._on_initialize) {
       const res = callback();
@@ -1787,84 +1793,45 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
   // Endpoints.
   // private registered_routes: Map<string, Array<string | RegExp>> = new Map();
   /**
-   * Registers a new method+endpoint pair, throwing if it already exists.
+   * Checks if an endpoint route already exists.
    * @param method    HTTP method
    * @param endpoint  String path or RegExp
    */
-  _register_endpoint(method, endpoint) {
-    if (!(endpoint instanceof RegExp)) {
-      const e = this._find_endpoint(method, endpoint);
-      if (e) {
-        throw new Error(`Duplicate "${method}:${endpoint}" endpoint route, it is already defined by endpoint "${e.id}".`);
-      }
+  _check_duplicate_route(route) {
+    const e = this._find_endpoint(route);
+    if (e) {
+      throw new Error(`Duplicate "${route.method}:${route.endpoint_str}" endpoint route, it is already defined by endpoint "${e.id}".`);
     }
   }
-  // Add one or multiple endpoints.
-  /*  @docs:
-          @title: Add endpoint(s)
-          @description: Add one or multiple endpoints.
-          @parameter:
-              @name: ...endpoints
-              @description:
-                  The endpoint parameters.
-  
-                  An endpoint parameter can either be a `Endpoint` class or an `object` with the `Endpoint` arguments.
-              @type: Endpoint, object
-          */
-  endpoint(...endpoints) {
-    for (let i = 0; i < endpoints.length; i++) {
-      if (endpoints[i] == null) {
-        continue;
-      }
-      if (Array.isArray(endpoints[i])) {
-        this.endpoint(...endpoints[i]);
-        continue;
-      }
-      let init_endpoint = endpoints[i];
-      if (!(init_endpoint instanceof import_endpoint.Endpoint)) {
-        init_endpoint._server = this;
-        init_endpoint = new import_endpoint.Endpoint(init_endpoint);
-      }
-      const endpoint = init_endpoint;
-      if (endpoint.view != null) {
-        if (endpoint.view.meta == null) {
-          endpoint.view.meta = this.meta.copy();
-        } else if (typeof endpoint.view.meta === "object" && !(endpoint.view.meta instanceof import_meta2.Meta)) {
-          endpoint.view.meta = new import_meta2.Meta(endpoint.view.meta);
-        }
-      }
-      this._register_endpoint(endpoint.route.method, endpoint.route.endpoint);
-      this.endpoints.set(endpoint.route.id, endpoint);
-    }
+  /**
+   * Add a single endpoint.
+   * Only supports a single endpoint due to parameter inference.
+   * @param endpoint The endpoint or endpoint options to add.
+   */
+  endpoint(endpoint) {
+    const e = endpoint instanceof import_endpoint.Endpoint ? endpoint : new import_endpoint.Endpoint(endpoint);
+    this._check_duplicate_route(e.route);
+    this.endpoints.set(e.route.id, e);
     return this;
   }
   // Add an error endpoint.
-  /*  @docs:
-          @title: Add error endpoint
-          @description:
-              Add an endpoint per error status code.
-          @parameter:
-              @name: status_code
-              @type: number
-              @description:
-                  The status code of the error.
-  
-                  The supported status codes are:
-                  * `404`
-                  * `400` (Will not be used when the endpoint uses an API callback).
-                  * `403`
-                  * `404`
-                  * `500`
-          @parameter:
-              @name: endpoint
-              @description:
-                  The endpoint parameters.
-  
-                  An endpoint parameter can either be a `Endpoint` class or an `object` with the `Endpoint` arguments.
-              @type: Endpoint, object
-      */
+  /**
+   *  Add an endpoint per error status code.
+   * @param status_code
+   *      The status code of the error.
+   *
+   *      The supported status codes are:
+   *      * `404`
+   *      * `400` (Will not be used when the endpoint uses an API callback).
+   *      * `403`
+   *      * `404`
+   *      * `500`
+   * @param endpoint The error endpoint or error endpoint options
+  */
   error_endpoint(status_code, endpoint) {
-    this.err_endpoints.set(status_code, endpoint instanceof import_endpoint.Endpoint ? endpoint : new import_endpoint.Endpoint({ ...endpoint, _server: this }));
+    const e = endpoint instanceof import_endpoint.Endpoint ? endpoint : new import_endpoint.Endpoint(endpoint);
+    this._check_duplicate_route(e.route);
+    this.err_endpoints.set(status_code, e);
     return this;
   }
   // ---------------------------------------------------------

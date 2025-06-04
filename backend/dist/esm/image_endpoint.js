@@ -45,7 +45,7 @@ class ImageEndpoint extends Endpoint {
     i_data;
     i_cache;
     is_image_endpoint;
-    constructor({ endpoint, path, content_type, cache = true, _is_static = true, rate_limit = undefined, _server, }) {
+    constructor({ endpoint, path, content_type, cache = true, _is_static = true, rate_limit = undefined, }) {
         // Initialize base.
         super({
             method: "GET",
@@ -62,7 +62,6 @@ class ImageEndpoint extends Endpoint {
             rate_limit,
             _static_path: path.str(),
             _is_static,
-            _server,
         });
         // Attributes.
         this.i_path = path.abs();

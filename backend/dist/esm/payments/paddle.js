@@ -158,7 +158,7 @@ export class Paddle {
     constructor({ api_key, client_key, sandbox = false, products = [], inclusive_tax = false, _server = null, }) {
         // Original constructor implementation remains the same
         // Verify args.
-        vlib.Scheme.verify({ object: arguments[0], check_unknown: true, parent: "payments", scheme: {
+        vlib.Scheme.validate(arguments[0], { strict: true, parent: "payments", scheme: {
                 type: { type: "string", default: "paddle" },
                 api_key: "string",
                 client_key: "string",
@@ -904,10 +904,8 @@ export class Paddle {
         // Initialize products.
         await this._initialize_products();
         /* @performance */ let now = this.performance.start();
-        // Add endpoints.
-        this.server.endpoint(
         // Initialize and verify an order, check if the user is authenticated when subscriptions are present and check if the user is not already subscribed to the same item.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/payments/init",
             content_type: "application/json",
@@ -946,9 +944,9 @@ export class Paddle {
                 // Success.
                 return stream.success({ data: { message: "Successfully initialized the order." } });
             }
-        }, 
+        });
         // Get products.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/payments/products",
             content_type: "application/json",
@@ -956,9 +954,9 @@ export class Paddle {
             callback: (stream) => {
                 return stream.success({ data: this.products });
             }
-        }, 
+        });
         // Get payment by id.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/payments/payment",
             content_type: "application/json",
@@ -969,9 +967,9 @@ export class Paddle {
             callback: async (stream, params) => {
                 return stream.success({ data: (await this._load_payment(params.id)) });
             }
-        }, 
+        });
         // Get payments.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/payments/payments",
             content_type: "application/json",
@@ -991,9 +989,9 @@ export class Paddle {
                 });
                 return stream.success({ data: result });
             }
-        }, 
+        });
         // Get refundable payments.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/payments/payments/refundable",
             content_type: "application/json",
@@ -1012,9 +1010,9 @@ export class Paddle {
                 });
                 return stream.success({ data: result });
             }
-        }, 
+        });
         // Get refunded payments.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/payments/payments/refunded",
             content_type: "application/json",
@@ -1032,9 +1030,9 @@ export class Paddle {
                 });
                 return stream.success({ data: result });
             }
-        }, 
+        });
         // Get refunding payments.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/payments/payments/refunding",
             content_type: "application/json",
@@ -1052,9 +1050,9 @@ export class Paddle {
                 });
                 return stream.success({ data: result });
             }
-        }, 
+        });
         // Create a refund.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/payments/refund",
             content_type: "application/json",
@@ -1068,9 +1066,9 @@ export class Paddle {
                 await this.create_refund(params.payment, params.line_items, params.reason);
                 return stream.success();
             }
-        }, 
+        });
         // Cancel a subscription.
-        {
+        this.server.endpoint({
             method: "DELETE",
             endpoint: "/volt/payments/subscription",
             content_type: "application/json",
@@ -1083,7 +1081,7 @@ export class Paddle {
                 await this.cancel_subscription(stream.uid, params.product);
                 return stream.success();
             }
-        }, 
+        });
         // Cancel a subscription by payment.
         // {
         //     method: "DELETE",
@@ -1100,7 +1098,7 @@ export class Paddle {
         //     }
         // },
         // Get active subscriptions.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/payments/active_subscriptions",
             content_type: "application/json",
@@ -1111,9 +1109,9 @@ export class Paddle {
                     data: { subscriptions: (await this.get_active_subscriptions(stream.uid)) },
                 });
             }
-        }, 
+        });
         // Is subscribed
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/payments/subscribed",
             content_type: "application/json",
@@ -1127,9 +1125,11 @@ export class Paddle {
                     data: { is_subscribed: (await this.is_subscribed(stream.uid, params.product)) }
                 });
             }
-        }, 
+        });
         // Webhook.
-        this.server.offline ? null : (await this._create_webhook()));
+        if (!this.server.offline) {
+            this.server.endpoint(await this._create_webhook());
+        }
         /* @performance */ now = this.performance.end("init-endpoints", now);
         // /* @performance */ this.performance.dump();
     }

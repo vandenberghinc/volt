@@ -17,7 +17,7 @@
         }
     },
     "scripts": {
-        "link": "vrepo --npm --link --dependencies ../vlib/js/,../vhighlight/",
+        "link": "vrepo --npm --link --dependencies ../vlib/ts/,../vhighlight/",
         "unlink": "vrepo --npm --unlink",
         "build": "npm run build:backend --silent && npm run add-backend-dist-files  && npm run build:backend:cjs --silent && npm run build:frontend --silent",
         "build:backend": "tsc -p backend/tsconfig.json && npm run add-backend-dist-files",
@@ -52,7 +52,7 @@
         "typescript": "^5.8.3"
     },
     "vrepo_links": {
-        "@vandenberghinc/vlib": "../vlib/js/",
+        "@vandenberghinc/vlib": "../vlib/ts/",
         "@vandenberghinc/vhighlight": "../vhighlight/"
     }
 }

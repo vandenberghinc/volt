@@ -5,7 +5,7 @@ import * as vlib from "@vandenberghinc/vlib";
 import { Meta } from './meta.js';
 import * as Mail from './plugins/mail/ui.js';
 import { Status } from "./status.js";
-import { Endpoint, EndpointOptions } from "./endpoint.js";
+import { Endpoint } from "./endpoint.js";
 import { Database } from "./database/database.js";
 import { Collection } from "./database/collection.js";
 import { Users } from "./users.js";
@@ -229,13 +229,31 @@ export declare class Server {
         city: string;
     }): Promise<void>;
     /**
-     * Registers a new method+endpoint pair, throwing if it already exists.
+     * Checks if an endpoint route already exists.
      * @param method    HTTP method
      * @param endpoint  String path or RegExp
      */
-    private _register_endpoint;
-    endpoint(...endpoints: (none | Endpoint | EndpointOptions | (none | EndpointOptions | Endpoint)[])[]): this;
-    error_endpoint(status_code: number, endpoint: Endpoint | EndpointOptions): this;
+    private _check_duplicate_route;
+    /**
+     * Add a single endpoint.
+     * Only supports a single endpoint due to parameter inference.
+     * @param endpoint The endpoint or endpoint options to add.
+     */
+    endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}>(endpoint: Endpoint<S> | Endpoint.Opts<S>): this;
+    /**
+     *  Add an endpoint per error status code.
+     * @param status_code
+     *      The status code of the error.
+     *
+     *      The supported status codes are:
+     *      * `404`
+     *      * `400` (Will not be used when the endpoint uses an API callback).
+     *      * `403`
+     *      * `404`
+     *      * `500`
+     * @param endpoint The error endpoint or error endpoint options
+    */
+    error_endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}>(status_code: number, endpoint: Endpoint<S> | Endpoint.Opts<S>): this;
     send_mail({ sender, recipients, subject, body, attachments, }: {
         sender?: string | [string, string];
         recipients?: (string | [string, string])[];

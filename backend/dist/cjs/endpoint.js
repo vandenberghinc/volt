@@ -39,6 +39,7 @@ var import_status = require("./status.js");
 var import_logger = require("./logger.js");
 var import_rate_limit = require("./rate_limit.js");
 var import_route = require("./route.js");
+var import_meta = __toESM(require("./meta.js"));
 const { log, error, warn } = import_logger.logger;
 const { debug } = vlib;
 class Endpoint {
@@ -104,8 +105,8 @@ class Endpoint {
   route;
   /** Requires authentication */
   authenticated;
-  /** Parameter scheme */
-  params;
+  /** Parameter scheme validator */
+  params_val;
   /** The default response headers */
   headers;
   /** Option 2) View based endpoint */
@@ -129,9 +130,7 @@ class Endpoint {
   _static_path;
   _templates;
   ip_whitelist;
-  _verify_params_parent;
   _is_compressed;
-  _allow_unknown_params;
   _initialized = false;
   _server;
   constructor({
@@ -154,13 +153,11 @@ class Endpoint {
     _templates = {},
     // only used in loading static files.
     _static_path = void 0,
-    _is_static = false,
-    _server
+    _is_static = false
   }) {
     this.route = new import_route.Route(method, endpoint);
     this.id = this.route.id;
     this.authenticated = authenticated;
-    this.params = params;
     if (this.callback === void 0) {
       this.callback = callback;
     }
@@ -174,7 +171,6 @@ class Endpoint {
     this.ip_whitelist = Array.isArray(ip_whitelist) ? ip_whitelist : void 0;
     this.is_static = _is_static;
     this.headers = [];
-    this._allow_unknown_params = allow_unknown_params;
     if (typeof endpoint === "string") {
       ["\n", ","].forEach((c) => {
         if (endpoint.indexOf(c) !== -1) {
@@ -220,13 +216,12 @@ class Endpoint {
     } else if (typeof rate_limit === "object" && rate_limit != null) {
       this.rate_limit_groups.push(import_rate_limit.RateLimits.add(rate_limit));
     }
-    this._verify_params_parent = this.route.id + ":";
-    this._server = _server;
+    let params_scheme = params;
     if (this.route.params.length > 0) {
-      this.params ??= {};
+      params_scheme ??= {};
       this.route.params.forEach((item) => {
-        if (this.params[item.name] == null) {
-          this.params[item.name] = {
+        if (params_scheme[item.name] == null) {
+          params_scheme[item.name] = {
             type: "string",
             required: item.required ?? true,
             allow_empty: false
@@ -234,9 +229,29 @@ class Endpoint {
         }
       });
     }
-    if (this.view != null) {
-      this.view._initialize(_server, this);
+    if (params_scheme != null) {
+      this.params_val = new vlib.scheme.Validator("object", {
+        scheme: params,
+        strict: !allow_unknown_params,
+        parent: this.route.id + ":",
+        throw: false
+      });
     }
+  }
+  /** Initialize with server. */
+  _initialize(server) {
+    this._server = server;
+    if (this.view != null) {
+      this.view._initialize(server, this);
+    }
+    if (this.view != null) {
+      if (this.view.meta == null) {
+        this.view.meta = server.meta.copy();
+      } else if (typeof this.view.meta === "object" && !(this.view.meta instanceof import_meta.default)) {
+        this.view.meta = new import_meta.default(this.view.meta);
+      }
+    }
+    return this;
   }
   /**
    * Convert a RegExp into a readable path:
@@ -366,14 +381,8 @@ class Endpoint {
       this._set_headers(stream);
       if (this.callback != null) {
         log(3, this.route.id, ": ", "Serving endpoint in callback mode.");
-        if (this.params != null) {
-          const { error: error2, invalid_fields } = vlib.Scheme.verify({
-            object: stream.params,
-            scheme: this.params,
-            check_unknown: !this._allow_unknown_params,
-            parent: this._verify_params_parent,
-            throw_err: false
-          });
+        if (this.params_val != null) {
+          const { error: error2, invalid_fields } = this.params_val.validate(stream.param);
           if (error2) {
             stream.send({
               status: import_status.Status.bad_request,
@@ -388,7 +397,7 @@ class Endpoint {
         }
         try {
           let promise;
-          if (this.params != null) {
+          if (this.params_val != null) {
             promise = this.callback(stream, stream.params ?? {});
           } else {
             promise = this.callback(stream, {});

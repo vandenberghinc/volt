@@ -296,9 +296,8 @@ export class Users {
         });
         // ---------------------------------------------------------
         // Default auth endpoints.
-        this.server.endpoint(
         // Send 2fa.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/auth/2fa",
             content_type: "application/json",
@@ -320,9 +319,9 @@ export class Users {
                     data: { message: "A 2FA code was sent if the specified email exists." },
                 });
             }
-        }, 
+        });
         // Sign in.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/auth/signin",
             content_type: "application/json",
@@ -451,9 +450,9 @@ export class Users {
                     }
                 });
             }
-        }, 
+        });
         // Sign out.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/auth/signout",
             content_type: "application/json",
@@ -469,9 +468,9 @@ export class Users {
                     data: { message: "Successfully signed out." },
                 });
             }
-        }, 
+        });
         // Sign up.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/auth/signup",
             content_type: "application/json",
@@ -571,9 +570,9 @@ export class Users {
                 // Sign in.
                 return await this._sign_in_response(stream, uid);
             }
-        }, 
+        });
         // Activate account.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/auth/activate",
             content_type: "application/json",
@@ -612,9 +611,9 @@ export class Users {
                 await this._create_user_cookie(stream, uid);
                 return stream.success({ data: { message: "Successfully verified the 2FA code." } });
             }
-        }, 
+        });
         // Forgot password.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/auth/forgot_password",
             content_type: "application/json",
@@ -659,9 +658,8 @@ export class Users {
         });
         // ---------------------------------------------------------
         // Default user endpoints.
-        this.server.endpoint(
         // Get user.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/user",
             content_type: "application/json",
@@ -689,9 +687,9 @@ export class Users {
                 user.support_pin ??= "";
                 return stream.success({ data: user });
             }
-        }, 
+        });
         // Set user.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/user",
             content_type: "application/json",
@@ -702,9 +700,9 @@ export class Users {
                 await this._create_detailed_user_cookie(stream, stream.uid);
                 return stream.success({ data: { message: "Successfully updated your account." } });
             }
-        }, 
+        });
         // Change password.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/user/change_password",
             content_type: "application/json",
@@ -743,9 +741,9 @@ export class Users {
                     data: { message: "Successfully updated your password." },
                 });
             }
-        }, 
+        });
         // Delete account.
-        {
+        this.server.endpoint({
             method: "DELETE",
             endpoint: "/volt/user",
             content_type: "application/json",
@@ -762,9 +760,9 @@ export class Users {
                     data: { message: "Successfully deleted your account." },
                 });
             }
-        }, 
+        });
         // Generate API key.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/user/api_key",
             content_type: "application/json",
@@ -778,9 +776,9 @@ export class Users {
                     }
                 });
             }
-        }, 
+        });
         // Revoke API key.
-        {
+        this.server.endpoint({
             method: "DELETE",
             endpoint: "/volt/user/api_key",
             content_type: "application/json",
@@ -793,9 +791,9 @@ export class Users {
                     data: { message: "Successfully revoked your API key." },
                 });
             }
-        }, 
+        });
         // Load data.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/user/data",
             content_type: "application/json",
@@ -811,9 +809,9 @@ export class Users {
                     data: await this.public.load({ uid: stream.uid, path: params.path }, { default: params.default })
                 });
             }
-        }, 
+        });
         // Save data.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/user/data",
             content_type: "application/json",
@@ -830,9 +828,9 @@ export class Users {
                     data: { message: "Successfully saved." },
                 });
             }
-        }, 
+        });
         // Delete data.
-        {
+        this.server.endpoint({
             method: "DELETE",
             endpoint: "/volt/user/data",
             content_type: "application/json",
@@ -850,9 +848,9 @@ export class Users {
                     data: { message: "Successfully deleted." },
                 });
             }
-        }, 
+        });
         // Load protected data.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/user/data/protected",
             content_type: "application/json",
@@ -871,9 +869,8 @@ export class Users {
         });
         // ---------------------------------------------------------
         // Default support endpoints.
-        this.server.endpoint(
         // Get PIN.
-        {
+        this.server.endpoint({
             method: "GET",
             endpoint: "/volt/support/pin",
             content_type: "application/json",
@@ -889,10 +886,10 @@ export class Users {
                     }
                 });
             }
-        }, 
+        });
         // Support.
         // Supported params are: `support_pin`, `subject`, `summary`, `detailed`, `attachments`, `recipient` and `type`.
-        {
+        this.server.endpoint({
             method: "POST",
             endpoint: "/volt/support/submit",
             content_type: "application/json",
@@ -1114,9 +1111,8 @@ export class Users {
      */
     async create({ first_name, last_name, username, email, password, phone_number = "", is_activated = null, _check_username_email = false, }) {
         // Verify params.
-        vlib.Scheme.verify({
-            object: arguments[0],
-            check_unknown: true,
+        vlib.Scheme.validate(arguments[0], {
+            strict: true,
             scheme: {
                 first_name: "string",
                 last_name: "string",

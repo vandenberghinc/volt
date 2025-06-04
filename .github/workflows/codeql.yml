@@ -4,82 +4,79 @@ name: "CodeQL ESM TypeScript Scans"
 on:
   push:
     branches:
-        - main
+      - main
     paths:
-        - 'backend/src/**'
-        - 'frontend/src/**'
-        - '.github/workflows/codeql.yml'
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/codeql.yml'
   pull_request:
     branches:
-        - main
+      - main
     paths:
-        - 'backend/src/**'
-        - 'frontend/src/**'
-        - '.github/workflows/codeql.yml'
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/codeql.yml'
 
 permissions:
   contents: read
   security-events: write
 
 jobs:
+  backend-codeql:
+    name: "Backend CodeQL Scan"
+    runs-on: ubuntu-latest
 
-    # Backend CodeQL Scan
-    backend-codeql:
-        name: "CodeQL Scan: Backend (NodeJS ESM TS)"
-        runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript,typescript
 
-            - name: Initialize CodeQL
-              uses: github/codeql-action/init@v3
-              with:
-                languages: javascript,typescript
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
 
-            - name: Setup Node.js 20.x
-              uses: actions/setup-node@v4
-              with:
-                node-version: 20.x
-                cache: npm
+      - name: Install backend dependencies
+        run: npm install
+        working-directory: ./
 
-            - name: Install backend dependencies
-              run: npm install
-              working-directory: ./
+      - name: Perform backend CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          working-directory: ./backend
+          category: "codeql-backend-scan"
 
-            - name: Perform backend CodeQL analysis
-              uses: github/codeql-action/analyze@v3
-              with:
-                working-directory: ./backend
-                category: "codeql-backend-scan"
-    
-    # Fontend CodeQL Scan
-    frontend-codeql:
-        name: "CodeQL Scan: Frontend (Web ESM TS)"
-        needs: backend-codeql
-        runs-on: ubuntu-latest
+  frontend-codeql:
+    name: "Frontend CodeQL Scan"
+    needs: backend-codeql
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Initialize CodeQL
-              uses: github/codeql-action/init@v3
-              with:
-                languages: javascript,typescript
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript,typescript
 
-            - name: Setup Node.js 20.x
-              uses: actions/setup-node@v4
-              with:
-                node-version: 20.x
-                cache: npm
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
 
-            - name: Install frontend dependencies
-              run: npm install
-              working-directory: ./
-            
-            - name: Perform frontend CodeQL analysis
-              uses: github/codeql-action/analyze@v3
-              with:
-                working-directory: ./frontend
-                category: "codeql-frontend-scan"
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: ./
+
+      - name: Perform frontend CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          working-directory: ./frontend
+          category: "codeql-frontend-scan"

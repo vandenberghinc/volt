@@ -27,8 +27,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var stdin_exports = {};
 __export(stdin_exports, {
-  View: () => View,
-  default: () => stdin_default
+  View: () => View
 });
 module.exports = __toCommonJS(stdin_exports);
 var vlib = __toESM(require("@vandenberghinc/vlib"));
@@ -128,7 +127,7 @@ class View {
     debug(3, this._endpoint?.route?.id, `: Bundling entry path "${this.source_path?.str()}".`);
     this._bundle = await vts.bundle({
       entry_paths: [this.source_path?.str() ?? ""],
-      output: `/tmp/${this._endpoint.method}_${this.source_path.str().replace(/\//g, "_")}.js`,
+      output: `/tmp/${this._endpoint.route.method}_${this.source_path.str().replace(/\//g, "_")}.js`,
       // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
       minify: false,
       //this._server.production,
@@ -158,7 +157,7 @@ class View {
   }
   // Build html.
   async _build_html() {
-    if (this._server === void 0 || this._endpoint === void 0) {
+    if (this._server == null || this._endpoint == null) {
       throw Error('View has not been initialized with "View._initialize()" yet.');
     }
     if (this.is_js_ts_view && !this._bundle) {
@@ -175,8 +174,13 @@ class View {
     const embed_stylesheet = (url, embed) => {
       if (embed == null && url != null && url.charAt(0) === "/") {
         for (const endpoint of this._server.endpoints.values()) {
-          if (url === endpoint.endpoint && (endpoint.raw_data != null || endpoint.data != null)) {
-            embed = endpoint.raw_data || endpoint.data;
+          if (url === endpoint.route.endpoint_str) {
+            if (typeof endpoint.raw_data === "string") {
+              embed = endpoint.raw_data;
+            } else if (typeof endpoint.data === "string") {
+              embed = endpoint.data;
+            }
+            break;
           }
         }
       }
@@ -272,7 +276,7 @@ class View {
     const embed_script = (url) => {
       let embed;
       for (const endpoint of this._server.endpoints.values()) {
-        if (url === endpoint.endpoint && (endpoint.raw_data != null || endpoint.data != null)) {
+        if (url === endpoint.route.endpoint_str && (endpoint.raw_data != null || endpoint.data != null)) {
           embed = endpoint;
         }
       }
@@ -342,7 +346,6 @@ class View {
     });
   }
 }
-var stdin_default = View;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   View

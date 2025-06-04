@@ -13,110 +13,101 @@ import { Status } from "./status.js";
 import { logger } from "./logger.js";
 import { RateLimits } from "./rate_limit.js";
 import { Route } from './route.js';
+import Meta from './meta.js';
 const { log, error, warn } = logger;
 const { debug } = vlib;
-/*  @docs:
- *  @nav: Backend
-    @chapter: Endpoints
-    @title: Endpoint
-    @description:
-        The endpoint class.
-    @parameter:
-        @name: method
-        @description: The method type.
-        @type: string
-    @parameter:
-        @name: endpoint
-        @description: The endpoint sub url.
-        @type: string
-    @parameter:
-        @name: authenticated
-        @description: Only allow authenticated requests.
-        @type: string
-    @parameter:
-        @name: rate_limit
-        @description:
-            The rate limit settings.
-            
-            Rate limiting works by creating a rate limit per group of endpoints. Multiple rate limiting groups can be applied by defining an array with rate limit objects. A group's interval and limit only need to be defined once on a single endpoint. When defined again these values will override the innitial group settings.
-
-            The rate limit parameter may be defined as three types.
-            - `string`: The assign the rate limit group without any group parameters. This can be useful when the group is already defined.
-            - `RateLimitGroup`: As a rate limit object.
-            - `RateLimitGroup[]`: As an array with multiple rate limit objects.
-
-            When left undefined no rate limiting will be applied.
-        @type: null, string, RateLimitGroup, RateLimitGroup[]
-        @attributes_type: RateLimitGroup
-        @attribute:
-            @name: group
-            @description: The rate limit group.
-            @type: string
-            @default: "global"
-        @attribute:
-            @name: limit
-            @description: The maximum requests per rate limit interval. These settings will be cached per group and only have to be assigned once. The assigned attributes will be overridden when these attributes are reassigned for the same group.
-            @type: number
-            @default: 50
-        @attr:
-            @name: interval
-            @description: The rate limit interval in seconds. These settings will be cached per group and only have to be assigned once. The assigned attributes will be overridden when these attributes are reassigned for the same group.
-            @type: number
-            @default: 60
-    @parameter:
-        @name: callback
-        @description:
-            The callback that will be executed when a client requests this endpoint.
-            Parameter `callback` precedes over parameter `data` and parameter `view`.
-            The callback can take parameter `stream` assigned with the `volt.Stream` object of the request.
-        @type: function
-    @parameter:
-        @name: view
-        @description:
-            The javascript view that will be executed on the client side.
-            Parameter `view` precedes over parameter `data`.
-        @type: View, object
-    @parameter:
-        @name: data
-        @description:
-            The data that will be returned as the response body.
-        @type: number, string, array, object
-    @parameter:
-        @name: content_type
-        @description: The content type for parameter `data` or `callback`.
-        @type: string
-    @parameter:
-        @name: compress
-        @description: Compress data, only available when initialized with one of the following parameters `view` or `data`.
-        @type: boolean
-    @parameter:
-        @name: cache
-        @description:
-            Parameter cache can define the max age of the cached response in seconds or as a boolean `true`. Anything higher than zero enables caching. When server production mode is enabled caching is done automatically unless `cache` is `false`. When production mode is disabled responses are never cached, even though the parameter is assigned. The response of an endpoint that uses parameter `callback` is never cached.
-        @type: boolean, number
-    @parameter:
-        @name: sitemap
-        @description:
-            A boolean indicating if the endpoint should show up in the sitemap. By default only when the attribute `view` is defined and the endpoint is unauthenticated, the endpoint will show up in sitemap.
-        @type: boolean
-    @parameter:
-        @name: robots
-        @description:
-            A boolean indicating if the endpoint should be crawled by search engines. By default only endpoints with `view` enabled will be crawled, unless specified otherwise.
-        @type: boolean
-    @parameter:
-        @name: ip_whitelist
-        @description:
-            An IP whitelist for the endpoint. When the parameter is defined with an `Array` type, the whitelist will become active.
-        @type: boolean
-    @parameter:
-        @name: _path
-        @ignore: true
-    @parameter:
-        @name: _is_static
-        @ignore: true
+// ---------------------------------------------------------
+// Endpoint
+/**
+ * @nav Backend
+ * @chapter Endpoints
+ * @title Endpoint
+ * @description The endpoint class.
+ *
+ * @param method
+ *   The method type.
+ *
+ * @param endpoint
+ *   The endpoint sub url.
+ *
+ * @param authenticated
+ *   Only allow authenticated requests.
+ *
+ * @param rate_limit
+ *   The rate limit settings.
+ *
+ *   Rate limiting works by creating a rate limit per group of endpoints. Multiple
+ *   rate limiting groups can be applied by defining an array with rate limit objects.
+ *   A group's interval and limit only need to be defined once on a single endpoint.
+ *   When defined again these values will override the initial group settings.
+ *
+ *   The rate limit parameter may be defined as three types:
+ *   - `string`: Assign the rate limit group without any group parameters. Useful when the group is already defined.
+ *   - `RateLimitGroup`: As a rate limit object.
+ *   - An array with multiple rate limit objects.
+ *
+ *   When left undefined no rate limiting will be applied.
+ *
+ * @param callback
+ *   The callback that will be executed when a client requests this endpoint.
+ *   Parameter `callback` precedes over parameter `data` and parameter `view`.
+ *   The callback can take parameter `stream` assigned with the `volt.Stream` object of the request.
+ *
+ * @param view
+ *   The JavaScript view that will be executed on the client side.
+ *   Parameter `view` precedes over parameter `data`.
+ *
+ * @param data
+ *   The data that will be returned as the response body.
+ *
+ * @param content_type
+ *   The content type for parameter `data` or `callback`.
+ *
+ * @param compress
+ *   Compress data, only available when initialized with one of the following parameters `view` or `data`.
+ *
+ * @param cache
+ *   Parameter cache can define the max age of the cached response in seconds or as a boolean `true`.
+ *   Anything higher than zero enables caching.
+ *
+ *   When server production mode is enabled caching is done automatically unless `cache` is `false`.
+ *   When production mode is disabled responses are never cached, even though the parameter is assigned.
+ *   The response of an endpoint that uses parameter `callback` is never cached.
+ *
+ * @param sitemap
+ *   A boolean indicating if the endpoint should show up in the sitemap.
+ *   By default only when the attribute `view` is defined and the endpoint is unauthenticated,
+ *   the endpoint will show up in sitemap.
+ *
+ * @param robots
+ *   A boolean indicating if the endpoint should be crawled by search engines.
+ *   By default only endpoints with `view` enabled will be crawled, unless specified otherwise.
+ *
+ * @param ip_whitelist
+ *   An IP whitelist for the endpoint. When the parameter is defined with an Array,
+ *   the whitelist will become active.
+ *
+ * @param _path
+ *   Internal parameter (ignored).
+ *
+ * @param _is_static
+ *   Internal parameter (ignored).
+ *
+ * @typedef RateLimitGroup
+ * @property group
+ *   The rate limit group.
+ *
+ * @property limit
+ *   The maximum requests per rate limit interval. These settings will be cached per group
+ *   and only have to be assigned once. The assigned attributes will be overridden when
+ *   these attributes are reassigned for the same group.
+ *
+ * @property interval
+ *   The rate limit interval in seconds. These settings will be cached per group
+ *   and only have to be assigned once. The assigned attributes will be overridden when
+ *   these attributes are reassigned for the same group.
  */
-class Endpoint {
+export class Endpoint {
     // Static attributes.
     static rate_limits = new Map();
     static compressed_content_types = [
@@ -175,8 +166,8 @@ class Endpoint {
     route;
     /** Requires authentication */
     authenticated;
-    /** Parameter scheme */
-    params;
+    /** Parameter scheme validator */
+    params_val;
     /** The default response headers */
     headers;
     /** Option 2) View based endpoint */
@@ -200,19 +191,16 @@ class Endpoint {
     _static_path;
     _templates;
     ip_whitelist;
-    _verify_params_parent;
     _is_compressed;
-    _allow_unknown_params;
     _initialized = false;
     _server;
     constructor({ method = "GET", endpoint = "/", authenticated = false, rate_limit = undefined, params = undefined, callback = undefined, view = undefined, data = undefined, content_type, // = "text/plain",
     compress = "auto", cache = true, ip_whitelist = undefined, sitemap = undefined, robots = undefined, allow_unknown_params = false, _templates = {}, // only used in loading static files.
-    _static_path = undefined, _is_static = false, _server, }) {
+    _static_path = undefined, _is_static = false, }) {
         // Attributes.
         this.route = new Route(method, endpoint);
         this.id = this.route.id;
         this.authenticated = authenticated;
-        this.params = params;
         if (this.callback === undefined) { // only assign when undefined, so derived classes can also define the callback function.
             this.callback = callback;
         }
@@ -226,7 +214,6 @@ class Endpoint {
         this.ip_whitelist = Array.isArray(ip_whitelist) ? ip_whitelist : undefined;
         this.is_static = _is_static;
         this.headers = [];
-        this._allow_unknown_params = allow_unknown_params;
         // Excluded endpoint chars
         if (typeof endpoint === "string") {
             ["\n", "\,"].forEach((c) => {
@@ -287,16 +274,13 @@ class Endpoint {
         else if (typeof rate_limit === "object" && rate_limit != null) {
             this.rate_limit_groups.push(RateLimits.add(rate_limit));
         }
-        // The endpoint parent for params verification.
-        this._verify_params_parent = this.route.id + ":";
-        // Initialize.
-        this._server = _server;
         // Add path parameters from route.
+        let params_scheme = params;
         if (this.route.params.length > 0) {
-            this.params ??= {};
+            params_scheme ??= {};
             this.route.params.forEach((item) => {
-                if (this.params[item.name] == null) {
-                    this.params[item.name] = {
+                if (params_scheme[item.name] == null) {
+                    params_scheme[item.name] = {
                         type: "string",
                         required: item.required ?? true,
                         allow_empty: false,
@@ -304,10 +288,34 @@ class Endpoint {
                 }
             });
         }
-        // Initialize html.
-        if (this.view != null) {
-            this.view._initialize(_server, this);
+        // Initialize the parameter scheme validator.
+        if (params_scheme != null) {
+            this.params_val = new vlib.scheme.Validator("object", {
+                scheme: params,
+                strict: !allow_unknown_params,
+                parent: this.route.id + ":",
+                throw: false,
+            });
         }
+    }
+    /** Initialize with server. */
+    _initialize(server) {
+        // Assign attribute.
+        this._server = server;
+        // Initialize view.
+        if (this.view != null) {
+            this.view._initialize(server, this);
+        }
+        // Init view meta.
+        if (this.view != null) {
+            if (this.view.meta == null) {
+                this.view.meta = server.meta.copy();
+            }
+            else if (typeof this.view.meta === "object" && !(this.view.meta instanceof Meta)) {
+                this.view.meta = new Meta(this.view.meta);
+            }
+        }
+        return this;
     }
     /**
      * Convert a RegExp into a readable path:
@@ -484,14 +492,8 @@ class Endpoint {
             // Callback.
             if (this.callback != null) {
                 log(3, this.route.id, ": ", "Serving endpoint in callback mode.");
-                if (this.params != null) {
-                    const { error, invalid_fields } = vlib.Scheme.verify({
-                        object: stream.params,
-                        scheme: this.params,
-                        check_unknown: !this._allow_unknown_params,
-                        parent: this._verify_params_parent,
-                        throw_err: false,
-                    });
+                if (this.params_val != null) {
+                    const { error, invalid_fields } = this.params_val.validate(stream.param);
                     if (error) {
                         stream.send({
                             status: Status.bad_request,
@@ -506,8 +508,8 @@ class Endpoint {
                 }
                 try {
                     let promise;
-                    if (this.params != null) {
-                        promise = this.callback(stream, stream.params ?? {});
+                    if (this.params_val != null) {
+                        promise = this.callback(stream, (stream.params ?? {}));
                     }
                     else {
                         promise = this.callback(stream, {});
@@ -557,6 +559,3 @@ class Endpoint {
         }
     }
 }
-// ---------------------------------------------------------
-// Exports.
-export { Endpoint };

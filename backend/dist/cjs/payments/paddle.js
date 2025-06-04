@@ -65,7 +65,7 @@ class Paddle {
   // private _inv_db?: Collection;
   performance;
   constructor({ api_key, client_key, sandbox = false, products = [], inclusive_tax = false, _server = null }) {
-    vlib.Scheme.verify({ object: arguments[0], check_unknown: true, parent: "payments", scheme: {
+    vlib.Scheme.validate(arguments[0], { strict: true, parent: "payments", scheme: {
       type: { type: "string", default: "paddle" },
       api_key: "string",
       client_key: "string",
@@ -724,229 +724,202 @@ class Paddle {
     this.performance.end("init-db");
     await this._initialize_products();
     let now = this.performance.start();
-    this.server.endpoint(
-      // Initialize and verify an order, check if the user is authenticated when subscriptions are present and check if the user is not already subscribed to the same item.
-      {
-        method: "POST",
-        endpoint: "/volt/payments/init",
-        content_type: "application/json",
-        rate_limit: "global",
-        params: {
-          items: "array"
-        },
-        callback: async (stream, params) => {
-          if (params.items.length === 0) {
-            return stream.error({ status: import_status.Status.bad_request, data: { error: "Shopping cart is empty." } });
-          }
-          let sub_plan_count = {};
-          const error2 = await params.items.iterate_async_await(async (item) => {
-            if (item.product.is_subscription) {
-              if (stream.uid == null) {
-                return "You must be signed-in to purchase a subscription.";
-              }
-              if (item.quantity != null && item.quantity > 1) {
-                return "Subscriptions have a max quantity of 1.";
-              }
-              if (sub_plan_count[item.product.subscription_id] == null) {
-                sub_plan_count[item.product.subscription_id] = 1;
-              } else {
-                return "You can not charge two different subscription plans from the same subscription product.";
-              }
-              if (await this._check_subscription(stream.uid, item.product.id, false)) {
-                return `You are already subscribed to product "${item.product.name}".`;
-              }
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/payments/init",
+      content_type: "application/json",
+      rate_limit: "global",
+      params: {
+        items: "array"
+      },
+      callback: async (stream, params) => {
+        if (params.items.length === 0) {
+          return stream.error({ status: import_status.Status.bad_request, data: { error: "Shopping cart is empty." } });
+        }
+        let sub_plan_count = {};
+        const error2 = await params.items.iterate_async_await(async (item) => {
+          if (item.product.is_subscription) {
+            if (stream.uid == null) {
+              return "You must be signed-in to purchase a subscription.";
             }
-          });
-          if (error2) {
-            return stream.error({ status: import_status.Status.bad_request, data: { error: error2 } });
+            if (item.quantity != null && item.quantity > 1) {
+              return "Subscriptions have a max quantity of 1.";
+            }
+            if (sub_plan_count[item.product.subscription_id] == null) {
+              sub_plan_count[item.product.subscription_id] = 1;
+            } else {
+              return "You can not charge two different subscription plans from the same subscription product.";
+            }
+            if (await this._check_subscription(stream.uid, item.product.id, false)) {
+              return `You are already subscribed to product "${item.product.name}".`;
+            }
           }
-          return stream.success({ data: { message: "Successfully initialized the order." } });
+        });
+        if (error2) {
+          return stream.error({ status: import_status.Status.bad_request, data: { error: error2 } });
         }
+        return stream.success({ data: { message: "Successfully initialized the order." } });
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/payments/products",
+      content_type: "application/json",
+      rate_limit: "global",
+      callback: (stream) => {
+        return stream.success({ data: this.products });
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/payments/payment",
+      content_type: "application/json",
+      rate_limit: "global",
+      params: {
+        id: "string"
       },
-      // Get products.
-      {
-        method: "GET",
-        endpoint: "/volt/payments/products",
-        content_type: "application/json",
-        rate_limit: "global",
-        callback: (stream) => {
-          return stream.success({ data: this.products });
-        }
+      callback: async (stream, params) => {
+        return stream.success({ data: await this._load_payment(params.id) });
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/payments/payments",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        days: { type: "number", default: 30 },
+        limit: { type: "number", default: null },
+        status: { type: "string", default: null }
       },
-      // Get payment by id.
-      {
-        method: "GET",
-        endpoint: "/volt/payments/payment",
-        content_type: "application/json",
-        rate_limit: "global",
-        params: {
-          id: "string"
-        },
-        callback: async (stream, params) => {
-          return stream.success({ data: await this._load_payment(params.id) });
-        }
+      callback: async (stream, params) => {
+        const result = await this.get_payments({
+          uid: stream.uid,
+          days: params.days,
+          limit: params.limit,
+          status: params.status
+        });
+        return stream.success({ data: result });
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/payments/payments/refundable",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        days: { type: "number", default: 30 },
+        limit: { type: ["null", "number"], default: null },
+        status: { type: ["null", "string"], default: null }
       },
-      // Get payments.
-      {
-        method: "GET",
-        endpoint: "/volt/payments/payments",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          days: { type: "number", default: 30 },
-          limit: { type: "number", default: null },
-          status: { type: "string", default: null }
-        },
-        callback: async (stream, params) => {
-          const result = await this.get_payments({
-            uid: stream.uid,
-            days: params.days,
-            limit: params.limit,
-            status: params.status
-          });
-          return stream.success({ data: result });
-        }
+      callback: async (stream, params) => {
+        const result = await this.get_refundable_payments({
+          uid: stream.uid,
+          days: params.days,
+          limit: params.limit
+        });
+        return stream.success({ data: result });
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/payments/payments/refunded",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        days: { type: "number", default: 30 },
+        limit: { type: ["null", "number"], default: null }
       },
-      // Get refundable payments.
-      {
-        method: "GET",
-        endpoint: "/volt/payments/payments/refundable",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          days: { type: "number", default: 30 },
-          limit: { type: ["null", "number"], default: null },
-          status: { type: ["null", "string"], default: null }
-        },
-        callback: async (stream, params) => {
-          const result = await this.get_refundable_payments({
-            uid: stream.uid,
-            days: params.days,
-            limit: params.limit
-          });
-          return stream.success({ data: result });
-        }
+      callback: async (stream, params) => {
+        const result = await this.get_refunded_payments({
+          uid: stream.uid,
+          days: params.days,
+          limit: params.limit
+        });
+        return stream.success({ data: result });
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/payments/payments/refunding",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        days: { type: ["null", "number"], default: null },
+        limit: { type: ["null", "number"], default: null }
       },
-      // Get refunded payments.
-      {
-        method: "GET",
-        endpoint: "/volt/payments/payments/refunded",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          days: { type: "number", default: 30 },
-          limit: { type: ["null", "number"], default: null }
-        },
-        callback: async (stream, params) => {
-          const result = await this.get_refunded_payments({
-            uid: stream.uid,
-            days: params.days,
-            limit: params.limit
-          });
-          return stream.success({ data: result });
-        }
+      callback: async (stream, params) => {
+        const result = await this.get_refunding_payments({
+          uid: stream.uid,
+          days: params.days,
+          limit: params.limit
+        });
+        return stream.success({ data: result });
+      }
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/payments/refund",
+      content_type: "application/json",
+      rate_limit: "global",
+      params: {
+        payment: { type: ["string", "object"] },
+        line_items: { type: ["array", "null"], default: null },
+        reason: { type: "string", default: "refund" }
       },
-      // Get refunding payments.
-      {
-        method: "GET",
-        endpoint: "/volt/payments/payments/refunding",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          days: { type: ["null", "number"], default: null },
-          limit: { type: ["null", "number"], default: null }
-        },
-        callback: async (stream, params) => {
-          const result = await this.get_refunding_payments({
-            uid: stream.uid,
-            days: params.days,
-            limit: params.limit
-          });
-          return stream.success({ data: result });
-        }
+      callback: async (stream, params) => {
+        await this.create_refund(params.payment, params.line_items, params.reason);
+        return stream.success();
+      }
+    });
+    this.server.endpoint({
+      method: "DELETE",
+      endpoint: "/volt/payments/subscription",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        product: "string"
       },
-      // Create a refund.
-      {
-        method: "POST",
-        endpoint: "/volt/payments/refund",
-        content_type: "application/json",
-        rate_limit: "global",
-        params: {
-          payment: { type: ["string", "object"] },
-          line_items: { type: ["array", "null"], default: null },
-          reason: { type: "string", default: "refund" }
-        },
-        callback: async (stream, params) => {
-          await this.create_refund(params.payment, params.line_items, params.reason);
-          return stream.success();
-        }
+      callback: async (stream, params) => {
+        await this.cancel_subscription(stream.uid, params.product);
+        return stream.success();
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/payments/active_subscriptions",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      callback: async (stream, params) => {
+        return stream.success({
+          data: { subscriptions: await this.get_active_subscriptions(stream.uid) }
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/payments/subscribed",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        product: "string"
       },
-      // Cancel a subscription.
-      {
-        method: "DELETE",
-        endpoint: "/volt/payments/subscription",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          product: "string"
-        },
-        callback: async (stream, params) => {
-          await this.cancel_subscription(stream.uid, params.product);
-          return stream.success();
-        }
-      },
-      // Cancel a subscription by payment.
-      // {
-      //     method: "DELETE",
-      //     endpoint: "/volt/payments/subscription_by_payment",
-      //     content_type: "application/json",
-      //     authenticated: true,
-      //     rate_limit: "global",
-      //     params: {
-      //         payment: {type: ["string", "object"]},
-      //     },
-      //     callback: async (stream, params) => {
-      //         await this.cancel_subscription_by_payment(params.payment);
-      //         return stream.success();
-      //     }
-      // },
-      // Get active subscriptions.
-      {
-        method: "GET",
-        endpoint: "/volt/payments/active_subscriptions",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        callback: async (stream, params) => {
-          return stream.success({
-            data: { subscriptions: await this.get_active_subscriptions(stream.uid) }
-          });
-        }
-      },
-      // Is subscribed
-      {
-        method: "GET",
-        endpoint: "/volt/payments/subscribed",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          product: "string"
-        },
-        callback: async (stream, params) => {
-          return stream.success({
-            data: { is_subscribed: await this.is_subscribed(stream.uid, params.product) }
-          });
-        }
-      },
-      // Webhook.
-      this.server.offline ? null : await this._create_webhook()
-    );
+      callback: async (stream, params) => {
+        return stream.success({
+          data: { is_subscribed: await this.is_subscribed(stream.uid, params.product) }
+        });
+      }
+    });
+    if (!this.server.offline) {
+      this.server.endpoint(await this._create_webhook());
+    }
     now = this.performance.end("init-endpoints", now);
   }
   // ---------------------------------------------------------

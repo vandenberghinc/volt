@@ -285,210 +285,96 @@ class Users {
       name: "Volt.Server.Users.Private",
       indexes: ["uid", "path"]
     });
-    this.server.endpoint(
-      // Send 2fa.
-      {
-        method: "GET",
-        endpoint: "/volt/auth/2fa",
-        content_type: "application/json",
-        rate_limit: "global",
-        params: {
-          email: "string"
-        },
-        callback: async (stream, params) => {
-          let uid;
-          if ((uid = await this.get_uid_by_email(params.email)) == null) {
-            return stream.success({
-              data: { message: "A 2FA code was sent if the specified email exists." }
-            });
-          }
-          await this.send_2fa({ uid, stream });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/auth/2fa",
+      content_type: "application/json",
+      rate_limit: "global",
+      params: {
+        email: "string"
+      },
+      callback: async (stream, params) => {
+        let uid;
+        if ((uid = await this.get_uid_by_email(params.email)) == null) {
           return stream.success({
             data: { message: "A 2FA code was sent if the specified email exists." }
           });
         }
+        await this.send_2fa({ uid, stream });
+        return stream.success({
+          data: { message: "A 2FA code was sent if the specified email exists." }
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/auth/signin",
+      content_type: "application/json",
+      rate_limit: {
+        limit: 10,
+        interval: 60,
+        group: "volt.auth"
       },
-      // Sign in.
-      {
-        method: "POST",
-        endpoint: "/volt/auth/signin",
-        content_type: "application/json",
-        rate_limit: {
-          limit: 10,
-          interval: 60,
-          group: "volt.auth"
-        },
-        callback: async (stream) => {
-          let email, email_err, username, username_err, password, uid, code;
-          try {
-            email = stream.param("email");
-          } catch (err) {
-            email_err = err;
-          }
-          try {
-            username = stream.param("username");
-          } catch (err) {
-            username_err = err;
-          }
-          if (email_err && username_err) {
+      callback: async (stream) => {
+        let email, email_err, username, username_err, password, uid, code;
+        try {
+          email = stream.param("email");
+        } catch (err) {
+          email_err = err;
+        }
+        try {
+          username = stream.param("username");
+        } catch (err) {
+          username_err = err;
+        }
+        if (email_err && username_err) {
+          return stream.error({
+            status: import_status.Status.bad_request,
+            type: "InvalidParams",
+            message: email_err.message
+          });
+        }
+        try {
+          password = stream.param("password");
+        } catch (err) {
+          return stream.error({
+            status: import_status.Status.bad_request,
+            type: "InvalidParams",
+            message: err.message
+          });
+        }
+        if (email) {
+          if ((uid = await this.get_uid_by_email(email)) == null) {
             return stream.error({
-              status: import_status.Status.bad_request,
-              type: "InvalidParams",
-              message: email_err.message
+              status: import_status.Status.unauthorized,
+              type: "Unauthorized",
+              message: "Unauthorized.",
+              invalid_fields: {
+                "email": "Invalid or unrecognized email",
+                "password": "Invalid or unrecognized password"
+              }
             });
           }
-          try {
-            password = stream.param("password");
-          } catch (err) {
+        } else {
+          if ((uid = await this.get_uid(username)) == null) {
             return stream.error({
-              status: import_status.Status.bad_request,
-              type: "InvalidParams",
-              message: err.message
-            });
-          }
-          if (email) {
-            if ((uid = await this.get_uid_by_email(email)) == null) {
-              return stream.error({
-                status: import_status.Status.unauthorized,
-                type: "Unauthorized",
-                message: "Unauthorized.",
-                invalid_fields: {
-                  "email": "Invalid or unrecognized email",
-                  "password": "Invalid or unrecognized password"
-                }
-              });
-            }
-          } else {
-            if ((uid = await this.get_uid(username)) == null) {
-              return stream.error({
-                status: import_status.Status.unauthorized,
-                type: "Unauthorized",
-                message: "Unauthorized.",
-                invalid_fields: {
-                  "username": "Invalid or unrecognized username",
-                  "password": "Invalid or unrecognized password"
-                }
-              });
-            }
-          }
-          if (await this.verify_password(uid, password)) {
-            if (this.server.enable_2fa) {
-              try {
-                code = stream.param("code");
-              } catch (err2) {
-                const start_time = Date.now();
-                await this.send_2fa({ uid, stream });
-                if (this.avg_send_2fa_time.length >= 1e4) {
-                  this.avg_send_2fa_time.shift();
-                }
-                this.avg_send_2fa_time.push(Date.now() - start_time);
-                return stream.send({
-                  status: import_status.Status.two_factor_auth_required,
-                  data: { error: "2FA required." }
-                });
-              }
-              const err = await this.verify_2fa(uid, code);
-              if (err) {
-                return stream.send({
-                  status: import_status.Status.unauthorized,
-                  data: {
-                    error: "Invalid 2FA code.",
-                    invalid_fields: {
-                      "code": err
-                    }
-                  }
-                });
-              }
-            }
-            return await this._sign_in_response(stream, uid);
-          }
-          if (this.avg_send_2fa_time.length >= 10) {
-            const sorted = [...this.avg_send_2fa_time].sort((a, b) => a - b);
-            const mid = Math.floor(sorted.length / 2);
-            if (sorted.length % 2 === 0) {
-              return (sorted[mid - 1] + sorted[mid]) / 2;
-            }
-            await new Promise((resolve) => setTimeout(resolve, sorted[mid]));
-          }
-          return stream.send({
-            status: import_status.Status.unauthorized,
-            data: {
-              error: "Unauthorized.",
+              status: import_status.Status.unauthorized,
+              type: "Unauthorized",
+              message: "Unauthorized.",
               invalid_fields: {
                 "username": "Invalid or unrecognized username",
                 "password": "Invalid or unrecognized password"
               }
-            }
-          });
+            });
+          }
         }
-      },
-      // Sign out.
-      {
-        method: "POST",
-        endpoint: "/volt/auth/signout",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        callback: async (stream) => {
-          await this._deactivate_token(stream.uid);
-          this._reset_cookies(stream);
-          return stream.success({
-            data: { message: "Successfully signed out." }
-          });
-        }
-      },
-      // Sign up.
-      {
-        method: "POST",
-        endpoint: "/volt/auth/signup",
-        content_type: "application/json",
-        rate_limit: "global",
-        params: {
-          username: "string",
-          first_name: "string",
-          last_name: "string",
-          email: "string",
-          password: "string",
-          verify_password: "string",
-          phone_number: { type: "string", required: false },
-          code: { type: "string", required: false }
-        },
-        callback: async (stream, params) => {
-          const { error: error2, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
-          if (error2) {
-            return stream.error({
-              status: import_status.Status.bad_request,
-              type: "InvalidParams",
-              message: error2,
-              invalid_fields: invalid_fields ?? void 0
-            });
-          }
-          if (await this.username_exists(params.username)) {
-            throw new ExternalError({
-              type: "UsernameAlreadyExists",
-              message: `Username "${params.username}" is already registered.`,
-              status: import_status.Status.bad_request,
-              invalid_fields: { "username": "Username is already registered" }
-            });
-          }
-          if (await this.email_exists(params.email)) {
-            throw new ExternalError({
-              type: "EmailAlreadyExists",
-              message: `Email "${params.email}" is already registered.`,
-              status: import_status.Status.bad_request,
-              invalid_fields: { "email": "Email is already registered" }
-            });
-          }
+        if (await this.verify_password(uid, password)) {
           if (this.server.enable_2fa) {
-            if (params.code == null || params.code == "") {
+            try {
+              code = stream.param("code");
+            } catch (err2) {
               const start_time = Date.now();
-              await this.send_2fa({
-                _email: params.email,
-                _username: params.username,
-                stream,
-                uid: void 0
-                // keep uid required param but use _email sys arg here.
-              });
+              await this.send_2fa({ uid, stream });
               if (this.avg_send_2fa_time.length >= 1e4) {
                 this.avg_send_2fa_time.shift();
               }
@@ -498,7 +384,7 @@ class Users {
                 data: { error: "2FA required." }
               });
             }
-            const err = await this.verify_2fa(params.email, params.code);
+            const err = await this.verify_2fa(uid, code);
             if (err) {
               return stream.send({
                 status: import_status.Status.unauthorized,
@@ -511,402 +397,491 @@ class Users {
               });
             }
           }
-          delete params.verify_password;
-          delete params.code;
-          params.is_activated = true;
-          params._check_username_email = false;
-          let uid;
-          try {
-            uid = await this.create(params);
-          } catch (err) {
-            return stream.error({
-              status: import_status.Status.bad_request,
-              type: "InvalidParams",
-              message: err.message,
-              invalid_fields: err.invalid_fields || {}
-            });
-          }
           return await this._sign_in_response(stream, uid);
         }
-      },
-      // Activate account.
-      {
-        method: "POST",
-        endpoint: "/volt/auth/activate",
-        content_type: "application/json",
-        rate_limit: "global",
-        params: {
-          "code": "string"
-        },
-        callback: async (stream, params) => {
-          let uid = stream.uid;
-          if (uid == null) {
-            uid = stream.cookies["UserID"].value;
-            if (uid === "null" || uid === "-1") {
-              uid = null;
+        if (this.avg_send_2fa_time.length >= 10) {
+          const sorted = [...this.avg_send_2fa_time].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          if (sorted.length % 2 === 0) {
+            return (sorted[mid - 1] + sorted[mid]) / 2;
+          }
+          await new Promise((resolve) => setTimeout(resolve, sorted[mid]));
+        }
+        return stream.send({
+          status: import_status.Status.unauthorized,
+          data: {
+            error: "Unauthorized.",
+            invalid_fields: {
+              "username": "Invalid or unrecognized username",
+              "password": "Invalid or unrecognized password"
             }
           }
-          if (uid == null) {
-            return stream.error({ status: import_status.Status.forbidden, message: "Permission denied." });
-          }
-          const err = await this.verify_2fa(uid, params.code);
-          if (err) {
-            return stream.error({
-              status: import_status.Status.forbidden,
-              message: "Permission denied.",
-              invalid_fields: {
-                "code": err
-              }
-            });
-          }
-          await this.set_activated(uid, true);
-          await this._create_user_cookie(stream, uid);
-          return stream.success({ data: { message: "Successfully verified the 2FA code." } });
-        }
-      },
-      // Forgot password.
-      {
-        method: "POST",
-        endpoint: "/volt/auth/forgot_password",
-        content_type: "application/json",
-        rate_limit: "global",
-        params: {
-          email: "string",
-          code: "string",
-          password: "string",
-          verify_password: "string"
-        },
-        callback: async (stream, params) => {
-          const { error: error2, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
-          if (error2) {
-            return stream.error({
-              status: import_status.Status.bad_request,
-              message: error2,
-              invalid_fields: invalid_fields ?? void 0
-            });
-          }
-          let uid;
-          if ((uid = await this.get_uid_by_email(params.email)) == null) {
-            return stream.error({ status: import_status.Status.forbidden, message: "Invalid email." });
-          }
-          const err = await this.verify_2fa(uid, params.code);
-          if (err) {
-            return stream.error({
-              status: import_status.Status.forbidden,
-              message: "Invalid 2FA code.",
-              invalid_fields: {
-                "code": "Invalid code"
-              }
-            });
-          }
-          await this.set_password(uid, params.password);
-          return await this._sign_in_response(stream, uid);
-        }
+        });
       }
-    );
-    this.server.endpoint(
-      // Get user.
-      {
-        method: "GET",
-        endpoint: "/volt/user",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          // detailed: { type: "boolean", default: false },
-        },
-        callback: async (stream, params) => {
-          const user = await this.get(stream.uid);
-          if (user.password) {
-            user.password = "*".repeat(user.password.length);
-          }
-          if (user.api_key) {
-            user.api_key = "*".repeat(user.api_key.length);
-          }
-          user.first_name ??= "";
-          user.last_name ??= "";
-          user.username ??= "";
-          user.email ??= "";
-          user.password ??= "";
-          user.api_key ??= "";
-          user.support_pin ??= "";
-          return stream.success({ data: user });
-        }
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/auth/signout",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      callback: async (stream) => {
+        await this._deactivate_token(stream.uid);
+        this._reset_cookies(stream);
+        return stream.success({
+          data: { message: "Successfully signed out." }
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/auth/signup",
+      content_type: "application/json",
+      rate_limit: "global",
+      params: {
+        username: "string",
+        first_name: "string",
+        last_name: "string",
+        email: "string",
+        password: "string",
+        verify_password: "string",
+        phone_number: { type: "string", required: false },
+        code: { type: "string", required: false }
       },
-      // Set user.
-      {
-        method: "POST",
-        endpoint: "/volt/user",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        callback: async (stream) => {
-          await this.set(stream.uid, stream.params);
-          await this._create_detailed_user_cookie(stream, stream.uid);
-          return stream.success({ data: { message: "Successfully updated your account." } });
+      callback: async (stream, params) => {
+        const { error: error2, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
+        if (error2) {
+          return stream.error({
+            status: import_status.Status.bad_request,
+            type: "InvalidParams",
+            message: error2,
+            invalid_fields: invalid_fields ?? void 0
+          });
         }
-      },
-      // Change password.
-      {
-        method: "POST",
-        endpoint: "/volt/user/change_password",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          current_password: "string",
-          password: "string",
-          verify_password: "string"
-        },
-        callback: async (stream, params) => {
-          if (await this.verify_password(stream.uid, params.current_password) !== true) {
-            return stream.error({
+        if (await this.username_exists(params.username)) {
+          throw new ExternalError({
+            type: "UsernameAlreadyExists",
+            message: `Username "${params.username}" is already registered.`,
+            status: import_status.Status.bad_request,
+            invalid_fields: { "username": "Username is already registered" }
+          });
+        }
+        if (await this.email_exists(params.email)) {
+          throw new ExternalError({
+            type: "EmailAlreadyExists",
+            message: `Email "${params.email}" is already registered.`,
+            status: import_status.Status.bad_request,
+            invalid_fields: { "email": "Email is already registered" }
+          });
+        }
+        if (this.server.enable_2fa) {
+          if (params.code == null || params.code == "") {
+            const start_time = Date.now();
+            await this.send_2fa({
+              _email: params.email,
+              _username: params.username,
+              stream,
+              uid: void 0
+              // keep uid required param but use _email sys arg here.
+            });
+            if (this.avg_send_2fa_time.length >= 1e4) {
+              this.avg_send_2fa_time.shift();
+            }
+            this.avg_send_2fa_time.push(Date.now() - start_time);
+            return stream.send({
+              status: import_status.Status.two_factor_auth_required,
+              data: { error: "2FA required." }
+            });
+          }
+          const err = await this.verify_2fa(params.email, params.code);
+          if (err) {
+            return stream.send({
               status: import_status.Status.unauthorized,
-              message: "Incorrect password.",
-              invalid_fields: {
-                current_password: "Incorrect password."
+              data: {
+                error: "Invalid 2FA code.",
+                invalid_fields: {
+                  "code": err
+                }
               }
             });
           }
-          const { error: error2, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
-          if (error2) {
-            return stream.error({
-              status: import_status.Status.bad_request,
-              message: error2,
-              invalid_fields: invalid_fields ?? void 0
-            });
-          }
-          await this.set_password(stream.uid, params.password);
-          return stream.success({
-            status: import_status.Status.success,
-            data: { message: "Successfully updated your password." }
+        }
+        delete params.verify_password;
+        delete params.code;
+        params.is_activated = true;
+        params._check_username_email = false;
+        let uid;
+        try {
+          uid = await this.create(params);
+        } catch (err) {
+          return stream.error({
+            status: import_status.Status.bad_request,
+            type: "InvalidParams",
+            message: err.message,
+            invalid_fields: err.invalid_fields || {}
           });
         }
-      },
-      // Delete account.
-      {
-        method: "DELETE",
-        endpoint: "/volt/user",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        callback: async (stream) => {
-          await this.delete(stream.uid);
-          this._reset_cookies(stream);
-          return stream.success({
-            status: import_status.Status.success,
-            data: { message: "Successfully deleted your account." }
-          });
-        }
-      },
-      // Generate API key.
-      {
-        method: "POST",
-        endpoint: "/volt/user/api_key",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        callback: async (stream) => {
-          return stream.success({
-            data: {
-              message: "Successfully generated an API key.",
-              api_key: await this.generate_api_key(stream.uid)
-            }
-          });
-        }
-      },
-      // Revoke API key.
-      {
-        method: "DELETE",
-        endpoint: "/volt/user/api_key",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        callback: async (stream) => {
-          await this.revoke_api_key(stream.uid);
-          return stream.send({
-            status: import_status.Status.success,
-            data: { message: "Successfully revoked your API key." }
-          });
-        }
-      },
-      // Load data.
-      {
-        method: "GET",
-        endpoint: "/volt/user/data",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          path: "string",
-          default: { type: "string", default: null }
-        },
-        callback: async (stream, params) => {
-          return stream.send({
-            status: import_status.Status.success,
-            data: await this.public.load({ uid: stream.uid, path: params.path }, { default: params.default })
-          });
-        }
-      },
-      // Save data.
-      {
-        method: "POST",
-        endpoint: "/volt/user/data",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          path: "string",
-          data: { type: void 0 }
-        },
-        callback: async (stream, params) => {
-          await this.public.save({ uid: stream.uid, path: params.path }, params.data);
-          return stream.send({
-            status: import_status.Status.success,
-            data: { message: "Successfully saved." }
-          });
-        }
-      },
-      // Delete data.
-      {
-        method: "DELETE",
-        endpoint: "/volt/user/data",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          path: "string",
-          data: { type: void 0 },
-          recursive: { type: "string", default: false }
-        },
-        callback: async (stream, params) => {
-          await this.public.delete({ uid: stream.uid, path: params.path }, params.recursive);
-          return stream.send({
-            status: import_status.Status.success,
-            data: { message: "Successfully deleted." }
-          });
-        }
-      },
-      // Load protected data.
-      {
-        method: "GET",
-        endpoint: "/volt/user/data/protected",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        params: {
-          path: "string",
-          default: { type: "string", default: null }
-        },
-        callback: async (stream, params) => {
-          return stream.send({
-            status: import_status.Status.success,
-            data: await this.protected.load({ uid: stream.uid, path: params.path }, { default: params.default })
-          });
-        }
+        return await this._sign_in_response(stream, uid);
       }
-    );
-    this.server.endpoint(
-      // Get PIN.
-      {
-        method: "GET",
-        endpoint: "/volt/support/pin",
-        content_type: "application/json",
-        authenticated: true,
-        rate_limit: "global",
-        callback: async (stream) => {
-          const pin = await this.get_support_pin(stream.uid);
-          return stream.success({
-            data: {
-              message: "Successfully retrieved your support PIN.",
-              pin
-            }
-          });
-        }
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/auth/activate",
+      content_type: "application/json",
+      rate_limit: "global",
+      params: {
+        "code": "string"
       },
-      // Support.
-      // Supported params are: `support_pin`, `subject`, `summary`, `detailed`, `attachments`, `recipient` and `type`.
-      {
-        method: "POST",
-        endpoint: "/volt/support/submit",
-        content_type: "application/json",
-        rate_limit: "global",
-        callback: async (stream) => {
-          let params = stream.params;
-          let user = null, email, first_name, last_name;
-          if (stream.uid == null) {
-            try {
-              email = stream.param("email");
-              first_name = stream.param("first_name");
-              last_name = stream.param("last_name");
-            } catch (err) {
-              return stream.error({ status: import_status.Status.bad_request, message: err.message });
-            }
-          } else {
-            user = await this.get(stream.uid);
-            email = user.email;
-            first_name = user.first_name;
-            last_name = user.last_name;
+      callback: async (stream, params) => {
+        let uid = stream.uid;
+        if (uid == null) {
+          uid = stream.cookies["UserID"].value;
+          if (uid === "null" || uid === "-1") {
+            uid = null;
           }
-          let body = "";
-          const subject = params.subject || (params.type == null ? "Support" : `Support ${params.type}`);
-          body += `<h1>${subject}</h1>`;
-          if (params.subject) {
-            delete params.subject;
-          }
-          if (params.type) {
-            body += `<span style='font-weight: bold'>Type</span>: ${params.type}<br>`;
-            delete params.type;
-          }
-          if (user) {
-            body += `<span style='font-weight: bold'>UID</span>: ${stream.uid}<br>`;
-            body += `<span style='font-weight: bold'>User</span>: ${user.username}<br>`;
-          }
-          body += `<span style='font-weight: bold'>Email</span>: ${email}<br>`;
-          body += `<span style='font-weight: bold'>First Name</span>: ${first_name}<br>`;
-          body += `<span style='font-weight: bold'>Last Name</span>: ${last_name}<br>`;
-          if (stream.uid != null) {
-            const support_pin = await this.get_support_pin(stream.uid);
-            body += `<span style='font-weight: bold'>Support PIN</span>: ${support_pin} <span style='color: green'>verified</span><br>`;
-          } else if (params.support_pin) {
-            body += `<span style='font-weight: bold'>Support PIN</span>: ${params.support_pin} <span style='color: red'>not yet verified</span><br>`;
-            delete params.support_pin;
-          } else {
-            body += `<span style='font-weight: bold'>Support PIN</span>: Unknown<br>`;
-          }
-          if (params.summary) {
-            body += `<br><span style='font-weight: bold'>Summary</span>:<br>${params.summary}<br>`;
-            delete params.summary;
-          }
-          if (params.detailed) {
-            body += `<br><span style='font-weight: bold'>Detailed</span>:<br>${params.detailed}<br>`;
-            delete params.detailed;
-          }
-          Object.keys(params).forEach((key) => {
-            if (key !== "attachments" && key !== "recipient") {
-              body += `<br><span style='font-weight: bold'>${key}</span>: ${params[key]}<br>`;
-            }
-          });
-          body += "<br>";
-          let attachments = [];
-          if (params.attachments) {
-            Object.keys(params.attachments).forEach((key) => {
-              attachments.push({
-                filename: key,
-                content: Buffer.from(params.attachments[key], "utf-8")
-              });
-            });
-          }
-          await this.server.send_mail({
-            recipients: [params.recipient || this.server.smtp_sender],
-            subject,
-            body,
-            attachments
-          });
-          return stream.success({ data: { message: "Successfully sent your request." } });
         }
+        if (uid == null) {
+          return stream.error({ status: import_status.Status.forbidden, message: "Permission denied." });
+        }
+        const err = await this.verify_2fa(uid, params.code);
+        if (err) {
+          return stream.error({
+            status: import_status.Status.forbidden,
+            message: "Permission denied.",
+            invalid_fields: {
+              "code": err
+            }
+          });
+        }
+        await this.set_activated(uid, true);
+        await this._create_user_cookie(stream, uid);
+        return stream.success({ data: { message: "Successfully verified the 2FA code." } });
       }
-    );
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/auth/forgot_password",
+      content_type: "application/json",
+      rate_limit: "global",
+      params: {
+        email: "string",
+        code: "string",
+        password: "string",
+        verify_password: "string"
+      },
+      callback: async (stream, params) => {
+        const { error: error2, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
+        if (error2) {
+          return stream.error({
+            status: import_status.Status.bad_request,
+            message: error2,
+            invalid_fields: invalid_fields ?? void 0
+          });
+        }
+        let uid;
+        if ((uid = await this.get_uid_by_email(params.email)) == null) {
+          return stream.error({ status: import_status.Status.forbidden, message: "Invalid email." });
+        }
+        const err = await this.verify_2fa(uid, params.code);
+        if (err) {
+          return stream.error({
+            status: import_status.Status.forbidden,
+            message: "Invalid 2FA code.",
+            invalid_fields: {
+              "code": "Invalid code"
+            }
+          });
+        }
+        await this.set_password(uid, params.password);
+        return await this._sign_in_response(stream, uid);
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/user",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        // detailed: { type: "boolean", default: false },
+      },
+      callback: async (stream, params) => {
+        const user = await this.get(stream.uid);
+        if (user.password) {
+          user.password = "*".repeat(user.password.length);
+        }
+        if (user.api_key) {
+          user.api_key = "*".repeat(user.api_key.length);
+        }
+        user.first_name ??= "";
+        user.last_name ??= "";
+        user.username ??= "";
+        user.email ??= "";
+        user.password ??= "";
+        user.api_key ??= "";
+        user.support_pin ??= "";
+        return stream.success({ data: user });
+      }
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/user",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      callback: async (stream) => {
+        await this.set(stream.uid, stream.params);
+        await this._create_detailed_user_cookie(stream, stream.uid);
+        return stream.success({ data: { message: "Successfully updated your account." } });
+      }
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/user/change_password",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        current_password: "string",
+        password: "string",
+        verify_password: "string"
+      },
+      callback: async (stream, params) => {
+        if (await this.verify_password(stream.uid, params.current_password) !== true) {
+          return stream.error({
+            status: import_status.Status.unauthorized,
+            message: "Incorrect password.",
+            invalid_fields: {
+              current_password: "Incorrect password."
+            }
+          });
+        }
+        const { error: error2, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
+        if (error2) {
+          return stream.error({
+            status: import_status.Status.bad_request,
+            message: error2,
+            invalid_fields: invalid_fields ?? void 0
+          });
+        }
+        await this.set_password(stream.uid, params.password);
+        return stream.success({
+          status: import_status.Status.success,
+          data: { message: "Successfully updated your password." }
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "DELETE",
+      endpoint: "/volt/user",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      callback: async (stream) => {
+        await this.delete(stream.uid);
+        this._reset_cookies(stream);
+        return stream.success({
+          status: import_status.Status.success,
+          data: { message: "Successfully deleted your account." }
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/user/api_key",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      callback: async (stream) => {
+        return stream.success({
+          data: {
+            message: "Successfully generated an API key.",
+            api_key: await this.generate_api_key(stream.uid)
+          }
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "DELETE",
+      endpoint: "/volt/user/api_key",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      callback: async (stream) => {
+        await this.revoke_api_key(stream.uid);
+        return stream.send({
+          status: import_status.Status.success,
+          data: { message: "Successfully revoked your API key." }
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/user/data",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        path: "string",
+        default: { type: "string", default: null }
+      },
+      callback: async (stream, params) => {
+        return stream.send({
+          status: import_status.Status.success,
+          data: await this.public.load({ uid: stream.uid, path: params.path }, { default: params.default })
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/user/data",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        path: "string",
+        data: { type: void 0 }
+      },
+      callback: async (stream, params) => {
+        await this.public.save({ uid: stream.uid, path: params.path }, params.data);
+        return stream.send({
+          status: import_status.Status.success,
+          data: { message: "Successfully saved." }
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "DELETE",
+      endpoint: "/volt/user/data",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        path: "string",
+        data: { type: void 0 },
+        recursive: { type: "string", default: false }
+      },
+      callback: async (stream, params) => {
+        await this.public.delete({ uid: stream.uid, path: params.path }, params.recursive);
+        return stream.send({
+          status: import_status.Status.success,
+          data: { message: "Successfully deleted." }
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/user/data/protected",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      params: {
+        path: "string",
+        default: { type: "string", default: null }
+      },
+      callback: async (stream, params) => {
+        return stream.send({
+          status: import_status.Status.success,
+          data: await this.protected.load({ uid: stream.uid, path: params.path }, { default: params.default })
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "GET",
+      endpoint: "/volt/support/pin",
+      content_type: "application/json",
+      authenticated: true,
+      rate_limit: "global",
+      callback: async (stream) => {
+        const pin = await this.get_support_pin(stream.uid);
+        return stream.success({
+          data: {
+            message: "Successfully retrieved your support PIN.",
+            pin
+          }
+        });
+      }
+    });
+    this.server.endpoint({
+      method: "POST",
+      endpoint: "/volt/support/submit",
+      content_type: "application/json",
+      rate_limit: "global",
+      callback: async (stream) => {
+        let params = stream.params;
+        let user = null, email, first_name, last_name;
+        if (stream.uid == null) {
+          try {
+            email = stream.param("email");
+            first_name = stream.param("first_name");
+            last_name = stream.param("last_name");
+          } catch (err) {
+            return stream.error({ status: import_status.Status.bad_request, message: err.message });
+          }
+        } else {
+          user = await this.get(stream.uid);
+          email = user.email;
+          first_name = user.first_name;
+          last_name = user.last_name;
+        }
+        let body = "";
+        const subject = params.subject || (params.type == null ? "Support" : `Support ${params.type}`);
+        body += `<h1>${subject}</h1>`;
+        if (params.subject) {
+          delete params.subject;
+        }
+        if (params.type) {
+          body += `<span style='font-weight: bold'>Type</span>: ${params.type}<br>`;
+          delete params.type;
+        }
+        if (user) {
+          body += `<span style='font-weight: bold'>UID</span>: ${stream.uid}<br>`;
+          body += `<span style='font-weight: bold'>User</span>: ${user.username}<br>`;
+        }
+        body += `<span style='font-weight: bold'>Email</span>: ${email}<br>`;
+        body += `<span style='font-weight: bold'>First Name</span>: ${first_name}<br>`;
+        body += `<span style='font-weight: bold'>Last Name</span>: ${last_name}<br>`;
+        if (stream.uid != null) {
+          const support_pin = await this.get_support_pin(stream.uid);
+          body += `<span style='font-weight: bold'>Support PIN</span>: ${support_pin} <span style='color: green'>verified</span><br>`;
+        } else if (params.support_pin) {
+          body += `<span style='font-weight: bold'>Support PIN</span>: ${params.support_pin} <span style='color: red'>not yet verified</span><br>`;
+          delete params.support_pin;
+        } else {
+          body += `<span style='font-weight: bold'>Support PIN</span>: Unknown<br>`;
+        }
+        if (params.summary) {
+          body += `<br><span style='font-weight: bold'>Summary</span>:<br>${params.summary}<br>`;
+          delete params.summary;
+        }
+        if (params.detailed) {
+          body += `<br><span style='font-weight: bold'>Detailed</span>:<br>${params.detailed}<br>`;
+          delete params.detailed;
+        }
+        Object.keys(params).forEach((key) => {
+          if (key !== "attachments" && key !== "recipient") {
+            body += `<br><span style='font-weight: bold'>${key}</span>: ${params[key]}<br>`;
+          }
+        });
+        body += "<br>";
+        let attachments = [];
+        if (params.attachments) {
+          Object.keys(params.attachments).forEach((key) => {
+            attachments.push({
+              filename: key,
+              content: Buffer.from(params.attachments[key], "utf-8")
+            });
+          });
+        }
+        await this.server.send_mail({
+          recipients: [params.recipient || this.server.smtp_sender],
+          subject,
+          body,
+          attachments
+        });
+        return stream.success({ data: { message: "Successfully sent your request." } });
+      }
+    });
   }
   // ---------------------------------------------------------
   // Users.
@@ -1038,9 +1013,8 @@ class Users {
    *      });
    */
   async create({ first_name, last_name, username, email, password, phone_number = "", is_activated = null, _check_username_email = false }) {
-    vlib.Scheme.verify({
-      object: arguments[0],
-      check_unknown: true,
+    vlib.Scheme.validate(arguments[0], {
+      strict: true,
       scheme: {
         first_name: "string",
         last_name: "string",

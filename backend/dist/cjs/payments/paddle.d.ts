@@ -77,7 +77,7 @@ export interface PaddleConstructorOptions {
     _server?: any;
 }
 export declare class Paddle {
-    private type;
+    type: string;
     private client_key;
     private sandbox;
     private inclusive_tax;
