@@ -1,28 +1,29 @@
-# File: .github/workflows/.codeql.yml
-name: "CodeQL TypeScript Scan"
+# .github/workflows/.codeql.yml
+name: "CodeQL ESM TypeScript Scans"
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'backend/src/**'
+      - 'frontend/src/**'
+      - '.github/workflows/.codeql.yml'
   pull_request:
     branches:
       - main
-  schedule:
-    - cron: '0 2 * * *'  # Daily at 02:00 UTC to keep results fresh
+    paths:
+      - 'backend/src/**'
+      - 'frontend/src/**'
+      - '.github/workflows/.codeql.yml'
 
 jobs:
-  codeql-analysis:
-    name: "Perform CodeQL Analysis"
+  backend-codeql:
+    name: "CodeQL Scan: Backend (NodeJS ESM TS)"
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [16.x, 18.x]  # Test against multiple Node.js LTS versions
 
     steps:
       - name: "Checkout repository"
@@ -32,34 +33,67 @@ jobs:
         uses: github/codeql-action/init@v2
         with:
           languages: javascript,typescript
-          # You can specify extra queries or query packs if needed:
-          # queries: security-and-quality, custom-queries
 
-      - name: "Setup Node.js ${{ matrix.node-version }}"
+      - name: "Setup Node.js 18.x"
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 18.x
           cache: 'npm'
 
       - name: "Install dependencies"
         run: npm ci
 
-      - name: "Build project"
-        run: npm run build
-        # Ensure that your package.json has a `build` script that compiles TypeScript (e.g., "tsc -p tsconfig.json").
-        # This step guarantees that CodeQL can pick up generated ESM artifacts if needed.
+      - name: "Build Backend"
+        run: npm run build:backend
+        # ↳ Assumes you have a "build:backend" script in package.json that compiles your backend TS (e.g. "tsc -p tsconfig.backend.json").
 
-      - name: "Perform CodeQL database creation"
-        # The init step above sets up the environment; the build step ensures source is ready.
-        # Now we run the analyze step to produce SARIF.
+      - name: "Perform Backend CodeQL Analysis"
         uses: github/codeql-action/analyze@v2
         with:
-          category: "codeql-ts-scan"
-          # You can override the default memory/threads or override other settings here if scanning a large codebase:
-          # memory: 8192
-          # threads: 2
+          category: "codeql-backend-scan"
+          extra-options: |
+            --include='backend/src/**/*.ts'
+            # Exclude everything else by not listing other paths.
 
-    # Optional: upload the SARIF as a report artifact for further analysis
-    outputs:
-      sarif: ${{ steps.analyze.outputs.sarif_on_disk }}
+  # frontend-codeql:
+  #   name: "CodeQL Scan: Frontend (Web ESM TS)"
+  #   needs: backend-codeql
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     security-events: write
 
+  #   steps:
+  #     - name: "Checkout repository"
+  #       uses: actions/checkout@v4
+
+  #     - name: "Initialize CodeQL"
+  #       uses: github/codeql-action/init@v2
+  #       with:
+  #         languages: javascript,typescript
+
+  #     - name: "Setup Node.js 18.x"
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 18.x
+  #         cache: 'npm'
+
+  #     - name: "Install Frontend Dependencies"
+  #       run: |
+  #         cd web
+  #         npm ci
+  #       # ↳ Assumes your web/ folder has its own package.json.
+
+  #     - name: "Build Frontend"
+  #       run: |
+  #         cd web
+  #         npm run build
+  #       # ↳ Assumes you have a "build" script in web/package.json to produce the ESM bundle(s).
+
+  #     - name: "Perform Frontend CodeQL Analysis"
+  #       uses: github/codeql-action/analyze@v2
+  #       with:
+  #         category: "codeql-frontend-scan"
+  #         extra-options: |
+  #           --include='web/**/*.ts'
+  #           --include='web/**/*.js'
