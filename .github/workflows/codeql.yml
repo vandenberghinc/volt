@@ -3,15 +3,13 @@ name: "CodeQL ESM TypeScript Scans"
 
 on:
   push:
-    branches:
-      - main
+    branches: main
     paths:
       - 'backend/src/**'
       - 'frontend/src/**'
       - '.github/workflows/.codeql.yml'
   pull_request:
-    branches:
-      - main
+    branches: main
     paths:
       - 'backend/src/**'
       - 'frontend/src/**'
@@ -98,4 +96,3 @@ jobs:
   #           --include='web/**/*.ts'
   #           --include='web/**/*.js'
 
-  
