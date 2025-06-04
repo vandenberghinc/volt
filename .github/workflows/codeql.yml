@@ -1,24 +1,23 @@
-# .github/workflows/.codeql.yml
+# File: .github/workflows/codeql.yml
 name: "CodeQL ESM TypeScript Scans"
 
 on:
-    push:
-      branches: [main]
-    pull_request:
-      branches: [main]
-# on:
-#   push:
-#     branches: [main]
-#     paths:
-#       - 'backend/src/**'
-#       - 'frontend/src/**'
-#       - '.github/workflows/.codeql.yml'
-#   pull_request:
-#     branches: [main]
-#     paths:
-#       - 'backend/src/**'
-#       - 'frontend/src/**'
-#       - '.github/workflows/.codeql.yml'
+  push:
+    branches:
+      - main           # ← change this if your default branch is 'master' or something else
+    paths:
+      - 'src/**'       # backend ESM NodeJS TS
+      - 'lib/**'       # (if you have a lib folder for backend)
+      - 'web/**'       # frontend ESM Web TS
+      - '.github/workflows/codeql.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'lib/**'
+      - 'web/**'
+      - '.github/workflows/codeql.yml'
 
 jobs:
   backend-codeql:
@@ -29,75 +28,75 @@ jobs:
       security-events: write
 
     steps:
-      - name: "Checkout repository"
+      - name: Check out repo
         uses: actions/checkout@v4
 
-      - name: "Initialize CodeQL"
+      - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
           languages: javascript,typescript
 
-      - name: "Setup Node.js 18.x"
+      - name: Setup Node.js 18.x
         uses: actions/setup-node@v4
         with:
           node-version: 18.x
           cache: 'npm'
 
-      - name: "Install dependencies"
+      - name: Install dependencies
         run: npm ci
 
-      - name: "Build Backend"
+      - name: Build Backend
         run: npm run build:backend
-        # ↳ Assumes you have a "build:backend" script in package.json that compiles your backend TS (e.g. "tsc -p tsconfig.backend.json").
+        # ↳ e.g. "build:backend": "tsc -p tsconfig.backend.json"
 
-      - name: "Perform Backend CodeQL Analysis"
+      - name: Perform Backend CodeQL Analysis
         uses: github/codeql-action/analyze@v2
         with:
           category: "codeql-backend-scan"
           extra-options: |
-            --include='backend/src/**/*.ts'
-            # Exclude everything else by not listing other paths.
+            --include='src/**/*.ts'
+            --include='src/**/*.js'
+            --include='lib/**/*.ts'
+            --include='lib/**/*.js'
 
-  # frontend-codeql:
-  #   name: "CodeQL Scan: Frontend (Web ESM TS)"
-  #   needs: backend-codeql
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #     security-events: write
+  frontend-codeql:
+    needs: backend-codeql
+    name: "CodeQL Scan: Frontend (Web ESM TS)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
 
-  #   steps:
-  #     - name: "Checkout repository"
-  #       uses: actions/checkout@v4
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
 
-  #     - name: "Initialize CodeQL"
-  #       uses: github/codeql-action/init@v2
-  #       with:
-  #         languages: javascript,typescript
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript,typescript
 
-  #     - name: "Setup Node.js 18.x"
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 18.x
-  #         cache: 'npm'
+      - name: Setup Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: 'npm'
 
-  #     - name: "Install Frontend Dependencies"
-  #       run: |
-  #         cd web
-  #         npm ci
-  #       # ↳ Assumes your web/ folder has its own package.json.
+      - name: Install Frontend Dependencies
+        run: |
+          cd web
+          npm ci
 
-  #     - name: "Build Frontend"
-  #       run: |
-  #         cd web
-  #         npm run build
-  #       # ↳ Assumes you have a "build" script in web/package.json to produce the ESM bundle(s).
+      - name: Build Frontend
+        run: |
+          cd web
+          npm run build
+        # ↳ e.g. "build": "tsc -p tsconfig.web.json" or whatever your web/ build command is.
 
-  #     - name: "Perform Frontend CodeQL Analysis"
-  #       uses: github/codeql-action/analyze@v2
-  #       with:
-  #         category: "codeql-frontend-scan"
-  #         extra-options: |
-  #           --include='web/**/*.ts'
-  #           --include='web/**/*.js'
-
+      - name: Perform Frontend CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "codeql-frontend-scan"
+          extra-options: |
+            --include='web/**/*.ts'
+            --include='web/**/*.js'
