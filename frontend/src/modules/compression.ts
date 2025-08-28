@@ -14,54 +14,41 @@ declare const pako: {
 // Imports.
 import { Utils } from "./utils.js"
 
-export const Compression = {
+export namespace Compression {
 
 	// Compress.
-	/*  @docs:
-	    @nav: Frontend
-	    @chapter: Compression
-	    @title: Compress
-	    @desc: Compress data.
-	    @param: 
-	        @name: data
-	        @description The data to compress.
-	    @param: 
-	        @name: options
-	        @description The pako gzip options.
+	/**
+     * Compress data.
+     * @param data The data to compress
+     * @param options The pako gzip options.
+     * @nav Frontend/Compression
+     * @docs
 	 */
-	compress(data: string | object, options: { level?: number } = { level: 9 }): Uint8Array {
+	export function compress(data: string | object, options: { level?: number } = { level: 9 }): Uint8Array {
         if (Utils.is_array(data) || Utils.is_obj(data)) {
             data = JSON.stringify(data);
         }
         return pako.gzip(data, options);
-    },
+    }
 
 	// Decompress.
 	// Valid types are: [string, array, object].
-	/*  @docs:
-	    @nav: Frontend
-	    @chapter: Compression
-	    @title: Decompress
-	    @desc: Decompress data.
-	    @param: 
-	        @name: data
-	        @description The data to decompress.
-	    @param: 
-	        @name: type
-	        @description The output data data
-	        @enum:
-	            @value: "string"
-	        @enum:
-	            @value: "array"
-	        @enum:
-	            @value: "object"
+	/**
+     * Decompress data.
+     * @param data The data to decompress.
+     * @param type The output data data. Valid types are: "string", "array", "object".
+     * @nav Frontend/Compression
+     * @docs
 	 */
-	decompress(data: Uint8Array, type: string = "string"): string | any[] | object {
+    export function decompress(
+        data: Uint8Array,
+        type: "string" | "array" | "object" = "string",
+    ): string | any[] | object {
         let decompressed = pako.ungzip(data, { to: 'string' });
         if (type === "array" || type === "object") {
             return JSON.parse(decompressed);
         }
         return decompressed;
-    },
+    }
 
 }

@@ -1,0 +1,79 @@
+/*
+ * Author: Daan van den Bergh
+ * Copyright: © 2022 - 2024 Daan van den Bergh.
+ */
+/**
+ * Create a gradient object.
+ *
+ * Can also be constructed with wrapper function `Gradient`.
+ * @nav Frontend/Styling
+ * @returns Returns the `GradientType` object.
+ * @param ...args The arguments can either be of length 1, containing the full gradient string `new GradientType("linear-gradient(...)")`. Or the arguments can be as `new GradientType("linear", "black", "0%", "white", "100%")`.
+ * @docs
+ */
+export class GradientType {
+    gradient;
+    type;
+    degree;
+    colors;
+    constructor(...args) {
+        if (args.length === 1) {
+            this.gradient = args[0];
+        }
+        else if (args.length > 1) {
+            this.type = args[0];
+            this.colors = [];
+            for (let i = 1; i < args.length; i++) {
+                if (args[i].endsWith("deg")) {
+                    this.degree = args[i];
+                    continue;
+                }
+                if (typeof args[i + 1] === "string" && args[i + 1].includes("%")) {
+                    this.colors.push({
+                        color: args[i],
+                        stop: args[i + 1],
+                    });
+                    i++;
+                }
+                else {
+                    this.colors.push({
+                        color: args[i],
+                        stop: undefined,
+                    });
+                }
+            }
+        }
+        else {
+            console.error("Invalid number of arguments for class \"Gradient()\".");
+        }
+    }
+    /**
+     * Cast to a CSS `*-gradient(...)` string. If `gradient` is unset but `colors` exist, it is built from `type`, `degree`, and `colors`, then cached.
+     * @returns The CSS gradient string, or an empty string when insufficient data is available.
+     */
+    // Cast to string.
+    toString() {
+        if (this.gradient == null && this.colors !== undefined) {
+            this.gradient = `${this.type}-gradient(`;
+            if (this.degree) {
+                this.gradient += this.degree + ", ";
+            }
+            for (let i = 0; i < this.colors.length; i++) {
+                this.gradient += this.colors[i].color;
+                this.gradient += " ";
+                let stop = this.colors[i].stop;
+                if (typeof stop === "number" && stop <= 1.0) {
+                    stop = (stop * 100) + "%";
+                }
+                this.gradient += stop;
+                if (i + 1 < this.colors.length) {
+                    this.gradient += ", ";
+                }
+            }
+            this.gradient += ")";
+            return this.gradient;
+        }
+        return this.gradient ?? "";
+    }
+}
+;

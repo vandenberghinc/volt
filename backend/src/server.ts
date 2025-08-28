@@ -2,8 +2,11 @@
  * Author: Daan van den Bergh
  * Copyright: © 2022 - 2024 Daan van den Bergh.
  */
-// @ts-ignore
-declare var __dirname; var __dirname = typeof __dirname !== 'undefined' ? __dirname : import.meta.dirname;
+
+import { fileURLToPath } from 'url';
+import * as path from 'path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ---------------------------------------------------------
 // Libraries.
@@ -12,21 +15,19 @@ import * as http from "http";
 import * as http2 from "http2";
 import * as crypto from "crypto";
 import * as nodemailer from 'nodemailer';
-// import * as libcluster from 'cluster';
 import libcluster from 'cluster';
 import * as os from 'os';
-import CleanCSS from 'clean-css';
+
+import * as vlib from "@vandenberghinc/vlib";
+const { debug } = vlib;
 
 // ---------------------------------------------------------
 // Imports.
 
-import * as vlib from "@vandenberghinc/vlib";
-import * as vhighlight from "@vandenberghinc/vhighlight";
-import { Utils, ExternalError } from "./utils.js";
+import { Utils } from "./utils.js";
 import { Meta } from './meta.js';
 import * as Mail from './plugins/mail/ui.js';
 import { Status } from "./status.js";
-import { Mutex } from "./mutex.js";
 import { Endpoint } from "./endpoint.js";
 import { ImageEndpoint } from "./image_endpoint.js";
 import { Stream } from "./stream.js";
@@ -35,58 +36,69 @@ import { Collection } from "./database/collection.js";
 import { Users } from "./users.js";
 import { Paddle } from "./payments/paddle.js";
 import { RateLimits, RateLimitServer, RateLimitClient } from "./rate_limit.js";
-import { Blacklist } from "./blacklist.js";
-import { logger } from "./logger.js";
-// import { BrowserPreview } from "./plugins/browser.js";
-
-const { log, error, warn } = logger;
-const { debug } = vlib;
+import { Route } from "./route.js";
 
 // import { ThreadMonitor } from "./plugins/thread_monitor.js";
 // const thread_monitor = new ThreadMonitor()
 // thread_monitor.start();
 
-import { Route } from "./route.js";
-
-
 // ---------------------------------------------------------
 // Types
 
-// None type.
-declare global {
-    type none = null | undefined;
-}
-
+/** Company profile information used in invoices, emails, and branding. */
 export interface CompanyInfo {
+    /** The name of your company. */
     name: string;
+    /** The legal name of your company. */
     legal_name: string;
+    /** The street name of your company's address. */
     street: string;
+    /** The house number or house name of your company's address. */
     house_number: string;
+    /** The postal/zip code of your company's address. */
     postal_code: string;
+    /** The city of your company's address. */
     city: string;
+    /** The province or state of your company's address. */
     province: string;
+    /** The country name of your company's address. */
     country: string;
+    /** The two-letter ISO country code of your company's location. */
     country_code: string;
+    /** The tax ID of your company. */
     tax_id?: string;
+    /** The type of company. */
     type?: string;
+    /** The endpoint URL path of your company's icon (PNG). Must be an endpoint URL since access to the file path is also required for creating invoices. */
     icon?: string;
-    icon_path?: string;
+    /** The endpoint URL path of your company's stroke icon (PNG). In payment invoices the stroke icon precedes the default icon. Must be an endpoint URL since access to the file path is also required for creating invoices. */
     stroke_icon?: string;
+    /** The file path of your company's icon (PNG), automatically retrieved from the {@link CompanyInfo.icon} property when possible. */
+    icon_path?: string;
+    /** The file path of your company's stroke icon (PNG), automatically retrieved from the {@link CompanyInfo.stroke_icon} property when possible. */
     stroke_icon_path?: string;
 }
 
+/** TLS certificate configuration for enabling HTTPS. */
 export interface TLSConfig {
+    /** The path to the certificate. */
     cert: string;
+    /** The path to the private key file. */
     key: string;
+    /** The path to the CA bundle file. */
     ca?: string | null;
+    /** The passphrase of the private key. */
     passphrase?: string;
 }
 
+/** Style tokens used to theme automatically generated emails. */
 export interface MailStyle {
+    /** The font family. */
     font: string;
     title_fg: string;
     subtitle_fg: string;
     text_fg: string;
+    /** The background color of the buttons in your mails. */
     button_fg: string;
     footer_fg: string;
     bg: string;
@@ -96,19 +108,7 @@ export interface MailStyle {
     divider_bg: string;
 }
 
-export interface RateLimitConfig {
-    server?: {
-        ip?: string | null;
-        port?: number;
-        https?: any | null;
-    };
-    client?: {
-        ip?: string | null;
-        port?: number;
-        url?: string | null;
-    };
-}
-
+/** Optional administrator configuration for protected endpoints. */
 export interface AdminConfig {
     password: string | null;
     ips: string[];
@@ -118,482 +118,181 @@ export interface AdminConfig {
     }>;
 }
 
+/** TypeScript build options for endpoint source generation. */
 export interface TypeScriptConfig {
     compiler_opts: Record<string, any>;
     output?: string;
 }
 
+/** Description of a static directory or file that should be served. */
 export interface StaticDirectory {
+    /** The path to the static directory or file. */
     path: string;
+    /** The base endpoint of the static directory, by default the path's name will be used.*/
     endpoint?: string;
+    /** Enable caching for the static endpoints; this value will be used for parameter `Endpoint.cache`. */
     cache?: number | boolean;
+    /** Define a specific cache policy per endpoint from this static directory as `{<endpoint>: <cache>}`; the cache value will be used for parameter `Endpoint.cache`. */
     endpoints_cache?: Record<string, boolean | number>;
+    /** An array of paths to exclude. The array may contain regexes. */
     exclude?: Array<string | RegExp>;
 }
 
+/** Attachment representation when sending emails. */
 export interface MailAttachment {
     filename: string;
     path?: string;
     content: any;
 }
 
-interface DatabaseCollections {}
+/**
+ * A definition of a registered endpoint, can be used to export params and response types to the frontend.
+ * @prop params The inferred interface of the endpoint parameters, note that the runtime value of this property is always `undefined`.
+ * @prop Params Alias for property {@link RegisteredEndpoint.params}.
+ */
+export type RegisteredEndpoint<
+    P extends vlib.Schema.Entries.Opts = {}
+> = {
+    params: vlib.Schema.Entries.Infer<P>;
+    Params: vlib.Schema.Entries.Infer<P>;
+};
+
+/** The payment options. */
+export type PaymentOpts = 
+    | (Paddle.Opts & {
+        /** The payment provider type. */
+        type: "paddle";
+    });
 
 // ---------------------------------------------------------
 // The server object.
-// @todo redirect to https on http also important for seo.
+// ---------------------------------------------------------
+
 // @todo convert throw new Error to frontend errors.
 // @todo figure out with what settings nodejs should be started for heavy servers, for example larger memory size `--max-old-space-size`
 // @todo implement usage of multiple cpu's using lib `cluster`.
 // @todo when rendering pages the user could use a special OptimizeText() function which will be optimized for copy writing and seo when adding loading static files. Quite hard but would be sublime (writesonic is a good platform).
 
-/*  @docs:
-    @nav: Backend
-    @chapter: Server
-    @title: Server
-    @description: 
-        The backend server class.
-        When the https parameters `certificate` and `private_key` are defined, the server will run automatically on http and https.
-    @parameter:
-        @name: production
-        @description: Whether the server is in production more, or in development mode.
-        @type: boolean
-        @required: true
-    @parameter:
-        @name: localhost
-        @description: Wether to run on localhost. This overrides the given `ip` parameter, and makes the `ip` parameter optional.
-        @type: boolean
-    @parameter:
-        @name: ip
-        @description: The ip where the server will run on.
-        @type: string
-        @required: true
-    @parameter:
-        @name: port
-        @description: The port where the server will run on. Leave the port `null` to run on port `80` for http and on port `443` for https.
-        @type: number
-    @parameter:
-        @name: tls
-        @description: The tls settings for HTTPS.
-        @type: object
-        @attribute:
-            @name: cert
-            @description: The path to the certificate.
-            @type: string
-        @attribute:
-            @name: key
-            @description: The path to the private key file.
-            @type: string
-        @attribute:
-            @name: ca
-            @description: The path to the ca bundle file.
-            @type: null, string
-        @attribute:
-            @name: passphrase
-            @description: The passphrase of the private key.
-            @type: string
-    @parameter:
-        @name: domain
-        @description: The full domain url without `http://` or `https://`.
-        @type: string
-        @required: true
-    @parameter:
-        @name: source
-        @description: The path to the source directory of your website. This may either be the source directory of your code, or the source directory where files will be stored for your website.
-        @type: string
-        @required: true
-    @parameter:
-        @name: is_primary
-        @description: Used to indicate if the current server is the primary node.
-        @type: string
-        @required: true
-    @parameter:
-        @name: statics
-        @description: Array with paths to static directories or static directory objects.
-        @type: string[], vlib.Path[], StaticDirectory
-        @required: true
-        @attributes_type: StaticDirectory
-        @attr:
-            @name: path
-            @descr: The path to the static directory or file.
-            @required: true
-        @attr:
-            @name: endpoint
-            @descr: The base endpoint of the static directory, by default the path's name will be used.
-            @required: false
-        @attr:
-            @name: cache
-            @descr: Enable caching for the static endpoints, this value will be used for parameter `Endpoint.cache`.
-            @type: boolean | number
-            @default: true
-            @required: false
-        @attr:
-            @name: endpoints_cache
-            @descr: This attribute can be used to define a specific cache policy per endpoint from this static directory. Must be formatted as `{<endpoint>: <cache>}`, the cache value will be used for parameter `Endpoint.cache`.
-            @default: {}
-            @required: false
-        @attr:
-            @name: exclude
-            @descr: An array of paths to exlude. The array may contain regexes.
-            @default: {}
-            @required: false
-    @parameter:
-        @name: database
-        @description:
-            The database settings.
-        @type: string, object, boolean
-        @required: true
-    @parameter:
-        @name: default_headers
-        @description: Used to override the default headers generated by volt. Leave parameter `default_headers` as `null` to let volt automatically generate the default headers.
-        @type: object
-    @parameter:
-        @name: favicon
-        @description: The path to the favicon.
-        @type: string
-    @parameter:
-        @name: token_expiration
-        @description: The token a sign in token will be valid in seconds.
-        @type: number
-    @parameter:
-        @name: enable_2fa
-        @description: Enable 2fa for user authentication.
-        @type: boolean
-        @required: true
-    @parameter:
-        @name: enable_account_activation
-        @description: Enable account activation by email after a user signs up.
-        @type: boolean
-        @required: true
-    @parameter:
-        @name: meta
-        @description: The default meta object.
-        @type: object, volt.Meta
-    @parameter:
-        @name: company
-        @type: object
-        @description: Your company information.
-        @attribute:
-            @name: name
-            @type: string
-            @required: true
-            @description: The name of your company.
-        @attribute:
-            @name: legal_name
-            @type: string
-            @required: true
-            @description: The legal name of your company.
-        @attribute:
-            @name: street
-            @type: string
-            @required: true
-            @description: The street name of your company's address.
-        @attribute:
-            @name: house_number
-            @type: string
-            @required: true
-            @description: The house number or house name of your company's address.
-        @attribute:
-            @name: postal_code
-            @type: string
-            @required: true
-            @description: The postal code or zip code of your company's address.
-        @attribute:
-            @name: city
-            @type: string
-            @required: true
-            @description: The city of your company's address.
-        @attribute:
-            @name: province
-            @type: string
-            @required: true
-            @description: The province or state of your company's address.
-        @attribute:
-            @name: country
-            @type: string
-            @required: true
-            @description: The country name of your company's address.
-        @attribute:
-            @name: country_code
-            @type: string
-            @required: true
-            @description: The two-letter ISO country code of your company's location.
-        @attribute:
-            @name: tax_id
-            @type: string
-            @required: false
-            @description: The tax id of your company.
-        @attribute:
-            @name: type
-            @type: string
-            @description: The type of company.
-        @attribute:
-            @name: icon
-            @type: string
-            @required: true
-            @description: The endpoint url path of your company's icon, png format. This must be an endpoint url since access to the file path is also required for creating invoices.
-        @attribute:
-            @name: stroke_icon
-            @type: string
-            @required: true
-            @description: The endpoint url path of your company's stroke icon, png format. In payment invoices the stroke icon precedes the default icon. This must be an endpoint url since access to the file path is also required for creating invoices.
-    @parameter:
-        @name: smtp
-        @description:
-            The smpt arguments object.
-            More information about the arguments can be found at the nodemailer <Link https://nodemailer.com/smtp/>documentation</Link>.
-        @type: object
-        @attribute:
-            @name: sender
-            @description:
-                The smtp sender address may either be a string with the email address, e.g. `your@email.com`.
-                Or an array with the sender name and email address, e.g. `["Sender", "your@email.com"]`.
-            @type: string, array
-        @attribute:
-            @name: host
-            @description: The mail server's host address.
-            @type: string
-        @attribute:
-            @name: port
-            @description: The mail server's port.
-            @type: number
-        @attribute:
-            @name: secure
-            @description: Enable secure options.
-            @type: boolean
-        @attr:
-            @name: auth
-            @description: The authentication settings.
-            @type: object
-            @attribute:
-                @name: user
-                @description: The email used for authentication.
-                @type: string
-            @attribute:
-                @name: pass
-                @description: The password used for authentication.
-                @type: string
-    @parameter:
-        @name: payments
-        @type: object
-        @description: The arguments for the payment class. The `type` attribute is used to indicate the payment provider, the other attributes are arguments for the payment class <Link #Paddle>Paddle</Link>.
-        @attribute:
-            @name: type
-            @type: string
-            @description: The payment provider name.
-            @required: true
-            @enum:
-                @value: paddle
-                @desc: Payment provider Paddle.
-    @parameter:
-        @name: google_tag
-        @description: The google tag id.
-        @type: string
-    @parameter:
-        @name: mail_style
-        @description: The mail settings to customize automatically generated mails.
-        @type: object
-        @attribute:
-            @name: font
-            @description: The font family.
-            @type: string
-        @attribute:
-            @name: button_bg
-            @description: The background color of the button's in your mails.
-            @type: string
-    @parameter:
-        @name: offline
-        @description: Boolean indicating if the development server is being run offline.
-        @type: boolean
-    @parameter:
-        @name: multiprocessing
-        @description: Enable multiprocessing when in production mode.
-        @type: boolean
-        @def: true
-    @parameter:
-        @name: processes
-        @description: The number of processes when multiprocessing is enabled. By default the number of CPU's will be used for the amount of processes.
-        @type: null, number
-        @def: null
-    @parameter:
-        @name: rate_limit
-        @description:
-            The rate limit server and client settings. Rate limiting works with a centralizer websocket server and secondary clients.
-        @type: object
-        @required: false
-        @attribute:
-            @name: server
-            @type: object
-            @description:
-                The server configuration.
+/** Nested types for the {@link Server} class. */
+export namespace Server {
 
-                By default the primary server instance will start the rate limit service.
+    /** Key options for the {@link Server.Opts} interface. */
+    export interface KeyOpts {
+        /** The name of the key. */
+        name: string;
+        /** The length of the key. */
+        length: number;
+    }
 
-                However, when parameter `rate_limit.server` is `false`. All rate limit instances will use a client to connect to an already running rate limit instance. If so, you must manually set up this rate limt server.
-            @attribute:
-                @name: ip
-                @description:
-                    The ip to which the rate limiting server will bind. By default the rate limit server will run on localhost only.
-                @type: null, string
-            @attribute:
-                @name: port
-                @description:
-                    The port to which the rate limiting server will bind. The default port is `51234`.
-                @type: number
-                @def: 51234
-            @attribute:
-                @name: https
-                @description:
-                    To enable https on the server you must define a `https.createServer` configuration. Otherwise, the rate limit server will run on http.
-                @type: null, object
-        @attribute:
-            @name: client
-            @description:
-                The client configuration. 
-            @attribute:
-                @name: ip
-                @description: 
-                    The ip address of the primary node with the rate limiting server. The primary node is indicated by the `Server.is_primary` parameter.
+    /** Constructor options. */
+    export interface Opts {
+        /** Whether the server is in production mode or in development mode. */
+        production?: boolean;
+        /** The IP address where the server will run. */
+        ip?: string;
+        /** The port where the server will run. Leave `null` to run on port `80` for HTTP and `443` for HTTPS. */
+        port?: number;
+        /** The full domain url without `http://` or `https://`. */
+        domain: string;
+        /** Used to indicate if the current server is the primary node. */
+        is_primary?: boolean;
+        /** The path to a persistent directory where some files such as logs, status info etc will be saved. */
+        source: string;
+        /** The database settings, see {@link Database.Opts}. */
+        database: string | Database.Opts;
+        /** Array with paths to static directories or static directory objects, see {@link StaticDirectory}. */
+        statics?: Array<string | vlib.Path | StaticDirectory>;
+        /** The path to the favicon. */
+        favicon?: string;
+        /** Your company information, see {@link CompanyInfo}. */
+        company: CompanyInfo;
+        /** The default meta object. */
+        meta?: Meta | Meta.Opts;
+        /** The TLS settings for HTTPS, see {@link TLSConfig}. */
+        tls?: TLSConfig;
+        /**
+         * The SMTP nodemailer arguments object.
+         * More information can be found at the nodemailer documentation.
+         * @attr sender The SMTP sender address; either a string email, e.g. `your@email.com`, or `[name, email]`.
+         * @attr host The mail server's host address.
+         * @attr port The mail server's port.
+         * @attr secure Enable secure options.
+         * @attr auth The authentication settings.
+         * @attr auth.user The email used for authentication.
+         * @attr auth.pass The password used for authentication.
+         */
+        smtp?: {
+            /** The SMTP sender address; either a string email, e.g. `your@email.com`, or`[name, email]`. */
+            sender: string | [string, string];
+            /** The mail server's host address. */
+            host?: string;
+            /** The mail server's port. */
+            port?: number;
+            /** Enable secure options. */
+            secure?: boolean;
+            /** The authentication settings. */
+            auth?: {
+                /** The email used for authentication. */
+                user: string;
+                /** The password used for authentication. */
+                pass: string;
+            };
+            /** The smtp `nodemailer.createTransport` argument that override the other {@link Server.Opts.smtp} options. */
+            override?: nodemailer.TransportOptions;
+        };
+        /** The mail settings to customize automatically generated mails, see {@link MailStyle}. */
+        mail_style?: Partial<MailStyle>;
+        /**
+         * The rate limit server and client settings. Rate limiting works with a centralizer websocket server and secondary clients.
+         * By default rate limiting is enabled but can be disabled by explicitly setting `rate_limit` to `false`.
+         */
+        rate_limit?: false | {
+            /** The primary server rate limit settings. */
+            server?: RateLimitServer.Opts;
+            /** The rate limit client settings. */
+            client?: RateLimitClient.Opts;
+        };
+        /** An array with names of crypto keys. Keys will be generated and stored in the database when they do not exist, and accessible as `Server.keys.$name`. Items may be a string (name) or an object with `name` and `length`, see {@link Server.KeyOpts}. */
+        keys?: (string | Server.KeyOpts)[];
+        /** The arguments for the payment class, see {@link PaymentOpts}. */
+        payments?: PaymentOpts;
+        /** Override the default headers generated by volt. Leave `default_headers` undefined to let volt automatically generate default headers. */
+        default_headers?: Record<string, any>;
+        /** The Google Tag ID. */
+        google_tag?: string;
+        /** Additional options for managing the {@link Users} class. */
+        users?: Users.Opts;
+        /** Enable threading behaviour when in production mode. */
+        threading?: false | true | {
+            /** Wether to enable threading behaviour. */
+            enabled: boolean,
+            /** The number of processes when threading is enabled. By default, the number of CPU's will be used. */
+            threads?: number;
+        };
+        /** Boolean indicating if the development server is being run offline. */
+        offline?: boolean;
+        /**
+         * Additional endpoints to add to the sitemap. By default all endpoints where attribute `view` is defined are added.
+         * @note Regex based endpoints are not added to the default sitemap so they should perhaps they should partially be included here.
+        */
+        additional_sitemap_endpoints?: string[];
+        /**
+         * Optional settings for the service daemons. Pass `false` to disable, see {@link vlib.Daemon.Opts}.
+         * The {@link vlib.Daemon.Opts.name} field will be defined with a default value of `domain.replaceAll(".", "")`.
+         * The {@link vlib.Daemon.Opts.logs}, {@link vlib.Daemon.Opts.errors} fields will be defined with a default value of `<source>/daemon/<name>`.
+         */
+        daemon?: false | vlib.Types.Optional<vlib.Daemon.Opts, "name">;
+        /** The active log level. */
+        log_level?: number;
+    }
+}
 
-                    When `Server.is_primary` is true, the rate limiting server will listen on the private ip address of your current machine.
-                @type: null, string
-            @attribute:
-                @name: port
-                @description:
-                    The port of the primary node with the rate limiting server. The default port is `51234`.
-                @type: number
-                @def: 51234
-            @attribute:
-                @name: url
-                @description:
-                    The full websocket url of the server. If defined this takes precedence over parameters `ip` and `port`.
-
-                    This can be useful when `rate_limit.server` is `false`.
-                @type: null, string
-    @parameter:
-        @name: keys
-        @description:
-            The array with names of crypto keys. The keys will be generated and stored in the database when they do not exist. The keys will be accessable as `Server.keys.$name`.
-
-            The array items may be a string representing the name of the key, or an object containing the name and the length of the key.
-        @type: array[string], array[object]
-        @required: false
-        @attribute:
-            @name: name
-            @description: 
-                The name of the key.
-            @type: string
-        @attribute:
-            @name: length
-            @description:
-                The length of the key.
-            @type: number
-    @parameter:
-        @name: additional_sitemap_endpoints
-        @description:
-            An array with additional endpoints that will be added to the sitemap. By default all endpoints where attribute `view` is defined will be added the sitemap.
-        @type: array[string]
-    @parameter:
-        @name: daemon
-        @description:
-            The optional settings for the service daemons. The service daemons can be disabled by passing value `false` to parameter `daemon`. 
-
-            By default this settings will also partially be used for the database service daemon.
-        @type: object
-        @attr:
-            @name: user
-            @desc: The executing user of the service daemon.
-            @type: string
-        @attr:
-            @name: group
-            @desc: The executing group of the service daemon.
-            @type: string
-        @attr:
-            @name: args
-            @desc: The arguments for the start command.
-            @type: array[string]
-        @attr:
-            @name: env
-            @desc: The environment variables for the service daemon.
-            @type: object
-        @attr:
-            @name: description
-            @desc: The description of the service daemon.
-            @type: string
-        @attr:
-            @name: logs
-            @desc: The path to the log file.
-            @type: string
-        @attr:
-            @name: errors
-            @desc: The path to the error log file.
-            @type: string
-    @parameter:
-        @name: admin
-        @description:
-            Administrator settings used for protected administrator endpoints.
-        @type: object
-        @attr:
-            @name: password
-            @desc: The password used for administrator endpoints.
-            @type: string
-        @attr:
-            @name: ips
-            @desc: IP addresses used by the website administrator. These ip's will be used to create a whitelist for administrator endpoints.
-            @type: string[]
-    @parameter:
-        @name: ts
-        @description:
-            Specify typescript options.
-        @type: object
-        @attr:
-            @name: output
-            @desc: The output directory for typescript endpoint source files.
-            @type: string
-        @attr:
-            @name: compiler_options
-            @desc: The compiler options for the typescript files.
-            @type: object
-            @required: false
-
-    @attribute:
-        @name: users
-        @type: object
-        @attribute:
-            @name: public
-            @type: UIDCollection
-            @desc: 
-                The database collection for public data of users.
-                
-                More information about the collection's functions can be found at <Type>UIDCollection</Type>
-            @warning: 
-                The authenticated user always has read and write access to all data inside the user's protected directory through the backend rest api. Any other users or unauthenticated users do not have access to this data.
-        @attribute:
-            @name: protected
-            @type: UIDCollection
-            @desc: 
-                The database collection for public data of users.
-                
-                More information about the collection's functions can be found at <Type>UIDCollection</Type>
-            @warning:
-                The authenticated user always has read access to all data inside the user's protected directory through the backend rest api. Any other users or unauthenticated users do not have access to this data.
-        @attribute:
-            @name: private
-            @type: UIDCollection
-            @desc: 
-                The database collection for public data of users.
-                
-                More information about the collection's functions can be found at <Type>UIDCollection</Type>
-            @note:
-                The user has no read or write access to the private directory.
-    @attribute:
-        @name: storage
-        @type: Collection
-        @desc: 
-            The database storage collection for the website's system backend data.
-            
-            More information about the collection's functions can be found at <Type>Collection</Type>
-
+/**
+ * The backend server class.
+ *
+ * When the HTTPS parameters `certificate` and `private_key` are defined, the server will run automatically on HTTP and HTTPS.
+ * 
+ * @property users The initialized {@link Users} instance.
  */
 
 // @tdo implement 3D secure "requires_action" status for a refund and payment intent.
@@ -601,9 +300,13 @@ interface DatabaseCollections {}
 
 // @ts-ignore
 export class Server {
-    
+
+    // ---------------------------------------------------------
     // Static attributes.
-    static content_type_mimes: Array<[string, string]> = [
+    // ---------------------------------------------------------
+
+    /** Content type per mime. */
+    static content_type_mimes: Map<string, string> = new Map([
         [".html", "text/html"],
         [".htm", "text/html"],
         [".shtml", "text/html"],
@@ -613,7 +316,7 @@ export class Server {
         [".jpeg", "image/jpeg"],
         [".jpg", "image/jpeg"],
         [".js", "application/javascript"],
-        [".ts", "application/javascript"],
+        [".ts", "application/typescript"],
         [".atom", "application/atom+xml"],
         [".rss", "application/rss+xml"],
         [".mml", "text/mathml"],
@@ -709,13 +412,10 @@ export class Server {
         [".asf", "video/x-ms-asf"],
         [".wmv", "video/x-ms-wmv"],
         [".avi", "video/x-msvideo"],
-    ];
+    ]);
 
-    public log!: (level: number, ...args: any[]) => void;
-    public warn!: (level: number, ...args: any[]) => void;
-    public error!: (...errs: any[]) => void;
-
-    static compressed_extensions: string[] = [
+    /** All file path extensions that are already compressed. */
+    static compressed_extensions: Set<string> = new Set([
         ".png",
         ".jpg",
         ".jpeg",
@@ -724,7 +424,7 @@ export class Server {
         ".bmp",
         ".tiff",
         ".ico",
-        ".svg",
+        // ".svg",
         ".svgz",
         ".mng",
         ".apng",
@@ -753,71 +453,110 @@ export class Server {
         ".mpg",
         ".mpeg",
         ".flv",
-    ];
+    ]);
 
-    // Instance properties
-    public ip: string;
-    public port: number;
-    public https_port: number;
-    public domain: string;
-    public full_domain: string;
-    public source: vlib.Path;  // vlib.Path type
-    public is_primary: boolean;
-    public statics: Array<string | StaticDirectory | vlib.Path>;
-    public statics_aspect_ratios: Map<string | RegExp, any>;
-    public favicon?: string;
-    public enable_2fa: boolean;
-    public enable_account_activation: boolean;
-    public token_expiration: number;
-    public google_tag?: string;
-    public production: boolean;
-    // public localhost: boolean;
-    public multiprocessing: boolean;
-    public processes: number;
-    public company: CompanyInfo;
-    public meta: Meta;
+    // ---------------------------------------------------------
+    // Attributes.
+    // ---------------------------------------------------------
+
+    /** The binded ip address. */
+    ip: string;
+
+    /** The binded http port. */
+    port: number;
+
+    /** The binded https port. */
+    https_port: number;
+
+    /** The raw domain. */
+    domain: string;
+
+    /** The full domain name with http/https depending if tls is enabled. */
+    full_domain: string;
+
+    /** The persistent storage source directory. */
+    source: vlib.Path;
+
+    /** Is the primary thread. */
+    is_primary: boolean;
+
+    /** Is in production mode. */
+    production: boolean;
+
+    /** The company information. */
+    company: CompanyInfo;
+
+    /** The default meta information. */
+    meta: Meta;
+
+    /** Is running in offline mode. */
+    offline: boolean;
+
+    /** The database instance. */
+    db: Database;
+
+    /** The smpt mailer. */
+    smtp?: nodemailer.Transporter;
+    smtp_sender?: string | [string, string]; // is defined when `smtp` is defined.
+    
+    /** The rate limit instance. */
+    rate_limit?: RateLimitServer | RateLimitClient;
+    
+    /** The added endpoints. */
+    endpoints: Map<string, Endpoint> = new Map();
+    
+    /** The added error endpoints. */
+    err_endpoints: Map<number, Endpoint> = new Map();
+
+    /** A record of keys used for hashing. */
+    keys: Record<string, string> = {};
+
+    /** Alias for the `Status` module. */
+    status: typeof Status;
+
+    /** Alias for the `RateLimits` module. */
+    rate_limits: typeof RateLimits;
+
+    /** The file logger. */
+    log: vlib.logging.FileLogger;
+
+    /** The users instance. */
+    users: Users;
+
+    /** The payments instance. */
+    payments?: Paddle;
+
+    /** Daemon instance to manage a live daemon. */
+    daemon?: vlib.Daemon;
+
+    // Public for internal use:
+    public _sys_db: Collection;
     public mail_style: MailStyle;
-    public online: boolean;
-    public offline: boolean;
-    // private honey_pot_key: string | null;
-    private _keys: Array<string | {name: string, length: number}>;
-    public additional_sitemap_endpoints: string[];
-    public log_level: number;
-    public tls?: TLSConfig;
-    // public admin: AdminConfig;
-    // public ts: TypeScriptConfig;
-    public lightweight: boolean;
-
-
-    public performance: vlib.Performance;
     public csp: Record<string, string>;
-    public default_headers: Record<string, string>;
-    public http!: http.Server;
-    public https!: http2.Http2SecureServer;
-    public endpoints: Map<string, Endpoint>;
-    public err_endpoints: Map<number, Endpoint>;
-    public db!: Database & DatabaseCollections;
-    public _sys_db!: Collection; // needs to be public for the RateLimit classes.
-    public storage!: Collection;
-    public smtp?: nodemailer.Transporter;
-    public smtp_sender?: string | [string, string];
-    public rate_limit?: RateLimitServer | RateLimitClient;
-    public blacklist?: Blacklist;
-    private _hash_key: string | null = null;
-    public keys: Record<string, string> = {};
-    private _on_start: Array<(args: {forked: boolean}) => void | Promise<void>> = [];
+    public statics_aspect_ratios: Map<string | RegExp, any>;
+    public google_tag?: string;
+
+    // Private.
+    private favicon?: string;
+    private statics: Array<string | StaticDirectory | vlib.Path>;
+    private _keys: Array<string | { name: string, length: number }>;
+    private additional_sitemap_endpoints: string[];
+    private tls?: TLSConfig;
+    private performance: vlib.Performance;
+    private default_headers: Record<string, string>;
+    private http!: http.Server;
+    private https!: http2.Http2SecureServer;
+    private threading: {
+        enabled: boolean;
+        threads: number;
+    };
+    /** The master hash key. */
+    private _master_hash_key: string | null = null;
+
+    /** User defined callbacks. */
+    private _on_start: Array<(args: { forked: boolean }) => void | Promise<void>> = [];
     private _on_initialize: Array<() => void | Promise<void>> = [];
     private _on_stop: Array<() => void | Promise<void>> = [];
-    // public browser_preview?: BrowserPreview;
-    public daemon?: vlib.Daemon;
-    private _stop_tscompiler_watcher?: () => void;
-
-    public users!: Users;
-    public payments!: Paddle;
-
-    public status: typeof Status;
-    public rate_limits: typeof RateLimits;
-    public logger: typeof logger;
 
     constructor({
         ip = "127.0.0.1",
@@ -847,30 +586,30 @@ export class Server {
         },
         rate_limit = {
             server: {
-                ip: null,
+                ip: undefined,
                 port: RateLimitServer.default_port,
-                https: null,
+                https: undefined,
             },
             client: {
-                ip: null,
+                ip: undefined,
                 port: RateLimitServer.default_port,
-                url: null,
+                url: undefined,
             },
         },
         keys = [],
         payments,
         default_headers,
         google_tag = undefined,
-        token_expiration = 86400,
-        enable_2fa = false,
-        enable_account_activation = true,
+        users,
         production = false,
-        multiprocessing = true,
-        processes,
+        threading = {
+            enabled: false,
+            threads: undefined,
+        },
         offline = false,
         additional_sitemap_endpoints = [],
         log_level = 0,
-        daemon = {},
+        daemon = false,
         // admin = {
         //     password: null,
         //     ips: [],
@@ -880,190 +619,126 @@ export class Server {
         //     output: undefined,
         // },
         // browser_preview = undefined,
-        lightweight = false,
-    }: {
-        ip?: string;
-        port?: number;
-        domain: string;
-        is_primary?: boolean;
-        source: string;
-        database?: string | Omit<ConstructorParameters<typeof Database>[0], "_server">;
-        statics?: Array<string | vlib.Path | StaticDirectory>;
-        favicon?: string;
-        company: CompanyInfo;
-        meta?: Meta | Record<string, any>;
-        tls?: TLSConfig;
-        smtp?: nodemailer.TransportOptions;
-        mail_style?: Partial<MailStyle>;
-        rate_limit?: false | RateLimitConfig;
-        keys?: Array<string | {name: string, length: number}>;
-        payments?: any;
-        default_headers?: Record<string, any>;
-        google_tag?: string;
-        token_expiration?: number;
-        enable_2fa?: boolean;
-        enable_account_activation?: boolean;
-        production?: boolean;
-        multiprocessing?: boolean;
-        processes?: number;
-        offline?: boolean;
-        additional_sitemap_endpoints?: string[];
-        log_level?: number;
-        daemon?: Record<string, any> | boolean;
-        // admin?: Partial<AdminConfig>;
-        // ts?: Partial<TypeScriptConfig>;
-        // browser_preview?: string;
-        lightweight?: boolean,
-    }) {
+    }: Server.Opts) {
 
-        // @debug
-        // Async hook for tracking active processes during stop().
-        // const async_resource_map = new Map();
-        // this.async_hook = require('async_hooks').createHook({
-        //     init(async_id, type, trigger_async_id, resource) {
-        //         const ignoredTypes = ['TickObject', 'PROMISE'];
-        //         if (ignoredTypes.includes(type)) {
-        //             return; // Skip logging for these async types
-        //         }
-
-        //         // Capture the stack trace of the function that initiated the async operation
-        //         const stack = new Error("SKIPAFTER").stack.split("SKIPAFTER")[1].trim();
-                
-        //         // Log async_id and initiating function call stack
-        //         // console.log(`Init async_id: ${async_id}`)
-        //         // console.log(`Init async_id: ${async_id}, type: ${type}, trigger: ${trigger_async_id}\nStack: ${stack}`);
-                
-        //         // Store the async resource and stack trace
-        //         async_resource_map.set(async_id, { type, stack });
+        // // Verify args.
+        // vlib.schema.validate(arguments[0], {
+        //     throw: true,
+        //     error_prefix: "Server: ", unknown: false,
+        //     schema: {
+        //         ip: { type: "string", required: false },
+        //         port: { type: "number", required: false },
+        //         domain: "string",
+        //         statics: { type: "array", default: [] },
+        //         is_primary: { type: "boolean", default: true },
+        //         source: "string",
+        //         database: {
+        //             type: ["string", "object"],
+        //             required: true,
+        //             scheme: { ...(Database.constructor_scheme as any), _server: undefined },
+        //         },
+        //         favicon: { type: "string", required: false },
+        //         company: {
+        //             type: "object",
+        //             default: {},
+        //             scheme: {
+        //                 name: "string",
+        //                 legal_name: "string",
+        //                 street: "string",
+        //                 house_number: "string",
+        //                 postal_code: "string",
+        //                 city: "string",
+        //                 province: "string",
+        //                 country: "string",
+        //                 country_code: "string",
+        //                 tax_id: { type: "string", default: null },
+        //                 icon: { type: "string", default: null },
+        //                 icon_path: { type: "string", default: null },
+        //                 stroke_icon: { type: "string", default: null },
+        //                 stroke_icon_path: { type: "string", default: null },
+        //             }
+        //         },
+        //         meta: { type: "object", required: false },
+        //         tls: {
+        //             type: ["object"],
+        //             required: false,
+        //             scheme: {
+        //                 cert: "string",
+        //                 key: "string",
+        //                 ca: { type: "string", default: null },
+        //                 passphrase: { type: "string", default: null },
+        //             }
+        //         },
+        //         rate_limit: {
+        //             type: ["boolean", "object"],
+        //             default: false,
+        //             scheme: {
+        //                 server: {
+        //                     type: "object", default: {}, scheme: {
+        //                         ip: { type: "string", default: null },
+        //                         port: { type: "number", default: RateLimitServer.default_port },
+        //                         https: { type: "object", default: null },
+        //                     }
+        //                 },
+        //                 client: {
+        //                     type: "object", default: {}, scheme: {
+        //                         ip: { type: "string", default: null },
+        //                         port: { type: "number", default: RateLimitServer.default_port },
+        //                         url: { type: "string", default: null },
+        //                     }
+        //                 },
+        //             },
+        //         },
+        //         keys: { type: "array", default: [] },
+        //         smtp: { type: ["null", "object"], required: false },
+        //         mail_style: {
+        //             type: "object",
+        //             required: false,
+        //             scheme: {
+        //                 font: { type: "string", default: '"Helvetica", sans-serif' },
+        //                 title_fg: { type: "string", default: "#121B23" },
+        //                 subtitle_fg: { type: "string", default: "#121B23" },
+        //                 text_fg: { type: "string", default: "#1F2F3D" },
+        //                 button_fg: { type: "string", default: "#FFFFFF" },
+        //                 footer_fg: { type: "string", default: "#686B80" },
+        //                 bg: { type: "string", default: "#EEEEEE" },
+        //                 widget_bg: { type: "string", default: "#FFFFFF" },
+        //                 button_bg: { type: "string", default: "#421959" },
+        //                 widget_border: { type: "string", default: "#E6E6E6" },
+        //                 divider_bg: { type: "string", default: "#E6E6E6" },
+        //             }
+        //         },
+        //         payments: { type: ["null", "object"], required: false },
+        //         default_headers: { type: ["null", "object"], required: false },
+        //         google_tag: { type: "string", required: false },
+        //         token_expiration: { type: "number", required: false },
+        //         enable_2fa: { type: "boolean", required: false },
+        //         enable_account_activation: { type: "boolean", required: false },
+        //         production: { type: "boolean", required: false },
+        //         multiprocessing: { type: "boolean", required: false, default: true },
+        //         processes: { type: "number", required: false, default: null },
+        //         offline: { type: "boolean", default: false },
+        //         additional_sitemap_endpoints: { type: "array", default: [] },
+        //         log_level: { type: "number", default: 0 },
+        //         daemon: { type: ["object", "boolean"], default: {} },
+        //         // admin: {type: "object", default: {}, attributes: {
+        //         //     ips: {type: "array", default: []},
+        //         //     password: {
+        //         //         type: "string",
+        //         //         verify: (param: string, attrs) => (param.length < 10 ? `Parameter "Server.admin.password" must have a length of at least 10 characters.` : undefined),
+        //         //     },
+        //         // }},
+        //         // ts: {
+        //         //     type: "object",
+        //         //     required: false,
+        //         //     scheme: {
+        //         //         compiler_opts: {type: "object", default: {}},
+        //         //         output: "string",
+        //         //     },
+        //         // },
+        //         // browser_preview: {type: ["string", "undefined"], required: false, default: undefined},
         //     },
-        //     destroy(async_id) {
-        //         // When an async resource is destroyed, remove it from the map
-        //         // console.log(`Destroy async_id: ${async_id}`);
-        //         async_resource_map.delete(async_id);
-        //     },
-        //     // before(async_id) {
-        //     //     console.log(`Before async_id: ${async_id}`);
-        //     // },
-        //     // after(async_id) {
-        //     //     console.log(`After async_id: ${async_id}`);
-        //     // },
-        // })
-        // this.async_hook.resource_map = async_resource_map;
-        // this.async_hook.enable();
-
-        // Verify args.
-        vlib.Scheme.validate(arguments[0], {err_prefix: "Server: ", strict: true, scheme: {
-            ip: { type: "string", required: false },
-            port: { type: "number", required: false },
-            domain: "string",
-            statics: {type: "array", default: []},
-            is_primary: {type: "boolean", default: true},
-            source: "string",
-            database: {
-                type: ["string", "object"],
-                required: false,
-                scheme: {...(Database.constructor_scheme as any), _server: undefined},
-            },
-            favicon: {type: "string", required: false},
-            // honey_pot_key: {type: "string", default: null},
-            company: {
-                type: "object",
-                default: {},
-                scheme: {
-                    name: "string",
-                    legal_name: "string",
-                    street: "string",
-                    house_number: "string",
-                    postal_code: "string",
-                    city: "string",
-                    province: "string",
-                    country: "string",
-                    country_code: "string",
-                    tax_id: {type: "string", default: null},
-                    icon: {type: "string", default: null},
-                    icon_path: {type: "string", default: null},
-                    stroke_icon: {type: "string", default: null},
-                    stroke_icon_path: {type: "string", default: null},
-                }
-            },
-            meta: {type: "object", required: false},
-            tls: {
-                type: ["object"],
-                required: false,
-                scheme: {
-                    cert: "string",
-                    key: "string",
-                    ca: {type: "string", default: null},
-                    passphrase: {type: "string", default: null},
-                }
-            },
-            rate_limit: {
-                type: ["boolean", "object"],
-                default: false,
-                scheme: {
-                    server: {type: "object", default: {}, scheme: {
-                        ip: {type: "string", default: null},
-                        port: {type: "number", default: RateLimitServer.default_port},
-                        https: {type: "object", default: null},
-                    }},
-                    client: {type: "object", default: {}, scheme: {
-                        ip: {type: "string", default: null},
-                        port: {type: "number", default: RateLimitServer.default_port},
-                        url: {type: "string", default: null},
-                    }},
-                },
-            },
-            keys: {type: "array", default: []},
-            smtp: {type: ["null", "object"], required: false},
-            mail_style: {
-                type: "object",
-                required: false,
-                scheme: {
-                    font: {type: "string", default: '"Helvetica", sans-serif'},
-                    title_fg: {type: "string", default: "#121B23"},
-                    subtitle_fg: {type: "string", default: "#121B23"},
-                    text_fg: {type: "string", default: "#1F2F3D"},
-                    button_fg: {type: "string", default: "#FFFFFF"},
-                    footer_fg: {type: "string", default: "#686B80"},
-                    bg: {type: "string", default: "#EEEEEE"},
-                    widget_bg: {type: "string", default: "#FFFFFF"},
-                    button_bg: {type: "string", default: "#421959"},
-                    widget_border: {type: "string", default: "#E6E6E6"},
-                    divider_bg: {type: "string", default: "#E6E6E6"},
-                }
-            },
-            payments: {type: ["null", "object"], required: false},
-            default_headers: {type: ["null", "object"], required: false},
-            google_tag: {type: "string", required: false},
-            token_expiration: {type: "number", required: false},
-            enable_2fa: {type: "boolean", required: false},
-            enable_account_activation: {type: "boolean", required: false},
-            production: {type: "boolean", required: false},
-            // localhost: { type: "boolean", required: false },
-            multiprocessing: {type: "boolean", required: false, default: true},
-            processes: {type: "number", required: false, default: null},
-            offline: {type: "boolean", default: false},
-            additional_sitemap_endpoints: {type: "array", default: []},
-            log_level: {type: "number", default: 0},
-            daemon: {type: ["object", "boolean"], default: {}},
-            // admin: {type: "object", default: {}, attributes: {
-            //     ips: {type: "array", default: []},
-            //     password: {
-            //         type: "string",
-            //         verify: (param: string, attrs) => (param.length < 10 ? `Parameter "Server.admin.password" must have a length of at least 10 characters.` : undefined),
-            //     },
-            // }},
-            // ts: {
-            //     type: "object",
-            //     required: false,
-            //     scheme: {
-            //         compiler_opts: {type: "object", default: {}},
-            //         output: "string",
-            //     },
-            // },
-            // browser_preview: {type: ["string", "undefined"], required: false, default: undefined},
-            lightweight: {type: "boolean", required: false},
-        }});
+        // });
 
         // Assign attributes directly.
         if (production || port == null) {
@@ -1077,38 +752,43 @@ export class Server {
         this.is_primary = is_primary && libcluster.isPrimary;
         this.source = new vlib.Path(source);
         this.favicon = favicon;
-        this.enable_2fa = enable_2fa;
-        this.enable_account_activation = enable_account_activation;
-        this.token_expiration = token_expiration;
         this.google_tag = google_tag;
         this.production = production;
-        // this.localhost = localhost;
-        this.lightweight = lightweight;
-        this.multiprocessing = multiprocessing;
-        this.processes = processes == null ? os.cpus().length : processes;
         this.company = company;
         this.mail_style = mail_style as MailStyle;
         this.offline = offline;
-        this.online = !offline;
-        // this.honey_pot_key = honey_pot_key;
         this._keys = keys;
         this.additional_sitemap_endpoints = additional_sitemap_endpoints;
-        this.log_level = log_level;
         this.tls = tls;
         // this.admin = admin as AdminConfig;
-        // this.ts = ts as TypeScriptConfig;
-        this.endpoints = new Map();
-        this.err_endpoints = new Map();
+
+        // Set threading.
+        if (typeof threading === "boolean") {
+            this.threading = {
+                enabled: threading,
+                threads: os.cpus().length,
+            }
+        } else {
+            this.threading = {
+                enabled: threading.enabled ?? true,
+                threads: threading.threads ?? os.cpus().length,
+            }
+        }
+
+        // Module aliases.
+        this.status = Status;
+        this.rate_limits = RateLimits;
 
         /* @performance */ this.performance = new vlib.Performance("Server performance");
 
-        // Assign objects to server so it is easy to access.
-        this.status = Status;
-        this.logger = logger;
-        this.rate_limits = RateLimits;
-
-        // Add global rate limit.
-        this.rate_limits.add({group: "global", interval: 60, limit: 1000});
+        // Create logs directory.
+        const log_source = this.source.join("logs");
+        if (!log_source.exists()) { log_source.mkdir_sync({ recursive: true }); }
+        this.log = new vlib.logging.FileLogger({
+            level: log_level,
+            log_path: log_source.join("logs").str(),
+            error_path: log_source.join("errors").str(),
+        });
 
         // Check source.
         if (!this.source.exists()) {
@@ -1117,21 +797,21 @@ export class Server {
         this.source = this.source.abs();
 
         // Set domain.
-        this.domain = domain!.replace("https://","").replace("http://","");
+        this.domain = domain!.replace("https://", "").replace("http://", "");
         while (this.domain.length > 0 && this.domain.charAt(this.domain.length - 1) === "/") {
             this.domain = this.domain.substr(0, this.domain.length - 1)
         }
 
         // Set full domain.
-        this.full_domain = `http${tls == null || tls.key == null ? "" : "s"}://${domain}`; // also required for Stripe.
-        while (this.full_domain.charAt(this.full_domain.length - 1) === "/") {
-            this.full_domain = this.full_domain.substr(0, this.full_domain.length - 1);
+        this.full_domain = `http${this.tls ? "s" : ""}://${this.domain}`;
+        while (this.full_domain.endsWith("/")) {
+            this.full_domain = this.full_domain.slice(0, -1);
         }
 
         // Set statics.
         this.statics = statics;
         this.statics_aspect_ratios = new Map();
-        
+
         // Add the default static to statics.
         this.statics.push({
             path: `${__dirname}/../../../frontend/src/static/`,
@@ -1154,27 +834,63 @@ export class Server {
 
         // Default headers.
         const base_default_headers: Record<string, string> = {
-            "Vary": "Origin",
-            "Referrer-Policy": "same-origin",
+            // Cache correctness for CORS/preflight:
+            "Vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+
+            // Safer default than same-origin, still keeps useful referrers:
+            "Referrer-Policy": "strict-origin-when-cross-origin",
+
             "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-            "Access-Control-Allow-Origin": "*",
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            'Access-Control-Allow-Credentials': 'true',
-            "X-XSS-Protection": "1; mode=block",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            // Let browsers read our rate-limit hint:
+            "Access-Control-Expose-Headers": "X-RateLimit-Reset",
+
             "X-Content-Type-Options": "nosniff",
-            "frame-ancestors": 'none',
             "X-Frame-Options": "DENY",
-            "Strict-Transport-Security": "max-age=31536000",
+
+            // Helpful isolation defaults (safe for most apps):
+            "Cross-Origin-Opener-Policy": "same-origin",
+            "Cross-Origin-Resource-Policy": "same-site",
+            // If you need SharedArrayBuffer, add COEP below (can break some embeds):
+            // "Cross-Origin-Embedder-Policy": "require-corp",
+
+            "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+
+            // Lock down powerful APIs by default.
+            // If you need one on a third-party origin, add it beside (self).
+            "Permissions-Policy":
+                "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=(), hid=(), serial=(), xr-spatial-tracking=(), display-capture=(), screen-wake-lock=(), sync-xhr=(), publickey-credentials-get=(self), encrypted-media=(self), autoplay=(self 'https://www.youtube-nocookie.com') fullscreen=(self 'https://www.youtube-nocookie.com'), browsing-topics=()",
+
+            // Do NOT set Allow-Origin / Credentials statically; set them per-request below.
+            // "X-XSS-Protection": "1; mode=block", // deprecated
+
         }
         const default_csp: Record<string, string> = {
-            "default-src": "'self' https://*.google-analytics.com",
-            "img-src": `'self' http://${this.domain} https://${this.domain} https://*.google-analytics.com https://raw.githubusercontent.com/vandenberghinc/ `,
-            "script-src": "'self' 'unsafe-inline' https://ajax.googleapis.com https://www.googletagmanager.com https://googletagmanager.com https://*.google-analytics.com https://code.jquery.com https://cdn.jsdelivr.net/npm/@vandenberghinc/",
-            "style-src": "'self' 'unsafe-inline' https://cdn.jsdelivr.net/npm/@vandenberghinc/",
-        }
+            "default-src": "'self'",
+            "base-uri": "'none'",
+            "object-src": "'none'",
+            "form-action": "'self'",
+            "frame-ancestors": "'none'",
+
+            // Keep GA images; drop explicit http:// to avoid mixed content.
+            "img-src": "'self' data: blob: https://*.google-analytics.com",
+
+            "script-src":
+                "'self' https://ajax.googleapis.com https://www.googletagmanager.com https://*.google-analytics.com",
+
+            // Needed for GA/GTAG beacons/fetch:
+            "connect-src": "'self' https://*.google-analytics.com",
+
+            "style-src": "'self'",
+            "font-src": "'self' data:",
+
+            // Auto-upgrade stray http URLs where possible:
+            "upgrade-insecure-requests": "",
+        };
+
         if (default_headers == null) {
             this.csp = default_csp;
-            this.default_headers = {...base_default_headers};
+            this.default_headers = { ...base_default_headers };
         } else {
             if (default_headers["Content-Security-Policy"] != null && typeof default_headers["Content-Security-Policy"] !== "object") {
                 throw Error("The Content-Security-Policy of the default headers must be an object with values for each csp key, e.g. \"{'script-src': '...'}\".");
@@ -1186,6 +902,10 @@ export class Server {
                 }
             })
             this.default_headers = default_headers;
+        }
+        if (!this.tls) {
+            // Always drop HSTS if TLS is not active.
+            delete this.default_headers["Strict-Transport-Security"];
         }
 
         // Initialize payments.
@@ -1200,129 +920,107 @@ export class Server {
             }
         }
 
-        // Define your list of endpoints
-        this.endpoints = new Map();
-        this.err_endpoints = new Map();
-
-        // Browser preview.
-        // if (browser_preview) {
-        //     this.browser_preview = new BrowserPreview(browser_preview);
-        // }
-
-        // Create logs directory.
-        const log_source = this.source.join("logs");
-        if (!log_source.exists()) { log_source.mkdir_sync(); }
-
-        // Configure the logger.
-        logger.log_level.set(this.log_level);
-        if (daemon === false) {
-            logger.assign_paths(log_source.join("logs").str(), log_source.join("errors").str());
-        }
-        this.log = logger.log.bind(logger);
-        this.warn = logger.warn.bind(logger);
-        this.error = logger.error.bind(logger);
-
         // Initialize the service daemon.
         // Must be initialized before initializing the database.
         if (daemon !== false) {
             const log_source = this.source.join("daemon");
-            if (!log_source.exists()) { log_source.mkdir_sync(); }
+            if (!log_source.exists()) { log_source.mkdir_sync({ recursive: true }); }
             this.daemon = new vlib.Daemon({
                 name: this.domain.replaceAll(".", ""),
-                user: (daemon as Record<string, any>).user || os.userInfo().username,
-                group: (daemon as Record<string, any>).group || null,
-                command: "volt --service --start",
-                cwd: this.source.str(),
-                args: (daemon as Record<string, any>).args || [],
-                env: (daemon as Record<string, any>).env || {},
-                description: (daemon as Record<string, any>).description || `Service daemon for website ${this.domain}.`,
-                auto_restart: true,
                 logs: (daemon as Record<string, any>).logs || log_source.join("logs").str(),
                 errors: (daemon as Record<string, any>).errors || log_source.join("errors").str(),
-            })
+                ...daemon,
+                // user: (daemon as Record<string, any>).user || os.userInfo().username,
+                // group: (daemon as Record<string, any>).group || null,
+                // command: "volt --service --start",
+                // cwd: this.source.str(),
+                // args: (daemon as Record<string, any>).args || [],
+                // env: (daemon as Record<string, any>).env || {},
+                // description: (daemon as Record<string, any>).description || `Service daemon for website ${this.domain}.`,
+                // auto_restart: true,
+            });
         }
 
         // Initialize the database class.
         if (typeof database === "string") {
-            this.db = new Database({uri: database, _server: this});
-        } else if (database != null) {
-            this.db = new Database({...database, _server: this});
+            this.db = new Database({ uri: database, _server: this });
+        } else {
+            this.db = new Database({ ...database, _server: this });
         }
 
+        // Database collections.
+        this._sys_db = this.db.collection({
+            name: "Volt.System",
+            indexes: ["_path"],
+        });
+
         // Initialize the users class.
-        this.users = new Users(this);
+        this.users = new Users({
+            ...users,
+            _server: this,
+        });
 
         // The smtp instance.
         if (smtp) {
             this.smtp_sender = smtp.sender;
-            this.smtp = nodemailer.createTransport(smtp);
+            this.smtp = nodemailer.createTransport({
+                ...smtp,
+                ...(smtp.override ?? {}),
+            });
         }
 
         // The rate limit server/client.
         if (rate_limit) {
             if (this.is_primary) {
-                this.rate_limit = new RateLimitServer({...(rate_limit.server ?? {}), _server: this});
+                this.rate_limit = new RateLimitServer({ ...(rate_limit.server ?? {}), _server: this });
             } else {
                 if (rate_limit.server?.https) {
                     (rate_limit.client as Record<string, any>).https = true;
                 }
-                this.rate_limit = new RateLimitClient({...(rate_limit.client ?? {}), _server: this});
+                this.rate_limit = new RateLimitClient({ ...(rate_limit.client ?? {}), _server: this });
             }
         }
-
-        // Blacklist class.
-        // if (this.honey_pot_key) {
-        //     this.blacklist = new Blacklist({api_key: this.honey_pot_key});
-        // }
     }
 
     // ---------------------------------------------------------
     // Utils.
 
-    // Get a content type from an extension.
+    /** Get a content type (MIME) from a file extension. */
     get_content_type(extension: string): string {
-        let content_type = Server.content_type_mimes.find((item) => {
-            if (item[0] == extension) {
-                return item[1];
-            }
-        })?.[1];
-        if (content_type == null) {
-            content_type = "application/octet-stream";
-        }
-        return content_type;
+        return Server.content_type_mimes.get(extension.toLowerCase()) ?? "application/octet-stream"
     }
 
-    // Set log level.
+    /** Set the logging verbosity level. */
     set_log_level(level: number): void {
-        this.log_level = level;
-        logger.log_level.set(level);
+        this.log.level.set(level);
     }
 
     // ---------------------------------------------------------
     // Crypto (private).
 
-    // Generate a crypto key.
+    /** Generate a cryptographically secure random key as a hex string. */
     generate_crypto_key(length: number = 32): string {
         return crypto.randomBytes(length).toString('hex');
     }
 
-    // Create a sha hmac with the master key.
+    /** Create an HMAC hash using the provided key and data. */
     hmac(key: string, data: string, algo: string = "sha256"): string {
         const hmac = crypto.createHmac(algo, key);
         hmac.update(data);
         return hmac.digest("hex");
     }
 
+    /** Create an HMAC hash using the server's master hash key. */
     _hmac(data: string): string {
-        if (!this._hash_key) {
+        if (!this._master_hash_key) {
             throw new Error("Hash key not initialized");
         }
-        const hmac = crypto.createHmac("sha256", this._hash_key);
+        const hmac = crypto.createHmac("sha256", this._master_hash_key);
         hmac.update(data);
         return hmac.digest("hex");
     }
 
-    // Hash without a key.
+    /** Create a hash (no key) of the given data using the specified algorithm. */
     hash(data: string | object, algo: string = "sha256"): string {
         if (typeof data !== "string") {
             data = JSON.stringify(data);
@@ -1350,7 +1048,29 @@ export class Server {
     // Add header defaults.
     private _set_header_defaults(stream: Stream): void {
         stream.set_headers(this.default_headers);
+
+        const origin = stream.headers.origin as string | undefined;
+        if (origin) {
+            const same_http = `http://${this.domain}`;
+            const same_https = `https://${this.domain}`;
+
+            if (origin === same_http || origin === same_https) {
+                stream.set_header("Access-Control-Allow-Origin", origin);
+                stream.set_header("Access-Control-Allow-Credentials", "true");
+            } else {
+                stream.set_header("Access-Control-Allow-Origin", "*");
+                // Do not send Access-Control-Allow-Credentials with a wildcard origin.
+            }
+
+            // Improve preflight reflection for caches and correctness.
+            const req_hdrs = stream.headers["access-control-request-headers"];
+            if (req_hdrs) stream.set_header("Access-Control-Allow-Headers", String(req_hdrs));
+
+            const req_method = stream.headers["access-control-request-method"];
+            if (req_method) stream.set_header("Access-Control-Allow-Methods", String(req_method));
+        }
     }
+
 
     // ---------------------------------------------------------
     // Endpoints (private).
@@ -1390,16 +1110,16 @@ export class Server {
             this.endpoint({
                 method: "GET",
                 endpoint: "/favicon.ico",
-                data: favicon.load_sync({type: "buffer"}),
+                data: favicon.load_sync({ type: "buffer" }),
                 content_type: this.get_content_type(favicon.extension()),
                 _is_static: true,
-                _server: this,
+                server: this,
             })
         }
 
         // Create status endpoint.
         const status_dir = this.source.join(".status");
-        if (!status_dir.exists()) { status_dir.mkdir_sync(); }
+        if (!status_dir.exists()) { status_dir.mkdir_sync({ recursive: true }); }
         const status_key_path = status_dir.join("key");
         let status_key: string;
         if (!status_key_path.exists()) {
@@ -1419,8 +1139,8 @@ export class Server {
                 // Check key.
                 if (params.key !== status_key) {
                     return stream.send({
-                        status: 403, 
-                        headers: {"Content-Type": "text/plain"},
+                        status: 403,
+                        headers: { "Content-Type": "text/plain" },
                         data: "Access Denied",
                     })
                 }
@@ -1447,8 +1167,8 @@ export class Server {
 
                 // Response.
                 return stream.send({
-                    status: 200, 
-                    headers: {"Content-Type": "application/json"},
+                    status: 200,
+                    headers: { "Content-Type": "application/json" },
                     data: status,
                 })
             },
@@ -1483,15 +1203,20 @@ export class Server {
     private async _create_sitemap(): Promise<void> {
 
         // Logs.
-        if (this.lightweight) { return; }
-        log(2, "Creating sitemap.");
+        this.log(2, "Creating sitemap.");
 
         let sitemap = "";
         sitemap += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         sitemap += "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
         for (const endpoint of this.endpoints.values()) {
             if (endpoint.allow_sitemap) {
-                sitemap += `<url>\n   <loc>${this.full_domain}/${endpoint.route.endpoint_str}</loc>\n</url>\n`; // @todo not compatiable with regex endpoints
+                if (endpoint.route.is_regex) continue; // skip regex routes
+                const ep = encodeURI(
+                    endpoint.route.endpoint_str.startsWith("/")
+                        ? endpoint.route.endpoint_str
+                        : `/${endpoint.route.endpoint_str}`
+                );
+                sitemap += `<url>\n   <loc>${this.full_domain}${ep}</loc>\n</url>\n`;
             }
         }
         this.additional_sitemap_endpoints.forEach((endpoint) => {
@@ -1514,8 +1239,7 @@ export class Server {
     private async _create_robots_txt(): Promise<void> {
 
         // Logs.
-        if (this.lightweight) { return; }
-        log(2, "Creating robots.txt.");
+        this.log(2, "Creating robots.txt.");
 
         // Proceed.
         let robots = "User-agent: *\n";
@@ -1544,8 +1268,7 @@ export class Server {
     /* private _create_admin_endpoint(): void {
 
         // Logs.
-        if (this.lightweight) { return; }
-        log(2, "Creating admin endpoint.");
+        this.log(2, "Creating admin endpoint.");
 
         // Add admin tokens.
         this.admin.tokens = [];
@@ -1698,18 +1421,18 @@ export class Server {
     private async _initialize_statics(): Promise<string[]> {
 
         // Logs.
-        log(2, "Initializing static directories.");
-        
+        this.log(2, "Initializing static directories.");
+
         // Static paths for the file watcher.
         const static_paths: string[] = [];
-        
+
         // Add static file.
         const add_static_file = async (
             path: any,  // vlib.Path type
-            endpoint: string, 
+            endpoint: string,
             cache: boolean | number = true
         ): Promise<void> => {
-            
+
             // Add to static paths.
             static_paths.push(path.str());
 
@@ -1743,13 +1466,12 @@ export class Server {
                         method: "GET",
                         endpoint,
                         content_type,
-                        compress: !Server.compressed_extensions.includes(path.extension()),
+                        compress: !Server.compressed_extensions.has(path.extension().toLowerCase()),
                         cache,
                         rate_limit: "global",
-                        _static_path: path.str(),
+                        file_path: path,
                         _is_static: true,
                     })
-                    ._load_data_by_path(this)
                 )
             }
         }
@@ -1759,42 +1481,37 @@ export class Server {
             if (opts == null) { return; }
             if (typeof opts === "object") {
                 // Check object.
-                vlib.Scheme.validate(opts, {
-                    strict: true, 
-                    scheme: {
+                vlib.schema.validate(opts, {
+                    unknown: false,
+                    throw: true,
+                    schema: {
                         path: "string",
-                        endpoint: {type: "string", default: null},
-                        cache: {type: ["boolean", "number"], default: true},
-                        endpoints_cache: {type: "object", default: {}},
-                        exclude: {type: "array", default: []},
+                        endpoint: { type: "string", default: null },
+                        cache: { type: ["boolean", "number"], default: true },
+                        endpoints_cache: { type: "object", default: {} },
+                        exclude: { type: "array", default: [] },
                     }
                 });
 
                 // Vars.
-                const exclude = [/.*\.DS_Store/, /.*\.cache/, /.*\.old/, /.*\.ignore/, ...opts.exclude || []]
                 const paths: any[] = [];  // vlib.Path[]
                 const source = new vlib.Path(opts.path).abs();
+                if (!source.exists()) {
+                    this.log(1, `Static path "${source.str()}" does not exist; skipping.`);
+                    return;
+                }
                 const source_len = source.str().length;
                 const is_dir = source.is_dir();
 
                 // Is excluded.
-                const is_excluded = (path: string | RegExp): boolean => {
-                    return exclude.some(pattern => {
-                        if (path instanceof RegExp) {
-                            if (pattern instanceof RegExp) {
-                                return pattern.source === path.source;
-                            } else {
-                                return path.test(String(pattern));
-                            }
-                        } else {
-                            if (pattern instanceof RegExp) {
-                                return pattern.test(String(path));
-                            } else {
-                                return path === pattern;
-                            }
-                        }
-                    });
-                }
+                const exclude = [/\.DS_Store$/, /\.cache(?:\/|$)/, /\.old(?:\/|$)/, /\.ignore$/, ...(opts.exclude || [])];
+                const is_excluded = (p: vlib.Path | string): boolean => {
+                    const s = typeof p === "string" ? p : p.str();
+                    return exclude.some(pattern =>
+                        pattern instanceof RegExp ? pattern.test(s) : s === String(pattern)
+                    );
+                };
+
 
                 // Initialize endpoint.
                 opts.endpoint = opts.endpoint || `/${source.full_name()}`;
@@ -1844,10 +1561,10 @@ export class Server {
                         opts.endpoints_cache === undefined ? opts.cache : opts.endpoints_cache[endpoint] ?? opts.cache,
                     )
                 }
-                
+
             }
             else if (typeof opts === "string") {
-                await add_static({path: opts});
+                await add_static({ path: opts });
             }
         }
 
@@ -1869,33 +1586,37 @@ export class Server {
     // Initialize.
     // Initialize.
     async initialize(): Promise<void> {
-        
+
         // Logs.
-        log(1, "Initializing server.");
+        this.log(1, "Initializing server.");
 
         /* @performance */ this.performance.start()
 
-    
+
         // Create HTTPS server.
         if (this.tls) {
             this.https = http2.createSecureServer(
                 {
-                    key: new vlib.Path(this.tls.key).load_sync({ encoding: 'utf8' }), 
-                    cert: new vlib.Path(this.tls.cert).load_sync({ encoding: 'utf8' }), 
-                    ca: this.tls.ca == null ? undefined : new vlib.Path(this.tls.ca).load_sync({ encoding: 'utf8' }), 
+                    key: new vlib.Path(this.tls.key).load_sync({ encoding: 'utf8' }),
+                    cert: new vlib.Path(this.tls.cert).load_sync({ encoding: 'utf8' }),
+                    ca: this.tls.ca == null ? undefined : new vlib.Path(this.tls.ca).load_sync({ encoding: 'utf8' }),
                     passphrase: this.tls.passphrase,
                     allowHTTP1: true,
                 },
-                // Support for http1.
-                // Does not work, requests get triggered on the stream and on this callback.
-                (req: http2.Http2ServerRequest, res: http2.Http2ServerResponse) => {
-                    if (req.httpVersion.charAt(0) !== "2") {
-                        this._serve(undefined, undefined, req, res)
-                    }
-                },
+                // code below replaced by this.https.on("request", ...)
+                // // Support for http1.
+                // // Does not work, requests get triggered on the stream and on this callback.
+                // (req: http2.Http2ServerRequest, res: http2.Http2ServerResponse) => {
+                //     if (req.httpVersion.charAt(0) !== "2") {
+                //         this._serve(undefined, undefined, req, res)
+                //     }
+                // },
             );
             this.https.on('stream', (stream: http2.ServerHttp2Stream, headers: any) => {
                 this._serve(stream, headers, undefined, undefined)
+            });
+            this.https.on('request', (req: http.IncomingMessage, res: http.ServerResponse) => {
+                this._serve(undefined, undefined, req, res);
             });
         }
 
@@ -1904,35 +1625,34 @@ export class Server {
             throw Error("Accepting payments in production mode requires HTTPS.");
         }
 
-        // Redirect HTTP requests to HTTPS.
+        // Create http server.
         if (this.tls) {
+            // Redirect HTTP requests to HTTPS.
             this.http = http.createServer((request: http.IncomingMessage, response: http.ServerResponse) => {
-                response.writeHead(301, { Location: `https://${request.headers.host}${request.url}` });
+                const reqUrl = typeof request.url === "string" ? request.url : "/";
+                // Build redirect using the canonical configured domain, not the untrusted Host header.
+                const location = `https://${this.domain}${reqUrl}`;
+                // 308 preserves method and body; safe for non-GET as well.
+                response.writeHead(308, { Location: location });
                 response.end();
             });
         } else {
+            // Serve http.
             this.http = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
                 this._serve(undefined, undefined, req, res)
             });
         }
 
         /* @performance */ this.performance.end("create-http-server");
-    
+
         // Start the database.
         if (this.db) {
             await this.db.initialize();
             /* @performance */ this.performance.end("init-db");
 
-            // Database collections.
-            this._sys_db = await this.db.collection({
-                name: "Volt.System",
-                indexes: [ "_path" ],
-            });
-            /* @performance */ this.performance.end("init-sys-collection");
-        
             // Load keys.
             const keys_document = await this._sys_db.load("keys");
-            const gen_user_crypto_key = (doc: Record<string, any>, key: string | {name: string, length: number}) => {
+            const gen_user_crypto_key = (doc: Record<string, any>, key: string | { name: string, length: number }) => {
                 if (typeof key === "string") {
                     doc[key] = this.generate_crypto_key(32);
                 } else {
@@ -1953,21 +1673,21 @@ export class Server {
                 }
             }
             if (keys_document == null) {
-                this._hash_key = this.generate_crypto_key(32);
+                this._master_hash_key = this.generate_crypto_key(32);
                 const doc: Record<string, string> = {
-                    _master_sha256: this._hash_key,
+                    _master_sha256: this._master_hash_key,
                 };
                 this._keys.forEach((key) => {
                     gen_user_crypto_key(doc, key);
                 })
-                await this._sys_db.save("keys", doc);
+                await this._sys_db.set("keys", doc);
             } else {
                 // Check hash key.
-                this._hash_key = keys_document._master_sha256;
+                this._master_hash_key = keys_document._master_sha256;
                 let perform_save = false;
-                if (this._hash_key === undefined) {
-                    this._hash_key = this.generate_crypto_key(32);
-                    keys_document._master_sha256 = this._hash_key;
+                if (this._master_hash_key === undefined) {
+                    this._master_hash_key = this.generate_crypto_key(32);
+                    keys_document._master_sha256 = this._master_hash_key;
                     perform_save = true;
                 }
 
@@ -1983,7 +1703,7 @@ export class Server {
 
                 // Save.
                 if (perform_save) {
-                    await this._sys_db.save("keys", keys_document);
+                    await this._sys_db.set("keys", keys_document);
                 }
             }
 
@@ -2018,7 +1738,7 @@ export class Server {
         //     this.db._initialize_db_preview();
         //     /* @performance */ this.performance.end("init-db-preview");
         // }
-        
+
         // Payments.
         if (this.payments !== undefined) {
             promises.push(this.payments._initialize());
@@ -2027,14 +1747,14 @@ export class Server {
 
         // Create sitemap when it does not exist.
         // Must be done at the end of initialization func since some funcs might still create endpoints.
-        if (this._find_endpoint("sitemap.xml") == null) {
+        if (this._find_endpoint("/sitemap.xml") == null) {
             promises.push(this._create_sitemap());
         }
         // /* @performance */ this.performance.end("create-sitemap");
-        
+
         // Create robots.txt when it does not exist.
         // Must be done at the end of initialization func since some funcs might still create endpoints.
-        if (this._find_endpoint("robots.txt") == null) {
+        if (this._find_endpoint("/robots.txt") == null) {
             promises.push(this._create_robots_txt());
         }
         // /* @performance */ this.performance.end("create-robots.txt");
@@ -2046,10 +1766,10 @@ export class Server {
         if (this.company.stroke_icon || this.company.icon) {
             for (const endpoint of this.endpoints.values()) {
                 if (this.company.stroke_icon_path == null && endpoint.route.endpoint === this.company.stroke_icon) {
-                    this.company.stroke_icon_path = endpoint._static_path ?? undefined;
+                    this.company.stroke_icon_path = endpoint.file_path?.str() || undefined;
                 }
                 if (this.company.icon_path == null && endpoint.route.endpoint === this.company.icon) {
-                    this.company.icon_path = endpoint._static_path ?? undefined;
+                    this.company.icon_path = endpoint.file_path?.str() || undefined;
                 }
             }
             if (this.company.stroke_icon != null && this.company.stroke_icon_path == null) {
@@ -2082,7 +1802,7 @@ export class Server {
      * @param callback The callback to be called when the server is initialized.
      */
     on_initialize(callback: () => void | Promise<void>): void {
-        this._on_initialize.append(callback);
+        this._on_initialize.push(callback);
     }
 
     // Serve a client.
@@ -2105,12 +1825,12 @@ export class Server {
             let endpoint_url: string;
 
             // Log endpoint result.
-            const log_endpoint_result = (message: string | null = null, status: number | null = null) => {
+            const log_endpoint_result = (message?: string | undefined, status?: number | undefined) => {
                 let log_level = endpoint && endpoint.is_static ? 3 : 0;
                 if (status == null) {
                     status = stream.status_code;
                 }
-                log(log_level, `${method}:${endpoint_url}: ${message ? message : Status.get_description(status as number)} [${status}] (${stream.ip}).`);
+                this.log(log_level, `${method}:${endpoint_url}: ${message ? message : Status.get_description(status ?? "unknown")} [${status}] (${stream.ip}).`);
             };
 
             // Serve error endpoint.
@@ -2122,30 +1842,30 @@ export class Server {
                     case 400:
                         default_response = {
                             status: 400,
-                            headers: {"Content-Type": is_api_endpoint ? "application/json" : "text/plain"},
-                            data: is_api_endpoint ? {error: "Bad Request"} : "Bad Request",
+                            headers: { "Content-Type": is_api_endpoint ? "application/json" : "text/plain" },
+                            data: is_api_endpoint ? { error: "Bad Request" } : "Bad Request",
                         };
                         break;
                     case 403:
                         default_response = {
                             status: 403,
-                            headers: {"Content-Type": is_api_endpoint ? "application/json" : "text/plain"},
-                            data: is_api_endpoint ? {error: "Access Denied"} : "Access Denied",
+                            headers: { "Content-Type": is_api_endpoint ? "application/json" : "text/plain" },
+                            data: is_api_endpoint ? { error: "Access Denied" } : "Access Denied",
                         };
                         break;
                     case 404:
                         default_response = {
                             status: 404,
-                            headers: {"Content-Type": is_api_endpoint ? "application/json" : "text/plain"},
-                            data: is_api_endpoint ? {error: "Not Found"} : "Not Found",
+                            headers: { "Content-Type": is_api_endpoint ? "application/json" : "text/plain" },
+                            data: is_api_endpoint ? { error: "Not Found" } : "Not Found",
                         };
                         break;
                     case 500:
                     default:
                         default_response = {
                             status: 500,
-                            headers: {"Content-Type": is_api_endpoint ? "application/json" : "text/plain"},
-                            data: is_api_endpoint ? {error: "Internal Server Error"} : "Internal Server Error",
+                            headers: { "Content-Type": is_api_endpoint ? "application/json" : "text/plain" },
+                            data: is_api_endpoint ? { error: "Internal Server Error" } : "Internal Server Error",
                         };
                         break;
                 }
@@ -2159,7 +1879,7 @@ export class Server {
                         try {
                             await err_endpoint._serve(stream, status_code);
                         } catch (err: any) {
-                            error(`Error endpoint ${status_code}: `, err);
+                            this.log.error(`Error endpoint ${status_code}: `, err);
                             stream.send(default_response);
                         }
                     }
@@ -2168,11 +1888,11 @@ export class Server {
             };
 
             // Check ip against blacklist.
-            if (this.online && this.blacklist !== undefined && !this.blacklist.verify(stream.ip)) {
-                await serve_error_endpoint(403);
-                log_endpoint_result();
-                return;
-            }
+            // if (!this.offline && this.blacklist !== undefined && !this.blacklist.verify(stream.ip)) {
+            //     await serve_error_endpoint(403);
+            //     this.log_endpoint_result();
+            //     return;
+            // }
 
             // Check if the request matches any of the defined endpoints.
             method = stream.method;
@@ -2180,20 +1900,21 @@ export class Server {
             // endpoint = this._find_endpoint(endpoint_url, method);
 
             // Find endpoint manually so the optional path params can be extracted.
-            log(3, "Searching for endpoint: ", `${method}:${endpoint_url}`);
+            this.log(3, "Searching for endpoint: ", `${method}:${endpoint_url}`);
             endpoint = this.endpoints.get(`${method}:${endpoint_url}`);
             if (!endpoint) {
                 // Check regex endpoints.
                 const route = new Route(method, endpoint_url);
                 for (const e of this.endpoints.values()) {
                     if (e.route.is_regex) {
-                        if (e.route.match(route)) {
-                            log(3, "Matched regex route: ", e.route.id);
+                        const matched_params = e.route.match(route);
+                        if (matched_params !== false) {
+                            this.log(3, "Matched regex route: ", e.route.id);
                             endpoint = e;
                             // insert path params into the stream when not already defined.
-                            Object.keys(route.matched_params).walk((k): void => {
+                            Object.keys(matched_params).walk((k): void => {
                                 if (stream.params[k] == null) {
-                                    stream.params[k] = route.matched_params[k];
+                                    stream.params[k] = matched_params[k];
                                 }
                             });
                             break
@@ -2201,7 +1922,7 @@ export class Server {
                     }
                 }
             } else {
-                log(3, "Matched route: ", endpoint.route.id);
+                this.log(3, "Matched route: ", endpoint.route.id);
             }
 
             // No endpoint found.
@@ -2215,14 +1936,8 @@ export class Server {
                         this._set_header_defaults(stream);
                         original_endpoint._set_headers(stream);
 
-                        // When any cors origin is allowed and origin is present then respond with that origin.
-                        if (stream.headers.origin && this.default_headers["Access-Control-Allow-Origin"] === "*") {
-                            stream.remove_header("Access-Control-Allow-Origin", "access-control-allow-origin");
-                            stream.set_header("Access-Control-Allow-Origin", stream.headers.origin);
-                        }
-
                         // Send.
-                        stream.send({status: Status.no_content});
+                        stream.send({ status: Status.no_content });
                         log_endpoint_result();
                         return;
                     }
@@ -2241,18 +1956,12 @@ export class Server {
             // Set default headers.
             this._set_header_defaults(stream);
 
-            // When any cors origin is allowed and origin is present then respond with that origin.
-            if (stream.headers.origin && this.default_headers["Access-Control-Allow-Origin"] === "*") {
-                stream.remove_header("Access-Control-Allow-Origin", "access-control-allow-origin");
-                stream.set_header("Access-Control-Allow-Origin", stream.headers.origin);
-            }
-
             // Serve options request.
             if (method === "OPTIONS") {
                 try {
                     await endpoint._serve_options(stream);
                 } catch (err: any) {
-                    error(`${method}:${endpoint_url}: `, err);
+                    this.log.error(`${method}:${endpoint_url}: `, err);
                     if (!stream.destroyed && !stream.closed) {
                         await serve_error_endpoint(500);
                         log_endpoint_result();
@@ -2264,7 +1973,7 @@ export class Server {
             }
 
             // Check rate limit.
-            if (this.online && this.production && this.rate_limit !== undefined && endpoint.rate_limit_groups.length > 0) {
+            if (!this.offline && this.production && this.rate_limit !== undefined && endpoint.rate_limit_groups.length > 0) {
                 const result = await this.rate_limit.limit(stream.ip, endpoint.rate_limit_groups);
                 if (result != null) {
                     stream.send({
@@ -2284,7 +1993,7 @@ export class Server {
             try {
                 await stream.join();
             } catch (err: any) {
-                error(`${method}:${endpoint_url}: `, err);
+                this.log.error(`${method}:${endpoint_url}: `, err);
                 await serve_error_endpoint(500);
                 log_endpoint_result();
                 return;
@@ -2292,7 +2001,7 @@ export class Server {
             try {
                 stream._parse_params();
             } catch (err: any) {
-                error(`${method}:${endpoint_url}: `, err);
+                this.log.error(`${method}:${endpoint_url}: `, err);
                 await serve_error_endpoint(400);
                 log_endpoint_result();
                 return;
@@ -2321,7 +2030,7 @@ export class Server {
             try {
                 await endpoint._serve(stream);
             } catch (err: any) {
-                error(`${method}:${endpoint_url}: `, err);
+                this.log.error(`${method}:${endpoint_url}: `, err);
                 if (!stream.destroyed && !stream.closed) {
                     await serve_error_endpoint(500);
                     log_endpoint_result();
@@ -2331,7 +2040,7 @@ export class Server {
 
             // Check if the response has been sent.
             if (!stream.finished) {
-                error(`${method}:${endpoint_url}: `, "Unfinished response.");
+                this.log.error(`${method}:${endpoint_url}: `, "Unfinished response.");
                 await serve_error_endpoint(500);
                 log_endpoint_result();
                 return;
@@ -2340,25 +2049,23 @@ export class Server {
             // Log.
             log_endpoint_result();
         } catch (err: any) {
-            error("Fatal error:", err);
+            this.log.error("Fatal error:", err);
         }
     }
-
 
     // ---------------------------------------------------------
     // Server.
 
     // Start the server.
-    /*  @docs:
-     *  @title: Start
-     *  @description:
-     *      Start the server.
-     *  @usage:
-     *      ...
-     *      server.start();
+
+    /**
+     * Start the server.
+     * @example
+     * ...
+     * server.start();
      */
     async start(): Promise<void> {
-        
+
         // Always initialize, even when forking.
         await this.initialize();
 
@@ -2380,8 +2087,8 @@ export class Server {
 
         // Production & Master.
         let forked = false;
-        if (this.production && this.multiprocessing && libcluster.isPrimary && this.processes > 1) {
-            this.log(0, `Starting ${this.processes} threads.`);
+        if (this.production && this.threading.enabled && libcluster.isPrimary && this.threading.threads > 1) {
+            this.log(0, `Starting ${this.threading.threads} threads.`);
 
             // Vars.
             let active_threads = 0;
@@ -2394,7 +2101,7 @@ export class Server {
                 const worker = libcluster.fork();
 
                 // Log.
-                log(restart ? 0 : 1, `Starting thread ${worker.process.pid}.`);
+                this.log(restart ? 0 : 1, `Starting thread ${worker.process.pid}.`);
 
                 // Cache thread id.
                 thread_ids[worker.process.pid!] = thread_id;
@@ -2404,10 +2111,10 @@ export class Server {
             };
 
             // Fork workers.
-            for (let i = 0; i < this.processes; i++) {
+            for (let i = 0; i < this.threading.threads; i++) {
                 // Generate thread id.
                 let thread_id;
-                while ((thread_id = vlib.String.random(8)) && Object.values(thread_ids).includes(thread_id)) {}
+                while ((thread_id = vlib.String.random(8)) && Object.values(thread_ids).includes(thread_id)) { }
 
                 // Create limiter.
                 restart_limiters[thread_id] = new vlib.TimeLimiter({ limit: 3, duration: 60 * 1000 });
@@ -2417,7 +2124,7 @@ export class Server {
             }
 
             // Save status.
-            await this._sys_db.save("status", {
+            await this._sys_db.set("status", {
                 running_since: Date.now(),
                 total_threads: active_threads,
                 running_threads: active_threads,
@@ -2430,7 +2137,7 @@ export class Server {
                 delete thread_ids[worker.process.pid!];
 
                 // Logs.
-                error(`Thread ${worker.process.pid} crashed.`);
+                this.log.error(`Thread ${worker.process.pid} crashed.`);
 
                 // Restart with limit.
                 const limiter = restart_limiters[thread_id];
@@ -2440,17 +2147,17 @@ export class Server {
                 }
                 // Reached limit, shutdown thread.
                 else {
-                    error(`Thread ${worker.process.pid} is being shut down due too its periodic restart limit.`);
+                    this.log.error(`Thread ${worker.process.pid} is being shut down due to its periodic restart limit.`);
                     --active_threads;
-                    await this._sys_db.save("status", { running_threads: active_threads });
+                    await this._sys_db.set("status", { running_threads: active_threads });
                     if (active_threads === 0) {
-                        error(`All threads died, stopping server.`);
+                        this.log.error(`All threads died, stopping server.`);
                         process.exit(0);
                     }
                 }
             });
         } else {
-            forked = this.production && this.multiprocessing;
+            forked = this.production && this.threading.enabled;
 
             // Load worker class modules.
             // if (libcluster.isWorker) {
@@ -2464,9 +2171,9 @@ export class Server {
                 if (!is_running) {
                     is_running = true;
                     if (this.https !== undefined) {
-                        log(0, `Running on http://${this.ip}:${this.port} and https://${this.ip}:${this.https_port}.`);
+                        this.log(0, `Running on http://${this.ip}:${this.port} and https://${this.ip}:${this.https_port}.`);
                     } else {
-                        log(0, `Running on http://${this.ip}:${this.port}.`);
+                        this.log(0, `Running on http://${this.ip}:${this.port}.`);
                     }
                 }
             };
@@ -2497,8 +2204,20 @@ export class Server {
             }
 
             // Set signals.
-            process.on('SIGTERM', () => process.exit(0));
-            process.on('SIGINT', () => process.exit(0));
+            let graceful_shutdown_shutting_down = false;
+            const graceful_shutdown = async () => {
+                if (graceful_shutdown_shutting_down) return;
+                graceful_shutdown_shutting_down = true;
+                try {
+                    await this.stop();
+                } catch (e) {
+                    this.log.error("Shutdown error:", e);
+                } finally {
+                    process.exit(0);
+                }
+            };
+            process.on('SIGTERM', graceful_shutdown);
+            process.on('SIGINT', graceful_shutdown);
 
             // Send running message.
             if (process.env.VOLT_FILE_WATCHER === "1") {
@@ -2532,30 +2251,26 @@ export class Server {
         debug(2, () => this.performance.dump(v => v >= 50));
     }
 
-    /*  @docs:
-     *  @title: On start
-     *  @description:
-     *      Add an (async) callback which will be executed at the end of `server.start()`.
-     *      The callback may take arguments `({forked <boolean>})`.
-     *  @usage:
-     *      ...
-     *      server.on_start(({forked}) => console.log("Hello World!"));
+    /**
+     * Add an (async) callback executed at the end of `server.start()`. The callback may take arguments `({forked <boolean>})`.
+     * @param callback The callback to run; receives `{ forked }`.
+     * @example
+     * ...
+     * server.on_start(({forked}) => console.log("Hello World!"));
      */
     on_start(callback: ({ forked }: { forked: boolean }) => void | Promise<void>): void {
-        this._on_start.append(callback);
+        this._on_start.push(callback);
     }
 
     // Stop the server.
-    /*  @docs:
-     *  @title: Stop
-     *  @description:
-     *      Stop the server.
-     *  @usage:
-     *      ...
-     *      server.stop();
+    /**
+     * Stop the server.
+     * @example
+     * ...
+     * server.stop();
      */
     async stop(): Promise<void> {
-        log(0, "Stopping the server...");
+        this.log(0, "Stopping the server...");
 
         // On stop callbacks.
         for (const callback of this._on_stop) {
@@ -2570,25 +2285,13 @@ export class Server {
             await this.rate_limit.stop();
         }
 
-        // Stop view source file watcher.
-        if (this._stop_tscompiler_watcher) {
-            log(0, "Stopping typescript watcher.");
-            this._stop_tscompiler_watcher();
-        }
-
         // Stop sockets.
-        if (this.https) {
-            await this.https.close();
-        }
-        if (this.http) {
-            await this.http.close();
-        }
-        if (this.db) {
-            await this.db.close();
-        }
+        if (this.https) this.https.close();
+        if (this.http) this.http.close();
+        if (this.db) await this.db.close();
 
         // Stop the logger.
-        logger.stop();
+        this.log.stop();
 
         // setTimeout(() => {
         //     thread_monitor.dump_active_resources({
@@ -2600,30 +2303,26 @@ export class Server {
 
 
 
-        
+
     }
 
-    /*  @docs:
-     *  @title: On stop
-     *  @description:
-     *      Set an (async) callback which will be executed at the start of `server.stop()`.
-     *  @usage:
-     *      ...
-     *      server.on_stop(() => console.log("Hello World!"));
+    /**
+     * Set an (async) callback which will be executed at the start of `server.stop()`.
+     * @param callback The callback to run.
+     * @example
+     * ...
+     * server.on_stop(() => console.log("Hello World!"));
      */
     on_stop(callback: () => void | Promise<void>): void {
-        this._on_stop.append(callback);
+        this._on_stop.push(callback);
     }
 
     // Fetch status.
-    /*  @docs:
-        @title: Fetch status.
-        @desc: This function is meant to be used when the server is in production mode, it will make an API request to your server through the defined `Server.domain` parameter.
-        @note: This function can be called without initializing the server.
-        @param:
-            @name: type
-            @desc: The wanted output type. Either an `object` or a `string` type for CLI purposes.
-    */
+    /**
+     * This function is meant to be used when the server is in production mode, it will make an API request to your server through the defined `Server.domain` parameter.
+     * @note This function can be called without initializing the server.
+     * @param type The wanted output type. Either an `object` or a `string` type for CLI purposes.
+     */
     async fetch_status(type: "object" | "string" = "object"): Promise<string | Record<string, any>> {
 
         // Load key.
@@ -2663,23 +2362,16 @@ export class Server {
     // ---------------------------------------------------------
     // Content Security Policy.
 
-        // Add a csp.
-    /*  @docs:
-     *  @title: Add CSP
-     *  @description: Add an url to the Content-Security-Policy. This function does not overwrite the existing key's value.
-     *  @warning: This function no longer has any effect when `Server.start()` has been called.
-     *  @parameter:
-     *      @name: key
-     *      @description: The Content-Security-Policy key, e.g. `script-src`.
-     *      @type: string
-     *  @parameter:
-     *      @name: value
-     *      @description: The value to add to the Content-Security-Policy key.
-     *      @type: null, string, string[]
-     *  @usage:
-     *      ...
-     *      server.add_csp("script-src", "somewebsite.com");
-     *      server.add_csp("upgrade-insecure-requests");
+    // Add a csp.
+    /**
+     * Add an url to the Content-Security-Policy. This function does not overwrite the existing key's value.
+     * @warning This function no longer has any effect when `Server.start()` has been called.
+     * @param key The Content-Security-Policy key, e.g. `script-src`.
+     * @param value The value to add to the Content-Security-Policy key.
+     * @example
+     * ...
+     * server.add_csp("script-src", "somewebsite.com");
+     * server.add_csp("upgrade-insecure-requests");
      */
     add_csp(key: string, value: null | string | string[] = null): void {
         if (this.csp[key] === undefined) {
@@ -2697,22 +2389,15 @@ export class Server {
     }
 
     // Remove a csp.
-    /*  @docs:
-     *  @title: Remove CSP
-     *  @description: Remove an url from the Content-Security-Policy. This function does not overwrite the existing key's value.
-     *  @warning: This function no longer has any effect when `Server.start()` has been called.
-     *  @parameter:
-     *      @name: key
-     *      @description: The Content-Security-Policy key, e.g. `script-src`.
-     *      @type: string
-     *  @parameter:
-     *      @name: value
-     *      @description: The value to remove from the Content-Security-Policy key.
-     *      @type: null, string
-     *  @usage:
-     *      ...
-     *      server.remove_csp("script-src", "somewebsite.com");
-     *      server.remove_csp("upgrade-insecure-requests");
+    /**
+     * Remove an url from the Content-Security-Policy. This function does not overwrite the existing key's value.
+     * @warning This function no longer has any effect when `Server.start()` has been called.
+     * @param key The Content-Security-Policy key, e.g. `script-src`.
+     * @param value The value to remove from the Content-Security-Policy key.
+     * @example
+     * ...
+     * server.remove_csp("script-src", "somewebsite.com");
+     * server.remove_csp("upgrade-insecure-requests");
      */
     remove_csp(key: string, value: null | string = null): void {
         if (this.csp[key] === undefined) {
@@ -2726,18 +2411,14 @@ export class Server {
     }
 
     // Delete a csp key.
-    /*  @docs:
-     *  @title: Delete CSP
-     *  @description: Delete an key from the Content-Security-Policy.
-     *  @warning: This function no longer has any effect when `Server.start()` has been called.
-     *  @parameter:
-     *      @name: key
-     *      @description: The Content-Security-Policy key, e.g. `script-src`.
-     *      @type: string
-     *  @usage:
-     *      ...
-     *      server.del_csp("script-src");
-     *      server.del_csp("upgrade-insecure-requests");
+    /**
+     * Delete an key from the Content-Security-Policy.
+     * @warning This function no longer has any effect when `Server.start()` has been called.
+     * @param key The Content-Security-Policy key, e.g. `script-src`.
+     * @example
+     * ...
+     * server.del_csp("script-src");
+     * server.del_csp("upgrade-insecure-requests");
      */
     del_csp(key: string): void {
         delete this.csp[key];
@@ -2800,7 +2481,7 @@ export class Server {
         province: string,
         city: string,
     }): Promise<void> {
-        
+
         // Args.
         if (key_path == null) {
             throw Error("Define parameter \"key_path\".");
@@ -2812,7 +2493,7 @@ export class Server {
         // Paths.
         const key = new vlib.Path(key_path);
         if (!key.exists()) {
-            throw Error(`Key path "${key.str()}" already exists, remove the file manually to continue.`);
+            throw Error(`Key path "${key.str()}" does not exist.`);
         }
         const csr = new vlib.Path(output_path);
         if (csr.exists()) {
@@ -2826,21 +2507,14 @@ export class Server {
             args: [
                 "req", "-new", "-key", key.str(), "-out", csr.str(),
                 "-subj",
-                "\"" +
-                "/C=" + country_code +
-                "/ST=" + province +
-                "/L=" + city +
-                "/O=" + name +
-                "/OU=" + organization_unit +
-                "/CN=" + domain +
-                "\""
+                `/C=${country_code}/ST=${province}/L=${city}/O=${name}/OU=${organization_unit}/CN=${domain}`
             ],
             opts: { stdio: "inherit" },
         });
         if (proc.exit_status != 0) {
             throw Error(`Encountered an error while generating the CSR [${proc.exit_status}]: ${proc.err}`);
         }
-        log(0, `Generated the tls key with CSR for domain "${this.domain}".`);
+        this.log(0, `Generated the tls key with CSR for domain "${this.domain}".`);
     }
 
     // ---------------------------------------------------------
@@ -2856,7 +2530,7 @@ export class Server {
         route: Route
     ): void {
         const e = this._find_endpoint(route);
-        if (e)  {
+        if (e) {
             throw new Error(`Duplicate "${route.method}:${route.endpoint_str}" endpoint route, it is already defined by endpoint "${e.id}".`);
         }
     }
@@ -2864,13 +2538,21 @@ export class Server {
     /**
      * Add a single endpoint. 
      * Only supports a single endpoint due to parameter inference.
+     * @template Response User inputted response type that will be returned as response, optionaly typing used for consistency.
+     * @template S system template for inferring the endpoint callback parameters.
      * @param endpoint The endpoint or endpoint options to add.
+     * @returns A registered endpoint object that can for instance be used to infer the endpoint parameters.
      */
-    endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}>(endpoint: Endpoint<S> | Endpoint.Opts<S>): this {
+    endpoint<const S extends vlib.Schema.Entries.Opts = {}>(
+        endpoint: Endpoint<S> | ConstructorParameters<typeof Endpoint<S>>[0]
+    ): RegisteredEndpoint<S> {
         const e = endpoint instanceof Endpoint ? endpoint : new Endpoint<S>(endpoint);
         this._check_duplicate_route(e.route);
         this.endpoints.set(e.route.id, e);
-        return this;
+        return {
+            params: undefined as any,
+            Params: undefined as any,
+        };
     }
 
     // Add an error endpoint.
@@ -2887,7 +2569,7 @@ export class Server {
      *      * `500`
      * @param endpoint The error endpoint or error endpoint options
     */
-    error_endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}>(
+    error_endpoint<const S extends vlib.Schema.Entries.Opts = {}>(
         status_code: number,
         endpoint: Endpoint<S> | Endpoint.Opts<S>,
     ): this {
@@ -2904,50 +2586,27 @@ export class Server {
     // Functions.
 
     // Send a mail.
-    /*  @docs:
-     *  @title: Send Mail
-     *  @description: Send one or multiple mails.
-     *  @note: Make sure the domain's DNS records SPF and DKIM are properly configured when sending attachments.
-     *  @return:
-     *      Returns a promise that will be resolved or rejected when the mail has been sent.
-     *  @parameter:
-     *      @name: sender
-     *      @description:
-     *          The sender address.
-     *          A sender address may either be a string with the email address, e.g. `your@email.com`.
-     *          Or an array with the sender name and email address, e.g. `["Sender", "your@email.com"]`.
-     *      @type: string, array
-     *  @parameter:
-     *      @name: recipients
-     *      @description:
-     *          The recipient addresses.
-     *          A reciepient address may either be a string with the email address, e.g. `your@email.com`.
-     *          Or an array with the sender name and email address, e.g. `["Sender", "your@email.com"]`.
-     *      @type: array[string, array]
-     *  @parameter:
-     *      @name: subject
-     *      @description: The subject text.
-     *      @type: string
-     *  @parameter:
-     *      @name: body
-     *      @description: The body text.
-     *      @type: string
-     *  @parameter:
-     *      @name: attachments
-     *      @description: An array with absolute file paths for attachments, or an array with nodemailer attachment objects.
-     *      @type: array[string], array[object]
-     *  @usage:
-     *      ...
-     *      await server.send_mail({
-     *          sender: ["Sender Name", "sender\@email.com"],
-     *          recipients: [
-     *              ["Recipient Name", "recipient1\@email.com"],
-     *              "recipient2\@email.com",
-     *          },
-     *          subject: "Example Mail",
-     *          body: "Hello World!",
-     *          attachments: ["/path/to/image.png"]
-     *      });
+    /**
+     * Send one or multiple mails.
+     * @note Make sure the domain's DNS records SPF and DKIM are properly configured when sending attachments.
+     * @returns Returns a promise that will be resolved or rejected when the mail has been sent.
+     * @param sender The sender address. Either a string email (e.g. `your@email.com`) or `[name, email]`.
+     * @param recipients The recipient addresses. Each item is either a string email or `[name, email]`.
+     * @param subject The subject text.
+     * @param body The body text or a `MailElement` instance.
+     * @param attachments An array with absolute file paths for attachments, or an array with nodemailer attachment objects.
+     * @example
+     * ...
+     * await server.send_mail({
+     *   sender: ["Sender Name", "sender@email.com"],
+     *   recipients: [
+     *     ["Recipient Name", "recipient1@email.com"],
+     *     "recipient2@email.com",
+     *   ],
+     *   subject: "Example Mail",
+     *   body: "Hello World!",
+     *   attachments: ["/path/to/image.png"]
+     * });
      */
     async send_mail({
         sender = undefined,
@@ -3039,53 +2698,44 @@ export class Server {
     // @todo add scheme for payment params.
 
     // On delete user.
-    /*  @docs:
-     *  @title: On delete user
-     *  @description: This function can be overridden with a callback for when a user is deleted.
-     *  @parameter:
-     *      @name: uid
-     *      @description: The uid of the deleted user.
-     *      @type: string, array
-     *  @usage:
-     *      ...
-     *      server.on_delete_user = ({uid}) => {}
+    /**
+     * This function can be overridden with a callback for when a user is deleted.
+     * @param uid The uid of the deleted user.
+     * @example
+     * ...
+     * server.on_delete_user = ({uid}) => {}
      */
-    async on_delete_user({ uid }: { uid: string | string[] }): Promise<void> {}
+    async on_delete_user({ uid }: { uid: string | string[] }): Promise<void> { }
 
-    // On successfull one-time payment.
-    // This gets called for every product in the payment.
-    async on_payment({ product, payment }: { product: any; payment: any }): Promise<void> {}
+    /** Called for each product in a successful one-time payment. Override to implement your logic. */
+    async on_payment({ product, payment }: { product: any; payment: any }): Promise<void> { }
 
-    // On successfull subscription.
-    // This gets called for every product in the payment.
-    async on_subscription({ product, payment }: { product: any; payment: any }): Promise<void> {}
+    /** Called for each product in a successful subscription. Override to implement your logic. */
+    async on_subscription({ product, payment }: { product: any; payment: any }): Promise<void> { }
 
     // On failed one-time or recurring payment.
     // async on_failed_payment({ payment }: { payment: any }): Promise<void> {}
 
-    // On successfull cancellation.
-    async on_cancellation({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> {}
+    /** Called when a cancellation succeeds. Override to implement your logic. */
+    async on_cancellation({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> { }
 
     // On failed cancellation.
     // async on_failed_cancellation({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> {}
 
-    // On successfull refund.
-    // The line items array are the items were refunded.
-    async on_refund({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> {}
+    /** Called when a refund succeeds. The line items array are the items that were refunded. */
+    async on_refund({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> { }
 
-    // On failed refund.
-    // The line items array are the items were the refund failed.
-    async on_failed_refund({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> {}
+    /** Called when a refund fails. The line items array are the items where the refund failed. */
+    async on_failed_refund({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> { }
 
-    // On chargeback.
-    // The line items array are the items were charged back.
-    async on_chargeback({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> {}
+    /** Called when a chargeback occurs. The line items array are the items that were charged back. */
+    async on_chargeback({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> { }
 
-    // On failed chargeback.
-    // The line items array are the items were the chargeback failed.
-    async on_failed_chargeback({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> {}
+    /** Called when a chargeback fails. The line items array are the items where the chargeback failed. */
+    async on_failed_chargeback({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> { }
 
     // Mail template.
+    /** Build the base email layout used by the various transactional email builders. */
     _mail_template({
         max_width = 400,
         children = [],
@@ -3100,11 +2750,11 @@ export class Server {
         let header;
         if (this.company.stroke_icon != null) {
             header = [
-                Image(`${this.full_domain}/${this.company.stroke_icon}`).height(16),
+                Image(`${this.full_domain}${this.company.stroke_icon ?? ""}`).height(16),
             ];
         } else if (this.company.icon != null) {
             header = [
-                Image(`${this.full_domain}/${this.company.icon}`).frame(20, 40),
+                Image(`${this.full_domain}${this.company.icon ?? ""}`).frame(20, 40),
             ];
         }
         if (header) {
@@ -3154,11 +2804,14 @@ export class Server {
     }
 
     // Render payment line items.
+    /** Helper that renders a list of payment line items for use in transactional emails. */
     _render_mail_payment_line_items({ payment, line_items, show_total_due = false }: {
         payment: any;
         line_items: any[];
         show_total_due?: boolean;
     }): any[] {
+        if (!this.payments) throw new Error("Payments not initialized");
+
         // Shortcuts.
         const style = this.mail_style;
         const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
@@ -3237,13 +2890,13 @@ export class Server {
                 !divider
                     ? null
                     : TableRow(
-                          TableData(
-                              VStack()
-                                  .background_color(style.text_fg)
-                                  .frame("100%", 1)
-                                  .margin(5, 0, 10, 0)
-                          ).frame("100%", 1)
-                      ).width("100%"),
+                        TableData(
+                            VStack()
+                                .background_color(style.text_fg)
+                                .frame("100%", 1)
+                                .margin(5, 0, 10, 0)
+                        ).frame("100%", 1)
+                    ).width("100%"),
             ];
         };
 
@@ -3264,14 +2917,15 @@ export class Server {
         let subtotal = 0;
         let subtotal_tax = 0;
         let total = 0;
-        payment.line_items.iterate((item: any) => {
+        payment.line_items.walk((item: any) => {
+            if (!this.payments) throw new Error("Payments not initialized");
             if (typeof item.product === "string") {
                 item.product = this.payments.get_product_sync(item.product);
             }
             if (currency == null) {
                 const c = Utils.get_currency_symbol(item.product.currency);
                 if (c == null) {
-                    error(`Failed to create a payment mail: `, new Error(`Unable to determine the currency of payment "${payment.id}".`));
+                    this.log.error(`Failed to create a payment mail: `, new Error(`Unable to determine the currency of payment "${payment.id}".`));
                 }
                 currency = c ?? "?";
             }
@@ -3349,6 +3003,7 @@ export class Server {
     }
 
     // On 2fa mail.
+    /** Build the 2FA verification email content. */
     on_2fa_mail({ code, username, email, date, ip, device }: { code: string; username: string; email: string; date: string; ip: string; device: string }): any {
         const style = this.mail_style;
         const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
@@ -3401,7 +3056,7 @@ export class Server {
                         TableRow().fixed_frame(5, 5),
                     ];
                 }),
-                
+
                 // 2FA code.
                 TableRow(
                     Text(code)
@@ -3428,6 +3083,7 @@ export class Server {
     }
 
     // On successfull payment mail.
+    /** Build the successful payment email content. */
     on_payment_mail({ payment }: { payment: any }): any {
 
         // Shortcuts.
@@ -3471,7 +3127,7 @@ export class Server {
                         .margin(0)
                 ),
                 TableRow(
-                    Text("A summary of your order can be found below or in the attachmed invoice pdf.")
+                    Text("A summary of your order can be found below or in the attached invoice PDF.")
                         .margin(5, 0, 20, 0)
                         .color(style.text_fg)
                         .font_size(16)
@@ -3479,7 +3135,7 @@ export class Server {
 
                 // Line items.
                 this._render_mail_payment_line_items({ payment, line_items: payment.line_items, show_total_due: true }),
-                
+
 
                 // Bottom spacing.
                 VStack()
@@ -3489,6 +3145,7 @@ export class Server {
     }
 
     // On failed payment mail.
+    /** Build the failed payment email content. */
     on_failed_payment_mail({ payment }: { payment: any }): any {
 
         // Shortcuts.
@@ -3510,7 +3167,7 @@ export class Server {
 
                 // Text.
                 TableRow(
-                    Text("We regret to inform you that your payment has encountered an issue and could not be processed successfully. We understand the inconvenience this may cause. Please try again, please contact customer support if the problem persists.")
+                    Text("We regret to inform you that your payment could not be processed successfully. We understand the inconvenience this may cause. Please try again, or contact customer support if the problem persists.")
                         .margin(10, 0, 20, 0)
                         .color(style.text_fg)
                         .font_size(16)
@@ -3550,6 +3207,7 @@ export class Server {
     }
 
     // On cancellation mail.
+    /** Build the successful cancellation email content. */
     on_cancellation_mail({ payment, line_items }: { payment: any; line_items: any[] }): any {
 
         // Shortcuts.
@@ -3563,7 +3221,7 @@ export class Server {
 
                 // Title.
                 TableRow(
-                    Title("Successfull Cancellation")
+                    Title("Successful Cancellation")
                         .color(style.title_fg)
                         .width("fit-content")
                         .font_size(26)
@@ -3610,6 +3268,7 @@ export class Server {
     }
 
     // On refund mail.
+    /** Build the failed cancellation email content. */
     on_failed_cancellation_mail({ payment }: { payment: any }): any {
 
         // Shortcuts.
@@ -3671,6 +3330,7 @@ export class Server {
     }
 
     // On refund mail.
+    /** Build the successful refund email content. */
     on_refund_mail({ payment, line_items }: { payment: any; line_items: any[] }): any {
 
         // Shortcuts.
@@ -3684,7 +3344,7 @@ export class Server {
 
                 // Title.
                 TableRow(
-                    Title("Successful Refund")
+                    Title("Chargeback Successful")
                         .color(style.title_fg)
                         .width("fit-content")
                         .font_size(26)
@@ -3731,6 +3391,7 @@ export class Server {
     }
 
     // On refund mail.
+    /** Build the failed refund email content. */
     on_failed_refund_mail({ payment, line_items }: { payment: any; line_items: any[] }): any {
 
         // Shortcuts.
@@ -3792,6 +3453,7 @@ export class Server {
     }
 
     // On refund mail.
+    /** Build the successful chargeback email content. */
     on_chargeback_mail({ payment, line_items }: { payment: any; line_items: any[] }): any {
 
         // Shortcuts.
@@ -3835,7 +3497,7 @@ export class Server {
                         .margin(0)
                 ),
                 TableRow(
-                    Text("A summary of your refundend products.")
+                    Text("A summary of the items charged back.")
                         .margin(5, 0, 20, 0)
                         .color(style.text_fg)
                         .font_size(16)
@@ -3852,6 +3514,7 @@ export class Server {
     }
 
     // On refund mail.
+    /** Build the failed chargeback email content. */
     on_failed_chargeback_mail({ payment, line_items }: { payment: any; line_items: any[] }): any {
 
         // Shortcuts.
@@ -3912,4 +3575,3 @@ export class Server {
         });
     }
 }
-export default Server;

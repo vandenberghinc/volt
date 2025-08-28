@@ -1,0 +1,156 @@
+import { Utils } from "./utils.js";
+import { User as UserBackend, Users as UsersBackend } from "../../../backend/src/users.js";
+export declare namespace User {
+    /**
+     * Frontend user object as exposed by the backend.
+     */
+    type UserObject = UserBackend.Frontend;
+    /**
+     * Get the user ID of the authenticated user.
+     * @nav Frontend/User
+     * @type undefined, string
+     * @return Returns the user ID when the user is authenticated and `undefined` when the user is not authenticated.
+     * @docs
+     */
+    function uid(): string | undefined;
+    /**
+     * Get the username of the authenticated user.
+     * @nav Frontend/User
+     * @type undefined, string
+     * @return Returns the user's username when the user is authenticated and `undefined` when the user is not authenticated.
+     * @docs
+     */
+    function username(): string | undefined;
+    /**
+     * Get the email of the authenticated user.
+     * @nav Frontend/User
+     * @type undefined, string
+     * @return Returns the user's email when the user is authenticated and `undefined` when the user is not authenticated.
+     * @docs
+     */
+    function email(): string | undefined;
+    /**
+     * Get the first name of the authenticated user.
+     * @nav Frontend/User
+     * @type undefined, string
+     * @return Returns the user's first name when the user is authenticated and `undefined` when the user is not authenticated.
+     * @docs
+     */
+    function first_name(): string | undefined;
+    /**
+     * Get the last name of the authenticated user.
+     * @nav Frontend/User
+     * @type undefined, string
+     * @return Returns the user's last name when the user is authenticated and `undefined` when the user is not authenticated.
+     * @docs
+     */
+    function last_name(): string | undefined;
+    /**
+     * Check if the current user is authenticated.
+     * @nav Frontend/User
+     * @type boolean
+     * @return Returns a boolean indicating whether the current user is authenticated.
+     * @docs
+     */
+    function is_authenticated(): boolean;
+    /**
+     * Check if the current user is activated.
+     * @nav Frontend/User
+     * @type boolean
+     * @return Returns a boolean indicating whether the current user is activated.
+     * @docs
+     */
+    function is_activated(): boolean;
+    /**
+     * Get the authenticated user object.
+     * @nav Frontend/User
+     * @type Promise
+     * @return Returns a promise with the authenticated user's object or a request error on a failed request.
+     * @docs
+     */
+    function get(): Promise<Utils.RequestResult<UsersBackend.Endpoints.GetUser.Result>>;
+    /**
+     * Update the authenticated user object.
+     * @nav Frontend/User
+     * @type Promise
+     * @return Returns a promise with a successful update response or a request error on a failed request.
+     * @docs
+     */
+    function update(payload: UsersBackend.Endpoints.UpdateUser.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.UpdateUser.Result>;
+    /**
+     * Activate the authenticated user.
+     * @nav Frontend/User
+     * @type Promise
+     * @return Returns a promise with a successful update response or a request error on a failed request.
+     * @docs
+     */
+    function activate(payload: UsersBackend.Endpoints.ActivateUser.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.ActivateUser.Result>;
+    /**
+     * Change the password of the authenticated user.
+     * @nav Frontend/User
+     * @type Promise
+     * @return Returns a promise with a successful update response or a request error on a failed request.
+     * @docs
+     */
+    function change_password(payload: UsersBackend.Endpoints.ChangePassword.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.ChangePassword.Result>;
+    /**
+     * Delete the user account.
+     * @nav Frontend/User
+     * @type Promise
+     * @return Returns a promise with a successful update response or a request error on a failed request.
+     * @docs
+     */
+    function delete_account(): Utils.RequestResultPromise<UsersBackend.Endpoints.DeleteUser.Result>;
+    /**
+     * Generate a new API key for the authenticated user.
+     * @nav Frontend/User
+     * @type Promise
+     * @return Returns a promise with a successful update response with the newly generated API key as an attribute or a request error on a failed request.
+     * @docs
+     */
+    function generate_api_key(): Utils.RequestResultPromise<UsersBackend.Endpoints.GenerateAPIKey.Result>;
+    /**
+     * Generate a new API key for the authenticated user.
+     * @nav Frontend/User
+     * @docs
+     */
+    function has_api_key(): Utils.RequestResultPromise<UsersBackend.Endpoints.HasAPIKey.Result>;
+    /**
+     * Revoke the API key of the authenticated user.
+     * @nav Frontend/User
+     * @type Promise
+     * @return Returns a promise with a successful update response or a request error on a failed request.
+     * @docs
+     */
+    function revoke_api_key(): Utils.RequestResultPromise<UsersBackend.Endpoints.RevokeAPIKey.Result>;
+    /**
+     * Load data from the authenticated user's database.
+     * @nav Frontend/User
+     * @type Promise
+     * @return Returns a promise with the loaded user's data or a request error on a failed request.
+     * @docs
+     */
+    function load_data(payload: UsersBackend.Endpoints.LoadUserData.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.LoadUserData.Result>;
+    /**
+     * Set data to the authenticated user's database, only updating the supplied fields.
+     * @nav Frontend/User
+     * @type Promise
+     * @return Returns a promise with a successful update response or a request error on a failed request.
+     * @docs
+     */
+    function set_data(payload: UsersBackend.Endpoints.SetUserData.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.SetUserData.Result>;
+    /**
+     * Delete public user data.
+     * @nav Frontend/User
+     */
+    function delete_data(payload: UsersBackend.Endpoints.DeleteUserData.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.DeleteUserData.Result>;
+    /**
+     * Load protected data from the authenticated user's database.
+     * @nav Frontend/User
+     * @type Promise
+     * @return Returns a promise with the loaded user's data or a request error on a failed request.
+     * @docs
+     */
+    function load_protected_data(payload: UsersBackend.Endpoints.LoadProtectedUserData.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.LoadProtectedUserData.Result>;
+}
+export { User as user };

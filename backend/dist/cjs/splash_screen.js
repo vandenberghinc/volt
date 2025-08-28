@@ -27,7 +27,20 @@ class SplashScreen {
   loader;
   style;
   _html;
-  // Constructor.
+  /**
+   * Create a new splash screen configuration.
+   *
+   * @param background The background color of the splash screen.
+   * @param image The image settings. When left undefined, no image will be shown.
+   * @param image.src The image source.
+   * @param image.width The image width in pixels as a number.
+   * @param image.height The image height in pixels as a number.
+   * @param image.style The CSS style for the image element.
+   * @param loader The loader settings. When left undefined, no loader will be shown.
+   * @param loader.color The color of the loader.
+   * @param loader.size The loader size in pixels as a number.
+   * @param style The CSS style to add to the main element of the splash screen.
+   */
   constructor({ background = null, image = null, loader = true, style = null }) {
     this.background = background;
     this.image = image;
@@ -35,7 +48,11 @@ class SplashScreen {
     this.style = style;
     this._html = void 0;
   }
-  // Get html.
+  /**
+   * Generate and return the splash screen HTML. Result is cached after the first call.
+   *
+   * @returns The splash screen HTML markup.
+   */
   get html() {
     if (this._html !== void 0) {
       return this._html;
@@ -53,7 +70,11 @@ class SplashScreen {
     this._html += "</div>";
     return this._html;
   }
-  // Serve a client.
+  /**
+   * Serve the splash screen HTML to a client over the provided stream.
+   *
+   * @param stream The stream used to send the HTTP response.
+   */
   _serve(stream) {
     stream.send({
       status: 200,

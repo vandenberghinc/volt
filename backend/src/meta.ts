@@ -6,73 +6,54 @@
 // ---------------------------------------------------------
 // Meta information.
 
-/*  @docs:
- *  @nav: Backend
-    @chapter: Endpoints
-    @title: Meta
-    @description: The js view meta information class.
-    @parameter:
-        @name: author
-        @description: The author's name.
-        @type: string
-    @parameter:
-        @name: title
-        @description: The page's title.
-        @type: string
-    @parameter:
-        @name: description
-        @description: The page's description.
-        @type: string
-    @parameter:
-        @name: image
-        @description: The page's image source.
-        @type: string
-    @parameter:
-        @name: robots
-        @description: The robots rules.
-        @type: string
-    @parameter:
-        @name: charset
-        @description: The used charset.
-        @type: string
-    @parameter:
-        @name: viewport
-        @description: The viewport settings.
-        @type: string
-    @parameter:
-        @name: favicon
-        @description: The url to the favicon.
-        @type: string
+/** Nested types for the {@link Meta} class. */
+export namespace Meta {
+
+    /** Constructor options. */
+    export interface Opts {
+        /** The author's name. */
+        author?: string,
+        /** The page's title. */
+        title?: string,
+        /** The page's description. */
+        description?: string,
+        /** The page's image source. */
+        image?: string,
+        /** The robots rules. */
+        robots?: string,
+        /** The used charset. */
+        charset?: string,
+        /** The viewport settings. */
+        viewport?: string,
+        /** The url to the favicon. */
+        favicon?: string,
+    }
+}
+
+/**
+ * The js view meta information class.
+ * @nav: Backend/Endpoints
  */
 export class Meta {
-    author: string | null;
-    title: string | null;
-    description: string | null;
-    image: string | null;
+    author?: string;
+    title?: string;
+    description?: string;
+    image?: string;
     robots: string;
     charset: string;
     viewport: string;
     favicon: string;
 
     constructor({
-        author = null,
-        title = null,
-        description = null,
-        image = null,
+        author,
+        title,
+        description,
+        image,
         robots = "index, follow",
         charset = "UTF-8",
         viewport = "width=device-width, initial-scale=1",
         favicon = "/favicon.ico",
-    }: {
-        author?: string | null,
-        title?: string | null,
-        description?: string | null,
-        image?: string | null,
-        robots?: string,
-        charset?: string,
-        viewport?: string,
-        favicon?: string,
-    } = {}) {
+    }: Meta.Opts = {}) {
         this.author = author;
         this.title = title;
         this.description = description;
@@ -84,23 +65,12 @@ export class Meta {
     }
 
     // Copy.
-    /*  @docs:
-        @title: Copy
-        @description: Create a copy of the current meta object without any references.
-        @param:
-            @name: override
-            @descr: The <Type>Meta</Type> constructor arguments to override.
+    /**
+     * Create a copy of the current meta object without any references.
+     * @param override - The <Type>Meta</Type> constructor arguments to override.
+     * @docs
      */
-    copy(override: {
-        author?: string | null,
-        title?: string | null,
-        description?: string | null,
-        image?: string | null,
-        robots?: string,
-        charset?: string,
-        viewport?: string,
-        favicon?: string,
-    } = {}): Meta {
+    copy(override: Partial<Meta.Opts> = {}): Meta {
         return new Meta({
             author: this.author,
             title: this.title,
@@ -114,33 +84,23 @@ export class Meta {
         })
     }
 
-    /* @docs:
-     * @title: Set value
-     * @description: Set value funcs that return the current object.
+    /**
+     * Set value funcs that return the current object.
      * @return: Returns the current <Type>Meta</Type> object.
-     * @type: Meta
-     * @funcs: 8
+     * @funcs 8
+     * @docs
      */
-    set_author(value: string | null): this { this.author = value; return this; }
-    set_title(value: string | null): this { this.title = value; return this; }
-    set_description(value: string | null): this { this.description = value; return this; }
-    set_image(value: string | null): this { this.image = value; return this; }
+    set_author(value: string | undefined): this { this.author = value; return this; }
+    set_title(value: string | undefined): this { this.title = value; return this; }
+    set_description(value: string | undefined): this { this.description = value; return this; }
+    set_image(value: string | undefined): this { this.image = value; return this; }
     set_robots(value: string): this { this.robots = value; return this; }
     set_charset(value: string): this { this.charset = value; return this; }
     set_viewport(value: string): this { this.viewport = value; return this; }
     set_favicon(value: string): this { this.favicon = value; return this; }
 
     // Get as object.
-    obj(): {
-        author: string | null,
-        title: string | null,
-        description: string | null,
-        image: string | null,
-        robots: string,
-        charset: string,
-        viewport: string,
-        favicon: string,
-    } {
+    obj(): Meta.Opts {
         return {
             author: this.author,
             title: this.title,

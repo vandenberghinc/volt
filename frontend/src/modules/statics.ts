@@ -15,21 +15,18 @@ export const Statics = {
         (window as any).volt_statics_aspect_ratios = aspect_ratios;
     },
     
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Static
-        @title: Aspect Ratio
-        @desc:
-            Retrieve the aspect ratio of a static endpoint.
-
-            All aspect ratios are embedded into the compiled HTML document.
-        @warning:
-            This function only works when the endpoint has been defined using the `Endpoint.view` attribute.
-        @param:
-            @name: endpoint
-            @type: string
-            @descr: The static image endpoint.
-    */
+    /**
+     * Retrieve the aspect ratio of a static endpoint.
+     * 
+     * All aspect ratios are embedded into the compiled HTML document.
+     * 
+     * @warning This function only works when the endpoint has been defined using the `Endpoint.view` attribute.
+     * 
+     * @param endpoint The static image endpoint.
+     * 
+     * @nav Frontend/Static
+     * @docs
+     */
     aspect_ratio(endpoint: string) {
         if (endpoint.charAt(0) !== "/") {
             endpoint = "/" + endpoint;

@@ -38,156 +38,132 @@ import { AnyElement } from "./any_element.js";
 export class LoaderButtonElement extends (AnchorHStackElement as any as VElementBaseSignature) {
 
     // Attributes.
-	public nodes: {
-	    text: VDivElement;
-	    loader: RingLoaderElement;
-	    [key: string]: any;
-	};
-	// @ts-ignore
-	public text: VDivElement;
-	public loader: RingLoaderElement;
-	
-	/**
-	 * @docs:
-	 * @title: Loader Button Constructor
-	 * @desc: Initializes the LoaderButton element with the provided text and loader.
-	 * @param:
-	 *     @name: text
-	 *     @descr: The text to display on the loader button.
-	 *     @type: string
-	 * @param:
-	 *     @name: loader
-	 *     @descr: The loader function to create the loading animation.
-	 *     @type: Function
-	 * @return:
-	 *     @type: void
-	 *     @description This constructor does not return a value.
-	 */
-	constructor(text: string = "", loader: () => any = RingLoader) {
+    public nodes: {
+        text: VDivElement;
+        loader: RingLoaderElement;
+        [key: string]: any;
+    };
+    // @ts-ignore
+    public text: VDivElement;
+    public loader: RingLoaderElement;
 
-		// Initialize base classes.
-		super();
-		this._init({
-			derived: LoaderButtonElement,
-		});
+    /**
+     * Initializes the LoaderButton element with the provided text and loader.
+     * @param text The text to display on the loader button.
+     * @param loader The loader factory function to create the loading animation.
+     * @returns This constructor does not return a value.
+     * @docs
+     */
+    constructor(text: string = "", loader: () => any = RingLoader) {
 
-		// Set nodes type.
-		this.text = VDiv();
-		this.loader = loader();
-		this.nodes = {
-			// @deprecated the `nodes` object is deprecated but keep for backward compatability.
-		    text: this.text,
-		    loader: this.loader,
-		};
+        // Initialize base classes.
+        super();
+        this._init({
+            derived: LoaderButtonElement,
+        });
 
-		// Set style.
-		this.wrap(false);
-		this.center();
-		this.center_vertical()
+        // Set nodes type.
+        this.text = VDiv();
+        this.loader = loader();
+        this.nodes = {
+            // @deprecated the `nodes` object is deprecated but keep for backward compatability.
+            text: this.text,
+            loader: this.loader,
+        };
 
-		// Children.
-		this.nodes.loader
-			.frame(LoaderButtonElement.default_style["--loader-width"], LoaderButtonElement.default_style["--loader-height"])
-			.background("white")
-			.update()
-			.hide()
-			.parent(this)
-		this.nodes.text
-			.text(text)
-			.margin(0)
-			.padding(0)
-			.parent(this);
-		
-		// Add children.
-		this.append(this.nodes.loader, this.nodes.text);
+        // Set style.
+        this.wrap(false);
+        this.center();
+        this.center_vertical()
 
-	}
+        // Children.
+        this.nodes.loader
+            .frame(LoaderButtonElement.default_style["--loader-width"], LoaderButtonElement.default_style["--loader-height"])
+            .background("white")
+            .update()
+            .hide()
+            .parent(this)
+        this.nodes.text
+            .text(text)
+            .margin(0)
+            .padding(0)
+            .parent(this);
 
-	/**
-	 * @docs:
-	 * @title: Styles
-	 * @desc: Retrieves or sets the styling attributes for the loader element. If no argument is provided, it returns the current styles including default loader dimensions.
-	 * @param:
-	 *     @name: style_dict
-	 *     @descr: An optional dictionary of styles to set.
-	 *     @type: object | null
-	 * @return:
-	 *     @type: object
-	 *     @description When no argument is passed, returns the current styles including loader dimensions. When an argument is provided, returns the result of the super class's styles method.
-	 * @funcs: 2
-	 */
-	styles(): Record<string, string>;
-	styles(style_dict: Record<string, any>): this;
-	styles(style_dict?: Record<string, any>): Record<string, string> | this {
-		if (style_dict == null) {
-			let styles = super.styles();
-			styles["--loader-width"] = this.nodes.loader.style.width || "20px";
-			styles["--loader-height"] = this.nodes.loader.style.height || "20px";
-			return styles;
-		} else {
-			return super.styles(style_dict);
-		}
-	}
+        // Add children.
+        this.append(this.nodes.loader, this.nodes.text);
 
-	/**
-	 * @docs:
-	 * @title: Set Default
-	 * @desc: Sets the default configuration for the LoaderButtonElement by calling the parent method.
-	 * @return:
-	 *     @type: this
-	 *     @description Returns the instance of the element for chaining.
-	 */
-	set_default(): this {
-		return super.set_default(LoaderButtonElement);
-	}
+    }
 
-	/**
-	 * @docs:
-	 * @title: Show Loader
-	 * @desc: Displays the loader and disables the button when clicked.
-	 * @return:
-	 *     @type: this
-	 *     @description Returns the instance of the element for chaining.
-	 */
-	show_loader(): this {
-		this.disable();
-		this.nodes.text.hide();
-		this.nodes.loader.update();
-		this.nodes.loader.show();
-		return this;
-	}
+    /**
+     * Retrieves or sets the styling attributes for the loader element. If no argument is provided, it returns the current styles including default loader dimensions.
+     * @param style_dict An optional dictionary of styles to set.
+     * @returns When no argument is passed, returns the current styles including loader dimensions.
+     * @returns When an argument is provided, returns the instance of the element for chaining.
+     * @docs
+     */
+    styles(): Record<string, string>;
+    styles(style_dict: Record<string, any>): this;
+    styles(style_dict?: Record<string, any>): Record<string, string> | this {
+        if (style_dict == null) {
+            let styles = super.styles();
+            styles["--loader-width"] = this.nodes.loader.style.width || "20px";
+            styles["--loader-height"] = this.nodes.loader.style.height || "20px";
+            return styles;
+        } else {
+            return super.styles(style_dict);
+        }
+    }
 
-	/**
-	 * @docs:
-	 * @title: Start
-	 * @desc: Initiates the loading process by showing the loader.
-	 * @return:
-	 *     @type: this
-	 *     @description Returns the instance of the element for chaining.
-	 */
-	// @ts-ignore
-	start(): this {
-	    return this.show_loader();
-	}
+    /**
+     * Sets the default configuration for the LoaderButtonElement by calling the parent method.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
+     */
+    set_default(): this {
+        return super.set_default(LoaderButtonElement);
+    }
 
-	/**
-	 * @docs:
-	 * @title: Hide Loader
-	 * @desc: Hides the loader, enables the button, and shows the text on click event.
-	 * @return:
-	 *     @type: this
-	 *     @description Returns the instance of the element for chaining.
-	 */
-	hide_loader(): this {
-	    this.enable();
-	    this.nodes.loader.hide();
-	    this.nodes.text.show();
-	    return this;
-	}
-	stop() { return this.hide_loader(); }
+    /**
+     * Displays the loader and disables the button when clicked.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
+     */
+    show_loader(): this {
+        this.disable();
+        this.nodes.text.hide();
+        this.nodes.loader.update();
+        this.nodes.loader.show();
+        return this;
+    }
+
+    /**
+     * Initiates the loading process by showing the loader.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
+     */
+    // @ts-ignore
+    start(): this {
+        return this.show_loader();
+    }
+
+    /**
+     * Hides the loader, enables the button, and shows the text on click event.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
+     */
+    hide_loader(): this {
+        this.enable();
+        this.nodes.loader.hide();
+        this.nodes.text.show();
+        return this;
+    }
+
+    /**
+     * Stops the loading process by hiding the loader (alias of `hide_loader`).
+     * @returns Returns the instance of the element for chaining.
+     */
+    stop() { return this.hide_loader(); }
 }
 export const LoaderButton = Elements.wrapper(LoaderButtonElement);
 export const NullLoaderButton = Elements.create_null(LoaderButtonElement);
-declare module './any_element.d.ts' { interface AnyElementMap { LoaderButtonElement: LoaderButtonElement }}
-
-
+declare module './any_element.d.ts' { interface AnyElementMap { LoaderButtonElement: LoaderButtonElement } }

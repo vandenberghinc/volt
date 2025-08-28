@@ -6,6 +6,9 @@
 // ---------------------------------------------------------
 // The HTML element server side for creating mails.
 // Element.
+
+// Null / undefined alias.
+type none = undefined | null;
    
 // The class.
 export class Element {
@@ -220,15 +223,12 @@ export class Element {
     // ---------------------------------------------------------
     // Default funcs.
 
-    /* @docs:
-     * @title: Background Color
-     * @description: Get or set the background color of the element.
-     * @funcs: 3
-     * @parameter:
-     *    @name: value
-     *    @description: The color value to set.
-     *    @type: string
-     * @returns: The current value when getting, or the element instance when setting.
+    /**
+     * Get or set the background color of the element.
+     * @param value The color value to set.
+     * @returns The current value when getting, or the element instance when setting.
+     * @funcs 3
+     * @docs
      */
     background_color(): string | undefined;
     background_color(value: string): this;
@@ -238,10 +238,10 @@ export class Element {
         return this;
     }
 
-    /* @docs:
-     * @title: Display
-     * @description: Get or set the display property.
-     * @funcs: 3
+    /**
+     * Get or set the display property.
+     * @funcs 3
+     * @docs
      */
     display(): string | undefined;
     display(value: string): this;
@@ -251,10 +251,10 @@ export class Element {
         return this;
     }
 
-    /* @docs:
-     * @title: Background Image
-     * @description: Get or set the background image.
-     * @funcs: 3
+    /**
+     * Get or set the background image.
+     * @funcs 3
+     * @docs
      */
     background_image(): string | undefined;
     background_image(value: string): this;

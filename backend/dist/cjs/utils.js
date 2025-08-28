@@ -41,13 +41,14 @@ class BaseError extends Error {
   status;
   data;
   invalid_fields;
-  constructor({ type = "APIError", message, status, data, invalid_fields }) {
+  constructor({ type = "APIError", message, status, data, invalid_fields, cause }) {
     super(message);
     this.name = "APIError";
     this.type = type;
     this.status = status ?? import_status.Status.internal_server_error;
     this.data = data;
     this.invalid_fields = invalid_fields ?? {};
+    this.cause = cause;
   }
   serve(stream) {
     stream.error({

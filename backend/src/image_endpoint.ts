@@ -14,28 +14,23 @@ import { promises as fs } from "fs"
 
 import * as vlib from "@vandenberghinc/vlib";
 import { Endpoint } from "./endpoint.js";
-import { logger } from "./logger.js";
 import { RateLimitGroup } from "./rate_limit.js";
 import type { Server } from "./server.js";
-
-const { log, error } = logger;
 
 // ---------------------------------------------------------
 // ImageEndpoint.
 // Supports resizing and editing formats.
 
-/*  @docs:
-    @nav: Backend
-    @chapter: Endpoints
-    @title: Image Endpoint
-    @description:
-        All static images are served through the `ImageEndpoint`.
-
-        The image endpoint accepts three optional query parameters when retrieving the image to transform the image.
-         - `type` string: The input type.
-         - `width` number: The height of the image as a number `100` or percentage `50%` / `0.5x`. The aspect ratio will be maintained when `height` is undefined.
-         - `height` number: The width of the image as a number `100` or percentage `50%` / `0.5x`. The aspect ratio will be maintained when `width` is undefined.
-         - `aspect_ratio` boolean: Maintain the aspect ratio when only one resizing dimension has been defined.
+/**
+ * All static images are served through the `ImageEndpoint`.
+ * 
+ * The image endpoint accepts three optional query parameters when retrieving the image to transform the image.
+ *     - `type` string: The input type.
+ *     - `width` number: The height of the image as a number `100` or percentage `50%` / `0.5x`. The aspect ratio will be maintained when `height` is undefined.
+ *     - `height` number: The width of the image as a number `100` or percentage `50%` / `0.5x`. The aspect ratio will be maintained when `width` is undefined.
+ *     - `aspect_ratio` boolean: Maintain the aspect ratio when only one resizing dimension has been defined.
+ * @docs
+ * @nav Backend/Endpoints
  */
 class ImageEndpoint extends Endpoint implements Endpoint {
 
@@ -91,7 +86,7 @@ class ImageEndpoint extends Endpoint implements Endpoint {
                 "aspect_ratio": {type: "string", default: null},
             },
             rate_limit,
-            _static_path: path.str(),
+            file_path: path,
             _is_static,
         })
 
@@ -237,16 +232,16 @@ class ImageEndpoint extends Endpoint implements Endpoint {
     // Get aspect ratio.
     async get_aspect_ratio(): Promise<string | null> {
         try {
-            const metadata = await sharp(this._static_path as string).metadata();
+            const metadata = await sharp(this.file_path?.str()).metadata();
             return `${metadata.width} / ${metadata.height}`;
         } catch (err: any) {
-            error(`Unable to determine the aspect ratio of image ${this._static_path}: `, err);
+            this.server?.log.error(`Unable to determine the aspect ratio of image ${this.file_path}: `, err);
             return null;
         }
     }
 
     // Clear cache.
-    _clear_cache(): void {
+    private _clear_cache(): void {
         if (ImageEndpoint.cache_in_memory) {
             this.i_cache.clear()
         }

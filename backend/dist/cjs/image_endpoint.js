@@ -32,8 +32,6 @@ __export(stdin_exports, {
 module.exports = __toCommonJS(stdin_exports);
 var import_sharp = __toESM(require("sharp"));
 var import_endpoint = require("./endpoint.js");
-var import_logger = require("./logger.js");
-const { log, error } = import_logger.logger;
 class ImageEndpoint extends import_endpoint.Endpoint {
   // Cache the original and transformed image data in memory.
   static cache_in_memory = false;
@@ -69,7 +67,7 @@ class ImageEndpoint extends import_endpoint.Endpoint {
         "aspect_ratio": { type: "string", default: null }
       },
       rate_limit,
-      _static_path: path.str(),
+      file_path: path,
       _is_static
     });
     this.i_path = path.abs();
@@ -175,10 +173,10 @@ class ImageEndpoint extends import_endpoint.Endpoint {
   // Get aspect ratio.
   async get_aspect_ratio() {
     try {
-      const metadata = await (0, import_sharp.default)(this._static_path).metadata();
+      const metadata = await (0, import_sharp.default)(this.file_path?.str()).metadata();
       return `${metadata.width} / ${metadata.height}`;
     } catch (err) {
-      error(`Unable to determine the aspect ratio of image ${this._static_path}: `, err);
+      this.server?.log.error(`Unable to determine the aspect ratio of image ${this.file_path}: `, err);
       return null;
     }
   }

@@ -17,11 +17,12 @@ import { LoaderButton, LoaderButtonElement } from "../ui/loader_button"
 import { Divider } from "../ui/divider"
 import { Input, ExtendedSelect, ExtendedInput, ExtendedInputElement, ExtendedSelectElement } from "../ui/input"
 import { Spacer } from "../ui/spacer"
-import { Link } from "../ui/link"
-import { CheckBox } from "../ui/checkbox"
-import { Form } from "../ui/form"
+import { Form, FormElement } from "../ui/form"
 import { YesNoPopupElement, YesNoPopup } from "../ui/popup"
 import { Span } from "../ui/span.js";
+import { VElement } from "../elements/module.js";
+
+import { Paddle as PaddleBackend, Payment as PaymentBackend, Product } from "../../../backend/src/payments/paddle.js";
 
 // Declare global variables or external libraries if necessary.
 // @todo import paddle here not using scripts
@@ -30,16 +31,19 @@ declare const Paddle: any;
 // ---------------------------------------------------------
 // Payments Object.
 
-const Payments = {
+/**
+ * @deprecated using stripe from now on.
+ */
+export namespace Payments {
     // ---------------------------------------------------------
     // Private Properties.
 
-    client_key: "{{PADDLE_CLIENT_KEY}}",
+    const client_key = "{{PADDLE_CLIENT_KEY}}";
     // @ts-ignore
-    sandbox: "{{PADDLE_SANDBOX}}" === "true",
+    export const sandbox = "{{PADDLE_SANDBOX}}" === "true";
     // @ts-ignore
-    tax_inclusive: "{{PADDLE_INCLUSIVE_TAX}}" === "true",
-    countries: {
+    export const tax_inclusive = "{{PADDLE_INCLUSIVE_TAX}}" === "true";
+    export const countries = {
         "AD": { name: "🇦🇩 Andorra", calling_code: "+376" },
         "AE": { name: "🇦🇪 United Arab Emirates", calling_code: "+971" },
         "AF": { name: "🇦🇫 Afghanistan", calling_code: "+93" },
@@ -289,37 +293,37 @@ const Payments = {
         "ZA": { name: "🇿🇦 South Africa", calling_code: "+27" },
         "ZM": { name: "🇿🇲 Zambia", calling_code: "+260" },
         "ZW": { name: "🇿🇼 Zimbabwe", calling_code: "+263" }
-    },
+    };
 
-    _paddle_initialized: false,
-    _payment_element: undefined as any, // Replace 'any' with the actual type if known.
-    _sign_in_redirect: undefined as string | undefined | null,
-    _step: 0 as number,
-    _steps_element: undefined as any,
-    _steps_container: undefined as any,
-    _overview_container: undefined as any,
-    _order_container: undefined as any,
-    _billing_container: undefined as any,
-    _payment_container: undefined as any,
-    _processing_container: undefined as any,
-    _checkout_button: undefined as any,
-    _prev_step_button: undefined as any,
-    _style: undefined as any,
-    _currency_symbol: undefined as string | undefined,
-    _render_payment_element_reject: undefined as undefined | Function,
-    _render_payment_element_resolve: undefined as undefined | Function,
-    _refunds_element: undefined as any,
-    _refunds_container: undefined as any,
-    _processing_element: undefined as any,
-    _theme: undefined as any,
-    _products: undefined as any,
-    _days_refundable: 30, // **Added Property**
+    let _paddle_initialized = false;
+    let _payment_element = undefined as any; // Replace 'any' with the actual type if known.
+    let _sign_in_redirect = undefined as string | undefined | null;
+    let _payment_step = 0 as number;
+    let _steps_element = undefined as any;
+    let _steps_container = undefined as any;
+    let _overview_container = undefined as any;
+    let _order_container = undefined as any;
+    let _billing_container = undefined as any;
+    let _payment_container = undefined as any;
+    let _processing_container = undefined as any;
+    let _checkout_button = undefined as any;
+    let _prev_step_button = undefined as any;
+    let _style = undefined as any;
+    let _currency_symbol = undefined as string | undefined;
+    let _render_payment_element_reject = undefined as undefined | Function;
+    let _render_payment_element_resolve = undefined as undefined | Function;
+    let _refunds_element = undefined as any;
+    let _refunds_container = undefined as any;
+    let _processing_element = undefined as any;
+    let _theme = undefined as any;
+    let _products = undefined as any;
+    let _days_refundable = 30; // **Added Property**
 
-    on_error: (data: string | Error) => {},
+    export let on_error: (data: string | Error) => any = () => {};
 
     // Additional properties that might be inferred from function bodies:
-    _refund_policy: undefined as string | undefined, // Used in commented code
-    _cancellation_policy: undefined as string | undefined, // Used in commented code
+    let _refund_policy: string | undefined; // Used in commented code
+    let _cancellation_policy: string | undefined; // Used in commented code
 
     // cart: { 
     //     items: [] as any[], // Replace 'any' with the actual item type.
@@ -329,16 +333,27 @@ const Payments = {
     //     remove: async function(productId: string, quantity: number | "all") { /* Implement remove logic */ },
     // },
 
-    _billing_element: undefined as any, // Replace 'any' with the actual type if known.
-    _billing_details: undefined as any, // Replace 'any' with the actual type if known.
+    let _billing_element: FormElement & {
+        name_input: ExtendedInputElement;
+        business_input: ExtendedInputElement;
+        vat_id_input: ExtendedInputElement;
+    }; // Replace 'any' with the actual type if known.
+    let _billing_details: Record<string, any> | undefined; // Replace 'any' with the actual type if known.
 
-    _overview_subtotal: undefined as any, // Replace 'any' with the actual type if known.
-    _overview_total: undefined as any, // Replace 'any' with the actual type if known.
-    _overview_subtotal_tax: undefined as any, // Replace 'any' with the actual type if known.
-    _overview_tax_container: undefined as any, // Replace 'any' with the actual type if known.
-    _overview_incl_excl_tax: undefined as any, // Replace 'any' with the actual type if known.
-    _overview_element: undefined as any, // Replace 'any' with the actual type if known.
-    _order_element: undefined as any, // Replace 'any' with the actual type if known.
+    let _overview_subtotal: VElement; // Replace 'any' with the actual type if known.
+    let _overview_total: VElement; // Replace 'any' with the actual type if known.
+    let _overview_subtotal_tax: VElement; // Replace 'any' with the actual type if known.
+    let _overview_tax_container: VElement; // Replace 'any' with the actual type if known.
+    let _overview_incl_excl_tax: VElement; // Replace 'any' with the actual type if known.
+    let _overview_element: VStackElement & {
+        total: number;
+        tax: number;
+        unknown_tax(): void;
+        calc_tax(country: string): Promise<void>;
+    }; // Replace 'any' with the actual type if known.
+    let _order_element: VStackElement & {
+        refresh(): void;
+    }; // Replace 'any' with the actual type if known.
 
     // ---------------------------------------------------------
     // Private Methods.
@@ -346,80 +361,84 @@ const Payments = {
     /**
      * Initialize Paddle with the provided client key and set up event callbacks.
      */
-    _initialize_paddle: function(): void {
-        if (this._paddle_initialized !== true) {
-            if (this.sandbox) {
+    function _initialize_paddle(): void {
+        if (_paddle_initialized !== true) {
+            if (sandbox) {
                 Paddle.Environment.set("sandbox");
             }
             Paddle.Setup({ 
-                token: this.client_key,
+                token: client_key,
                 eventCallback: (data: any) => {
                     if (data.name === "checkout.loaded") {
-                        (this._render_payment_element_resolve as Function)();
+                        (_render_payment_element_resolve as Function)();
                     }
                     else if (data.name === "checkout.completed") {
-                        this._show_processing("success");
+                        _show_processing("success");
                     }
                     else if (data.name === "checkout.payment.initiated") {
                         // Uncomment and implement if needed.
-                        // this._show_processing("processing");
+                        // _show_processing("processing");
                     }
                     else if (data.name === "checkout.payment.failed") {
-                        this._show_processing("error");
+                        _show_processing("error");
                     }
                     else if (data.type === "checkout.error") {
                         if (data.error?.detail) {
                             console.error(data);
-                            this.on_error(data.error.detail);
+                            Payments.on_error(data.error.detail);
                         } else {
                             console.error(data);
-                            this.on_error(new Error("Unknown error"));
+                            Payments.on_error(new Error("Unknown error"));
                         }
-                        (this._render_payment_element_reject as Function)(data.detail.split("|")[0]);
+                        (_render_payment_element_reject as Function)(data.detail.split("|")[0]);
                     }
                     else if (data.type === "checkout.warning") {
-                        if (this.sandbox) {
+                        if (sandbox) {
                             console.log("Checkout warning:", data);
                         }
                     }
                     else {
                         // Handle other events if necessary.
                         // Uncomment for debugging.
-                        // if (this.sandbox) {
+                        // if (sandbox) {
                         //     console.log("Event", data);
                         // }
                     }
                 }
             });
-            this._paddle_initialized = true;
+            _paddle_initialized = true;
         }
-    },
+    }
 
     /**
      * Reset the payment element by removing it if it exists.
      */
-    _reset: function(): void {
-        if (this._payment_element !== undefined) {
-            this._payment_element.remove();
+    function _reset_payment_element(): void {
+        if (_payment_element !== undefined) {
+            _payment_element.remove();
         }
-        this._payment_element = undefined;
-    },
+        _payment_element = undefined;
+    }
 
     /**
      * Initialize the order by verifying authentication and making a POST request.
      */
-    _init_order: async function (): Promise<void> {
+    async function _init_order(): Promise<void> {
         try {
-            if (this._sign_in_redirect != null && !User.is_authenticated()) {
-                Utils.redirect(this._sign_in_redirect);
+            if (_sign_in_redirect != null && !User.is_authenticated()) {
+                Utils.redirect(_sign_in_redirect);
             }
-            const response = await Utils.request_v1({
+            const payload: PaddleBackend.Endpoints.InitPayment.Params = {
+                items: Cart.items,
+            }
+            const response = await Utils.request({
                 method: "POST",
                 url: "/volt/payments/init",
-                data: {
-                    items: this.cart.items,
-                }
+                data: payload,
             });
+            if (response.error) {
+                throw new Error(response.error.message);
+            }
             // Handle response if necessary.
         } catch (err: any) {
             if (typeof err === "object" && err.error != null) {
@@ -427,29 +446,29 @@ const Payments = {
             }
             throw new Error(err);
         }
-    },
+    }
 
     /**
      * Set the current step in the payment process.
      */
-    _set_step: async function (): Promise<void | null> {
+    async function _set_step(): Promise<void | null> {
         // Switch step.
-        switch (this._step) {
+        switch (_payment_step) {
 
             // Order.
             case 0: {
                 // Select the current step.
-                this._steps_element.select(this._step);
+                _steps_element.select(_payment_step);
 
                 // Show and hide relevant containers.
-                this._overview_container.show();
-                this._order_container.show();
-                this._billing_container.hide();
-                this._payment_container.hide();
-                this._processing_container.hide();
-                this._checkout_button.nodes.text.text("Next");
-                // this._policy_checkbox.hide();
-                this._prev_step_button.hide();
+                _overview_container.show();
+                _order_container.show();
+                _billing_container.hide();
+                _payment_container.hide();
+                _processing_container.hide();
+                _checkout_button.nodes.text.text("Next");
+                // _policy_checkbox.hide();
+                _prev_step_button.hide();
                 break;
             }
 
@@ -460,32 +479,32 @@ const Payments = {
 
                 // Verify the order.
                 try {
-                    await this._init_order();
+                    await _init_order();
                 } catch (err) {
-                    --this._step;
+                    --_payment_step;
                     console.error(err);
-                    this.on_error(err as Error);
+                    Payments.on_error(err as Error);
                     return null;
                 }
 
                 // Render billing element.
-                this._render_billing_element();
+                _render_billing_element();
 
                 // Await minimum duration.
                 await min_duration;
 
                 // Select the current step.
-                this._steps_element.select(this._step);
+                _steps_element.select(_payment_step);
 
                 // Show and hide relevant containers.
-                this._overview_container.show();
-                this._order_container.hide();
-                this._billing_container.show();
-                this._payment_container.hide();
-                this._processing_container.hide();
-                this._checkout_button.nodes.text.text("Next");
-                // this._policy_checkbox.hide();
-                this._prev_step_button.show();
+                _overview_container.show();
+                _order_container.hide();
+                _billing_container.show();
+                _payment_container.hide();
+                _processing_container.hide();
+                _checkout_button.nodes.text.text("Next");
+                // _policy_checkbox.hide();
+                _prev_step_button.show();
                 break;
             }
 
@@ -493,82 +512,82 @@ const Payments = {
             case 2: {
                 // Check if the billing details are entered correctly.
                 try {
-                    this._billing_details = this._billing_element.data();
-                    this._billing_details.phone_number = this._billing_details.phone_country_code + this._billing_details.phone_number;
-                    delete this._billing_details.phone_country_code;
+                    _billing_details = _billing_element.data() as unknown as Record<string, any>;
+                    _billing_details.phone_number = _billing_details.phone_country_code + _billing_details.phone_number;
+                    delete _billing_details.phone_country_code;
                 } catch (error) {
-                    --this._step;
+                    --_payment_step;
                     console.error(error);
-                    this.on_error(error as Error);
+                    Payments.on_error(error as Error);
                     return null;
                 }
 
                 // Render payment element.
                 try {
-                    await this._render_payment_element();
+                    await _render_payment_element();
                 } catch (error) {
-                    --this._step;
+                    --_payment_step;
                     console.error(error);
-                    this.on_error(error as Error);
+                    Payments.on_error(error as Error);
                     return null;
                 }
 
                 // Select the current step.
-                this._steps_element.select(this._step);
+                _steps_element.select(_payment_step);
 
                 // Show and hide relevant containers.
-                this._overview_container.hide();
-                this._order_container.hide();
-                this._billing_container.hide();
-                this._payment_container.show();
-                this._processing_container.hide();
-                this._checkout_button.nodes.text.text("Checkout");
-                // this._policy_checkbox.show();
-                this._prev_step_button.show();
+                _overview_container.hide();
+                _order_container.hide();
+                _billing_container.hide();
+                _payment_container.show();
+                _processing_container.hide();
+                _checkout_button.nodes.text.text("Checkout");
+                // _policy_checkbox.show();
+                _prev_step_button.show();
                 break;
             }
         }
-    },
+    }
 
     /**
      * Navigate to the next step in the payment process.
      */
-    _next: async function (): Promise<void | null> {
-        if (this._step < 3) {
-            ++this._step;
-            return this._set_step();
-        } else if (this._step === 3) {
-            return this._set_step();
+    async function _next(): Promise<void | null> {
+        if (_payment_step < 3) {
+            ++_payment_step;
+            return _set_step();
+        } else if (_payment_step === 3) {
+            return _set_step();
         }
-    },
+    }
 
     /**
      * Navigate to the previous step in the payment process.
      */
-    _prev: async function (): Promise<void | null> {
-        if (this._step > 0) {
-            --this._step;
-            return this._set_step();
+    async function _prev(): Promise<void | null> {
+        if (_payment_step > 0) {
+            --_payment_step;
+            return _set_step();
         }
-    },
+    }
 
     /**
      * Render the steps element in the UI.
      */
-    _render_steps_element: function (): void {
+    function _render_steps_element(): void {
         // Shortcuts.
-        const style = this._style;
+        const style = _style;
 
         // The previous step button.
-        this._prev_step_button = HStack(
+        _prev_step_button = HStack(
             ImageMask("/volt_static/payments/arrow.long.webp")
                 .frame(15, 15)
-                .mask_color(this._style.fg_1)
+                .mask_color(_style.fg_1)
                 .transition_mask("background 300ms ease-in-out")
                 .transform("rotate(180deg)")
                 .margin_right(10),
             Text("Previous Step")
-                .color(this._style.fg_1)
+                .color(_style.fg_1)
                 .transition("color 300ms ease-in-out")
                 .padding(0)
                 .margin(0)
@@ -577,22 +596,22 @@ const Payments = {
         .hide()
         .on_mouse_over_out(
             (e: any) => {
-                e.child(0).color(this._style.fg);
-                e.child(1).color(this._style.fg);
+                e.child(0).color(_style.fg);
+                e.child(1).color(_style.fg);
             },
             (e: any) => {
-                e.child(0).color(this._style.fg_1);
-                e.child(1).color(this._style.fg_1);
+                e.child(0).color(_style.fg_1);
+                e.child(1).color(_style.fg_1);
             },
         )
         .on_click(() => {
-            this._prev()
+            _prev()
                 .catch((err: any) => console.error(err));
         })
         .center_vertical();
 
         // The steps element.
-        this._steps_element = HStack(
+        _steps_element = HStack(
             ForEach(
                 ["Order Details", "Billing Details", "Payment Details", "Processing Details"],
                 (item: string, index: number) => {
@@ -601,18 +620,18 @@ const Payments = {
                             .font_size(11)
                             .padding(0)
                             .margin(0)
-                            .color(index === 0 ? this._style.selected.fg : this._style.fg_1)
+                            .color(index === 0 ? _style.selected.fg : _style.fg_1)
                             .frame(17.5, 17.5)
-                            .background(index === 0 ? this._style.selected.bg : this._style.bg_1)
+                            .background(index === 0 ? _style.selected.bg : _style.bg_1)
                             .transition("color 300ms ease-in-out, background 300ms ease-in-out")
                             .border_radius("50%")
                             .margin_right(15)
                             .flex_shrink(0)
                             .center()
                             .center_vertical()
-                            .border(1, this._style.divider_bg),
+                            .border(1, _style.divider_bg),
                         Text(item)
-                            .color(index === 0 ? this._style.fg : this._style.fg_1)
+                            .color(index === 0 ? _style.fg : _style.fg_1)
                             .transition("color 300ms ease-in-out")
                             .padding(0)
                             .font_size(14)
@@ -624,10 +643,10 @@ const Payments = {
                 }
             ),
             Spacer().min_frame(10, 1),
-            this._prev_step_button,
+            _prev_step_button,
         )
         .overflow_x("scroll")
-        .class("hide_scrollbar")
+        .class("volt_hide_scrollbar")
         .extend(
             {
                 selected_index: 0,
@@ -662,43 +681,43 @@ const Payments = {
         );
 
         // Append the steps element to the steps container.
-        this._steps_container.append(this._steps_element);
-    },
+        _steps_container.append(_steps_element);
+    }
 
     /**
      * Render the overview element in the UI.
      */
-    _render_overview_element: function (): void {
+    function _render_overview_element(): void {
         // The subtotal price from the overview.
-        this._overview_subtotal = Text(`${this._currency_symbol == null ? "$" : this._currency_symbol} 0.00`)
-            .color(this._style.fg)
-            .font_size(this._style.font_size)
+        _overview_subtotal = Text(`${_currency_symbol == null ? "$" : _currency_symbol} 0.00`)
+            .color(_style.fg)
+            .font_size(_style.font_size)
             .flex_shrink(0)
             .margin(0)
             .padding(0);
         
         // The total price from the overview.
-        this._overview_total = Text(`${this._currency_symbol == null ? "$" : this._currency_symbol} 0.00`)
+        _overview_total = Text(`${_currency_symbol == null ? "$" : _currency_symbol} 0.00`)
             .font_weight("bold")
-            .color(this._style.fg)
-            .font_size(this._style.font_size)
+            .color(_style.fg)
+            .font_size(_style.font_size)
             .flex_shrink(0)
             .margin(0)
             .padding(0);
         
         // The subtotal VAT price from the overview.
-        this._overview_subtotal_tax = Text(`${this._currency_symbol == null ? "$" : this._currency_symbol} 0.00`)
-            .color(this._style.fg)
-            .font_size(this._style.font_size)
+        _overview_subtotal_tax = Text(`${_currency_symbol == null ? "$" : _currency_symbol} 0.00`)
+            .color(_style.fg)
+            .font_size(_style.font_size)
             .flex_shrink(0)
             .margin(0)
             .padding(0);
         
         // The tax stack.
-        this._overview_tax_container = HStack(
+        _overview_tax_container = HStack(
                 Text("Tax:")
-                    .color(this._style.fg)
-                    .font_size(this._style.font_size)
+                    .color(_style.fg)
+                    .font_size(_style.font_size)
                     .stretch(true)
                     .flex_shrink(0)
                     .margin(0, 5, 0, 0)
@@ -706,39 +725,39 @@ const Payments = {
                     .wrap(false)
                     .overflow("hidden")
                     .text_overflow("ellipsis"),
-                this._overview_subtotal_tax,
+                _overview_subtotal_tax,
             )
             .margin_top(5);
         
         // The incl/excl tax text.
-        this._overview_incl_excl_tax = Text(this.tax_inclusive ? "incl. tax" : "excl. tax")
-            .color(this._style.fg_2)
-            .font_size(this._style.font_size - 6)
+        _overview_incl_excl_tax = Text(Payments.tax_inclusive ? "incl. tax" : "excl. tax")
+            .color(_style.fg_2)
+            .font_size(_style.font_size - 6)
             .margin(2.5, 0, 0, 0)
             .padding(0)
             .flex_shrink(0)
             .text_trailing();
         
         // The checkout button.
-        this._checkout_button = LoaderButton("Next")
-            .color(this._style.button.fg)
-            .background(this._style.button.bg)
-            .border_radius(this._style.button.border_radius)
-            .border(this._style.button.border_inset ? `${this._style.button.border_width} inset ${this._style.button.border_color}` : `${this._style.button.border_width} solid ${this._style.button.border_color}`)
-            .hover_brightness(...this._style.button.hover_brightness as [any, any])
+        _checkout_button = LoaderButton("Next")
+            .color(_style.button.fg)
+            .background(_style.button.bg)
+            .border_radius(_style.button.border_radius)
+            .border(_style.button.border_inset ? `${_style.button.border_width} inset ${_style.button.border_color}` : `${_style.button.border_width} solid ${_style.button.border_color}`)
+            .hover_brightness(..._style.button.hover_brightness as [any, any])
             .nodes.loader
-                .background(this._style.button.fg)
+                .background(_style.button.fg)
                 .update()
                 .parent<LoaderButtonElement>()
             .on_click(async () => {
-                this._checkout_button.show_loader();
-                Payments._next()
+                _checkout_button.show_loader();
+                _next()
                     .then(() => {
-                        this._checkout_button.hide_loader();
+                        _checkout_button.hide_loader();
                     })
                     .catch((err: any) => {
                         console.error(err);
-                        this._checkout_button.hide_loader();
+                        _checkout_button.hide_loader();
                     });
             });
         
@@ -751,21 +770,21 @@ const Payments = {
         //           " policy. I agree that my payment method may be used for recurring subscriptions.", 
         //     required: true
         // }) // @todo check text.
-        // .color(this._style.fg_2)
-        // .border_color(this._style.divider_bg)
-        // .font_size(this._style.font_size - 6)
-        // .focus_color(this._style.theme_fg)
-        // .missing_color(this._style.missing_fg)
-        // .inner_bg(this._style.bg)
+        // .color(_style.fg_2)
+        // .border_color(_style.divider_bg)
+        // .font_size(_style.font_size - 6)
+        // .focus_color(_style.theme_fg)
+        // .missing_color(_style.missing_fg)
+        // .inner_bg(_style.bg)
         // .margin_bottom(15)
         // .hide();
         
         // The overview element.
-        this._overview_element = VStack(
+        _overview_element = VStack(
             Title("Overview")
-                .color(this._style.fg)
+                .color(_style.fg)
                 .width("fit-content")
-                .font_size(this._style.font_size - 2)
+                .font_size(_style.font_size - 2)
                 .flex_shrink(0)
                 .margin(0, 0, 15, 0)
                 .letter_spacing("1px")
@@ -774,8 +793,8 @@ const Payments = {
         
             HStack(
                 Text("Subtotal:")
-                    .color(this._style.fg)
-                    .font_size(this._style.font_size)
+                    .color(_style.fg)
+                    .font_size(_style.font_size)
                     .stretch(true)
                     .flex_shrink(0)
                     .margin(0, 5, 0, 0)
@@ -783,13 +802,13 @@ const Payments = {
                     .wrap(false)
                     .overflow("hidden")
                     .text_overflow("ellipsis"),
-                this._overview_subtotal,
+                _overview_subtotal,
             ),
             // Uncomment and define Shipping if needed.
             // HStack(
             //     Text("Shipping:")
-            //         .color(this._style.fg_1)
-            //         .font_size(this._style.font_size)
+            //         .color(_style.fg_1)
+            //         .font_size(_style.font_size)
             //         .stretch(true)
             //         .flex_shrink(0)
             //         .margin(0, 5, 0, 0)
@@ -798,8 +817,8 @@ const Payments = {
             //         .overflow("hidden")
             //         .text_overflow("ellipsis"),
             //     Text("free")
-            //         .color(this._style.fg_1)
-            //         .font_size(this._style.font_size)
+            //         .color(_style.fg_1)
+            //         .font_size(_style.font_size)
             //         .flex_shrink(0)
             //         .margin(0)
             //         .padding(0)
@@ -808,15 +827,15 @@ const Payments = {
             //         .text_overflow("ellipsis"),
             // )
             // .margin_top(5),
-            this._overview_tax_container,
+            _overview_tax_container,
             Divider()
                 .margin(20, 0, 20, 0)
-                .background(this._style.divider_bg),
+                .background(_style.divider_bg),
             HStack(
                 Text("Total:")
                     .font_weight("bold")
-                    .color(this._style.fg)
-                    .font_size(this._style.font_size)
+                    .color(_style.fg)
+                    .font_size(_style.font_size)
                     .stretch(true)
                     .flex_shrink(0)
                     .margin(0, 5, 0, 0)
@@ -825,13 +844,13 @@ const Payments = {
                     .overflow("hidden")
                     .text_overflow("ellipsis"),
                 VStack(
-                    this._overview_total,
-                    this._overview_incl_excl_tax,
+                    _overview_total,
+                    _overview_incl_excl_tax,
                 ),
             )
             .margin_bottom(25),
             // this._policy_checkbox,
-            this._checkout_button,
+            _checkout_button,
         )
         .extend({
             total: 0,
@@ -839,58 +858,55 @@ const Payments = {
             /**
              * Handle unknown tax scenarios by updating the UI accordingly.
              */
-            unknown_tax: () => {
-                this._overview_incl_excl_tax.text(this.tax_inclusive ? "incl. tax" : "excl. tax");
-                this._overview_tax_container.hide();
-                this._overview_element.tax = 0;
-                this._overview_total.text(`${this._currency_symbol} ${this._overview_element.total.toFixed(2)}`);
+            unknown_tax() {
+                _overview_incl_excl_tax.text(Payments.tax_inclusive ? "incl. tax" : "excl. tax");
+                _overview_tax_container.hide();
+                _overview_element.tax = 0;
+                _overview_total.text(`${_currency_symbol} ${_overview_element.total.toFixed(2)}`);
             },
             /**
              * Calculate tax based on the provided country code.
              * @param country - The country code to calculate tax for.
              */
-            calc_tax: async (country: string) => {
-                this._initialize_paddle();
+            async calc_tax(country: string): Promise<void> {
+                _initialize_paddle();
                 try {
                     const result = await Paddle.PricePreview({
-                        items: this.cart.items.map((item: any) => { 
+                        items: Cart.items.map((item: any) => { 
                             return { priceId: item.product.price_id, quantity: item.quantity }; 
                         }),
                         address: { countryCode: country },
                     });
-                    this._overview_element.tax = 0;
+                    _overview_element.tax = 0;
                     result.data.details.lineItems.forEach((item: any) => {
-                        this._overview_element.tax += parseInt(item.totals.tax) / 100;
+                        _overview_element.tax += parseInt(item.totals.tax) / 100;
                     });
-                    this._overview_tax_container.show();
-                    this._overview_incl_excl_tax.text("incl. tax");
-                    this._overview_subtotal_tax.text(`${this._currency_symbol} ${this._overview_element.tax.toFixed(2)}`);
-                    this._overview_total.text(`${this._currency_symbol} ${(this._overview_element.total + this._overview_element.tax).toFixed(2)}`);
+                    _overview_tax_container.show();
+                    _overview_incl_excl_tax.text("incl. tax");
+                    _overview_subtotal_tax.text(`${_currency_symbol} ${_overview_element.tax.toFixed(2)}`);
+                    _overview_total.text(`${_currency_symbol} ${(_overview_element.total + _overview_element.tax).toFixed(2)}`);
                 } catch (error: any) {
                     if (error?.error?.detail) {
-                        this.on_error(error.error.detail);
+                        Payments.on_error(error.error.detail);
                         console.error(error);
                     } else {
                         console.error(error);
                     }
-                    this._overview_element.unknown_tax();
+                    _overview_element.unknown_tax();
                 }
             },
         });
 
         // Append the overview element to the overview container.
-        this._overview_container.append(this._overview_element);
-    },
+        _overview_container.append(_overview_element);
+    }
 
     /**
      * Render the order element in the UI.
      */
-    _render_order_element: function (): void {
+    function _render_order_element(): void {
         // Render.
-        interface Extension extends VStackElement {
-            refresh(this: Extension): Extension;
-        }
-        this._order_element = VStack()
+        _order_element = VStack()
         .extend({
             /**
              * Refresh the order element by updating the cart and UI elements.
@@ -898,31 +914,30 @@ const Payments = {
             refresh(this) {
 
                 // Refresh the cart.
-                Payments.cart.refresh();
+                Cart.refresh();
 
                 // Shortcuts.
-                const style = Payments._style;
-                const cart = Payments.cart;
-                const cart_items = Payments.cart.items;
+                const style = _style;
+                const cart_items = Cart.items;
                 
                 // Shopping cart view.
                 let currency_symbol: string | null = null;
                 let subtotal = 0;
                 cart_items.forEach((item: any) => {
-                    if (currency_symbol === null) {
+                    if (currency_symbol == null) {
                         currency_symbol = Payments.get_currency_symbol(item.product.currency);
                     }
                     subtotal += item.product.price * item.quantity;
                 });
-                if (currency_symbol === null) {
+                if (currency_symbol == null) {
                     currency_symbol = "$";
                 }
-                Payments._currency_symbol = currency_symbol;
+                _currency_symbol = currency_symbol;
                 
                 // Set the overview prices.
-                Payments._overview_subtotal.text(`${currency_symbol} ${subtotal.toFixed(2)}`);
-                Payments._overview_element.total = subtotal;
-                Payments._overview_element.unknown_tax();
+                _overview_subtotal.text(`${currency_symbol} ${subtotal.toFixed(2)}`);
+                _overview_element.total = subtotal;
+                _overview_element.unknown_tax();
                 
                 // Add the products.
                 this.remove_children();
@@ -1007,7 +1022,7 @@ const Payments = {
                                             return null;
                                         }
                                         item.quantity = quantity;
-                                        cart.save();
+                                        Cart.save();
                                         this.refresh();
                                     }, 500);
                                 })
@@ -1099,10 +1114,10 @@ const Payments = {
                                             )
                                             .on_click(async () => {
                                                 if (item.quantity === 1) {
-                                                    await cart.remove(item.product.id, "all");
+                                                    await Cart.remove(item.product.id, "all");
                                                     this.refresh();
                                                 } else {
-                                                    await cart.remove(item.product.id, 1);
+                                                    await Cart.remove(item.product.id, 1);
                                                     this.refresh();
                                                 }
                                             }),
@@ -1121,7 +1136,7 @@ const Payments = {
                                                 (e: any) => e.mask_color(style.fg_1)
                                             )
                                             .on_click(async () => {
-                                                await cart.add(item.product.id, 1);
+                                                await Cart.add(item.product.id, 1);
                                                 this.refresh();
                                             }),
                                         ImageMask("/volt_static/payments/trash.webp")
@@ -1139,7 +1154,7 @@ const Payments = {
                                                 (e: any) => e.mask_color(style.fg_1)
                                             )
                                             .on_click(async () => {
-                                                await cart.remove(item.product.id, "all");
+                                                await Cart.remove(item.product.id, "all");
                                                 this.refresh();
                                             }),
                                     )
@@ -1173,7 +1188,7 @@ const Payments = {
                                 )
                             )
                             .overflow_x("scroll")
-                            .class("hide_scrollbar")
+                                .class("volt_hide_scrollbar")
                             .width("100%")
                             .media(
                                 "width >= 800px",
@@ -1200,17 +1215,17 @@ const Payments = {
                 }
                 return this;
             }
-        } as Extension);
-            
+        });
+
         // Append the order element to the order container.
-        this._order_container.append(this._order_element.refresh());
-    },
+        _order_container.append(_order_element.refresh());
+    }
 
     // Render the refunds element.
-    _render_refunds_element: function(): void {
+    function _render_refunds_element(): void {
         // Render.
-        const style = this._style;
-        this._refunds_element = VStack()
+        const style = _style;
+        _refunds_element = VStack()
         .extend({
             /**
              * Refresh the refunds element by fetching and displaying refundable, refunding, and refunded payments.
@@ -1220,29 +1235,53 @@ const Payments = {
                 this.inner_html("");
 
                 // Create containers.
-                let payments = await Payments.get_refundable_payments({
-                    days: Payments._days_refundable,
+                const refundable_res = await Payments.get_refundable_payments({
+                    days: _days_refundable,
                 });
+                let refundable: PaddleBackend.Endpoints.GetRefundablePayments.Result = [];
+                if (refundable_res.error) {
+                    const e = new Error(refundable_res.error.message);
+                    console.error(e);
+                    Payments.on_error(e);
+                } else {
+                    refundable = refundable_res.data
+                }
                 const refundable_container = VStack()
                     .extend({
                         title: "Refundable Payments",
-                        payments: payments,
+                        payments: refundable,
                         is_refundable: true,
                     });
-                payments = await Payments.get_refunding_payments();
+                const refunding_res = await Payments.get_refunding_payments();
+                let refunding: PaddleBackend.Endpoints.GetRefundingPayments.Result = [];
+                if (refunding_res.error) {
+                    const e = new Error(refunding_res.error.message);
+                    console.error(e);
+                    Payments.on_error(e);
+                } else {
+                    refunding = refunding_res.data
+                }
                 const refunding_container = VStack()
                     .hide()
                     .extend({
                         title: "Processing Refunds",
-                        payments: payments,
+                        payments: refunding,
                         is_refunding: true,
                     });
-                payments = await Payments.get_refunded_payments();
+                const refunded_res = await Payments.get_refunded_payments();
+                let refunded: PaddleBackend.Endpoints.GetRefundedPayments.Result = [];
+                if (refunded_res.error) {
+                    const e = new Error(refunded_res.error.message);
+                    console.error(e);
+                    Payments.on_error(e);
+                } else {
+                    refunded = refunded_res.data
+                }
                 const refunded_container = VStack()
                     .hide()
                     .extend({
                         title: "Refunded Payments",
-                        payments: payments,
+                        payments: refunded,
                         is_refunded: true,
                     });
 
@@ -1268,10 +1307,10 @@ const Payments = {
                             }
                         })
                         .on_click((e: any) => {
-                            e.color(Payments._style.fg_1);
-                            e.background(Payments._style.bg_1);
+                            e.color(_style.fg_1);
+                            e.background(_style.bg_1);
                             [e.parentElement.child(1), e.parentElement.child(2)].forEach((child: any) => {
-                                child.color(Payments._style.fg_1);
+                                child.color(_style.fg_1);
                                 child.background("none");
                             });
 
@@ -1299,10 +1338,10 @@ const Payments = {
                             }
                         })
                         .on_click((e: any) => {
-                            e.color(Payments._style.fg_1);
-                            e.background(Payments._style.bg_1);
+                            e.color(_style.fg_1);
+                            e.background(_style.bg_1);
                             [e.parentElement.child(0), e.parentElement.child(2)].forEach((child: any) => {
-                                child.color(Payments._style.fg_1);
+                                child.color(_style.fg_1);
                                 child.background("none");
                             });
 
@@ -1330,10 +1369,10 @@ const Payments = {
                             }
                         })
                         .on_click((e: any) => {
-                            e.color(Payments._style.fg_1);
-                            e.background(Payments._style.bg_1);
+                            e.color(_style.fg_1);
+                            e.background(_style.bg_1);
                             [e.parentElement.child(0), e.parentElement.child(1)].forEach((child: any) => {
-                                child.color(Payments._style.fg_1);
+                                child.color(_style.fg_1);
                                 child.background("none");
                             });
 
@@ -1400,7 +1439,11 @@ const Payments = {
                     } else {
                         await Promise.all(container.payments.map(async (payment: any) => {
                             await Promise.all(payment.line_items.map(async (item: any) => {
-                                item.product = await Payments.get_product(item.product);
+                                const res = await Payments.get_product(item.product);
+                                if (res.error) {
+                                    throw new Error(res.error.message);
+                                }
+                                item.product = res.data;
                             }));
                         }));
                         container.append(
@@ -1505,18 +1548,24 @@ const Payments = {
                                                         animation_duration: 300,
                                                         on_yes: async () => {
                                                             try {
-                                                                await Payments.create_refund(payment);
+                                                                const res = await Payments.create_refund(payment);
+                                                                if (res.error) {
+                                                                    const e = new Error(res.error.message);
+                                                                    console.error(e);
+                                                                    Payments.on_error(e);
+                                                                    return ;
+                                                                }
                                                             } catch(err) {
                                                                 console.error(err);
                                                                 Payments.on_error(err as Error);
-                                                                return null;
+                                                                return;
                                                             }
                                                             (this as any).refresh().then(() => {
                                                                 refunding_option.click();
                                                             });
                                                         },
                                                     })
-                                                    .font(window.getComputedStyle(Payments._refunds_container).font)
+                                                    .font(window.getComputedStyle(_refunds_container).font)
                                                     .widget
                                                         .background(style.bg)
                                                         .color(style.fg_1)
@@ -1609,58 +1658,58 @@ const Payments = {
         });
 
         // Append.
-        this._refunds_element.refresh();
-        this._refunds_container.append(this._refunds_element);
-    },
+        _refunds_element.refresh();
+        _refunds_container.append(_refunds_element);
+    }
 
     // Render the address element.
-    _render_billing_element: function(): void {
-        if (this._billing_element !== undefined) { return ; }
+    function _render_billing_element(): void {
+        if (_billing_element !== undefined) { return ; }
 
         // Utils.
         const CreateInput = (args: any) => {
             return ExtendedInput(args)
-                .color(this._style.fg)
-                .font_size(this._style.font_size)
-                .missing_color(this._style.missing_fg)
-                .focus_color(this._style.theme_fg)
-                .border_color(this._style.divider_bg)
-                .border_radius(this._style.border_radius)
+                .color(_style.fg)
+                .font_size(_style.font_size)
+                .missing_color(_style.missing_fg)
+                .focus_color(_style.theme_fg)
+                .border_color(_style.divider_bg)
+                .border_radius(_style.border_radius)
                 .input
-                    .color(this._style.fg_1)
+                    .color(_style.fg_1)
                     .parent<ExtendedInputElement>();
         }
         const CreateSelect = (args: any) => {
             return ExtendedSelect(args)
-                .background(this._style.bg)
-                .color(this._style.fg)
-                .font_size(this._style.font_size)
-                .missing_color(this._style.missing_fg)
-                .focus_color(this._style.theme_fg)
-                .border_color(this._style.divider_bg)
-                .border_radius(this._style.border_radius)
+                .background(_style.bg)
+                .color(_style.fg)
+                .font_size(_style.font_size)
+                .missing_color(_style.missing_fg)
+                .focus_color(_style.theme_fg)
+                .border_color(_style.divider_bg)
+                .border_radius(_style.border_radius)
                 .dropdown_height(150)
                 .background("transparent")
                 .dropdown
-                    .background(this._style.bg_1)
+                    .background(_style.bg_1)
                     .background_blur(20)
                     .parent<ExtendedSelectElement>()
                 .input
                     .white_space("pre")
                     // .border_radius(0)
-                    .color(this._style.fg_1)
+                    .color(_style.fg_1)
                     .parent<ExtendedSelectElement>();
         }
 
         // Create element.
         const input_spacing = 15;
         let country_code: any;
-        this._billing_element = Form(
+        _billing_element = Form(
 
             Title("Billing Details")
-                .color(this._style.fg)
+                .color(_style.fg)
                 .width("fit-content")
-                .font_size(this._style.font_size - 2)
+                .font_size(_style.font_size - 2)
                 .flex_shrink(0)
                 .margin(0, 0, 0, 0)
                 .letter_spacing("1px")
@@ -1668,14 +1717,14 @@ const Payments = {
                 .ellipsis_overflow(true),
 
             Divider()
-                .background(this._style.divider_bg)
+                .background(_style.divider_bg)
                 .margin(10, 0, 10, 0),
 
             HStack(
                 Text("Personal")
-                    .font_size(this._style.font_size)
-                    .color(this._style.fg)
-                    .background(this._style.bg_1)
+                    .font_size(_style.font_size)
+                    .color(_style.fg)
+                    .background(_style.bg_1)
                     .padding(8, 6)
                     .margin(0)
                     .stretch(true)
@@ -1683,32 +1732,32 @@ const Payments = {
                     .transition("color 350ms ease, background 350ms ease")
                     .on_mouse_over((e: any) => {
                         if (e.background() === "transparent") {
-                            e.color(this._style.fg);
+                            e.color(_style.fg);
                         }
                     })
                     .on_mouse_out((e: any) => {
                         if (e.background() === "transparent") {
-                            e.color(this._style.fg_1);
+                            e.color(_style.fg_1);
                         }
                     })
                     .on_click((e: any) => {
 
-                        e.color(this._style.fg_1);
-                        e.background(this._style.bg_1)
+                        e.color(_style.fg_1);
+                        e.background(_style.bg_1)
                         const other = e.parentElement.child(1);
-                        other.color(this._style.fg_1);
+                        other.color(_style.fg_1);
                         other.background("none");
 
-                        this._billing_element.name_input.show();
-                        this._billing_element.name_input.required(true);
-                        this._billing_element.business_input.hide();
-                        this._billing_element.business_input.required(false);
-                        this._billing_element.vat_id_input.hide();
-                        this._billing_element.vat_id_input.required(false);
+                        _billing_element.name_input.show();
+                        _billing_element.name_input.required(true);
+                        _billing_element.business_input.hide();
+                        _billing_element.business_input.required(false);
+                        _billing_element.vat_id_input.hide();
+                        _billing_element.vat_id_input.required(false);
                     }),
                 Text("Business")
-                    .font_size(this._style.font_size)
-                    .color(this._style.fg_1)
+                    .font_size(_style.font_size)
+                    .color(_style.fg_1)
                     .background("transparent")
                     .padding(8, 6)
                     .margin(0)
@@ -1717,33 +1766,33 @@ const Payments = {
                     .transition("color 350ms ease, background 350ms ease")
                     .on_mouse_over((e: any) => {
                         if (e.background() === "transparent") {
-                            e.color(this._style.fg);
+                            e.color(_style.fg);
                         }
                     })
                     .on_mouse_out((e: any) => {
                         if (e.background() === "transparent") {
-                            e.color(this._style.fg_1);
+                            e.color(_style.fg_1);
                         }
                     })
                     .on_click((e: any) => {
 
-                        e.color(this._style.fg_1);
-                        e.background(this._style.bg_1)
+                        e.color(_style.fg_1);
+                        e.background(_style.bg_1)
                         const other = e.parentElement.child(0);
-                        other.color(this._style.fg_1);
+                        other.color(_style.fg_1);
                         other.background("transparent");
 
-                        this._billing_element.name_input.hide();
-                        this._billing_element.name_input.required(false);
-                        this._billing_element.business_input.show();
-                        this._billing_element.business_input.required(true);
-                        this._billing_element.vat_id_input.show();
-                        this._billing_element.vat_id_input.required(true);
+                        _billing_element.name_input.hide();
+                        _billing_element.name_input.required(false);
+                        _billing_element.business_input.show();
+                        _billing_element.business_input.required(true);
+                        _billing_element.vat_id_input.show();
+                        _billing_element.vat_id_input.required(true);
                     }),
             )
             .overflow("hidden")
-            .border(1, this._style.divider_bg)
-            .border_radius(this._style.border_radius)
+            .border(1, _style.divider_bg)
+            .border_radius(_style.border_radius)
             .margin_top(10)
             .margin_bottom(10)
             .flex_shrink(0),
@@ -1833,7 +1882,7 @@ const Payments = {
                 items: Object.fromEntries(Object.entries(Payments.countries).map(([key, value]) => [key, value.name])),
             })
             .on_change((_: any, country: string) => {
-                this._overview_element.calc_tax(country);
+                _overview_element.calc_tax(country);
                 country_code.value(Payments.countries[country].calling_code);
             })
             .margin_top(input_spacing)
@@ -1869,31 +1918,31 @@ const Payments = {
         );
 
         // Append.
-        this._billing_container.append(this._billing_element);
-    },
+        _billing_container.append(_billing_element);
+    }
 
     // Render the payment element.
-    _render_payment_element: async function(): Promise<void> {
+    async function _render_payment_element(): Promise<void> {
         return new Promise((resolve, reject) => {
-            this._render_payment_element_resolve = resolve;
-            this._render_payment_element_reject = reject;
+            _render_payment_element_resolve = resolve;
+            _render_payment_element_reject = reject;
 
             // Already rendered.
-            if (this._payment_element !== undefined) {
+            if (_payment_element !== undefined) {
                 return resolve();
             }
 
             // Checks.
-            if (this.client_key == null) {
+            if (client_key == null) {
                 return reject(new Error(`No client key has been assigned to "Payments.client_key".`));
             }
-            if (this.cart.items.length === 0) {
+            if (Cart.items.length === 0) {
                 return reject(new Error("Shopping cart is empty."));
             }
 
             // Check subscription or one time payment.
             let is_subscription = false;
-            this.cart.items.forEach((item: any) => {
+            Cart.items.forEach((item: any) => {
                 if (item.is_subscription === true) {
                     is_subscription = true;
                     return false;
@@ -1901,34 +1950,40 @@ const Payments = {
             });
 
             // Initialize paddle.
-            this._initialize_paddle();
+            _initialize_paddle();
 
             // Create element.
-            this._payment_element = VStack()
+            _payment_element = VStack()
                 .class("checkout-container");
 
             // Append.
-            this._payment_container.append(this._payment_element);
+            _payment_container.append(_payment_element);
+
+            if (!_billing_details) {
+                const e = new Error("Billing details are not yet defined.")
+                Payments.on_error(e);
+                throw e;
+            }
 
             // Initialize.
             let custom_data: any = {
-                customer_name: this._billing_details.name,
+                customer_name: _billing_details.name,
             };
             if (User.is_authenticated()) {
                 custom_data.uid = User.uid();
             }
             try {
                 let business: any = undefined;
-                if (this._billing_details.business !== "") {
+                if (_billing_details.business !== "") {
                     business = {
-                        name: this._billing_details.business,
-                        taxIdentifier: this._billing_details.vat_id === "" ? undefined : this._billing_details.vat_id,
+                        name: _billing_details.business,
+                        taxIdentifier: _billing_details.vat_id === "" ? undefined : _billing_details.vat_id,
                     };
                 }
                 Paddle.Checkout.open({
                     settings: {
                         displayMode: "inline",
-                        theme: this._theme,
+                        theme: _theme,
                         locale: "en",
                         frameTarget: "checkout-container",
                         frameInitialHeight: "450",
@@ -1936,15 +1991,15 @@ const Payments = {
                         // successUrl: this.return_url,
                         // successUrl: "http://test.vandenberghinc.com/checkout?payment_status=success",
                     },
-                    items: this.cart.items.map((item: any) => { return { priceId: item.product.price_id, quantity: item.quantity }; }),
+                    items: Cart.items.map((item: any) => { return { priceId: item.product.price_id, quantity: item.quantity }; }),
                     customer: {
-                        email: this._billing_details.email,
+                        email: _billing_details.email,
                         address: {
-                            countryCode: this._billing_details.country,
-                            postalCode: this._billing_details.postal_code,
-                            region: this._billing_details.province,
-                            city: this._billing_details.city,
-                            firstLine: `${this._billing_details.street} ${this._billing_details.house_number}`,
+                            countryCode: _billing_details.country,
+                            postalCode: _billing_details.postal_code,
+                            region: _billing_details.province,
+                            city: _billing_details.city,
+                            firstLine: `${_billing_details.street} ${_billing_details.house_number}`,
                         },
                         business,
                     },
@@ -1954,7 +2009,7 @@ const Payments = {
                 return reject(err);
             }
 
-            // const iframe = this._payment_element.children[0];
+            // const iframe = _payment_element.children[0];
             // iframe.onload = () => {
             //     console.log("ON LOAD");
             //     let doc = iframe.contentDocument || iframe.contentWindow.document;
@@ -1963,22 +2018,22 @@ const Payments = {
             // }
 
         });
-    },
+    }
 
     // Render the processing element.
-    _render_processing_element: function(): void {
+    function _render_processing_element(): void {
 
         // Already defined.
-        if (this._processing_element !== undefined) {
-            this._processing_element.set_processing();
+        if (_processing_element !== undefined) {
+            _processing_element.set_processing();
             return ;
         }
         
         // Create element.
-        this._processing_element = VStack(
+        _processing_element = VStack(
             Title("Processing")
-                .color(this._style.fg)
-                .font_size(this._style.font_size - 2)
+                .color(_style.fg)
+                .font_size(_style.font_size - 2)
                 .flex_shrink(0)
                 .letter_spacing("1px")
                 .text_transform("uppercase")
@@ -1987,9 +2042,9 @@ const Payments = {
                 .padding(0)
                 .assign_to_parent_as("title_e"),
             Text("Processing your payment, please wait.")
-                .color(this._style.fg_1)
-                .font_size(this._style.font_size - 2)
-                .line_height(this._style.font_size)
+                .color(_style.fg_1)
+                .font_size(_style.font_size - 2)
+                .line_height(_style.font_size)
                 .margin(5, 0, 0, 0)
                 .padding(0)
                 .assign_to_parent_as("text_e")
@@ -2000,7 +2055,7 @@ const Payments = {
                 .hide()
                 .frame(40, 40)
                 .padding(5)
-                .mask_color(this._style.missing_fg)
+                .mask_color(_style.missing_fg)
                 .margin_top(15)
                 .assign_to_parent_as("error_image_e"),
             Image("/volt_static/payments/party.webp")
@@ -2009,7 +2064,7 @@ const Payments = {
                 .margin_top(15)
                 .assign_to_parent_as("success_image_e"),
             RingLoader()
-                .background(this._style.theme_fg)
+                .background(_style.theme_fg)
                 .frame(40, 40)
                 .update()
                 .margin_top(15)
@@ -2069,60 +2124,60 @@ const Payments = {
         });
 
         // Append.
-        this._processing_container.append(this._processing_element);
-    },
+        _processing_container.append(_processing_element);
+    }
 
     // Show the processing container.
-    _show_processing: async function(status: string | null = null): Promise<void> {
+    async function _show_processing(status: string | null = null): Promise<void> {
         
         // Select step.
-        this._step = 3;
-        this._steps_element.select(this._step);
+        _payment_step = 3;
+        _steps_element.select(_payment_step);
 
         // Render the processing element.
-        this._render_processing_element();
+        _render_processing_element();
 
         // Set elements.
-        this._order_container.hide();
-        this._billing_container.hide();
-        this._payment_container.hide();
-        this._processing_container.show();
-        this._overview_container.hide();
-        this._prev_step_button.hide();
+        _order_container.hide();
+        _billing_container.hide();
+        _payment_container.hide();
+        _processing_container.show();
+        _overview_container.hide();
+        _prev_step_button.hide();
 
         // Update.
         if (status != null) {
-            this._update_processing(status);
+            _update_processing(status);
         }
 
-    },
+    }
 
     // Update the processing container.
-    _update_processing: async function(status: string): Promise<void> {
+    async function _update_processing(status: string): Promise<void> {
 
         // Handle result code.
         switch (status) {
             case "success":
-                this._processing_element.set_success();
+                _processing_element.set_success();
                 break;
             case "processing":
-                this._processing_element.set_processing();
+                _processing_element.set_processing();
                 break;
             case "cancelled":
-                this._processing_element.set_cancelled();
+                _processing_element.set_cancelled();
                 break;
             case "error":
-                this._processing_element.set_error();
+                _processing_element.set_error();
                 break;
             default:
                 console.error(`Unknown session result code "${status}".`);
-                this._processing_element.set_error("An unknown error has occurred.");
+                _processing_element.set_error("An unknown error has occurred.");
                 break;
         }
-    },
+    }
 
     // Initialize checkout page.
-    style: function({
+    export function style({
         theme = "light", // light or dark
         font_size = 16,
         border_radius = 10,
@@ -2177,35 +2232,35 @@ const Payments = {
         if (typeof button.border_width === "number") { button.border_width = `${button.border_width}px`; }
 
         // Save style.
-        this._style = {};
-        this._theme = theme;
-        this._style.font_size = font_size;
-        this._style.border_radius = border_radius;
-        this._style.bg = bg;
-        this._style.bg_1 = bg_1;
-        this._style.divider_bg = divider_bg;
-        this._style.fg = fg;
-        this._style.fg_1 = fg_1;
-        this._style.fg_2 = fg_2;
-        this._style.theme_fg = theme_fg;
-        this._style.missing_fg = missing_fg;
-        this._style.selected = selected;
-        this._style.button = button;
+        _style = {};
+        _theme = theme;
+        _style.font_size = font_size;
+        _style.border_radius = border_radius;
+        _style.bg = bg;
+        _style.bg_1 = bg_1;
+        _style.divider_bg = divider_bg;
+        _style.fg = fg;
+        _style.fg_1 = fg_1;
+        _style.fg_2 = fg_2;
+        _style.theme_fg = theme_fg;
+        _style.missing_fg = missing_fg;
+        _style.selected = selected;
+        _style.button = button;
 
         // Set CSS variables.
-        Object.keys(this._style).forEach((key) => {
-            if (typeof this._style[key] === "number") {
-                document.documentElement.style.setProperty(`--vpayments_${key}`, `${this._style[key]}px`);
+        Object.keys(_style).forEach((key) => {
+            if (typeof _style[key] === "number") {
+                document.documentElement.style.setProperty(`--vpayments_${key}`, `${_style[key]}px`);
             } else {
-                document.documentElement.style.setProperty(`--vpayments_${key}`, this._style[key]);
+                document.documentElement.style.setProperty(`--vpayments_${key}`, _style[key]);
             }
         });
-        document.documentElement.style.setProperty(`--vpayments_theme_fg_80`, `${this._style.theme_fg}80`);
-        document.documentElement.style.setProperty(`--vpayments_missing_fg_80`, `${this._style.missing_fg}80`);
-    },
+        document.documentElement.style.setProperty(`--vpayments_theme_fg_80`, `${_style.theme_fg}80`);
+        document.documentElement.style.setProperty(`--vpayments_missing_fg_80`, `${_style.missing_fg}80`);
+    }
 
     // Initialize checkout page.
-    create_checkout_dropin: function({
+    function create_checkout_dropin({
         steps_container,
         order_container,
         billing_container,
@@ -2246,50 +2301,50 @@ const Payments = {
         }
 
         // Args.
-        this._steps_container = steps_container;
-        this._order_container = order_container;
+        _steps_container = steps_container;
+        _order_container = order_container;
         // @ts-ignore
-        this._billing_container = billing_container.hide();
+        _billing_container = billing_container.hide();
         // @ts-ignore
-        this._payment_container = payment_container.hide();
+        _payment_container = payment_container.hide();
         // @ts-ignore
-        this._processing_container = processing_container.hide();
-        this._overview_container = overview_container;
+        _processing_container = processing_container.hide();
+        _overview_container = overview_container;
 
         // Settings.
-        this._sign_in_redirect = sign_in_redirect;
+        _sign_in_redirect = sign_in_redirect;
 
         // Events.
-        this.on_error = on_error;
+        Payments.on_error = on_error;
 
         // Check style.
-        if (this._style === undefined) {
-            this.style();
+        if (_style === undefined) {
+            Payments.style();
         }
 
         // Other attributes.
-        this._step = 0;
+        _payment_step = 0;
 
         // Render the steps element.
-        this._render_steps_element();
+        _render_steps_element();
 
         // When the user was redirected the URL params are defined, if so only render the processing view.
         if (Utils.url_param("payment_status", null) != null) {
-            this._show_processing(Utils.url_param("payment_status", null));
+            _show_processing(Utils.url_param("payment_status", null));
         }
         // No redirect.
         else {
             // Render the overview element.
-            this._render_overview_element();
+            _render_overview_element();
 
             // Render the order element.
             // Must be rendered after the overview element is rendered.
-            this._render_order_element();
+            _render_order_element();
         }
-    },
+    }
 
     // Initialize refund page.
-    create_refunds_dropin: function({
+    function create_refunds_dropin({
         // The element containers.
         refunds_container,
 
@@ -2310,23 +2365,23 @@ const Payments = {
         }
 
         // Args.
-        this._refunds_container = refunds_container;
-        this._days_refundable = days_refundable;
+        _refunds_container = refunds_container;
+        _days_refundable = days_refundable;
         
         // Events.
-        this.on_error = on_error;
+        Payments.on_error = on_error;
 
         // Check style.
-        if (this._style === undefined) {
-            this.style();
+        if (_style === undefined) {
+            Payments.style();
         }
 
         // Other attributes.
-        this._step = 0;
+        _payment_step = 0;
 
         // Render the refunds element.
-        this._render_refunds_element();
-    },
+        _render_refunds_element();
+    }
 
     // Backend API.
 
@@ -2344,7 +2399,7 @@ const Payments = {
      *   @name: currency
      *   @description: The currency from the product object.
      */
-    get_currency_symbol: function(currency: string): string | null {
+    export function get_currency_symbol(currency: string): string | null {
         switch (currency.toLowerCase()) {
             case "aed": return "د.إ";
             case "afn": return "Af";
@@ -2501,7 +2556,7 @@ const Payments = {
             case "zmw": return "ZK";
         }
         return null;
-    },
+    }
 
     // Fetch the payment products.
     /**
@@ -2513,24 +2568,15 @@ const Payments = {
      * @type: array[object]
      * @return: Returns the backend defined payment products.
      */
-    get_products: async function(): Promise<any[]> {
-        return new Promise((resolve, reject) => {
-            if (this._products !== undefined) {
-                return resolve(this._products);
-            }
-            Utils.request_v1({
-                method: "GET",
-                url: "/volt/payments/products",
-            })
-            .then((products: any[]) => {
-                this._products = products;
-                resolve(this._products);
-            })
-            .catch((err: any) => {
-                reject(err);
-            });
+    export function get_products(): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetProducts.Result> {
+        if (_products !== undefined) {
+            return _products;
+        }
+        return Utils.request({
+            method: "GET",
+            url: "/volt/payments/products",
         });
-    },
+    }
 
     // Fetch a payment product by id.
     /**
@@ -2547,31 +2593,39 @@ const Payments = {
      *   @type: string
      *   @desc: The id of the payment product.
      */
-    get_product: async function(id: string): Promise<any> {
-        return new Promise(async (resolve, reject) => {
-            const products = await this.get_products();
-            let product: any = null;
-            for (const p of products) {
-                if (p.id === id) {
-                    product = p;
-                    break;
-                }
-                if (p.is_subscription) {
-                    for (const plan of p.plans) {
-                        if (plan.id === id) {
-                            product = plan;
-                            break;
-                        }
+    export async function get_product(id: string): Utils.RequestResultPromise<Product> {
+        // APPLY_NEW_RESPONSE
+        const products = await get_products();
+        if (products.error) return products;
+        let product: Product | undefined = undefined;
+        for (const p of products.data) {
+            if (p.id === id) {
+                product = p;
+                break;
+            }
+            if (p.is_subscription && p.plans) {
+                for (const plan of p.plans) {
+                    if (plan.id === id) {
+                        product = plan;
+                        break;
                     }
-                    if (product) break;
                 }
+                if (product) break;
             }
-            if (product == null) {
-                return reject(new Error(`Product "${id}" does not exist.`));
+        }
+        if (product == null) {
+            return {
+                error: {
+                    message: `Product "${id}" does not exist.`
+                },
+                status: 400,
             }
-            resolve(product);
-        });
-    },
+        }
+        return {
+            status: 200,
+            data: product
+        };
+    }
 
     // Fetch a payment object by id.
     /**
@@ -2586,15 +2640,15 @@ const Payments = {
      *   @type: string
      *   @desc: The id of the payment.
      */
-    get_payment: async function(id: string): Promise<any> {
-        return Utils.request_v1({
+    export function get_payment(
+        payload: PaddleBackend.Endpoints.GetPayment.Params
+    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetPayment.Result> {
+        return Utils.request({
             method: "GET",
             url: "/volt/payments/payment",
-            data: {
-                id: id,
-            }
+            data: payload,
         });
-    },
+    }
 
     // Get all payments.
     /**
@@ -2625,21 +2679,15 @@ const Payments = {
      *     @value: "paid"
      *     @desc: Payments that are paid.
      */
-    get_payments: async function({
-        days = 30,
-        limit = null,
-        status = null,
-    } = {}): Promise<any> {
-        return Utils.request_v1({
+    export function get_payments(
+        payload: PaddleBackend.Endpoints.GetPayments.Params
+    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetPayments.Result> {
+        return Utils.request({
             method: "GET",
             url: "/volt/payments/payments",
-            data: {
-                days,
-                limit,
-                status,
-            }
+            data: payload
         });
-    },
+    }
 
     // Get refundable payments.
     /**
@@ -2657,19 +2705,15 @@ const Payments = {
      *   @type: number
      *   @desc: Limit the amount of response payment objects.
      */
-    get_refundable_payments: async function({
-        days = 30,
-        limit = null,
-    } = {}): Promise<any> {
-        return Utils.request_v1({
+    export function get_refundable_payments(
+        payload?: PaddleBackend.Endpoints.GetRefundablePayments.Params
+    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetRefundablePayments.Result> {
+        return Utils.request({
             method: "GET",
             url: "/volt/payments/payments/refundable",
-            data: {
-                days,
-                limit,
-            }
+            data: payload
         });
-    },
+    }
 
     // Get refunded payments.
     /**
@@ -2687,19 +2731,15 @@ const Payments = {
      *   @type: number
      *   @desc: Limit the amount of response payment objects.
      */
-    get_refunded_payments: async function({
-        days = 30,
-        limit = null,
-    } = {}): Promise<any> {
-        return Utils.request_v1({
+    export function get_refunded_payments(
+        payload?: PaddleBackend.Endpoints.GetRefundedPayments.Params
+    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetRefundedPayments.Result> {
+        return Utils.request({
             method: "GET",
             url: "/volt/payments/payments/refunded",
-            data: {
-                days,
-                limit,
-            }
+            data: payload
         });
-    },
+    }
 
     // Get refunding payments.
     /**
@@ -2717,19 +2757,15 @@ const Payments = {
      *   @type: number
      *   @desc: Limit the amount of response payment objects.
      */
-    get_refunding_payments: async function({
-        days = null,
-        limit = null,
-    } = {}): Promise<any> {
-        return Utils.request_v1({
+    export function get_refunding_payments(
+        payload?: PaddleBackend.Endpoints.GetRefundingPayments.Params
+    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetRefundingPayments.Result> {
+        return Utils.request({
             method: "GET",
             url: "/volt/payments/payments/refunding",
-            data: {
-                days,
-                limit,
-            }
+            data: payload
         });
-    },
+    }
 
     // Create refund.
     /**
@@ -2754,17 +2790,15 @@ const Payments = {
      *   @type: string
      *   @desc: The refund reason.
      */
-    create_refund: async function(payment: number | string, line_items: any[] | null = null, reason: string = "refund"): Promise<any> {
-        return Utils.request_v1({
+    export function create_refund(
+        payload: PaddleBackend.Endpoints.RefundPayment.Params
+    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.RefundPayment.Result> {
+        return Utils.request({
             method: "POST",
             url: "/volt/payments/refund",
-            data: {
-                payment,
-                line_items,
-                reason,
-            }
+            data: payload
         });
-    },
+    }
 
     // Cancel subscription.
     /**
@@ -2780,15 +2814,15 @@ const Payments = {
      *   @type: string
      *   @desc: The product id.
      */
-    cancel_subscription: async function(product: string): Promise<any> {
-        return Utils.request_v1({
+    export function cancel_subscription(
+        payload: PaddleBackend.Endpoints.CancelSubscription.Params
+    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.CancelSubscription.Result> {
+        return Utils.request({
             method: "DELETE",
             url: "/volt/payments/subscription",
-            data: {
-                product,
-            }
+            data: payload
         });
-    },
+    }
 
     // Is subscribed.
     /**
@@ -2803,15 +2837,15 @@ const Payments = {
      *   @type: string
      *   @desc: The product id.
      */
-    is_subscribed: async function(product: string): Promise<any> {
-        return Utils.request_v1({
+    export function is_subscribed(
+        payload: PaddleBackend.Endpoints.IsSubscribed.Params
+    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.IsSubscribed.Result> {
+        return Utils.request({
             method: "GET",
             url: "/volt/payments/subscribed",
-            data: {
-                product,
-            }
+            data: payload
         });
-    },
+    }
 
     // Get active subscriptions.
     /**
@@ -2821,18 +2855,21 @@ const Payments = {
      * @title: Get active subscriptions
      * @desc: Get the active subscriptions of the authenticated user.
      */
-    get_active_subscriptions: async function(): Promise<any> {
-        return Utils.request_v1({
+    export function get_active_subscriptions(): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetActiveSubscriptions.Result> {
+        return Utils.request({
             method: "GET",
             url: "/volt/payments/active_subscriptions",
         });
-    },
+    }
 
     // Shopping cart.
 
     // The shopping cart object.
-    cart: {
-        items: [] as any[],
+    export namespace Cart {
+        export let items: {
+            product: Product;
+            quantity: number;
+        }[] = [];
 
         // Refresh the shopping cart.
         /**
@@ -2845,17 +2882,17 @@ const Payments = {
          *
          *   The current cart items are accessible as `Payments.cart.items`.
          */
-        refresh: function(): void {
+        export function refresh(): void {
             // Load from local storage.
             try {
-                this.items = JSON.parse(localStorage.getItem("volt_shopping_cart") as string) || [];
+                Cart.items = JSON.parse(localStorage.getItem("volt_shopping_cart") as string) || [];
             } catch(err) {
-                this.items = [];
+                Cart.items = [];
             }
 
             // Reset the charge objects.
-            Payments._reset();
-        },
+            _reset_payment_element();
+        }
 
         // Save the shopping cart.
         /**
@@ -2868,13 +2905,13 @@ const Payments = {
          *
          *   The current cart items are accessible as `Payments.cart.items`.
          */
-        save: function(): void {
+        export function save(): void {
             // Save to local storage.
-            localStorage.setItem("volt_shopping_cart", JSON.stringify(this.items));
+            localStorage.setItem("volt_shopping_cart", JSON.stringify(Cart.items));
 
             // Reset the charge objects.
-            Payments._reset();
-        },
+            _reset_payment_element();
+        }
 
         // Add a product to the shopping cart.
         /**
@@ -2899,9 +2936,9 @@ const Payments = {
          *   @description: The quantity to add.
          *   @type: number
          */
-        add: async function(id: string, quantity: number = 1): Promise<void> {
-            this.refresh(); // Update in case another window has updated the cart.
-            const found = this.items.some((item: any) => {
+        export async function add(id: string, quantity: number = 1): Promise<void> {
+            Cart.refresh(); // Update in case another window has updated the cart.
+            const found = Cart.items.some((item: any) => {
                 if (item.product.id === id) {
                     item.quantity += quantity;
                     return true;
@@ -2911,8 +2948,9 @@ const Payments = {
             if (!found) {
                 try {
                     const product = await Payments.get_product(id);
-                    this.items.push({
-                        product: product,
+                    if (product.error) throw new Error(product.error.message)
+                    Cart.items.push({
+                        product: product.data,
                         quantity: quantity,
                     });
                 } catch (error: any) {
@@ -2921,8 +2959,8 @@ const Payments = {
                     throw new Error(`Failed to add product with id "${id}" to the cart.`);
                 }
             }
-            this.save();
-        },
+            Cart.save();
+        }
 
         // Remove a product from the shopping cart.
         /**
@@ -2945,10 +2983,10 @@ const Payments = {
          *   @description: The quantity to remove. When the quantity value is "all", the entire product will be removed from the shopping cart.
          *   @type: number | "all"
          */
-        remove: async function(id: string, quantity: number | "all" = 1): Promise<void> {
-            this.refresh(); // Update in case another window has updated the cart.
+        export async function remove(id: string, quantity: number | "all" = 1): Promise<void> {
+            Cart.refresh(); // Update in case another window has updated the cart.
             let new_cart: any[] = [];
-            this.items.forEach((item: any) => {
+            Cart.items.forEach((item: any) => {
                 if (item.product.id === id) {
                     if (quantity === "all") {
                         item.quantity = 0;
@@ -2960,9 +2998,9 @@ const Payments = {
                     new_cart.push(item);
                 }
             });
-            this.items = new_cart;
-            this.save();
-        },
+            Cart.items = new_cart;
+            Cart.save();
+        }
 
         // Clear the shopping cart.
         /**
@@ -2977,15 +3015,15 @@ const Payments = {
          *
          *   The current cart items are accessible as `Payments.cart.items`.
          */
-        clear: async function(): Promise<void> {
-            this.items = [];
-            this.save();
+        export async function clear(): Promise<void> {
+            Cart.items = [];
+            Cart.save();
         }
-    },
-
+    }
 
 };
-
-// Exports.
-export { Payments };
 export { Payments as payments }; // also export as lowercase for compatibility.
+
+// APPLY_FIX // @todo if undeprecate: convert to namespace
+// APPLY_FIX // @todo if undeprecate: audit by claude
+// APPLY_FIX // @todo if undeprecate: remove request_v1 everywhere in volt, return Utils.RequestResult instead

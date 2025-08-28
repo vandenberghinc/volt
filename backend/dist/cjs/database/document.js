@@ -1,6 +1,8 @@
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -14,69 +16,62 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var stdin_exports = {};
 __export(stdin_exports, {
-  Document: () => Document,
-  ExtendedDocument: () => ExtendedDocument
+  Document: () => Document
 });
 module.exports = __toCommonJS(stdin_exports);
-var import_logger = require("../logger.js");
+var vlib = __toESM(require("@vandenberghinc/vlib"));
+var mongodb = __toESM(require("mongodb"));
 var import_status = require("../status.js");
 var import_utils = require("../utils.js");
-const { log } = import_logger.logger;
-class Document {
-  /** Attributes */
-  ref;
-  data;
-  /** Constructor
-   * @param ref The document reference object.
-   * @param data The initialized document data.
-  */
-  constructor(ref, data) {
-    this.ref = ref;
-    this.data = data;
-  }
-  /** Check if a document exists.
-    * @note this does not load the full document.
-    */
-  async exists() {
-    return this.ref.exists();
-  }
-}
+var import_collection = require("./collection.js");
+var Document;
 (function(Document2) {
   class Ref {
     col;
     query;
     def;
-    chunked;
+    // chunked: boolean;
     record_version;
+    // defaults to 1.
     error_type;
     transform_version;
     _on_load;
-    /** Constructor
-     * @param col The collection created by the server.
-     * @param uid The uid of the document, this is only required when the collection is a UIDCollection.
-     * @param query The document query, used to find the existing document.
-     * @param def The default value, when the default value is an object then the attributes will be checked / inserted as well.
-     * @param chunked If true then the document is stored in chunks.
-     * @param external_errors If true then the errors are thrown as external errors, instead of internal errors.
-     * @param record_version The record type version for the database.
-     *        This can be used in combination with parameter `transform_version` to ...
-     *        Transform older record versions to the current version.
-     * @param transform_version The function to transform an older document version to the current version.
-     * @param on_load The function to call when the document is loaded.
-    */
+    /** Construct a new `Ref` instance. */
     constructor(query, opts) {
+      if (!query || typeof query !== "string" && typeof query !== "object" || typeof query === "object" && query != null && Object.keys(query).length === 0) {
+        throw new (opts.external_errors ? import_utils.ExternalError : import_utils.InternalError)({
+          type: "InvalidDocumentRef",
+          message: "Query must be a non-empty string or a non-empty object",
+          status: import_status.Status.bad_request
+        });
+      }
       this.query = query;
       this.col = opts.col;
       this.def = opts.def;
-      this.chunked = opts.chunked || false;
       this.error_type = opts.external_errors ? import_utils.ExternalError : import_utils.InternalError;
-      this.record_version = typeof opts.record_version === "number" ? opts.record_version : 1;
       this.transform_version = opts.transform_version;
       this._on_load = opts.on_load;
-      if (this.record_version != 1 && !this.transform_version) {
+      const version = opts.record_version ?? 1;
+      if (!Number.isInteger(version) || version < 1) {
+        throw new this.error_type({
+          type: "InvalidDocumentRef",
+          message: "Record version must be a positive integer",
+          status: import_status.Status.bad_request
+        });
+      }
+      this.record_version = version;
+      if (this.record_version !== 1 && !this.transform_version) {
         throw new this.error_type({
           type: "InvalidDocumentRef",
           message: "Transform version must be set when record version is set.",
@@ -84,39 +79,66 @@ class Document {
         });
       }
     }
-    /** Insert defaults from constructor param `def`. */
-    insert_defaults(data) {
-      if (data && this.def && !Array.isArray(this.def) && (typeof this.def === "object" || typeof this.def === "function")) {
-        const set_defaults = (obj, defaults) => {
-          Object.keys(defaults).forEach((key) => {
-            if (obj[key] === void 0) {
-              obj[key] = defaults[key];
-            } else if (typeof obj[key] === "object" && !Array.isArray(obj[key]) && obj[key] != null && typeof defaults[key] === "object" && !Array.isArray(defaults[key]) && defaults[key] != null) {
-              set_defaults(obj[key], defaults[key]);
-            }
-          });
-        };
-        set_defaults(data, typeof this.def === "function" ? this.def() : this.def);
-      }
-    }
     /**
      * On load callback.
-     * @note this is not called when default data is used for an empty document.
+     *
+     * @param opts.insert_defaults Whether to insert default values.
+     *                             Defaults to `true`.
      */
-    on_load(data) {
-      if (this.record_version && data.__record_version !== 1) {
-        data = this.transform_version(this.record_version, data);
+    on_load(data, opts) {
+      if (this.record_version != null && this.transform_version != null && data.__record_version !== this.record_version) {
+        try {
+          data = this.transform_version(data.__record_version, this.record_version, data);
+        } catch (e) {
+          throw new this.error_type({
+            type: "DocumentTransformError",
+            message: `Failed to transform document version: ${e instanceof Error ? e.message : String(e)}`,
+            status: import_status.Status.internal_server_error,
+            cause: e
+          });
+        }
+        data.__record_version = this.record_version;
       }
-      this.insert_defaults(data);
+      if (this.record_version != null && data.__record_version == null) {
+        data.__record_version = this.record_version;
+      }
+      if (this.def && (opts?.insert_defaults ?? true)) {
+        try {
+          import_collection.Collection.insert_defaults_helper(data, this.as_default({ clone: false }), { clone: true });
+        } catch (e) {
+          throw new this.error_type({
+            type: "RecursionDepthExceeded",
+            message: e instanceof Error ? e.message : String(e),
+            status: import_status.Status.internal_server_error,
+            cause: e
+          });
+        }
+      }
       if (this._on_load) {
         data = this._on_load(data);
       }
       return data;
     }
-    /** Get the computed default value, when defined. */
-    as_default() {
+    /**
+     * Get the computed default value, when defined.
+     *
+     * Cloning the default object by default.
+     *
+     * @param opts.clone Whether to clone the default object.
+     *                   Defaults to `true`.
+     */
+    as_default(opts) {
       if (this.def) {
-        return typeof this.def === "function" ? this.def() : this.def;
+        const raw = typeof this.def === "function" ? this.def() : this.def;
+        if (opts?.clone ?? true) {
+          const cloned = typeof globalThis.structuredClone === "function" ? structuredClone(raw) : vlib.Object.deep_copy(raw);
+          cloned.__record_version = this.record_version;
+          return cloned;
+        }
+        return {
+          ...raw,
+          __record_version: this.record_version
+        };
       }
     }
     /** Check if a project exists.
@@ -126,14 +148,18 @@ class Document {
       return await this.col.exists(this.query);
     }
     /**
-     * Load a project from the database
+     * Load a project from the database.
+     * Automatically performing the optional {@link Ref.Opts.transform_version} and {@link Ref.Opts.on_load} callbacks.
+     *
      * @param def the default value, when the default value is an object then the attributes will be checked / inserted as well.
      */
     async load() {
-      const data = await this.col.load(this.query, { chunked: this.chunked });
+      let data = await this.col.load(this.query);
       if (!data) {
         if (this.def) {
-          return typeof this.def === "function" ? this.def() : this.def;
+          data = this.as_default();
+          data._id = new mongodb.ObjectId();
+          return this.on_load(data, { insert_defaults: false });
         }
         return;
       }
@@ -141,84 +167,131 @@ class Document {
     }
     /**
      * Load partial by projection.
+     *
+     * @warning This does not execute the optional {@link Ref.Opts.transform_version} and {@link Ref.Opts.on_load} callbacks.
+     *
      * @param fields The fields to load, nested fields should be separated by a dot (e.g. "a.b.c").
      */
     async load_partial(...fields) {
       const projection = {};
+      projection._id = 1;
+      projection.__record_version = 1;
       for (const field of fields) {
         projection[field] = 1;
       }
       return await this.col.load(this.query, { projection });
     }
-    /** Save the project to the database */
-    async save(data) {
-      data.__record_version = this.record_version;
-      return this.col.save(this.query, data, { chunked: this.chunked });
-    }
-    /** Save partial to the database
-     * @note automatically inserts the new values when the document is loaded.
+    /**
+     * Safely save the document to the database, internally executing {@link Collection.save}
+     * Inserting default values upon document creation.
+     *
+     * @note This retrieves the default document values opon every call.
+     *       Either by executing the {@link Ref.def} method, or by passing its
+     *       raw properties directly if it is passed as such.
+     *
+     * @warning Keep in mind that if you defined {@link Ref.def} as method,
+     *          it will be called on every call of this function.
      */
-    async save_partial(partial_data) {
-      if (this.chunked) {
-        throw new this.error_type({
-          type: "UnsupportedDocumentOperation",
-          message: "Chunked documents do not support partial updates.",
-          status: import_status.Status.bad_request
-        });
-      }
-      return this.col.save(this.query, partial_data, { chunked: this.chunked });
+    async safe_set(data, opts) {
+      const op_data = {
+        ...opts?.flatten ? this.col.flatten(data) : data,
+        __record_version: this.record_version
+      };
+      return this.col.save(this.query, {
+        $set: op_data,
+        $setOnInsert: this.as_default()
+      }, opts);
     }
-    /** Delete database record. */
+    /**
+     * Save the document to the database, internally executing {@link Collection.set}
+     *
+     * @warning This does not insert the default values upon document creation.
+     *          Use {@link safe_set} to safely insert defaults.
+     *
+     * @throws An error if the document write is not acknowledged by mongodb (failed) or if the matched query count is 0.
+     *         Or when `return` is `true` it returns an error if the returned document is undefined.
+     */
+    async set(data, opts) {
+      const op_data = {
+        ...data,
+        // flattening is handled in `col.set`.
+        __record_version: this.record_version
+      };
+      return this.col.set(this.query, op_data, opts);
+    }
+    /**
+     * Save the document to the database, internally executing {@link Collection.set}
+     *
+     * @warning This does not insert the default values upon document creation.
+     *          Use {@link safe_set} to safely insert defaults.
+     *
+     * @throws An error if the document write is not acknowledged by mongodb (failed) or if the matched query count is 0.
+     *         Or when `return` is `true` it returns an error if the returned document is undefined.
+     */
+    async set_partial(data, opts) {
+      const op_data = {
+        ...data,
+        // flattening is handled in `col.set`.
+        __record_version: this.record_version
+      };
+      return this.col.set(this.query, op_data, opts);
+    }
+    /**
+     * Save a single document without performing any default `$set` or `$inc` like operations.
+     * When a document does not exist it will automatically be created.
+     * Inserting default values upon document creation.
+     *
+     * @warning Keep in mind that if you defined {@link Ref.def} as method,
+     *          it will be called on every call of this function.
+     *
+     * @note This retrieves the default document values opon every call.
+     *       Either by executing the {@link Ref.def} method, or by passing its
+     *       raw properties directly if it is passed as such.
+     *
+     * @throws An error if the document write is not acknowledged by mongodb (failed) or if the matched query count is 0.
+     *         Or when `return` is `true` it returns an error if the returned document is undefined.
+     */
+    async safe_save(data, opts) {
+      if (data.$set == null) {
+        data.$set = { __record_version: this.record_version };
+      } else {
+        data.$set = {
+          ...data.$set,
+          __record_version: this.record_version
+        };
+      }
+      data.$setOnInsert = this.as_default();
+      return this.col.save(this.query, data, opts);
+    }
+    /**
+     * Save a single document without performing any default `$set` or `$inc` like operations.
+     * When a document does not exist it will automatically be created.
+     *
+     * @warning This does not insert the default values upon document creation.
+     *          Use {@link safe_save} to safely insert defaults.
+     *
+     * @throws An error if the document write is not acknowledged by mongodb (failed) or if the matched query count is 0.
+     *         Or when `return` is `true` it returns an error if the returned document is undefined.
+     */
+    async save(data, opts) {
+      if (data.$set == null) {
+        data.$set = { __record_version: this.record_version };
+      } else {
+        data.$set = {
+          ...data.$set,
+          __record_version: this.record_version
+        };
+      }
+      return this.col.save(this.query, data, opts);
+    }
+    /** Delete the database record. */
     async delete(opts) {
-      return this.col.delete(this.query, {
-        ...opts,
-        chunked: this.chunked
-      });
+      return this.col.delete(this.query, opts);
     }
   }
   Document2.Ref = Ref;
 })(Document || (Document = {}));
-class ExtendedDocument extends Document {
-  /** Constructor
-   * @param ref The document reference object.
-   * @param data The initialized document data.
-  */
-  constructor(ref, data) {
-    super(ref, data);
-  }
-  /** Wrapper function to insert an obj into another
-    * @note this is not a deep copy.
-    */
-  static __insert_obj(obj, partial) {
-    Object.keys(partial).forEach((key) => {
-      const val = partial[key];
-      if (val !== null && typeof val === "object" && !Array.isArray(val) && obj[key] !== null && typeof obj[key] === "object" && !Array.isArray(obj[key])) {
-        ExtendedDocument.__insert_obj(obj[key], val);
-      } else {
-        obj[key] = val;
-      }
-    });
-  }
-  /** Save the data to the database */
-  async save() {
-    return this.ref.save(this.data);
-  }
-  /** Save partial to the database
-    * @note automatically inserts the new values when the document is loaded.
-    */
-  async save_partial(partial_data) {
-    if (this.data && typeof partial_data === "object" && !Array.isArray(this.data) && partial_data && typeof partial_data === "object" && !Array.isArray(partial_data)) {
-      ExtendedDocument.__insert_obj(this.data, partial_data);
-    }
-    return this.ref.save_partial(partial_data);
-  }
-  /** Delete database record. */
-  async delete(opts) {
-    return this.ref.delete(opts);
-  }
-}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  Document,
-  ExtendedDocument
+  Document
 });

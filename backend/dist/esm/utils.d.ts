@@ -7,12 +7,13 @@ declare class BaseError extends Error {
     status: number;
     data?: any[] | Record<string, any>;
     invalid_fields: Record<string, string>;
-    constructor({ type, message, status, data, invalid_fields }: {
+    constructor({ type, message, status, data, invalid_fields, cause }: {
         type?: string;
         message: string;
         status?: number;
         data?: any;
         invalid_fields?: Record<string, string>;
+        cause?: unknown;
     });
     serve(stream: Stream): this;
 }

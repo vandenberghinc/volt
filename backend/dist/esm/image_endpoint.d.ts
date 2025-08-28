@@ -1,6 +1,17 @@
 import * as vlib from "@vandenberghinc/vlib";
 import { Endpoint } from "./endpoint.js";
 import { RateLimitGroup } from "./rate_limit.js";
+/**
+ * All static images are served through the `ImageEndpoint`.
+ *
+ * The image endpoint accepts three optional query parameters when retrieving the image to transform the image.
+ *     - `type` string: The input type.
+ *     - `width` number: The height of the image as a number `100` or percentage `50%` / `0.5x`. The aspect ratio will be maintained when `height` is undefined.
+ *     - `height` number: The width of the image as a number `100` or percentage `50%` / `0.5x`. The aspect ratio will be maintained when `width` is undefined.
+ *     - `aspect_ratio` boolean: Maintain the aspect ratio when only one resizing dimension has been defined.
+ * @docs
+ * @nav Backend/Endpoints
+ */
 declare class ImageEndpoint extends Endpoint implements Endpoint {
     static cache_in_memory: boolean;
     static supported_images: string[];
@@ -19,6 +30,6 @@ declare class ImageEndpoint extends Endpoint implements Endpoint {
     });
     transform(type?: string | null, width?: number | string | null, height?: number | string | null, aspect_ratio?: string | boolean | null): Promise<Buffer>;
     get_aspect_ratio(): Promise<string | null>;
-    _clear_cache(): void;
+    private _clear_cache;
 }
 export { ImageEndpoint };

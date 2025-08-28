@@ -1,3 +1,11 @@
+/**
+ * HTTP status codes.
+ * @example
+ * 	#include <vlib/sockets/http.h>
+ * 	short success = vlib::http::status::success;
+ * @nav Backend/Server
+ * @docs
+ */
 export declare const Status: {
     undefined: number;
     continue: number;
@@ -55,7 +63,7 @@ export declare const Status: {
     not_extended: number;
     network_auth_required: number;
     two_factor_auth_required: number;
-    get_description(status: number): string;
+    get_description(status: number | "unknown"): string;
 };
 export { Status as status };
 export default Status;

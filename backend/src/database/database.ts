@@ -7,78 +7,44 @@
 // Libraries.
 
 // External imports.
-import { ChildProcess, spawn } from "child_process";
 import { Db, MongoClient, ServerApiVersion } from 'mongodb';
+import * as mongodb from "mongodb"
 
 // Imports.
-import { logger } from "../logger.js";
-import * as vlib from "@vandenberghinc/vlib";
-import { Collection, IndexOptions } from "./collection.js";
+import { Collection, TransactionCollection, IndexOpts } from "./collection.js";
 import type { Server } from "../server.js";
-import { Document } from "./document.js";
-
-/** Debug */
-const { log } = logger;
 
 // ---------------------------------------------------------
 // Database.
 
-/*  @docs:
-    @nav: Backend
-    @chapter: Database
-    @title: Database
-    @desc: 
-        The MongoDB database class, accessable under `Server.db`.
+export namespace Database {
 
-        The database class can be utilized in two ways.
+    /** The database constructor options. */
+    export interface Opts {
+        /** The database URI. */
+        uri: string,
+        /** The additional cient options. */
+        client?: Record<string, any>,
+    }
+}
 
-        1. You only provide the `uri` parameter to access an already running mongodb database.
-
-        2. You provide parameters `config` and `start_args` to start and optionally create the database.
-
-    @warning: 
-        Do not forget to enable TLS when using the `config` parameter.
-    @param:
-        @name: uri
-        @desc: The mongodb server uri.
-        @type: string
-    @param:
-        @name: source
-        @desc: The source path of the database directory, by default path `$server_source/.db` will be used.
-        @type: null, string
-    @param:
-        @name: config
-        @desc: The json data for the mongodb config file.
-        @type: null, string
-    @param:
-        @name: start_args
-        @desc: The mongod database start command arguments.
-        @type: null, array[string]
-    @param:
-        @name: client
-        @desc: The MongoClient options.
-        @type: null, object
+/**
+ * The MongoDB database class, accessable under `Server.db`.
+ * @docs
+ * @nav Backend/Database
 */
 export class Database {
     static constructor_scheme = {
         uri: {type: "string", default: null},
-        source: {type: "string", default: null},
-        config: {type: "object", default: {}},
-        start_args: {type: "array", default: []},
         client: {type: "object", default: {}},
-        collections: {type: "array", default: [], value_scheme: {
-            type: ["string", "object"],
-            preprocess: (info: string | Record<string, any>) => typeof info === "string" ? {name: info} : info,
-            scheme: {
-                name: Collection.constructor_scheme.name,
-                ttl: Collection.constructor_scheme.ttl,
-                indexes: Collection.constructor_scheme.indexes,
-            },
-        }},
-        preview: {type: "boolean", default: true},
-        preview_ip_whitelist: {type: "array", default: []},
-        daemon: {type: ["object", "boolean"], default: {}},
         _server: {type: ["object", "undefined"]},
+
+        // source: {type: "string", default: null},
+        // config: {type: "object", default: {}},
+        // start_args: {type: "array", default: []},
+        // preview: {type: "boolean", default: true},
+        // preview_ip_whitelist: {type: "array", default: []},
+        // daemon: {type: ["object", "boolean"], default: {}},
     }
 
     // Attributes.
@@ -87,7 +53,7 @@ export class Database {
     server: Server;
     client?: MongoClient;
     _db?: Db;
-    collections = new Map<string, Collection>();
+    collections = new Map<string, Collection<any>>();
 
     private _connect_promise?: Promise<void>;
 
@@ -98,17 +64,13 @@ export class Database {
         uri,
         client,
         _server,
-    }: {
-        uri: string,
-        client?: Record<string, any>,
-        _server: Server,
-    }) {
+    }: Database.Opts & { _server: Server }) {
         this.uri = uri;
         this.client_opts = client;
         this.server = _server;
         
         // DEPRECATED
-        
+
         // source?: string,
         // config?: Record<string, any>,
         // start_args?: string[],
@@ -118,9 +80,9 @@ export class Database {
 
         // Checks.
         // if (!_server || (_server.is_primary && uri == null)) {
-        //     ({uri, config, start_args, config, client} = vlib.Scheme.verify({
+        //     ({uri, config, start_args, config, client} = vlib.Schema.verify({
         //         object: arguments[0],
-        //         check_unknown: true, 
+        //         check_unknown: true,
         //         throw_err: true,
         //         scheme: Database.constructor_scheme
         //     }));
@@ -136,7 +98,7 @@ export class Database {
         // if (this.server?.daemon && daemon !== false) {
         //     const log_source = this.server.source.join(".logs");
         //     if (!log_source.exists()) {
-        //         log_source.mkdir_sync();
+        //         log_source.mkdir_sync({ recursive: true });
         //     }
         //     if (!this.server) {
         //         throw new Error("Parameter 'Database._server' must be defined for this behaviour.");
@@ -173,9 +135,9 @@ export class Database {
             await this.client.connect();
             this._db = this.client.db();
             this.connected = true;
-            log(1, "Connected to the database.");
+            this.server.log(1, "Connected to the database.");
         } catch (error) {
-            console.error(error);
+            this.server.log.error(error);
             throw new Error('Error connecting to the database');
         }
     }
@@ -210,7 +172,7 @@ export class Database {
 
     // Close.
     async close(): Promise<void> {
-        log(0, "Stopping the database.");
+        this.server.log(0, "Stopping the database.");
         await this.client?.close();
     }
 
@@ -221,16 +183,17 @@ export class Database {
      * @param info.unique If true, an error will be thrown if the collection already exists.
      *                    By default it is false.
      */
-    async collection<Data extends Document.Data = any>(info: 
+    collection<Data extends mongodb.Document = mongodb.Document>(info: 
         string |
-        (Omit<ConstructorParameters<typeof Collection>[0], "db"> & {
+        (Omit<Collection.Opts<Data>, "db"> & {
             unique?: boolean;
         })
-    ): Promise<Collection<Data>> {
+    ): Collection<Data> {
+        
         // Set name by single string argument.
         let name: string;
         let unique = false;
-        let args: Omit<ConstructorParameters<typeof Collection<Data>>[0], "db"> | undefined;
+        let args: Omit<Collection.Opts<Data>, "db"> | undefined;
         if (typeof info === "string") {
             name = info;
         } else {
@@ -256,26 +219,6 @@ export class Database {
         this.collections.set(name, col);
         return col;
 
-        
-        // Logs.
-        // debug(2, `Initializing collection "${name}".`);
-
-        // // Check if the collection exists
-        // if (this._listed_cols == null) {
-        //     this._listed_cols = await this.db.listCollections().toArray();
-        // }
-        // if (!this._listed_cols.find(x => x.name === name)) {
-        //     log(0, `Creating collection "${name}".`);
-        //     await this.db.createCollection(name);
-        // }
-        
-        // // Create collection.
-        // const col: Collection = Collection.create({
-        //     ...info,
-        //     collection: this.db.collection(name),
-        // });
-        // this.collections.set(name, col);
-        // return col;
     }
 
 
@@ -823,26 +766,6 @@ export class Database {
     // start_args: string[];
     // config: Record<string, any>;
 
-
-    /*  @docs:
-     *  @title: Get Collections
-     *  @description: Get the names of the initializated database collections.
-     */
-    // async get_collections(): Promise<string[]> {
-    //     const created = Object.keys(Array.from(this.collections.keys()));
-    //     const database = (await this.db.listCollections().toArray()).map((item: any) => item.name);
-    //     return created.concat(database)
-    //         .filter((value, index, self) => self.indexOf(value) === index)
-    //         .sort((a, b) => {
-    //             const result = a.toLowerCase().localeCompare(b.toLowerCase());
-    //             if (a.startsWith('_') && b.startsWith('_')) { return result; }
-    //             if (a.startsWith('_')) { return 1; }
-    //             if (b.startsWith('_')) { return -1; }
-    //             return result;
-    //         });
-    // }
-
-
     // DEPRECATED
     // _start_mongo(): void {
 
@@ -870,7 +793,7 @@ export class Database {
     //     const db_path = this.source.join("db");
     //     this.config.storage.dbPath = db_path.str()
     //     if (!db_path.exists()) {
-    //         db_path.mkdir_sync();
+    //         db_path.mkdir_sync({ recursive: true });
     //     }
 
     //     if (this.config.processManagement === undefined) { this.config.processManagement = {}; }
@@ -885,7 +808,7 @@ export class Database {
     // if (this.server?.is_primary && this.uri == null) {
     //     // Create the database.
     //     if (!this.source!.exists()) {
-    //         this.source!.mkdir_sync();
+    //         this.source!.mkdir_sync({ recursive: true });
     //     }
 
     //     // Set the uri.

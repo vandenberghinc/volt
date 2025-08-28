@@ -36,15 +36,12 @@ var import_view = require("./view.js");
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var import_utils = require("./utils.js");
 var import_status = require("./status.js");
-var import_logger = require("./logger.js");
 var import_rate_limit = require("./rate_limit.js");
 var import_route = require("./route.js");
 var import_meta = __toESM(require("./meta.js"));
-const { log, error, warn } = import_logger.logger;
 const { debug } = vlib;
 class Endpoint {
   // Static attributes.
-  static rate_limits = /* @__PURE__ */ new Map();
   static compressed_content_types = [
     // Image formats (often already compressed)
     "image/jpeg",
@@ -106,7 +103,7 @@ class Endpoint {
   /** Requires authentication */
   authenticated;
   /** Parameter scheme validator */
-  params_val;
+  params_schema;
   /** The default response headers */
   headers;
   /** Option 2) View based endpoint */
@@ -114,6 +111,8 @@ class Endpoint {
   /** Option 3) Data endpoint, raw */
   data;
   raw_data;
+  /** Option 4 Data endpoint by file path. */
+  file_path;
   /** Content length & type */
   content_length;
   content_type;
@@ -127,33 +126,31 @@ class Endpoint {
   /** Private attributes */
   _compress;
   _cache;
-  _static_path;
-  _templates;
   ip_whitelist;
   _is_compressed;
   _initialized = false;
-  _server;
+  /** A reference to the server. */
+  server;
   constructor({
     method = "GET",
     endpoint = "/",
     authenticated = false,
     rate_limit = void 0,
     params = void 0,
-    callback = void 0,
-    view = void 0,
-    data = void 0,
-    content_type,
-    // = "text/plain",
     compress = "auto",
     cache = true,
     ip_whitelist = void 0,
     sitemap = void 0,
     robots = void 0,
     allow_unknown_params = false,
-    _templates = {},
-    // only used in loading static files.
-    _static_path = void 0,
-    _is_static = false
+    _is_static = false,
+    // mode options.
+    callback = void 0,
+    view = void 0,
+    data = void 0,
+    file_path = void 0,
+    content_type
+    // = "text/plain",
   }) {
     this.route = new import_route.Route(method, endpoint);
     this.id = this.route.id;
@@ -166,8 +163,7 @@ class Endpoint {
     this._cache = cache;
     this.allow_sitemap = sitemap ?? true;
     this.allow_robots = robots ?? true;
-    this._templates = _templates;
-    this._static_path = _static_path == null ? void 0 : new vlib.Path(_static_path).abs().str();
+    this.file_path = file_path == null ? file_path : new vlib.Path(file_path).abs();
     this.ip_whitelist = Array.isArray(ip_whitelist) ? ip_whitelist : void 0;
     this.is_static = _is_static;
     this.headers = [];
@@ -209,10 +205,20 @@ class Endpoint {
     this.rate_limit_groups = [];
     if (Array.isArray(rate_limit)) {
       rate_limit.forEach((item) => {
-        this.rate_limit_groups.push(import_rate_limit.RateLimits.add(item));
+        if (typeof item === "string") {
+          const group = import_rate_limit.RateLimits.groups.get(item);
+          if (!group)
+            throw new Error(`Rate limit group "${item}" does not exist.`);
+          this.rate_limit_groups.push(group);
+        } else {
+          this.rate_limit_groups.push(import_rate_limit.RateLimits.add(item));
+        }
       });
     } else if (typeof rate_limit === "string") {
-      this.rate_limit_groups.push(import_rate_limit.RateLimits.add({ group: rate_limit }));
+      const group = import_rate_limit.RateLimits.groups.get(rate_limit);
+      if (!group)
+        throw new Error(`Rate limit group "${rate_limit}" does not exist.`);
+      this.rate_limit_groups.push(group);
     } else if (typeof rate_limit === "object" && rate_limit != null) {
       this.rate_limit_groups.push(import_rate_limit.RateLimits.add(rate_limit));
     }
@@ -230,9 +236,9 @@ class Endpoint {
       });
     }
     if (params_scheme != null) {
-      this.params_val = new vlib.scheme.Validator("object", {
-        scheme: params,
-        strict: !allow_unknown_params,
+      this.params_schema = new vlib.Schema.Validator({
+        schema: params_scheme,
+        unknown: !allow_unknown_params,
         parent: this.route.id + ":",
         throw: false
       });
@@ -240,7 +246,7 @@ class Endpoint {
   }
   /** Initialize with server. */
   _initialize(server) {
-    this._server = server;
+    this.server = server;
     if (this.view != null) {
       this.view._initialize(server, this);
     }
@@ -253,64 +259,18 @@ class Endpoint {
     }
     return this;
   }
-  /**
-   * Convert a RegExp into a readable path:
-   * - strips ^…$ anchors
-   * - unescapes `\/` → `/`
-   * - `(?<name>…)` → `:name`
-   * - anonymous captures `(…)` → `:param1`, `:param2`, …
-   */
-  _stringify_endpoint_regex(re) {
-    let src = re.source;
-    src = src.replace(/^\^/, "").replace(/\$$/, "");
-    src = src.replace(/\\\//g, "/");
-    src = src.replace(/\(\?<([^>]+)>[^)]+\)/g, (_match, name) => `:${name}`);
-    let idx = 1;
-    src = src.replace(/\((?!\?)[^)]+\)/g, () => `:param${idx++}`);
-    return src;
-  }
-  // Load data by path.
-  _load_data_by_path(server) {
-    const path = new vlib.Path(this._static_path);
-    let data;
-    if (path.extension() === ".js") {
-      data = path.load_sync();
-    } else if (path.extension() === ".css") {
-      const minifier = new import_clean_css.default();
-      data = minifier.minify(path.load_sync()).styles;
-    } else {
-      data = path.load_sync({ type: "buffer" });
-    }
-    if (this._templates && typeof data === "string") {
-      data = import_utils.Utils.fill_templates(data, this._templates);
-    }
-    this.data = data;
-    return this;
-  }
-  // Set default headers.
-  _set_headers(stream) {
-    this.headers.forEach((item) => {
-      stream.set_header(item[0], item[1]);
-    });
-  }
-  // Refresh for file watcher.
-  async _refresh(server) {
-    if (server.production) {
-      throw new Error("This function is not designed for production mode.");
-    }
-    if (this.view != null) {
-      await this.view._build_html();
-    }
-  }
   // Initialize.
   async _dynamic_initialize() {
-    if (!this._server) {
+    if (!this.server) {
       throw new Error(`Endpoint "${this.id}" is not initialized by the server yet.`);
     }
     if (this.view != null) {
       await this.view._build_html();
     }
-    if (this._server.production && this.callback == null && this._compress) {
+    if (this.file_path != null) {
+      this._load_data_by_path(this.server);
+    }
+    if (this.server.production && this.callback == null && this._compress) {
       this._is_compressed = true;
       if (this.data != null && (this.data instanceof Buffer || typeof this.data === "string")) {
         this.raw_data = this.data;
@@ -346,6 +306,12 @@ class Endpoint {
     }
     this._initialized = true;
   }
+  // Set default headers.
+  _set_headers(stream) {
+    this.headers.forEach((item) => {
+      stream.set_header(item[0], item[1]);
+    });
+  }
   // Serve a client.
   async _serve_options(stream) {
     if (!this._initialized) {
@@ -371,7 +337,7 @@ class Endpoint {
     }
     try {
       if (this.ip_whitelist && !this.ip_whitelist.includes(stream.ip)) {
-        log(2, this.route.id, ": ", "Blocking ip ", stream.ip, " per ip whitelist.");
+        this.server?.log(2, this.route.id, ": ", "Blocking ip ", stream.ip, " per ip whitelist.");
         stream.send({
           status: import_status.Status.unauthorized,
           data: "Unauthorized."
@@ -380,15 +346,15 @@ class Endpoint {
       }
       this._set_headers(stream);
       if (this.callback != null) {
-        log(3, this.route.id, ": ", "Serving endpoint in callback mode.");
-        if (this.params_val != null) {
-          const { error: error2, invalid_fields } = this.params_val.validate(stream.param);
-          if (error2) {
+        this.server?.log(3, this.route.id, ": ", "Serving endpoint in callback mode.");
+        if (this.params_schema != null) {
+          const { error, invalid_fields } = this.params_schema.validate(stream.params ?? {});
+          if (error) {
             stream.send({
               status: import_status.Status.bad_request,
               headers: { "Content-Type": "application/json" },
               data: {
-                error: error2,
+                error,
                 invalid_fields
               }
             });
@@ -397,7 +363,7 @@ class Endpoint {
         }
         try {
           let promise;
-          if (this.params_val != null) {
+          if (this.params_schema != null) {
             promise = this.callback(stream, stream.params ?? {});
           } else {
             promise = this.callback(stream, {});
@@ -416,15 +382,15 @@ class Endpoint {
               type: "InternalServerError"
             });
           }
-          error(`${this.id}: `, err);
+          this.server?.log.error(`${this.id}: `, err);
         }
         return;
       } else if (this.view != null) {
-        log(3, this.route.id, ": ", "Serving endpoint in view mode.");
+        this.server?.log(3, this.route.id, ": ", "Serving endpoint in view mode.");
         this.view._serve(stream, status_code);
         return;
       } else if (this.data != null) {
-        log(3, this.route.id, ": ", "Serving endpoint in data mode.");
+        this.server?.log(3, this.route.id, ": ", "Serving endpoint in data mode.");
         stream.send({
           status: status_code,
           data: this.data
@@ -436,6 +402,24 @@ class Endpoint {
     } catch (err) {
       throw err;
     }
+  }
+  // Load data by path.
+  _load_data_by_path(server) {
+    if (!this.file_path) {
+      throw new Error(`Endpoint "${this.id}" has no file path assigned.`);
+    }
+    const path = new vlib.Path(this.file_path);
+    let data;
+    if (path.extension() === ".js") {
+      data = path.load_sync();
+    } else if (path.extension() === ".css") {
+      const minifier = new import_clean_css.default();
+      data = minifier.minify(path.load_sync()).styles;
+    } else {
+      data = path.load_sync({ type: "buffer" });
+    }
+    this.data = data;
+    return this;
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

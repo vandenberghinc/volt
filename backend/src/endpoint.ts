@@ -10,17 +10,14 @@ import CleanCSS from 'clean-css';
 import zlib from 'zlib';
 import { View } from './view.js';
 import * as vlib from "@vandenberghinc/vlib";
-import * as vhighlight from "@vandenberghinc/vhighlight";
-import { Utils, ExternalError, InternalError } from "./utils.js";
+import { ExternalError, InternalError } from "./utils.js";
 import { Status } from "./status.js";
-import { logger } from "./logger.js";
-import { RateLimits, RateLimitGroup } from "./rate_limit.js";
+import { RateLimits, RateLimitGroup, RateLimitData } from "./rate_limit.js";
 import { Stream, AuthStream } from "./stream.js";
 import type { Server } from "./server.js";
 import { Route } from './route.js';
 import Meta from './meta.js';
 
-const { log, error, warn } = logger;
 const { debug } = vlib;
 
 // ---------------------------------------------------------
@@ -117,10 +114,9 @@ const { debug } = vlib;
  *   these attributes are reassigned for the same group.
  */
 
-export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
+export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
 
     // Static attributes.
-    static rate_limits: Map<string, any> = new Map();
     static compressed_content_types: string[] = [
         // Image formats (often already compressed)
         "image/jpeg",
@@ -171,7 +167,7 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
         "application/vnd.ms-fontobject",
         // Other binary data
         "application/octet-stream",
-    ]
+    ];
 
     /** Route attributes */
     id: string;
@@ -181,21 +177,24 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
     authenticated: boolean;
 
     /** Parameter scheme validator */
-    params_val?: vlib.scheme.Validator<object, object, "object">;
+    params_schema?: vlib.Schema.Validator<object>;
 
     /** The default response headers */
     headers: [string, string][];
 
     /** Option 1) User callback - defined as method so a derived endpoint can do that as well. */
-    callback?(stream: Stream, params: vlib.scheme.Infer.Scheme<S>): any;
-    callback?(stream: AuthStream, params: vlib.scheme.Infer.Scheme<S>): any;
+    callback?(stream: Stream, params: vlib.Schema.Entries.Infer<S>): any;
+    callback?(stream: AuthStream, params: vlib.Schema.Entries.Infer<S>): any;
 
     /** Option 2) View based endpoint */
     view?: View;
 
     /** Option 3) Data endpoint, raw */
-    data: Buffer | string | any[] | Record<any, any>;
+    data?: Buffer | string | any[] | Record<any, any>;
     raw_data?: Buffer | string | any[] | Record<any, any>;
+
+    /** Option 4 Data endpoint by file path. */
+    file_path?: vlib.Path;
 
     /** Content length & type */
     content_length?: number;
@@ -208,18 +207,18 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
     allow_robots: boolean;
 
     /** Rate limit groups for internal use. */
-    rate_limit_groups: ReturnType<typeof RateLimits.add>[];
+    rate_limit_groups: RateLimitData[];
 
     /** Private attributes */
     private _compress: boolean;
     private _cache: boolean | number;
-    public _static_path?: string; 
-    private _templates: Record<string, any>;
     private ip_whitelist?: string[];
     private _is_compressed?: boolean;
 
     private _initialized = false;
-    private _server?: Server;
+
+    /** A reference to the server. */
+    server?: Server;
 
     constructor({
         method = "GET",
@@ -227,45 +226,79 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
         authenticated = false,
         rate_limit = undefined,
         params = undefined,
-        callback = undefined,
-        view = undefined,
-        data = undefined,
-        content_type,// = "text/plain",
         compress = "auto",
         cache = true,
         ip_whitelist = undefined,
         sitemap = undefined,
         robots = undefined,
         allow_unknown_params = false,
-        _templates = {}, // only used in loading static files.
-        _static_path = undefined,
         _is_static = false,
-    }: 
-        {
-            method?: string,
-            endpoint: string | RegExp,
-            authenticated?: boolean,
-            rate_limit?: string | RateLimitGroup | RateLimitGroup[],
-            params?: S,
-            callback?:
-            | ((stream: Stream, params: vlib.scheme.Infer.Scheme<S>) => any)
-            | ((stream: AuthStream, params: vlib.scheme.Infer.Scheme<S>) => any),
-            data?: any,
-            compress?: "auto" | boolean,
-            cache?: boolean | number,
-            ip_whitelist?: string[],
-            sitemap?: boolean,
-            robots?: boolean,
-            _templates?: Record<string, any>,
-            _static_path?: string,
-            _is_static?: boolean,
-            allow_unknown_params?: boolean;
-        }
+        // mode options.
+        callback = undefined,
+        view = undefined,
+        data = undefined,
+        file_path = undefined,
+        content_type,// = "text/plain",
+    }: {
+        method?: string,
+        endpoint: string | RegExp,
+        rate_limit?: string | RateLimitGroup | (string | RateLimitGroup)[],
+        params?: S,
+        compress?: "auto" | boolean,
+        cache?: boolean | number,
+        ip_whitelist?: string[],
+        sitemap?: boolean,
+        robots?: boolean,
+        _is_static?: boolean,
+        allow_unknown_params?: boolean;
+    }
+        // Modes.
         & (
-            // With view.
-            | { view: View | View.Opts; content_type?: string }
-            // Without view, content type is required.
-            | { view?: null | undefined; content_type: string }
+            // With data & content type.
+            | {
+                data?: Buffer | string | any[] | Record<any, any>;
+                file_path?: never;
+                view?: never;
+                authenticated?: boolean,
+                callback?: never;
+                content_type: string;
+            }
+            // With file path & content type.
+            | {
+                data?: never;
+                file_path: string | vlib.Path;
+                authenticated?: boolean,
+                callback?: never;
+                view?: never;
+                content_type: string;
+            }
+            // With callback & content type.
+            | {
+                data?: never;
+                file_path?: never;
+                authenticated?: false,
+                callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any)
+                view?: never;
+                content_type: string;
+            }
+            // With authenticated callback & content type.
+            | {
+                data?: never;
+                file_path?: never;
+                authenticated: true,
+                callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any),
+                view?: never;
+                content_type: string;
+            }
+            // With view, and optional content type.
+            | {
+                data?: never;
+                file_path?: never;
+                authenticated?: boolean,
+                callback?: never;
+                view: View | View.Opts;
+                content_type?: string;
+            }
         )
     ) {
         
@@ -281,8 +314,7 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
         this._cache = cache;
         this.allow_sitemap = sitemap ?? true;
         this.allow_robots = robots ?? true;
-        this._templates = _templates;
-        this._static_path = _static_path == null ? undefined : new vlib.Path(_static_path).abs().str(); // use abs, is automatically assigned for static files.
+        this.file_path = file_path == null ? file_path : new vlib.Path(file_path).abs();
         this.ip_whitelist = Array.isArray(ip_whitelist) ? ip_whitelist : undefined;
         this.is_static = _is_static;
         this.headers = [];
@@ -341,16 +373,24 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
         this.rate_limit_groups = [];
         if (Array.isArray(rate_limit)) {
             rate_limit.forEach((item) => {
-                this.rate_limit_groups.push(RateLimits.add(item))
+                if (typeof item === "string") {
+                    const group = RateLimits.groups.get(item);
+                    if (!group) throw new Error(`Rate limit group "${item}" does not exist.`);
+                    this.rate_limit_groups.push(group);
+                } else {
+                    this.rate_limit_groups.push(RateLimits.add(item))
+                }
             });
         } else if (typeof rate_limit === "string") {
-            this.rate_limit_groups.push(RateLimits.add({group: rate_limit}))
+            const group = RateLimits.groups.get(rate_limit);
+            if (!group) throw new Error(`Rate limit group "${rate_limit}" does not exist.`);
+            this.rate_limit_groups.push(group);
         } else if (typeof rate_limit === "object" && rate_limit != null) {
             this.rate_limit_groups.push(RateLimits.add(rate_limit))
         }
 
         // Add path parameters from route.
-        let params_scheme: vlib.scheme.Scheme.Opts | undefined = params;
+        let params_scheme: vlib.Schema.Entries.Opts | undefined = params;
         if (this.route.params.length > 0) {
             params_scheme ??= {} as any;
             this.route.params.forEach((item) => {
@@ -367,9 +407,9 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
 
         // Initialize the parameter scheme validator.
         if (params_scheme != null) {
-            this.params_val = new vlib.scheme.Validator("object", {
-                scheme: params,
-                strict: !allow_unknown_params,
+            this.params_schema = new vlib.Schema.Validator({
+                schema: params_scheme,
+                unknown: !allow_unknown_params,
                 parent: this.route.id + ":",
                 throw: false,
             });
@@ -380,7 +420,7 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
     _initialize(server: Server): this {
 
         // Assign attribute.
-        this._server = server;
+        this.server = server;
         
         // Initialize view.
         if (this.view != null) {
@@ -397,106 +437,10 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
         }
         return this;
     }
-        
-
-    /**
-     * Convert a RegExp into a readable path:
-     * - strips ^…$ anchors
-     * - unescapes `\/` → `/`
-     * - `(?<name>…)` → `:name`
-     * - anonymous captures `(…)` → `:param1`, `:param2`, …
-     */
-    _stringify_endpoint_regex(re: RegExp): string {
-        let src = re.source;
-
-        // 1) strip anchors
-        src = src.replace(/^\^/, "").replace(/\$$/, "");
-
-        // 2) unescape slashes
-        src = src.replace(/\\\//g, "/");
-
-        // 3) named capture groups → :name
-        src = src.replace(/\(\?<([^>]+)>[^)]+\)/g, (_match, name) => `:${name}`);
-
-        // 4) anonymous captures → :paramN
-        let idx = 1;
-        src = src.replace(/\((?!\?)[^)]+\)/g, () => `:param${idx++}`);
-
-        return src;
-    }
-
-    // Load data by path.
-    _load_data_by_path(server: any): this {
-        // Load data.
-        const path = new vlib.Path(this._static_path!);
-        let data: string | Buffer;
-        if (path.extension() === ".js") {
-            data = path.load_sync();
-
-            // @deprecated compile using vhighlight, now esbuild is used for bundling, callback is not supported yet.
-            // const hash = server.hash(data);
-
-            // // Check cache for restarts by file watcher.
-            // const {cache_path, cache_hash, cache_data} = Utils.get_compiled_cache(server.domain, "GET", path.str());
-            // if (cache_data && hash === cache_hash) {
-            //     data = cache_data;
-            // }
-
-            // // Compile.
-            // else {
-            //     const compiler = new vhighlight.JSCompiler({
-            //         line_breaks: true,
-            //         double_line_breaks: false,
-            //         comments: false,
-            //         white_space: false,
-            //     })
-            //     data = compiler.compile_code(data, path.str());
-
-            //     // Cache for restarts.
-            //     Utils.set_compiled_cache(cache_path, data, hash);
-            // }
-        }
-        else if (path.extension() === ".css") {
-            const minifier = new CleanCSS();
-            data = minifier.minify(path.load_sync()).styles;
-        }
-        else {
-            data = path.load_sync({type: "buffer"});
-        }
-
-        // Fill templates.
-        if (this._templates && typeof data === "string") {
-            data = Utils.fill_templates(data, this._templates);
-        }
-
-        // Assign.
-        this.data = data;
-        return this;
-    }
-
-    // Set default headers.
-    _set_headers(stream: any): void {
-        this.headers.forEach((item) => {
-            stream.set_header(item[0], item[1]);
-        })
-    }
-
-    // Refresh for file watcher.
-    async _refresh(server: any): Promise<void> {
-        // Not in production.
-        if (server.production) {
-            throw new Error("This function is not designed for production mode.");
-        }
-
-        // Build html code of view.
-        if (this.view != null) {
-            await this.view._build_html();
-        }
-    }
 
     // Initialize.
     async _dynamic_initialize(): Promise < void> {
-        if (!this._server) {
+        if (!this.server) {
             throw new Error(`Endpoint "${this.id}" is not initialized by the server yet.`);
         }
         // Build html code of view.
@@ -504,8 +448,17 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
             await this.view._build_html();
         }
 
+        /**
+         * Load data by file path
+         * @todo in the future we should not load all of the data but just send it to the client in chunks
+         *       but we need to account for compression and content length when implementing this.
+         */
+        if (this.file_path != null) {
+            this._load_data_by_path(this.server);
+        }
+
         // Compression enabled.
-        if (this._server.production && this.callback == null && this._compress) {
+        if (this.server.production && this.callback == null && this._compress) {
             this._is_compressed = true;
             if (this.data != null && (this.data instanceof Buffer || typeof this.data === "string")) {
                 this.raw_data = this.data;
@@ -553,6 +506,13 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
         this._initialized = true;
     }
 
+    // Set default headers.
+    _set_headers(stream: Stream): void {
+        this.headers.forEach((item) => {
+            stream.set_header(item[0], item[1]);
+        })
+    }
+
     // Serve a client.
     async _serve_options(stream: Stream): Promise<void> {
         if (!this._initialized) {
@@ -585,7 +545,7 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
         try {
             // Check IP whitelist.
             if (this.ip_whitelist && !this.ip_whitelist.includes(stream.ip)) {
-                log(2, this.route.id, ": ", "Blocking ip ", stream.ip, " per ip whitelist.");
+                this.server?.log(2, this.route.id, ": ", "Blocking ip ", stream.ip, " per ip whitelist.");
                 stream.send({
                     status: Status.unauthorized, 
                     data: "Unauthorized.",
@@ -598,9 +558,9 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
 
             // Callback.
             if (this.callback != null) {
-                log(3, this.route.id, ": ", "Serving endpoint in callback mode.");
-                if (this.params_val != null) {
-                    const { error, invalid_fields } = this.params_val.validate(stream.param);
+                this.server?.log(3, this.route.id, ": ", "Serving endpoint in callback mode.");
+                if (this.params_schema != null) {
+                    const { error, invalid_fields } = this.params_schema.validate(stream.params ?? {});
                     if (error) {
                         stream.send({
                             status: Status.bad_request, 
@@ -615,10 +575,10 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
                 }
                 try {
                     let promise;
-                    if (this.params_val != null) {
-                        promise = this.callback(stream as any, (stream.params ?? {}) as any);
+                    if (this.params_schema != null) {
+                        promise = this.callback(stream, (stream.params ?? {}) as any);
                     } else {
-                        promise = this.callback(stream as any, {} as any);
+                        promise = this.callback(stream, {} as any);
                     }
                     if (promise instanceof Promise) {
                         await promise;
@@ -634,21 +594,21 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
                             type: "InternalServerError",
                         });
                     }
-                    error(`${this.id}: `, err); // after sending the response since this edits the error.
+                    this.server?.log.error(`${this.id}: `, err); // after sending the response since this edits the error.
                 }
                 return;
             }
 
             // View.
             else if (this.view != null) {
-                log(3, this.route.id, ": ", "Serving endpoint in view mode.");
+                this.server?.log(3, this.route.id, ": ", "Serving endpoint in view mode.");
                 this.view._serve(stream, status_code);
                 return;
             }
 
             // Data.
             else if (this.data != null) {
-                log(3, this.route.id, ": ", "Serving endpoint in data mode.");
+                this.server?.log(3, this.route.id, ": ", "Serving endpoint in data mode.");
                 stream.send({
                     status: status_code, 
                     data: this.data,
@@ -664,9 +624,91 @@ export class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
             throw err; // must have another catch block here otherwise when an error occurs in here it is somehow not catched by the try and catch block from Server._serve which will cause the program to crash.
         }
     }
+
+    // Load data by path.
+    private _load_data_by_path(server: Server): this {
+        if (!this.file_path) {
+            throw new Error(`Endpoint "${this.id}" has no file path assigned.`);
+        }
+        
+        // Load data.
+        const path = new vlib.Path(this.file_path);
+        let data: string | Buffer;
+        if (path.extension() === ".js") {
+            data = path.load_sync();
+
+            // @deprecated compile using vhighlight, now esbuild is used for bundling, callback is not supported yet.
+            // const hash = server.hash(data);
+
+            // // Check cache for restarts by file watcher.
+            // const {cache_path, cache_hash, cache_data} = Utils.get_compiled_cache(server.domain, "GET", path.str());
+            // if (cache_data && hash === cache_hash) {
+            //     data = cache_data;
+            // }
+
+            // // Compile.
+            // else {
+            //     const compiler = new vhighlight.JSCompiler({
+            //         line_breaks: true,
+            //         double_line_breaks: false,
+            //         comments: false,
+            //         white_space: false,
+            //     })
+            //     data = compiler.compile_code(data, path.str());
+
+            //     // Cache for restarts.
+            //     Utils.set_compiled_cache(cache_path, data, hash);
+            // }
+        }
+        else if (path.extension() === ".css") {
+            const minifier = new CleanCSS();
+            data = minifier.minify(path.load_sync()).styles;
+        }
+        else {
+            data = path.load_sync({type: "buffer"});
+        }
+
+        // Assign.
+        this.data = data;
+        return this;
+    }
+
+    // Refresh for file watcher.
+    // async _refresh(server: Server): Promise<void> {
+    //     // Not in production.
+    //     if (server.production) {
+    //         throw new Error("This function is not designed for production mode.");
+    //     }
+
+    //     // Build html code of view.
+    //     if (this.view != null) {
+    //         await this.view._build_html();
+    //     }
+    // }
 }
 export namespace Endpoint {
 
-    /** Constructor options without the `_server` attribute. */
-    export type Opts<S extends vlib.scheme.Infer.Scheme.S = {}> = ConstructorParameters<typeof Endpoint<S>>[0];
+    /** Options for constructing an endpoint. */
+    export type Opts<S extends vlib.Schema.Entries.Opts = {}> = ConstructorParameters<typeof Endpoint<S>>[0];
 }
+
+// const e = new Endpoint({
+//     method: "POST",
+//     endpoint: "/api/docs/feedback",
+//     content_type: "application/json",
+//     params: {
+//         /** The user id. */
+//         uid: "string",
+//         /** The project name. */
+//         project: "string",
+//         /** The project version. */
+//         version: "string",
+//         /** The document id. */
+//         id: "string",
+//         /** Whether the feedback is positive or negative. */
+//         positive: "boolean",
+//     },
+//     rate_limit: "global",
+//     async callback(stream, params) {
+//     }
+// })

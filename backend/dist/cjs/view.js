@@ -33,11 +33,9 @@ module.exports = __toCommonJS(stdin_exports);
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var vts = __toESM(require("@vandenberghinc/vlib/vts"));
 var vhighlight = __toESM(require("@vandenberghinc/vhighlight"));
-var import_meta = __toESM(require("./meta.js"));
-var import_logger = __toESM(require("./logger.js"));
+var import_meta = require("./meta.js");
 var import_route = require("./route.js");
-var import_frontend = __toESM(require("./frontend.js"));
-const { log, error } = import_logger.default;
+var import_frontend = require("./frontend.js");
 const { debug } = vlib;
 class View {
   // Global settings.
@@ -45,7 +43,7 @@ class View {
   static links = [];
   static body_style = null;
   // css string style.
-  static splash_screen = null;
+  static splash_screen = void 0;
   // SplashScreen object.
   // Private static attributes,
   static _volt_css;
@@ -73,10 +71,10 @@ class View {
   payments;
   // vhighlight?: string | undefined;
   min_device_width;
-  _server;
-  _endpoint;
+  server;
+  endpoint;
   // Constructor.
-  constructor({ source = null, callback = null, includes = [], links = [], templates = {}, meta = new import_meta.default(), jquery = false, lang = "en", body_style = null, splash_screen = null, tree_shaking = false, mangle = false, min_device_width = 600, _src }) {
+  constructor({ source = null, callback = null, includes = [], links = [], templates = {}, meta = new import_meta.Meta(), jquery = false, lang = "en", body_style = null, splash_screen = void 0, tree_shaking = false, mangle = false, min_device_width = 600, _src }) {
     this.source = source;
     this.callback = callback;
     this.includes = [...View.includes, ...includes];
@@ -116,36 +114,30 @@ class View {
     if (endpoint === void 0) {
       throw Error('Invalid usage, define parameter "endpoint".');
     }
-    this._server = server;
-    this._endpoint = endpoint;
+    this.server = server;
+    this.endpoint = endpoint;
   }
   // Bundle the compiled typescript / javascript dynamically on demand to optimize server startup for development purposes.
   async _dynamic_bundle() {
-    if (this._server === void 0 || this._endpoint === void 0) {
+    if (this.server === void 0 || this.endpoint === void 0) {
       throw Error('View has not been initialized with "View._initialize()" yet.');
     }
-    debug(3, this._endpoint?.route?.id, `: Bundling entry path "${this.source_path?.str()}".`);
+    debug(3, this.endpoint?.route?.id, `: Bundling entry path "${this.source_path?.str()}".`);
     this._bundle = await vts.bundle({
-      entry_paths: [this.source_path?.str() ?? ""],
-      output: `/tmp/${this._endpoint.route.method}_${this.source_path.str().replace(/\//g, "_")}.js`,
+      include: this.source_path ? [this.source_path?.str()] : [],
+      output: `/tmp/${this.endpoint.route.method}_${this.source_path.str().replace(/\//g, "_")}.js`,
       // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
       minify: false,
       //this._server.production,
       platform: "browser",
-      // format: "esm",
-      format: "iife",
+      format: "esm",
+      // format: "iife", // can causes issues with node_modules imports.
       target: "es2022",
-      // target: "esnext",
-      // sourcemap: this._server.production ? false : "inline",
+      // sourcemap: this.server.production ? false : "inline",
       extract_inputs: true,
       // since bundle.inputs is used by server.js.
       tree_shaking: true
     });
-    if (this._bundle.errors.length > 0) {
-      error(this._endpoint?.route?.id, `: Encountered an error while bundling "${this.source}".
-`, this._bundle.debug());
-      return;
-    }
     this.payments = this._bundle.inputs.find((path) => path.endsWith("/modules/paddle.js"));
     await this._build_html();
   }
@@ -155,25 +147,138 @@ class View {
       return this._dynamic_bundle();
     }
   }
+  /** Create an error HTML file when errors are encountered during the bundle process. */
+  async _build_bundle_err_html() {
+    const bundle = await vts.inspect_bundle({
+      include: this.source_path ? [this.source_path?.str()] : [],
+      output: vlib.Path.tmp().join(`${this.endpoint?.route.method}_${this.source_path.str().replace(/\//g, "_")}.js`),
+      // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
+      minify: false,
+      //this._server.production,
+      platform: "browser",
+      format: "esm",
+      // format: "iife", // can causes issues with node_modules imports.
+      target: "es2022",
+      tree_shaking: true
+    });
+    this.server?.log.error(this.endpoint?.route?.id, `: Encountered an error while bundling "${this.source}".
+${bundle.debug({ limit: 25 })}`);
+    const escape_html = (str) => vlib.Color.to_html(str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"));
+    if (this.server?.production) {
+      this.html = `
+                <!DOCTYPE html>
+                <html lang='${this.lang}'>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <title>Bundling Error</title>
+                </head>
+                <body style='font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 2rem; background: #f5f5f5;'>
+                    <div style='max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
+                        <h1 style='color: #d32f2f; margin-top: 0;'>Bundling Error</h1>
+                        <p>An error occurred while processing your request. Please contact support if this issue persists.</p>
+                    </div>
+                </body>
+                </html>
+                `.dedent(false);
+    } else {
+      const formatted_import_chains = bundle.format_import_chains();
+      const formatted_errors = bundle.format_errors();
+      this.html = `
+                <!DOCTYPE html>
+                <html lang='${this.lang}'>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <title>Bundling Error - ${escape_html(this.source || "Unknown")}</title>
+                    <style>
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            margin: 0;
+                            padding: 1rem;
+                            background: #1e1e1e;
+                            color: #d4d4d4;
+                        }
+                        .container {
+                            max-width: 1200px;
+                            margin: 0 auto;
+                        }
+                        h1 {
+                            color: #FFFFFF;
+                            font-size: 1.5rem;
+                            margin-bottom: 0.5rem;
+                        }
+                        .source {
+                            color: #C0C0C0;
+                            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+                            font-size: 0.875rem;
+                            margin-bottom: 1rem;
+                        }
+                        pre {
+                            background: #2d2d2d;
+                            border: 1px solid #3e3e3e;
+                            border-radius: 4px;
+                            padding: 1rem;
+                            overflow-x: auto;
+                            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+                            font-size: 0.875rem;
+                            line-height: 1.5;
+                            margin: 20px 0px 0px 0px;
+                        }
+                        .error-count {
+                            background: #f44336;
+                            color: white;
+                            padding: 0.25rem 0.5rem;
+                            border-radius: 4px;
+                            font-size: 0.875rem;
+                            display: inline-block;
+                            margin-bottom: 1rem;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>Bundle Error</h1>
+                        <div class="source">Source: ${escape_html(this.source || "Unknown")}</div>
+                        <div class="error-count">${bundle.errors.length} error${bundle.errors.length === 1 ? "" : "s"}</div>
+                        <pre>${escape_html(bundle.debug({ limit: -1 }))}</pre>
+                        <!--<h2>Metafile</h2>
+                        <pre>${escape_html(bundle.metafile ?? "No metafile detected.")}</pre>
+                        <h2>Input files</h2>
+                        <pre>${escape_html(bundle.inputs.length ? bundle.inputs.join("\n") : "No input files detected.")}</pre>
+                        <h2>Import Chains</h2>
+                        <pre>${escape_html(formatted_import_chains.length ? formatted_import_chains.join("\n") : "No import chains detected.")}</pre>
+                        <h2>Encountered Errors</h2>
+                        <pre>${escape_html(formatted_errors.length ? formatted_errors.join("\n") : "No errors detected.")}</pre>
+                        -->
+                    </div>
+                </body>
+                </html>
+                `.dedent(false);
+    }
+  }
   // Build html.
   async _build_html() {
-    if (this._server == null || this._endpoint == null) {
+    if (this.server == null || this.endpoint == null) {
       throw Error('View has not been initialized with "View._initialize()" yet.');
     }
     if (this.is_js_ts_view && !this._bundle) {
       await this._dynamic_bundle();
     }
-    const line_break = this._server.production ? "\n" : "\n";
+    if (this._bundle.errors.length > 0) {
+      return this._build_bundle_err_html();
+    }
+    const line_break = this.server.production ? "\n" : "\n";
     const has_bundle = this._bundle != null && typeof this._bundle === "object";
     this.html = "";
     this.html += `<!DOCTYPE html><html style='min-width:100%;min-height:100%;' lang='${this.lang}'>${line_break}`;
     this.html += `<head>${line_break}`;
     if (this.meta) {
-      this.html += this.meta.build_html(this._server.full_domain) + line_break;
+      this.html += this.meta.build_html(this.server.full_domain) + line_break;
     }
     const embed_stylesheet = (url, embed) => {
       if (embed == null && url != null && url.charAt(0) === "/") {
-        for (const endpoint of this._server.endpoints.values()) {
+        for (const endpoint of this.server.endpoints.values()) {
           if (url === endpoint.route.endpoint_str) {
             if (typeof endpoint.raw_data === "string") {
               embed = endpoint.raw_data;
@@ -204,7 +309,7 @@ class View {
       include_links_script += `__incl_lnk(${JSON.stringify(link)});${line_break}`;
     };
     if (!View._volt_css) {
-      View._volt_css = await new vlib.Path(import_frontend.default.css.volt).load();
+      View._volt_css = await new vlib.Path(import_frontend.Frontend.css.volt).load();
     }
     if (!View._vhighlight_css) {
       View._vhighlight_css = await new vlib.Path(vhighlight.web_exports.css).load();
@@ -275,7 +380,7 @@ class View {
     }
     const embed_script = (url) => {
       let embed;
-      for (const endpoint of this._server.endpoints.values()) {
+      for (const endpoint of this.server.endpoints.values()) {
         if (url === endpoint.route.endpoint_str && (endpoint.raw_data != null || endpoint.data != null)) {
           embed = endpoint;
         }
@@ -295,12 +400,12 @@ class View {
     if (this.jquery) {
       this.html += "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js'></script>" + line_break;
     }
-    if (this._server.google_tag !== void 0) {
-      include_js_script += `__volt_incl_js("https://www.googletagmanager.com/gtag/js?id=${this._server.google_tag}");${line_break}`;
+    if (this.server.google_tag !== void 0) {
+      include_js_script += `__volt_incl_js("https://www.googletagmanager.com/gtag/js?id=${this.server.google_tag}");${line_break}`;
     }
-    this.html += `<script>${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this._server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
-    if (this._server.payments) {
-      if (this._server.payments.type === "paddle") {
+    this.html += `<script>${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this.server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
+    if (this.server.payments) {
+      if (this.server.payments.type === "paddle") {
         if (this.payments) {
           include_js_script += `__volt_incl_js("https://cdn.paddle.com/paddle/v2/paddle.js");${line_break}`;
         }
@@ -338,7 +443,7 @@ class View {
   }
   // Serve a client.
   _serve(stream, status_code = 200) {
-    debug(2, this._endpoint?.route?.id, ": Serving HTML ", this.html?.slice(0, 50), "...");
+    debug(2, this.endpoint?.route?.id, ": Serving HTML ", this.html?.slice(0, 50), "...");
     stream.send({
       status: status_code,
       headers: { "Content-Type": "text/html" },

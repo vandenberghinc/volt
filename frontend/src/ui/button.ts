@@ -42,14 +42,10 @@ import { Elements, VElementBaseSignature, VElement, VElementTagMap, VHTMLElement
 export class ButtonElement extends VElementTagMap.a {
 
 	/**
-	 * @docs:
-	 * @nav: Frontend
-	 * @chapter: Buttons
-	 * @title: Button
-	 * @desc: Initializes the Button element with the provided text.
-	 * @param:
-	 *     @name: text
-	 *     @description The text to display on the button.
+	 * Initializes the Button element with the provided text.
+	 * @param text The text to display on the button.
+	 * @nav Frontend/Buttons
+     * @docs
 	 */
 	constructor(text: string = "") {
 		super({

@@ -1,14 +1,3 @@
-<!--<p align="center">
-  <img src="https://github.com/vandenberghinc/volt/blob/main/dev/media/icon/stroke.png?raw=true" alt="Volt Logo" width="200">
-</p>-->
-
-<p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.23-orange" alt="Version">
-  <img src="https://img.shields.io/badge/language-TypeScript-blue" alt="Language">
-  <img src="https://img.shields.io/badge/status-in%20development-forestgreen" alt="Status">
-  <img src="https://img.shields.io/badge/OS-MacOS%20%26%20Linux-blue" alt="OS">
-</p>
-
 # Volt – TypeScript Web Framework
 
 **Volt** is an open‑source framework for building dynamic websites and web apps in TypeScript. It combines a SwiftUI‑inspired **frontend UI library** with a powerful **Node.js backend server**, so you can create full‑stack applications in a single cohesive project.

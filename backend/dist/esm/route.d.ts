@@ -13,7 +13,6 @@ export declare class Route {
         required: boolean;
     }[];
     private matcher?;
-    matched_params: Record<string, any>;
     /**
      *
      * @param method   HTTP method (e.g. "GET", "post", etc.)
@@ -23,18 +22,11 @@ export declare class Route {
      *                    Ensure the wildcards are encapsulated by / or at the start of end of the string.
      */
     constructor(method: string, endpoint: string | RegExp);
-    /** Create match args
-      * @warning this is required for the `match()` method
-      */
-    static create_match_args(method: string, endpoint: string): {
-        method: string;
-        endpoint: string;
-    };
     /**
      * Tests this route against another Route (e.g. a “request” Route).
-     * Returns true/false and on true populates other.params.
+     * @returns `false` when not matched, and a `params` object when matched.
      */
-    match(other: Route): boolean;
+    match(other: Route): false | Record<string, any>;
     private _create_route_matcher;
     private static _stringify_endpoint_regex;
     static clean_endpoint(endpoint: RegExp): RegExp;

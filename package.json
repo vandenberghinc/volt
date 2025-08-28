@@ -1,7 +1,7 @@
 {
     "author": "Daan van den Bergh",
     "name": "@vandenberghinc/volt",
-    "version": "1.1.23",
+    "version": "1.1.27",
     "description": "",
     "type": "module",
     "types": "./backend/dist/esm/volt.d.ts",
@@ -13,20 +13,18 @@
             "import": "./backend/dist/esm/volt.js"
         },
         "./frontend": {
-            "import": "./frontend/dist/volt.js"
+            "import": "./frontend/dist/frontend/src/volt.js"
         }
     },
     "scripts": {
         "link": "vrepo --npm --link --dependencies ../vlib/ts/,../vhighlight/",
         "unlink": "vrepo --npm --unlink",
-        "build": "npm run build:backend --silent && npm run add-backend-dist-files  && npm run build:backend:cjs --silent && npm run build:frontend --silent",
-        "build:backend": "tsc -p backend/tsconfig.json && npm run add-backend-dist-files",
+        "build": "npm run build:backend --silent && npm run build:backend:cjs --silent && npm run build:frontend --silent",
+        "build:backend": "tsc -p backend/tsconfig.json",
         "build:backend:cjs": "vts --transform-esm --debug 1 --src backend/dist/esm/ --dest backend/dist/cjs/ --override --platform node --target es2023",
         "build:frontend": "tsc -p frontend/tsconfig.json",
         "start": "node start.js",
-        "check-circular-dependencies": "npx madge --circular frontend/src/",
-        "add-backend-dist-files": "rsync -az --delete ./frontend/src/css/ ./backend/dist/css/",
-        "generate-docs": "libris --generate-docs"
+        "check-circular-dependencies": "npx madge --circular frontend/src/"
     },
     "publishConfig": {
         "access": "public"

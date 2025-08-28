@@ -1,5 +1,5 @@
 
 // Settings.
-export const Settings = {
-	production: "{{PRODUCTION}}" as any as boolean,
+export namespace Settings {
+	export const production: boolean = "{{PRODUCTION}}" as any;
 }

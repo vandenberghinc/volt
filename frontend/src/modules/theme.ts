@@ -8,38 +8,44 @@ import { Color } from "./color.js"
 import { Themes as ThemesModule } from "./themes.js"
 
 // Types.
+
+/** Name of a theme attribute key. */
 type ThemeAttributeName = string;
+
+/** Identifier of a theme variant. */
 type ThemeId = "dark" | "light";
+
+/** List of supported theme identifiers. */
 const ThemeIdList = ["dark", "light"] as const;
+
+/** Theme options for dark and light variants. */
 type ThemesOptions<ThemeOptions extends {}> = { dark: ThemeOptions, light: ThemeOptions };
+
+/** Callback invoked when a theme is activated. */
 type OnActivateCallback<ThemeOptions extends {}> = (themes_class: Theme<ThemeOptions>, active_id: ThemeId) => void;
 
-// Themes class.
-/* 	@docs:
-    @nav: Frontend
-    @chapter: Themes
-    @note: The `ThemesClass` is also initializable under function `Themes`.
-    @desc:
-        A themes class to efficiently style the site using themes.
-
-        The constructor arguments must be a theme style per theme name. Every theme variable should exist in all themes or it may cause undefined behaviour. The theme name that is passed first will be the active theme by default.
-        ```
-        Theme("main-theme", {
-            light: {
-                text_fg: "#000000",
-            },
-            dark: {
-                text_fg: "#FFFFFF",
-            },
-        })
-        ```
-
-        When theme attributes are retrieved, by default they will be the active theme's attribute as a css variable. So this can be passed to an element.
-        However, some element functions do not accept css variables, in this case the `value()` function can be used to retrieve the raw value. Do not forget to apply an `on_theme_update()` callback on the elements where you use this.
+/**
+ * A themes class to efficiently style the site using themes.
+ *
+ * The constructor arguments must be a theme style per theme name. Every theme variable should exist in all themes or it may cause undefined behaviour. The theme name that is passed first will be the active theme by default.
+ * ```
+ * Theme("main-theme", {
+ *     light: {
+ *         text_fg: "#000000",
+ *     },
+ *     dark: {
+ *         text_fg: "#FFFFFF",
+ *     },
+ * })
+ * ```
+ *
+ * When theme attributes are retrieved, by default they will be the active theme's attribute as a css variable. So this can be passed to an element.
+ * However, some element functions do not accept css variables, in this case the `value()` function can be used to retrieve the raw value. Do not forget to apply an `on_theme_update()` callback on the elements where you use this.
+ * @nav Frontend/Themes
+ * @note The `ThemesClass` is also initializable under function `Themes`.
+ * @docs
  */
 export class Theme<ThemeOptions extends Record<string, any>> {
-
-    // helper: union of all keys across all themes
 
     // Attributes.
     public active_id!: ThemeId;
@@ -122,12 +128,16 @@ export class Theme<ThemeOptions extends Record<string, any>> {
         return `${this._id}.${String(this.active_id)}`
     }
 
-    // Get cached active subtheme id.
+    /** Get cached active subtheme id from localStorage. */
     get_active_id_cached(): string {
         return localStorage.getItem(this._id) ?? "";
     }
 
-    // Activate a theme.
+    /**
+     * Activate a theme and update CSS variables.
+     * @param id The theme id to activate.
+     * @param apply_theme_update Whether to call the global theme update hook after activation.
+     */
     activate(id: ThemeId, apply_theme_update: boolean = true): this {
         if (ThemeIdList.includes(id) === false || (this as any)[id] === undefined) {
             throw Error(`Theme "${id as string}" does not exist.`);
@@ -155,13 +165,21 @@ export class Theme<ThemeOptions extends Record<string, any>> {
     // Set an on activate callback.
     on_activate(): OnActivateCallback<ThemeOptions> | undefined;
     on_activate(callback: OnActivateCallback<ThemeOptions>): this;
+    /**
+     * Get or set the callback invoked after a theme is activated.
+     * When called without a callback, returns the currently set callback.
+     * @param callback The callback to invoke with the theme instance and active id after activation.
+     */
     on_activate(callback?: OnActivateCallback<ThemeOptions>): this | OnActivateCallback<ThemeOptions> | undefined {
         if (callback == null) { return this._on_activate_callback; }
         this._on_activate_callback = callback;
         return this;
     }
 
-    // Toggle themes.
+    /**
+     * Toggle the active theme between "dark" and "light".
+     * @param apply_theme_update Whether to call the global theme update hook after toggling.
+     */
     toggle(apply_theme_update: boolean = true): this {
         const other: ThemeId = this.active_id === "dark" ? "light" : "dark";
         this.activate(other, apply_theme_update);
@@ -171,7 +189,11 @@ export class Theme<ThemeOptions extends Record<string, any>> {
     // ---------------------------------------------------------------------
     // Adding values.
 
-    // Add a new attribute.
+    /**
+     * Internal: add a theme attribute and expose it as a CSS variable-backed property.
+     * @param id The attribute name to add.
+     * @param theme Optional theme id used for initialization and gradient detection.
+     */
     _add_attr(id: string, theme?: ThemeId): void {
         if (theme == null) {
             this._css_vars[id] = `var(--${this._id}_${id})`;
@@ -207,7 +229,12 @@ export class Theme<ThemeOptions extends Record<string, any>> {
         this._attrs.append(id);
     }
 
-    // Assign a new value.
+    /**
+     * Assign a new value to a theme attribute and update its CSS variable for the active theme.
+     * @param theme The theme id to modify.
+     * @param key The attribute name.
+     * @param value The new value for the attribute.
+     */
     set(theme: ThemeId, key: string, value: any): this {
 
         // Update theme.
@@ -231,11 +258,15 @@ export class Theme<ThemeOptions extends Record<string, any>> {
         return this;
     }
 
+    /** Get the raw active theme object. */
     get raw(): ThemeOptions {
         return this.active;
     }
 
-    // Get raw value.
+    /**
+     * Get the raw (non-CSS-variable) value of an attribute from the active theme.
+     * @param id The attribute name.
+     */
     value(id: ThemeAttributeName): any {
         if (this.active === undefined) { return; }
         return this.active![id];
@@ -244,7 +275,11 @@ export class Theme<ThemeOptions extends Record<string, any>> {
     // ---------------------------------------------------------------------
     // Color manipulation methods.
 
-    // Create a new color for each theme.
+    /**
+     * Create a new attribute for each theme using a callback and expose it as a CSS variable.
+     * @param id The new attribute name to create.
+     * @param create_theme_value Callback that returns the value for each theme.
+     */
     create<T = string>(id: string, create_theme_value: (theme_id: ThemeId, theme: ThemeOptions) => T): void {
 
         // Already created.
@@ -302,8 +337,12 @@ export class Theme<ThemeOptions extends Record<string, any>> {
         return this._css_vars[full_id] as string;
     }
 
-    // Opacity.
-    // Opacity must be a number `0.0` till `1.0`, and may also be an object with opacity pet theme `{dark: 0.2, light: 0.35}`.
+    /**
+     * Set the opacity on a theme color, creating a derived CSS variable.
+     * Opacity must be a number `0.0` till `1.0`, and may also be an object with opacity per theme `{dark: 0.2, light: 0.35}`.
+     * @param theme_attr The source theme color attribute.
+     * @param opacity The opacity value or per-theme map.
+     */
     opacity(theme_attr: ThemeAttributeName, opacity: number = 1.0): string {
 
         // Create full id.
@@ -404,7 +443,7 @@ export class Theme<ThemeOptions extends Record<string, any>> {
         // `.dedent();
         // document.head.appendChild(style);
 
-        document.body.classList.add("notransition");
+        document.body.classList.add("volt_notransition");
 
         // Force a reflow to apply the new styles immediately
         // document.head.getBoundingClientRect();
@@ -419,7 +458,7 @@ export class Theme<ThemeOptions extends Record<string, any>> {
             setTimeout(() => this.enable_transitions(0), delay);
             return this;
         }
-        document.body.classList.remove("notransition");
+        document.body.classList.remove("volt_notransition");
         // const style = document.getElementById('__libris_thme_disable_transitions__');
         // if (style) {
         //     style.remove();
@@ -428,6 +467,7 @@ export class Theme<ThemeOptions extends Record<string, any>> {
         return this;
     }
 }
+/** Interface merge to expose theme attributes as properties from ThemeOptions on Theme instances. */
 // @ts-ignore
-export interface Theme<ThemeOptions extends Record<string, any>> extends ThemeOptions {}
-// export type ExtendTheme<ThemeOptions extends Record<string, any>> = Theme<any>;
+export interface Theme<ThemeOptions extends Record<string, any>> extends ThemeOptions { }
+

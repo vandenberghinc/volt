@@ -29,8 +29,6 @@ class Route {
   params = [];
   // path param names.
   matcher;
-  // Inserted only when passed as arg into `match()`.
-  matched_params = {};
   /**
    *
    * @param method   HTTP method (e.g. "GET", "post", etc.)
@@ -59,47 +57,51 @@ class Route {
     }
     this.id = `${this.method}:${this.endpoint_str}`;
   }
-  /** Create match args
-    * @warning this is required for the `match()` method
-    */
-  static create_match_args(method, endpoint) {
-    return {
-      method: method.trim().toUpperCase(),
-      endpoint: endpoint.replace(/\/+$/, "") || "/"
-    };
-  }
+  // /** Create match args
+  //   * @warning this is required for the `match()` method 
+  //   */
+  // public static create_match_args(method: string, endpoint: string): { method: string, endpoint: string} {
+  //     return {
+  //         method: method.trim().toUpperCase(),
+  //         endpoint: endpoint.replace(/\/+$/, "") || "/",
+  //     };
+  // }
   /**
    * Tests this route against another Route (e.g. a “request” Route).
-   * Returns true/false and on true populates other.params.
+   * @returns `false` when not matched, and a `params` object when matched.
    */
   match(other) {
     if (this.endpoint instanceof RegExp && other.endpoint instanceof RegExp) {
       return false;
     }
     if (other.method !== this.method) {
-      other.matched_params = {};
       return false;
     }
     if (this.endpoint instanceof RegExp) {
       const m = this.endpoint.exec(other.endpoint_str);
       if (!m) {
-        other.matched_params = {};
         return false;
+      } else if (m.groups) {
+        const x = Object.fromEntries(Object.entries(m.groups).map(([name, val]) => {
+          return [name, val == null ? val : decodeURIComponent(val)];
+        }));
+        console.log("ROUTE PARAMS:", x);
+        return x;
       }
-      other.matched_params = m.groups ? { ...m.groups } : {};
-      return true;
+      return {};
     }
     if (this.matcher) {
       const result = this.matcher.match(other.endpoint_str);
       if (!result) {
-        other.matched_params = {};
         return false;
       }
-      other.matched_params = result;
-      return true;
+      const keys = Object.keys(result);
+      for (const k of keys) {
+        result[k] = decodeURIComponent(result[k]);
+      }
+      return result;
     }
-    other.matched_params = {};
-    return this.endpoint_str === other.endpoint_str;
+    return this.endpoint_str === other.endpoint_str ? {} : false;
   }
   // ─── Helper: compile colon-style patterns ───
   _create_route_matcher(pattern) {

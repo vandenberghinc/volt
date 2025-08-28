@@ -16,19 +16,20 @@ import { register_element as _register_element } from "./register_element.js";
 // Elements module.
 export namespace Elements {
 
+    /**
+     * Re-exports the `register_element` helper for registering custom elements.
+     */
     export const register_element = _register_element;
-    
+
     // Get by id.
     // @note: always use VElement as return type since this is most likely the case and avoids type casting for users.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Elements
-        @title: Get Element by ID
-        @desc: Get an element by its ID.
-        @param:
-            @name: id
-            @description The ID of the element.
-    */
+    /**
+     * Get an element by its ID.
+     * @nav Frontend
+     * @chapter Elements
+     * @param id The ID of the element.
+     * @docs
+     */
     export function get(id: string): VElement {
         const e = document.getElementById(id);
         if (e == null) {
@@ -39,29 +40,25 @@ export namespace Elements {
 
     // Get by id (alias).
     // @note: always use VElement as return type since this is most likely the case and avoids type casting for users.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Elements
-        @title: Get Element by ID (Alias)
-        @desc: Alias for `get` to get an element by its ID.
-        @param:
-            @name: id
-            @description The ID of the element.
-    */
+    /**
+     * Alias for `get` to retrieve an element by its ID.
+     * @nav Frontend
+     * @chapter Elements
+     * @param id The ID of the element.
+     * @docs
+     */
     export function get_by_id(id: string): VElement {
         return Elements.get(id);
     }
 
     // Click an element by id.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Elements
-        @title: Click Element by ID
-        @desc: Programmatically clicks an element by its ID.
-        @param:
-            @name: id
-            @description The ID of the element.
-    */
+    /**
+     * Programmatically clicks an element by its ID.
+     * @nav Frontend
+     * @chapter Elements
+     * @param id The ID of the element.
+     * @docs
+     */
     export function click(id: string): void {
         const element = document.getElementById(id);
         if (element) {
@@ -72,7 +69,19 @@ export namespace Elements {
     }
 
     // Create a new element class.
+    /**
+     * Generic constructor signature used for class decorators and factories.
+     */
     type Constructor<T = any> = new (...args: any[]) => T;
+
+    /**
+     * Options for the `Elements.create` class decorator.
+     * @property name The name to use for this element (becomes the “v-…” tag)
+     * @property tag Optional host tag to extend (defaults to constructor.tag if set)
+     * @property default_style Default inline styles for the element.
+     * @property default_attributes Default attributes for the element.
+     * @property default_events Default event handlers for the element.
+     */
     interface CreateOpts {
         name: string; // The name to use for this element (will become the “v-…” tag)
         tag?: string; // Optional host tag to extend (defaults to constructor.tag if set)
@@ -80,7 +89,7 @@ export namespace Elements {
         default_attributes?: Record<string, any>;
         default_events?: Record<string, any>;
     }
-    
+
     /**
      * Class decorator factory.  
      * @example
@@ -88,7 +97,7 @@ export namespace Elements {
      *   class Foo extends HTMLElement { … }
      */
     export function create(opts: CreateOpts): <T extends Constructor>(constructor: T) => T {
-        
+
         // Validate required options at factory time
         if (typeof opts.name !== "string" || opts.name.trim() === "") {
             throw new Error(`@Elements.create requires a non-empty string “name”`);
@@ -127,7 +136,7 @@ export namespace Elements {
 
     // export function create<T extends { new(...args: any[]): {} }>(constructor: T): void {
     //     const any_con = constructor as any;
-        
+
     //     // Register new html element.
     //     if (!any_con._volt_is_registered) {
     //         console.log({ type: constructor })
@@ -161,9 +170,15 @@ export namespace Elements {
     //     }
     // }
 
+    /**
+     * Re-exported constructor wrapper from the base module.
+     */
     // Create a constructor wrapper.
     export const wrapper = _wrapper;
 
+    /**
+     * Shared null element mainly for TypeScript typing convenience.
+     */
     // Create a shared null element mainly for typescript types.
     export const create_null = _create_null;
 
@@ -172,16 +187,14 @@ export namespace Elements {
     // When an input is not required, no errors will be thrown.
     // An object will be returned with each input's id as the key and the input's value as value.
     // Only supported extended input elements like `ExtendedInput`.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Elements
-        @title: Submit Elements
-        @desc: Submits multiple elements by ID or reference.
-        @deprecated: true
-        @param:
-            @name: elements
-            @description A list of element IDs or element references to submit.
-    */
+    /**
+     * Submits multiple elements by ID or reference.
+     * @nav Frontend
+     * @chapter Elements
+     * @deprecated
+     * @param elements A list of element IDs or element references to submit.
+     * @docs
+     */
     export function submit(...elements: (string | VElement | HTMLElement)[]): Record<string, any> {
         const params: Record<string, any> = {};
         let error;
@@ -212,18 +225,14 @@ export namespace Elements {
 
     // Forward a function to a child so a user can easily create functions on the parent like border_radius() which actually set the border radius of a child.
     // The new function still returns `this`.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Elements
-        @title: Forward Function to Child
-        @desc: Forwards a function to a child element.
-        @param:
-            @name: func_name
-            @description The name of the function to forward.
-        @param:
-            @name: child
-            @description The child element or a function that returns the child element.
-    */
+    /**
+     * Forwards a function to a child element.
+     * @nav Frontend
+     * @chapter Elements
+     * @param func_name The name of the function to forward.
+     * @param child The child element or a function that returns the child element.
+     * @docs
+     */
     export function forward_func_to_child(func_name: string, child: any): (val?: any) => any {
         return function (this: any, val?: any) {
             if (typeof child === "function") {
@@ -238,6 +247,9 @@ export namespace Elements {
     }
 
     // Update the extend_velement function to use proper types
+    /**
+     * Typed re-export of `extend` to augment a `VElement` with additional helpers.
+     */
     export const extend = extend_velement;
 
     // Create.

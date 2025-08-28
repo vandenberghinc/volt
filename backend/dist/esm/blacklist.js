@@ -11,9 +11,12 @@ export class Blacklist {
     constructor({ api_key, // honey pot api key
     _server, }) {
         // Checks.
-        vlib.Scheme.validate(arguments[0], { strict: true, scheme: {
+        vlib.schema.validate(arguments[0], {
+            unknown: false, throw: true,
+            schema: {
                 api_key: "string",
-            } });
+            }
+        });
         // Arguments.
         this.api_key = api_key;
         // Attributes.

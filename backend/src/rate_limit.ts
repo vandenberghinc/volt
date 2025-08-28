@@ -5,11 +5,11 @@
 
 // ---------------------------------------------------------
 // Imports.
-
+import * as https from "https";
 import * as vlib from "@vandenberghinc/vlib";
 import { Utils } from "./utils.js";
 import { Collection } from "./database/collection.js";
-import { logger } from "./logger.js";
+import type { Server } from "./server.js";
 
 // ---------------------------------------------------------
 // Types
@@ -34,47 +34,38 @@ export interface RateLimitCacheData {
 // ---------------------------------------------------------
 // Rate limit groups.
 
-/*  @docs:
-    @nav: Backend
-    @chapter: Rate Limit
-    @title: Rate Limit Groups
-    @desc:
-        The rate limit groups for the endpoint.
-
-        A group can either be registered through this class or by defining the rate limit group on an endpoint using `Endpoint.rate_limit`.
-
-        This class will be accessable under `Server` attribute `rate_limits`.
+/**
+ * The rate limit groups for the endpoint.
+ * 
+ * A group can either be registered through this class or by defining the rate limit group on an endpoint using `Endpoint.rate_limit`.
+ * 
+ * This class will be accessable under `Server` attribute `rate_limits`.
+ * @nav Backend/Rate Limit
+ * @docs
  */
-export const RateLimits = {
-    groups: new Map<string, RateLimitData>(),
+export namespace RateLimits {
+    export const groups = new Map<string, RateLimitData>([
+        /** The `global` rate settings. */
+        ["global", { group: "global", interval: 60, limit: 1000 }],
+    ]);
 
-    /*  @docs:
-        @title: Add group
-        @desc:
-            Add a rate limit group.
-        @param:
-            @name: group
-            @description: The rate limit group.
-            @type: string
-            @default: "global"
-        @param:
-            @name: limit
-            @description: The maximum requests per rate limit interval.
-            @type: number
-            @default: 50
-        @param:
-            @name: interval
-            @description: The rate limit interval in seconds.
-            @type: number
-            @default: 60
+    /**
+     * Add a rate limit group.
+     * @param group  The rate limit group.
+     * @param limit The maximum requests per rate limit interval, defaults to 50.
+     * @param interval The rate limit interval in seconds, defaults to 60.
+     * @docs
      */
-    add({
+    export function add({
+        /** The rate limit group name. */
         group = null,
+        /** The maximum requests per rate limit interval. */
         limit = null,
+        /** The rate limit interval in seconds. */
         interval = null,
     }: RateLimitGroup): RateLimitData {
-        const settings: RateLimitData = this.groups.has(group!) 
-            ? this.groups.get(group!)! 
+        const settings: RateLimitData = groups.has(group!) 
+            ? groups.get(group!)! 
             : { group: "", limit: 0, interval: 0 };
         
         settings.group = group!;
@@ -88,7 +79,7 @@ export const RateLimits = {
         } else if (!settings.interval) {
             settings.interval = 60;
         }
-        this.groups.set(group!, settings)
+        groups.set(group!, settings)
         return settings;
     }
 }
@@ -96,62 +87,53 @@ export const RateLimits = {
 // ---------------------------------------------------------
 // Server.
 
-/*  @docs:
-    @nav: Backend
-    @chapter: Rate Limit
-    @title: Rate Limit Server
-    @desc: 
-        The rate limit websocket class (server).
+/** Nested types for the {@link RateLimitServer}. */
+export namespace RateLimitServer {
 
-        Rate limiting is handled automatically when the endpoints has it enabled.
-    @param:
-        @name: ip
-        @desc: The rate limit server ip. By default localhost will be used.
-        @type: null, string
-    @param:
-        @name: port
-        @desc: The rate limit server port. The default port is `51234`.
-        @def: 51234
-        @type: number
-    @param:
-        @name: https
-        @desc: To enable https on the server you must define a `https.createServer` configuration.
-        @type: boolean
-    @param:
-        @name: _server
-        @ignore: true
+    /** Constructor options. */
+    export interface Opts {
+        /** The port to which the rate limiting server will bind. The default is `51234`. */
+        port?: number,
+        /** The IP address to which the rate limiting server will bind. By default, it runs on localhost only. */
+        ip?: string,
+        /** Enable the https attribute to run on https. */
+        https?: https.ServerOptions,
+    }
+}
+
+/**
+ * The rate limit websocket class (server).
+ * Rate limiting is handled automatically when the endpoints has it enabled.
+ * 
+ * @nav Backend/Rate Limit
  */
 export class RateLimitServer {
     // Static attributes.
     static default_port: number = 51234;
 
     // Instance attributes
-    private ip: string | null;
+    private ip: string | undefined;
     private port: number;
     private https_config: any;
-    private server: { _sys_db: Collection };
+    private server: Server;
     private limits: Map<string, Map<string, RateLimitCacheData>>;
     private ws?: any;
     private clear_caches_interval?: NodeJS.Timeout;
 
     constructor({
         port = RateLimitServer.default_port,
-        ip = null,
-        https = null,
+        ip,
+        https,
         _server,
-    }: {
-        port?: number,
-        ip?: string | null,
-        https?: any | null,
-        _server: { _sys_db: Collection },
-    }) {
+    }: RateLimitServer.Opts & { _server: Server }) {
         // Checks.
-        vlib.Scheme.validate(arguments[0], {
-            strict: true, 
-            scheme: {
+        vlib.schema.validate(arguments[0], {
+            unknown: false,
+            throw: true,
+            schema: {
                 port: {type: "number", default: RateLimitServer.default_port},
-                ip: {type: "string", default: null},
-                https: {type: "https", default: null},
+                ip: {type: "string", required: false},
+                https: {type: "any", required: false},
                 _server: "object",
             }
         });
@@ -176,7 +158,7 @@ export class RateLimitServer {
         });
         if (data.api_key == null) {
             data.api_key = vlib.String.random(32);
-            await this.server._sys_db.save("rate_limit", data);
+            await this.server._sys_db.set("rate_limit", data);
         }
 
         // Initialize server.
@@ -193,12 +175,12 @@ export class RateLimitServer {
 
         // Listen event.
         this.ws.on_event("listen", (address: string) => {
-            logger.log(0, `Running on ${address}.`);
+            this.server.log(0, `Running on ${address}.`);
         });
 
         // Error event.
         this.ws.on_event('error', (stream: any, e: Error) => {
-            logger.error(e);
+            this.server.log.error(e);
         });
 
         // Create limit command.
@@ -210,7 +192,7 @@ export class RateLimitServer {
                     data: {response: await this.limit(data.ip, data.groups)}
                 });
             } catch (e: any) {
-                logger.error(e);
+                this.server.log.error(e);
                 this.ws.send({ stream, id, data: { error: e.message } });
             }
         });
@@ -221,7 +203,7 @@ export class RateLimitServer {
                 await this.reset(data.group);
                 this.ws.send({stream, id, data: {error: undefined}});
             } catch (e: any) {
-                logger.error(e);
+                this.server.log.error(e);
                 this.ws.send({ stream, id, data: {error: e.message} });
             }
         });
@@ -230,7 +212,7 @@ export class RateLimitServer {
                 await this.reset_all();
                 this.ws.send({ stream, id, data: { error: undefined } });
             } catch (e: any) {
-                logger.error(e);
+                this.server.log.error(e);
                 this.ws.send({ stream, id, data: { error: e.message } });
             }
         });
@@ -253,7 +235,7 @@ export class RateLimitServer {
 
     // Stop.
     async stop(): Promise<void> {
-        logger.log(0, "Stopping the rate limit server.");
+        this.server.log("Stopping the rate limit server.");
         if (this.clear_caches_interval) {
             clearInterval(this.clear_caches_interval);
         }
@@ -331,60 +313,49 @@ export class RateLimitServer {
 // ---------------------------------------------------------
 // Client.
 
-/*  @docs:
-    @nav: Backend
-    @chapter: Rate Limit
-    @title: Rate Limit Client
-    @desc: 
-        The secondary rate limit class (client).
+/** Nested types for the {@link RateLimitClient}. */
+export namespace RateLimitClient {
 
-        Rate limiting is handled automatically when the endpoints has it enabled.
-    @param:
-        @name: ip
-        @desc: The rate limit server ip. By default localhost will be used.
-        @type: null, string
-    @param:
-        @name: port
-        @desc: The rate limit server port. The default port is `51234`.
-        @def: 51234
-        @type: number
-    @param:
-        @name: https
-        @desc: A boolean indicating if the rate limit server has https enabled.
-        @type: boolean
-    @param:
-        @name: url
-        @desc: The websocket url of the server. If defined this takes precedence over parameters `ip` and `port`.
-        @type: null, string
-    @param:
-        @name: _server
-        @ignore: true
+    /** Constructor options. */
+    export interface Opts {
+        /** The port to which the rate limiting server will bind. The default is `51234`. */
+        port?: number,
+        /** The IP address to which the rate limiting server will bind. By default, it runs on localhost only. */
+        ip?: string,
+        /** A boolean flag indicating if the server runs on HTTPS. */
+        https?: boolean,
+        /** The websocket URL of the server. If defined this takes precedence over parameters `ip` and `port`. */
+        url?: string,
+    }
+}
+
+/**
+ * The secondary rate limit class (client).
+ * 
+ * Rate limiting is handled automatically when the endpoints has it enabled.
+ * 
+ * @nav Backend/Rate Limit
  */
 export class RateLimitClient {
     private ip: string;
     private port: number;
     private https: boolean;
-    private url: string | null;
+    private url?: string;
     private server: any;
     private ws?: any;
 
     constructor({
-        ip = null,
+        ip,
         port = RateLimitServer.default_port,
         https = false,
-        url = null,
+        url,
         _server,
-    }: {
-        ip?: string | null,
-        port?: number,
-        https?: boolean,
-        url?: string | null,
-        _server: any,
-    }) {
+    }: RateLimitClient.Opts & { _server: Server }) {
         // Checks.
-        vlib.Scheme.validate(arguments[0], {
-            strict: true, 
-            scheme: {
+        vlib.schema.validate(arguments[0], {
+            unknown: false, 
+            throw: true,
+            schema: {
                 ip: {type: "string", default: null},
                 port: {type: "number", default: RateLimitServer.default_port},
                 https: {type: "object", default: null},
@@ -426,17 +397,17 @@ export class RateLimitClient {
 
         // Error event.
         this.ws.on_event('error', (e: Error) => {
-            logger.error(e);
+            this.server.log.error(e);
         });
 
         // Reconnect event.
         this.ws.on_event('reconnect', (e: Error) => {
-            logger.log(0, 'Attempting to reconnect with the server.');
+            this.server.log('Attempting to reconnect with the server.');
         });
 
         // Close event.
         this.ws.on_event('close', () => {
-            logger.log(0, 'Websocket closed after exhausting all reconnect attempts.');
+            this.server.log('Websocket closed after exhausting all reconnect attempts.');
             process.exit(1); // stop the thread.
         });
 
@@ -446,7 +417,7 @@ export class RateLimitClient {
 
     // Stop.
     async stop(): Promise<void> {
-        logger.log(0, "Stopping the rate limit client.");
+        this.server.log("Stopping the rate limit client.");
         if (this.ws) {
             await this.ws.disconnect();
             this.ws = undefined;

@@ -39,9 +39,13 @@ class Blacklist {
     // honey pot api key
     _server
   }) {
-    vlib.Scheme.validate(arguments[0], { strict: true, scheme: {
-      api_key: "string"
-    } });
+    vlib.schema.validate(arguments[0], {
+      unknown: false,
+      throw: true,
+      schema: {
+        api_key: "string"
+      }
+    });
     this.api_key = api_key;
     this.cache = /* @__PURE__ */ new Map();
   }

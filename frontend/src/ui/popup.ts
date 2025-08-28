@@ -4,9 +4,9 @@
  */
 
 // Imports.
+import { Mutex } from "@vandenberghinc/vlib/frontend"
 import { Elements, VElementBaseSignature, VElement, AppendType } from "../elements/module.js"
-import { Mutex } from "../modules/mutex"
-import { FrameElement, HStack, HStackElement, VStack, VStackElement } from "./stack"
+import { HStack, HStackElement, VStack, VStackElement } from "./stack"
 import { Text, TextElement } from "./text"
 import { Title, TitleElement } from "./title"
 import { LoaderButtonElement, LoaderButton } from "./loader_button"
@@ -113,7 +113,7 @@ export class YesNoPopupElement extends (VStackElement as any as VElementBaseSign
         }
 
         // Title.
-        this.title = Title(text) // never user inner html instead use append incase of links or code lines.
+        this.title = Title(title) // never user inner html instead use append incase of links or code lines.
             .font_family("inherit")
             .font_weight(500)
             .font_size(34)

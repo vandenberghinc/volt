@@ -1,4 +1,4 @@
-import { Scheme } from "@vandenberghinc/vlib/frontend";
+import { Schema } from "@vandenberghinc/vlib/frontend";
 
 /**
  * A utility class for color manipulation, conversion, and adjustment.
@@ -76,7 +76,7 @@ export class Color {
         } else if (Array.isArray(input)) {
             return Color.array_to_rgba(input);
         }
-        throw new Error(`Invalid color input "${input}" with type "${Scheme.value_type(input)}". Ensure the input is a hex or rgb(a) color.`);
+        throw new Error(`Invalid color input "${input}" with type "${Schema.value_type(input)}". Ensure the input is a hex or rgb(a) color.`);
     }
 
     /**

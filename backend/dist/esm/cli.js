@@ -18,7 +18,12 @@ const CONFIG_PATHS = [
 ];
 // ---------------------------------------------------------
 // CLI.
-// Initialize the server.
+/**
+ * Initialize the server by resolving a configuration file and returning an initialized `volt.Server`.
+ * If `path` is not provided, common configuration subpaths are searched under `source`.
+ * @param path Optional path to the configuration file (.json or .js). When null, defaults are searched.
+ * @param source Optional base directory used when searching default config subpaths.
+ */
 const initialize_server = async (path = null, source = "") => {
     if (source == null) {
         source = "";
@@ -61,15 +66,11 @@ const initialize_server = async (path = null, source = "") => {
         return { path, server: new volt.Server(path.load_sync({ type: "object" })) };
     }
 };
-// Create the CLI.
-/*  @docs:
- *  @lang: CLI
- *  @name: CLI
- *  @title: VWeb CLI
- *  @description: The VWeb CLI.
- *  @usage:
- *      @CLI:
- *          $ volt --start
+/**
+ * The VWeb CLI.
+ * @nav CLI
+ * @example
+ *  $ volt --start
  */
 const cli = new vlib.CLI({
     name: "volt",
@@ -90,32 +91,21 @@ const cli = new vlib.CLI({
     version: "1.1.1",
     commands: [
         // Start.
-        /*  @docs:
-         *  @lang: CLI
-         *  @parent: CLI
-         *  @title: Start
-         *  @name: --start
-         *  @description: Start the website (daemon).
-         *  @param:
-         *      @name: --source
-         *      @type: string
-         *      @desc: The source path to the website, the configuration file will be automatically loaded. It must reside at one of the default config sub paths.
-         *      @con_required: true
-         *  @param:
-         *      @name: --config
-         *      @type: string
-         *      @desc: The path to the configuration file.
-         *      @con_required: true
-         *  @param:
-         *      @name: --daemon
-         *      @type: boolean
-         *      @desc: Flag to start the service daemon.
-         *      @con_required: true
-         *  @usage:
-         *      @CLI:
-         *          $ cd path/to/my/website && volt --start
-         *          $ volt --start --source path/to/my/website
-         *          $ volt --start --config path/to/my/website/config.js
+        /**
+         * Start the website (daemon).
+         * @lang CLI
+         * @parent CLI
+         * @name --start
+         * @param --source The source path to the website; the configuration file will be automatically loaded. It must reside at one of the default config sub paths. Required.
+         * @param --config The path to the configuration file. Required.
+         * @param --daemon Flag to start the service daemon. Required.
+         * @example
+         *   $ cd path/to/my/website && volt --start
+         * @example
+         *   $ volt --start --source path/to/my/website
+         * @example
+         *   $ volt --start --config path/to/my/website/config.js
+         * @docs
          */
         {
             id: "--start",
@@ -175,27 +165,20 @@ const cli = new vlib.CLI({
             }
         },
         // Stop.
-        /*  @docs:
-         *  @lang: CLI
-         *  @parent: CLI
-         *  @title: Stop
-         *  @name: --stop
-         *  @description: Stop the website service daemon.
-         *  @param:
-         *      @name: --source
-         *      @type: string
-         *      @desc: The source path to the website, the configuration file will be automatically loaded. It must reside at one of the default config sub paths.
-         *      @con_required: true
-         *  @param:
-         *      @name: --config
-         *      @type: string
-         *      @desc: The path to the configuration file.
-         *      @con_required: true
-         *  @usage:
-         *      @CLI:
-         *          $ volt --stop
-         *          $ volt --stop --source path/to/my/website
-         *          $ volt --stop --config path/to/my/website/config.js
+        /**
+         * Stop the website service daemon.
+         * @lang CLI
+         * @parent CLI
+         * @name --stop
+         * @param --source The source path to the website; the configuration file will be automatically loaded. It must reside at one of the default config sub paths. Required.
+         * @param --config The path to the configuration file. Required.
+         * @example
+         *   $ volt --stop
+         * @example
+         *   $ volt --stop --source path/to/my/website
+         * @example
+         *   $ volt --stop --config path/to/my/website/config.js
+         * @docs
          */
         {
             id: "--stop",

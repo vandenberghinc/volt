@@ -1,0 +1,172 @@
+import { VElementBaseSignature } from "../elements/module.js";
+import { HStackElement, AnchorHStackElement } from "./stack";
+import { ImageMaskElement } from "./image";
+import { AnyElement } from "./any_element.js";
+/**
+ * Callback invoked with the dropdown element instance.
+ */
+type DropdownCallback = (element: DropdownElement) => void;
+declare const DropdownElement_base: VElementBaseSignature;
+/**
+ * Easily create a dropdown element.
+ * @nav Frontend/Elements
+ * @param target The target element for where the dropdown will be placed.
+ * @param animate Enable animations.
+ * @param duration The animation duration in milliseconds.
+ * @param side Expand to the `"left"` or `"right"` side relative to the target element.
+ * @param auto_remove Auto remove the dropdown when it is closed.
+ * @param use_target_min Use the target element for a minimum width of the dropdown.
+ * @param below_target Place the dropdown below the target with by default an `y_offset` of `10`, unless `y_offset` is defined as `false`.
+ * @param x_offset The additional x offset of the dropdown's position, this value will be added the computed x position.
+ * @param y_offset The additional y offset of the dropdown's position, this value will be added the computed y position.
+ * @param content Optional content array to easily create a context-menu like dropdown menu.
+ * @param content.text The content text. Required.
+ * @param content.image The content image source.
+ * @param content.image_padding The image padding.
+ * @param content.image_top The image margin top.
+ * @param content.href The href redirect on click.
+ * @param content.callback The on click callback.
+ * @param content.on_click The on click callback.
+ * @param content.on_click_redirect The on click redirect function arguments.
+ * @param content.anchor Flag indicating if the content node should be an anchor. Default: false.
+ * @docs
+ */
+export declare class DropdownElement extends DropdownElement_base {
+    static element_name: string;
+    private _target;
+    private _animate;
+    private _duration;
+    private _side?;
+    private _use_target_min;
+    private _auto_remove;
+    private _min_width?;
+    private _max_width?;
+    private _min_height?;
+    private _max_height?;
+    private _below_target;
+    x_offset: number;
+    y_offset: number;
+    content_items: ((AnchorHStackElement | HStackElement) & {
+        image: ImageMaskElement;
+    })[];
+    on_expand_callback?: DropdownCallback;
+    on_minimize_callback?: DropdownCallback;
+    mouse_over_background: string;
+    mouse_out_opacity: number;
+    _content_padding: [any, any] | [any, any, any, any];
+    _content_margin: [any, any] | [any, any, any, any];
+    _frame_min_width: number;
+    _frame_min_height: number;
+    _frame_max_width: number;
+    _frame_max_height: number;
+    next_toggle_allowed?: number;
+    expanded: boolean;
+    animation_timeout: any;
+    close_handler?: Function;
+    /**
+     * Create a new dropdown instance. See the class documentation for available options.
+     */
+    constructor({ target, animate, duration, side, auto_remove, min_width, max_width, min_height, max_height, use_target_min, below_target, x_offset, y_offset, content, }: {
+        target: AnyElement | HTMLElement;
+        animate?: boolean;
+        duration?: number;
+        side?: string;
+        auto_remove?: boolean;
+        min_width?: number;
+        max_width?: number;
+        min_height?: number;
+        max_height?: number;
+        use_target_min?: boolean;
+        below_target?: boolean;
+        x_offset?: number;
+        y_offset?: number;
+        content?: {
+            text: string;
+            image?: string;
+            image_padding?: number;
+            image_top?: number;
+            href?: string;
+            callback?: Function;
+            on_click?: Function;
+            on_click_redirect?: string;
+            anchor?: boolean;
+            ellipsis_overflow?: boolean;
+        }[];
+    });
+    /**
+     * Measure the dropdown to compute and cache min/max frame sizes based on current content and constraints.
+     * @private
+     */
+    _get_frame(): void;
+    /**
+     * Toggle the dropdown: expands when minimized, minimizes when expanded.
+     */
+    toggle(): this;
+    /**
+     * Expand (open) the dropdown and position it relative to the target.
+     * Triggers the `on_expand` callback when set.
+     */
+    expand(): this;
+    /**
+     * Minimize (close) the dropdown.
+     * When `force` is true, skips the debounce guard to close immediately.
+     * @param force Force closing even if toggling is temporarily blocked.
+     */
+    minimize(force?: boolean): this;
+    on_expand(): undefined | DropdownCallback;
+    on_expand(callback: DropdownCallback): this;
+    on_minimize(): undefined | DropdownCallback;
+    on_minimize(callback: DropdownCallback): this;
+    font_size(): string;
+    font_size(value: string | number): this;
+    color(): string;
+    color(value: string): this;
+    /**
+     * Iterate content nodes created by the `content` parameter. When the callback returns any non null value the iteration will be stopped.
+     * @param callback The callback invoked for each content element.
+     * @docs
+    */
+    iterate_content(callback: (element: AnchorHStackElement | HStackElement) => any): this;
+    content_padding(): typeof this._content_padding;
+    content_padding(...args: typeof this._content_padding): this;
+    content_margin(): typeof this._content_margin;
+    content_margin(...args: typeof this._content_margin): this;
+    content_background(): string;
+    content_background(value: string): this;
+    content_opacity(): number;
+    content_opacity(value: number): this;
+}
+export declare const Dropdown: <Extensions extends object = {}>(args_0: {
+    target: AnyElement | HTMLElement;
+    animate?: boolean;
+    duration?: number;
+    side?: string;
+    auto_remove?: boolean;
+    min_width?: number;
+    max_width?: number;
+    min_height?: number;
+    max_height?: number;
+    use_target_min?: boolean;
+    below_target?: boolean;
+    x_offset?: number;
+    y_offset?: number;
+    content?: {
+        text: string;
+        image?: string;
+        image_padding?: number;
+        image_top?: number;
+        href?: string;
+        callback?: Function;
+        on_click?: Function;
+        on_click_redirect?: string;
+        anchor?: boolean;
+        ellipsis_overflow?: boolean;
+    }[];
+}) => DropdownElement & Extensions;
+export declare const NullDropdown: <Extensions extends object = {}>() => DropdownElement & Extensions;
+declare module './any_element.d.ts' {
+    interface AnyElementMap {
+        DropdownElement: DropdownElement;
+    }
+}
+export {};

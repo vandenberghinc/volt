@@ -34,31 +34,21 @@ __export(stdin_exports, {
 });
 module.exports = __toCommonJS(stdin_exports);
 var vlib = __toESM(require("@vandenberghinc/vlib"));
-var import_logger = require("./logger.js");
-const RateLimits = {
-  groups: /* @__PURE__ */ new Map(),
-  /*  @docs:
-      @title: Add group
-      @desc:
-          Add a rate limit group.
-      @param:
-          @name: group
-          @description: The rate limit group.
-          @type: string
-          @default: "global"
-      @param:
-          @name: limit
-          @description: The maximum requests per rate limit interval.
-          @type: number
-          @default: 50
-      @param:
-          @name: interval
-          @description: The rate limit interval in seconds.
-          @type: number
-          @default: 60
-   */
-  add({ group = null, limit = null, interval = null }) {
-    const settings = this.groups.has(group) ? this.groups.get(group) : { group: "", limit: 0, interval: 0 };
+var RateLimits;
+(function(RateLimits2) {
+  RateLimits2.groups = /* @__PURE__ */ new Map([
+    /** The `global` rate settings. */
+    ["global", { group: "global", interval: 60, limit: 1e3 }]
+  ]);
+  function add({
+    /** The rate limit group name. */
+    group = null,
+    /** The maximum requests per rate limit interval. */
+    limit = null,
+    /** The rate limit interval in seconds. */
+    interval = null
+  }) {
+    const settings = RateLimits2.groups.has(group) ? RateLimits2.groups.get(group) : { group: "", limit: 0, interval: 0 };
     settings.group = group;
     if (limit) {
       settings.limit = limit;
@@ -70,10 +60,11 @@ const RateLimits = {
     } else if (!settings.interval) {
       settings.interval = 60;
     }
-    this.groups.set(group, settings);
+    RateLimits2.groups.set(group, settings);
     return settings;
   }
-};
+  RateLimits2.add = add;
+})(RateLimits || (RateLimits = {}));
 class RateLimitServer {
   // Static attributes.
   static default_port = 51234;
@@ -85,13 +76,14 @@ class RateLimitServer {
   limits;
   ws;
   clear_caches_interval;
-  constructor({ port = RateLimitServer.default_port, ip = null, https = null, _server }) {
-    vlib.Scheme.validate(arguments[0], {
-      strict: true,
-      scheme: {
+  constructor({ port = RateLimitServer.default_port, ip, https, _server }) {
+    vlib.schema.validate(arguments[0], {
+      unknown: false,
+      throw: true,
+      schema: {
         port: { type: "number", default: RateLimitServer.default_port },
-        ip: { type: "string", default: null },
-        https: { type: "https", default: null },
+        ip: { type: "string", required: false },
+        https: { type: "any", required: false },
         _server: "object"
       }
     });
@@ -110,7 +102,7 @@ class RateLimitServer {
     });
     if (data.api_key == null) {
       data.api_key = vlib.String.random(32);
-      await this.server._sys_db.save("rate_limit", data);
+      await this.server._sys_db.set("rate_limit", data);
     }
     this.ws = new vlib.websocket.Server({
       ip: this.ip,
@@ -123,10 +115,10 @@ class RateLimitServer {
       }
     });
     this.ws.on_event("listen", (address) => {
-      import_logger.logger.log(0, `Running on ${address}.`);
+      this.server.log(0, `Running on ${address}.`);
     });
     this.ws.on_event("error", (stream, e) => {
-      import_logger.logger.error(e);
+      this.server.log.error(e);
     });
     this.ws.on("limit", async (stream, id, data2) => {
       try {
@@ -136,7 +128,7 @@ class RateLimitServer {
           data: { response: await this.limit(data2.ip, data2.groups) }
         });
       } catch (e) {
-        import_logger.logger.error(e);
+        this.server.log.error(e);
         this.ws.send({ stream, id, data: { error: e.message } });
       }
     });
@@ -145,7 +137,7 @@ class RateLimitServer {
         await this.reset(data2.group);
         this.ws.send({ stream, id, data: { error: void 0 } });
       } catch (e) {
-        import_logger.logger.error(e);
+        this.server.log.error(e);
         this.ws.send({ stream, id, data: { error: e.message } });
       }
     });
@@ -154,7 +146,7 @@ class RateLimitServer {
         await this.reset_all();
         this.ws.send({ stream, id, data: { error: void 0 } });
       } catch (e) {
-        import_logger.logger.error(e);
+        this.server.log.error(e);
         this.ws.send({ stream, id, data: { error: e.message } });
       }
     });
@@ -172,7 +164,7 @@ class RateLimitServer {
   }
   // Stop.
   async stop() {
-    import_logger.logger.log(0, "Stopping the rate limit server.");
+    this.server.log("Stopping the rate limit server.");
     if (this.clear_caches_interval) {
       clearInterval(this.clear_caches_interval);
     }
@@ -248,10 +240,11 @@ class RateLimitClient {
   url;
   server;
   ws;
-  constructor({ ip = null, port = RateLimitServer.default_port, https = false, url = null, _server }) {
-    vlib.Scheme.validate(arguments[0], {
-      strict: true,
-      scheme: {
+  constructor({ ip, port = RateLimitServer.default_port, https = false, url, _server }) {
+    vlib.schema.validate(arguments[0], {
+      unknown: false,
+      throw: true,
+      schema: {
         ip: { type: "string", default: null },
         port: { type: "number", default: RateLimitServer.default_port },
         https: { type: "object", default: null },
@@ -285,20 +278,20 @@ class RateLimitClient {
       ping: true
     });
     this.ws.on_event("error", (e) => {
-      import_logger.logger.error(e);
+      this.server.log.error(e);
     });
     this.ws.on_event("reconnect", (e) => {
-      import_logger.logger.log(0, "Attempting to reconnect with the server.");
+      this.server.log("Attempting to reconnect with the server.");
     });
     this.ws.on_event("close", () => {
-      import_logger.logger.log(0, "Websocket closed after exhausting all reconnect attempts.");
+      this.server.log("Websocket closed after exhausting all reconnect attempts.");
       process.exit(1);
     });
     await this.ws.connect();
   }
   // Stop.
   async stop() {
-    import_logger.logger.log(0, "Stopping the rate limit client.");
+    this.server.log("Stopping the rate limit client.");
     if (this.ws) {
       await this.ws.disconnect();
       this.ws = void 0;

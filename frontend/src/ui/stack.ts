@@ -23,7 +23,6 @@ import { Elements, VElementBaseSignature, VElementTagMap, VElement, AppendType }
         // "clear": "both",
         "display": "block",
         "overflow": "hidden",
-        "width": "100%", // to ensure its passed along all children.
     }
 })
 export class FrameElement extends VElementTagMap.div {
@@ -62,7 +61,6 @@ declare module './any_element.d.ts' { interface AnyElementMap { FrameElement: Fr
         // "text-align": "start",
         "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
         "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-        "width": "100%", // to ensure its passed along all children.
     }
 })
 export class VStackElement extends VElementTagMap.div {
@@ -102,8 +100,6 @@ declare module './any_element.d.ts' { interface AnyElementMap { VStackElement: V
         "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
         "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
         "text-decoration": "none",
-
-        "width": "100%", // to ensure its passed along all children.
 
         // After extending VStack.
         "color": "inherit", // inherit colors since <a> does not have that and a <div> does.
@@ -148,7 +144,6 @@ declare module './any_element.d.ts' { interface AnyElementMap { AnchorVStackElem
         "flex:": "1 1 auto", // prevent children from exceeding its max width, @warning do not remove this cause it can produce some nasty overflow bugs, so if you want to remove it create an function to optionally remove it.
         "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
         "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-        "width": "100%", // to ensure its passed along all children.
     },
 })
 export class HStackElement extends VElementTagMap.div {;
@@ -188,7 +183,6 @@ declare module './any_element.d.ts' { interface AnyElementMap { HStackElement: H
         "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
         "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
         "text-decoration": "none",
-        "width": "100%", // to ensure its passed along all children.
 
         // After extending VStack.
         "color": "inherit", // inherit colors since <a> does not have that and a <div> does.
@@ -223,7 +217,6 @@ declare module './any_element.d.ts' { interface AnyElementMap { AnchorHStackElem
         // "text-align": "start",
         "outline": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
         "border": "none", // otherwise the focus border might show up inside an animation when the href # hashtag id is loaded.
-        "width": "100%", // to ensure its passed along all children.
     },
 })
 export class ZStackElement extends VElementTagMap.div {

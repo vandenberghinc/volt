@@ -5,7 +5,7 @@
 
 // Imports.
 import { Elements, VElement, VElementTagMap, AppendType } from "../elements/module.js"
-import { Scheme } from "@vandenberghinc/vlib/frontend";
+import { Schema } from "@vandenberghinc/vlib/frontend";
 
 // Table head element.
 @Elements.create({
@@ -243,11 +243,11 @@ export class TableElement extends VElementTagMap.div {
         columns: AppendType[],
 	}) {
 		// if (!Array.isArray(rows)) {
-		// 	console.error(`Invalid type "${Scheme.value_type(rows)}" for parameter "rows" the valid type is "array".`)
+		// 	console.error(`Invalid type "${Schema.value_type(rows)}" for parameter "rows" the valid type is "array".`)
 		// 	return this;
 		// }
 		if (!Array.isArray(columns)) {
-			console.error(`Invalid type "${Scheme.value_type(columns)}" for parameter "columns" the valid type is "array".`)
+			console.error(`Invalid type "${Schema.value_type(columns)}" for parameter "columns" the valid type is "array".`)
 			return this;
 		}
 		// console.log(columns, rows)

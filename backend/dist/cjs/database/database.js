@@ -21,29 +21,18 @@ __export(stdin_exports, {
 });
 module.exports = __toCommonJS(stdin_exports);
 var import_mongodb = require("mongodb");
-var import_logger = require("../logger.js");
 var import_collection = require("./collection.js");
-const { log } = import_logger.logger;
 class Database {
   static constructor_scheme = {
     uri: { type: "string", default: null },
-    source: { type: "string", default: null },
-    config: { type: "object", default: {} },
-    start_args: { type: "array", default: [] },
     client: { type: "object", default: {} },
-    collections: { type: "array", default: [], value_scheme: {
-      type: ["string", "object"],
-      preprocess: (info) => typeof info === "string" ? { name: info } : info,
-      scheme: {
-        name: import_collection.Collection.constructor_scheme.name,
-        ttl: import_collection.Collection.constructor_scheme.ttl,
-        indexes: import_collection.Collection.constructor_scheme.indexes
-      }
-    } },
-    preview: { type: "boolean", default: true },
-    preview_ip_whitelist: { type: "array", default: [] },
-    daemon: { type: ["object", "boolean"], default: {} },
     _server: { type: ["object", "undefined"] }
+    // source: {type: "string", default: null},
+    // config: {type: "object", default: {}},
+    // start_args: {type: "array", default: []},
+    // preview: {type: "boolean", default: true},
+    // preview_ip_whitelist: {type: "array", default: []},
+    // daemon: {type: ["object", "boolean"], default: {}},
   };
   // Attributes.
   uri;
@@ -75,9 +64,9 @@ class Database {
       await this.client.connect();
       this._db = this.client.db();
       this.connected = true;
-      log(1, "Connected to the database.");
+      this.server.log(1, "Connected to the database.");
     } catch (error) {
-      console.error(error);
+      this.server.log.error(error);
       throw new Error("Error connecting to the database");
     }
   }
@@ -106,7 +95,7 @@ class Database {
   }
   // Close.
   async close() {
-    log(0, "Stopping the database.");
+    this.server.log(0, "Stopping the database.");
     await this.client?.close();
   }
   /**
@@ -116,7 +105,7 @@ class Database {
    * @param info.unique If true, an error will be thrown if the collection already exists.
    *                    By default it is false.
    */
-  async collection(info) {
+  collection(info) {
     let name;
     let unique = false;
     let args;

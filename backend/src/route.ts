@@ -17,9 +17,6 @@ export class Route {
         match(path: string): Record<string, any> | undefined;
     }
 
-    // Inserted only when passed as arg into `match()`.
-    public matched_params: Record<string, any> = {}; 
-
     /**
      * 
      * @param method   HTTP method (e.g. "GET", "post", etc.)
@@ -29,6 +26,7 @@ export class Route {
      *                    Ensure the wildcards are encapsulated by / or at the start of end of the string.
      */
     constructor(method: string, endpoint: string | RegExp) {
+        
         // Normalize the method (uppercase, no extra whitespace)
         this.method = method.trim().toUpperCase();
         this.endpoint = endpoint;
@@ -60,21 +58,21 @@ export class Route {
         this.id = `${this.method}:${this.endpoint_str}`;
     }
 
-    /** Create match args
-      * @warning this is required for the `match()` method 
-      */
-    public static create_match_args(method: string, endpoint: string): { method: string, endpoint: string} {
-        return {
-            method: method.trim().toUpperCase(),
-            endpoint: endpoint.replace(/\/+$/, "") || "/",
-        };
-    }
+    // /** Create match args
+    //   * @warning this is required for the `match()` method 
+    //   */
+    // public static create_match_args(method: string, endpoint: string): { method: string, endpoint: string} {
+    //     return {
+    //         method: method.trim().toUpperCase(),
+    //         endpoint: endpoint.replace(/\/+$/, "") || "/",
+    //     };
+    // }
 
     /**
      * Tests this route against another Route (e.g. a “request” Route).
-     * Returns true/false and on true populates other.params.
+     * @returns `false` when not matched, and a `params` object when matched.
      */
-    public match(other: Route): boolean {
+    public match(other: Route): false | Record<string, any> {
         
         // 0) reject regex-vs-regex
         if (this.endpoint instanceof RegExp && other.endpoint instanceof RegExp) {
@@ -83,7 +81,6 @@ export class Route {
 
         // 1) method must match
         if (other.method !== this.method) {
-            other.matched_params = {};
             return false;
         }
 
@@ -92,27 +89,36 @@ export class Route {
             // other.endpoint is guaranteed to be a string here
             const m = this.endpoint.exec(other.endpoint_str);
             if (!m) {
-                other.matched_params = {};
                 return false;
-            }
-            other.matched_params = m.groups ? { ...m.groups } : {};
-            return true;
+            } else if (m.groups) {
+                // Unidecode groups.
+                const x = Object.fromEntries(
+                    Object.entries(m.groups).map(([name, val]) => {
+                        // val may be undefined if the group didn't participate
+                        return [name, val == null ? val : decodeURIComponent(val)];
+                    })
+                );
+                console.log("ROUTE PARAMS:", x);
+                return x;
+            } 
+            return {};
         }
 
         // 3) colon-style pattern
         if (this.matcher) {
             const result = this.matcher.match(other.endpoint_str);
             if (!result) {
-                other.matched_params = {};
                 return false;
             }
-            other.matched_params = result;
-            return true;
+            const keys = Object.keys(result);
+            for (const k of keys) {
+                result[k] = decodeURIComponent(result[k]);
+            }
+            return result;
         }
 
         // 4) literal string compare
-        other.matched_params = {};
-        return this.endpoint_str === other.endpoint_str;
+        return this.endpoint_str === other.endpoint_str ? {} : false;
     }
 
 

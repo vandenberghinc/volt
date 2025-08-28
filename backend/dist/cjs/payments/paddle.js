@@ -27,26 +27,48 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var stdin_exports = {};
 __export(stdin_exports, {
+  LineItem: () => LineItem,
   Paddle: () => Paddle,
-  default: () => stdin_default
+  Payment: () => Payment,
+  PaymentStatusValues: () => PaymentStatusValues
 });
 module.exports = __toCommonJS(stdin_exports);
 var https = __toESM(require("https"));
 var PDFDocument = __toESM(require("pdfkit"));
 var libcrypto = __toESM(require("crypto"));
-var import_blob_stream = __toESM(require("blob-stream"));
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var import_utils = require("../utils.js");
-var import_logger = require("../logger.js");
 var import_status = require("../status.js");
-const { log, error } = import_logger.logger;
-class RequestError extends Error {
-  status_code;
-  constructor(err, status_code) {
-    super(err);
-    this.status_code = status_code;
+var LineItem;
+(function(LineItem2) {
+  LineItem2.Schema = {
+    product: "string",
+    item_id: "string",
+    paddle_prod_id: "string",
+    quantity: "number",
+    tax_rate: "number",
+    tax: "number",
+    discount: "number",
+    subtotal: "number",
+    total: "number",
+    status: { type: "string", enum: ["paid", "refunded", "refunding"] }
+  };
+})(LineItem || (LineItem = {}));
+const PaymentStatusValues = ["open", "paid", "past_due", "unknown"];
+var Payment;
+(function(Payment2) {
+  function anonymize(payment) {
+    if (!payment.uid || payment.uid === "unauth") {
+      const { billing_details, ...rest } = payment;
+      return {
+        ...rest,
+        billing_details: void 0
+      };
+    }
+    return payment;
   }
-}
+  Payment2.anonymize = anonymize;
+})(Payment || (Payment = {}));
 class Paddle {
   type;
   client_key;
@@ -58,22 +80,28 @@ class Paddle {
   _headers;
   webhook_key;
   _has_create_products_permission;
-  _settings_db;
+  _last_products_db;
+  _webhook_conf_db;
   _sub_db;
   _active_sub_db;
   _pay_db;
-  // private _inv_db?: Collection;
+  // private _inv_db: Collection;
   performance;
-  constructor({ api_key, client_key, sandbox = false, products = [], inclusive_tax = false, _server = null }) {
-    vlib.Scheme.validate(arguments[0], { strict: true, parent: "payments", scheme: {
-      type: { type: "string", default: "paddle" },
-      api_key: "string",
-      client_key: "string",
-      sandbox: { type: "boolean", default: false },
-      inclusive_tax: { type: "boolean", default: false },
-      products: "array",
-      _server: "object"
-    } });
+  constructor({ api_key, client_key, sandbox = false, products = [], inclusive_tax = false, _server }) {
+    vlib.schema.validate(arguments[0], {
+      unknown: false,
+      throw: true,
+      parent: "payments",
+      schema: {
+        type: { type: "string", default: "paddle" },
+        api_key: "string",
+        client_key: "string",
+        sandbox: { type: "boolean", default: false },
+        inclusive_tax: { type: "boolean", default: false },
+        products: "array",
+        _server: "object"
+      }
+    });
     this.type = "paddle";
     this.client_key = client_key;
     this.sandbox = sandbox;
@@ -90,6 +118,26 @@ class Paddle {
     this.server.csp["script-src"] += " https://*.paddle.com/ https://*.payments-amazon.com https://*.paypal.com https://*.google.com";
     this.server.csp["style-src"] += " https://*.paddle.com/ https://*.media-amazon.com https://*.paypal.com https://*.google.com";
     this.server.csp["img-src"] += " https://*.paddle.com/ https://*.media-amazon.com https://*.paypal.com https://*.google.com";
+    this._last_products_db = this.server.db.collection({
+      name: "Volt.Paddle.LastProducts",
+      indexes: ["production", "version"]
+    });
+    this._webhook_conf_db = this.server.db.collection({
+      name: "Volt.Paddle.WebhookConfig",
+      indexes: ["production", "version"]
+    });
+    this._sub_db = this.server.db.collection({
+      name: "Volt.Paddle.Subscriptions",
+      indexes: ["uid", "id"]
+    });
+    this._active_sub_db = this.server.db.collection({
+      name: "Volt.Paddle.ActiveSubscriptions",
+      indexes: ["uid", "prod_id"]
+    });
+    this._pay_db = this.server.db.collection({
+      name: "Volt.Paddle.Payments",
+      indexes: ["uid", "id", "tran_id"]
+    });
     this.performance = new vlib.Performance("Payments performance");
   }
   // ---------------------------------------------------------
@@ -98,10 +146,23 @@ class Paddle {
   // Utils (private).
   async _req(method, endpoint, params = null) {
     const promise = new Promise((resolve, reject) => {
+      const is_get_like = method === "GET" || method === "HEAD";
+      let hostname = this._host;
+      let path = endpoint;
+      try {
+        if (/^https?:\/\//i.test(endpoint)) {
+          const u = new URL(endpoint);
+          hostname = u.hostname;
+          path = u.pathname + u.search;
+        } else if (is_get_like && params != null) {
+          path = `${endpoint}?${new URLSearchParams(params).toString()}`;
+        }
+      } catch {
+      }
       const options = {
         method,
-        hostname: this._host,
-        path: method === "GET" && params != null ? `${endpoint}?${new URLSearchParams(params).toString()}` : endpoint,
+        hostname,
+        path,
         port: 443,
         headers: this._headers
       };
@@ -113,21 +174,21 @@ class Paddle {
         response.on("end", () => {
           if (response?.statusCode >= 200 && response?.statusCode < 300) {
             try {
-              resolve(JSON.parse(data));
-            } catch (error2) {
+              resolve(data ? JSON.parse(data) : {});
+            } catch (error) {
               reject(new Error("Failed to parse response data"));
             }
           } else {
             if (data == null || data === "") {
-              return reject(new RequestError(`${method}:${endpoint}: Request failed [${response.statusCode}].`, response.statusCode));
+              return reject(new Paddle.RequestError(`${method}:${endpoint}: Request failed [${response.statusCode}].`, response.statusCode));
             }
             try {
               data = JSON.parse(data);
             } catch (e) {
-              return reject(new RequestError(`${method}:${endpoint}: Request failed [${response.statusCode}].`, response.statusCode));
+              return reject(new Paddle.RequestError(`${method}:${endpoint}: Request failed [${response.statusCode}].`, response.statusCode));
             }
             if (data.error == null) {
-              return reject(new RequestError(`${method}:${endpoint}: Request failed [${response.statusCode}].`, response.statusCode));
+              return reject(new Paddle.RequestError(`${method}:${endpoint}: Request failed [${response.statusCode}].`, response.statusCode));
             }
             data = data.error;
             let errs = "";
@@ -138,24 +199,24 @@ class Paddle {
               });
               errs = errs.substr(0, errs.length - 2);
             }
-            return reject(new RequestError(`${method}:${endpoint}: ${data.detail} [${response.statusCode}]${errs}.`, response.statusCode));
+            return reject(new Paddle.RequestError(`${method}:${endpoint}: ${data.detail} [${response.statusCode}]${errs}.`, response.statusCode));
           }
         });
       });
-      if (params != null) {
+      if (!is_get_like && params != null) {
         const requestBody = JSON.stringify(params);
         request.setHeader("Content-Length", Buffer.byteLength(requestBody));
         request.write(requestBody);
       }
-      request.on("error", (error2) => {
-        reject(error2);
+      request.on("error", (error) => {
+        reject(error);
       });
       request.end();
     });
     try {
       return await promise;
     } catch (e) {
-      if (e instanceof Error || e instanceof RequestError) {
+      if (e instanceof Error || e instanceof Paddle.RequestError) {
         throw e;
       }
       throw new Error(e);
@@ -165,7 +226,7 @@ class Paddle {
   // Database (private).
   // Add or remove a subscription to the user's active subscriptions.
   async _add_subscription(uid, prod_id, sub_id) {
-    await this._active_sub_db.save({ uid, prod_id }, { prod_id, sub_id });
+    await this._active_sub_db.set({ uid, prod_id }, { prod_id, sub_id });
   }
   async _delete_subscription(uid, prod_id) {
     await this._active_sub_db.delete({ uid, prod_id });
@@ -200,7 +261,7 @@ class Paddle {
     return products;
   }
   async _save_subscription(subscription) {
-    await this._sub_db.save({
+    await this._sub_db.set({
       uid: subscription.uid == null ? "unauth" : subscription.uid,
       id: subscription.id
     }, subscription);
@@ -221,7 +282,7 @@ class Paddle {
   }
   // Save and delete payments, all failed payments should be deleted from the database.
   async _save_payment(payment) {
-    await this._pay_db.save({
+    await this._pay_db.set({
       uid: payment.uid == null ? "unauth" : payment.uid,
       id: payment.id
     }, payment);
@@ -232,20 +293,20 @@ class Paddle {
     if (payment == null) {
       throw Error(`Unable to find payment "${id}".`);
     }
-    if (uid == null || uid == "unauth") {
-      delete payment.billing_details;
+    return payment;
+  }
+  async _load_payment_for_public(id) {
+    return Payment.anonymize(await this._load_payment(id));
+  }
+  async _load_payment_by_transaction(tran_id) {
+    const payment = await this._pay_db.find({ tran_id });
+    if (payment == null) {
+      throw Error(`Unable to find the payment by transaction id "${tran_id}".`);
     }
     return payment;
   }
-  async _load_payment_by_transaction(id) {
-    const payment = await this._pay_db.find({ tran_id: id });
-    if (payment == null) {
-      throw Error(`Unable to find the payment by transaction id "${id}".`);
-    }
-    if (payment.uid == null || payment.uid == "unauth") {
-      delete payment.billing_details;
-    }
-    return payment;
+  async _load_payment_by_transaction_for_public(tran_id) {
+    return Payment.anonymize(await this._load_payment_by_transaction(tran_id));
   }
   async _delete_payment(id) {
     const uid = id.split("_")[1];
@@ -259,7 +320,7 @@ class Paddle {
   }
   // List all active subscriptions.
   async _get_all_active_subscriptions() {
-    return await this._active_sub_db.list_query({});
+    return await this._active_sub_db.list_all();
   }
   // ---------------------------------------------------------
   // Overall (private).
@@ -328,8 +389,8 @@ class Paddle {
       if (process.argv.includes("--no-payment-edits")) {
         return false;
       }
-      if (this._has_create_products_permission) {
-        return true;
+      if (this._has_create_products_permission != null) {
+        return this._has_create_products_permission;
       }
       const input = await vlib.logging.prompt("Some paddle products have to be edited, do you wish to make these changes? [y/n]: ");
       if (["y", "yes", "ok"].includes(input.toLowerCase())) {
@@ -348,7 +409,7 @@ class Paddle {
       if (!await has_create_products_permission()) {
         return;
       }
-      log(0, `Creating product ${product.name}.`);
+      this.server.log(0, `Creating product ${product.name}.`);
       const created_product = await this._req("POST", "/products", {
         name: product.name,
         description: product.description,
@@ -357,26 +418,26 @@ class Paddle {
         custom_data: { id: product.id }
       });
       product.paddle_prod_id = created_product.data.id;
-      log(0, `Creating a price for product ${product.name}.`);
+      this.server.log(0, `Creating a price for product ${product.name}.`);
       const created_price = await this._req("POST", "/prices", {
         product_id: product.paddle_prod_id,
         name: product.name,
         description: product.description,
         unit_price: { amount: Math.floor(product.price * 100).toString(), currency_code: product.currency },
         billing_cycle: product.is_subscription ? { interval: product.interval, frequency: product.frequency } : null,
-        trial_period: product.trial,
+        trial_period: product.is_subscription ? product.trial : null,
         tax_mode: this.inclusive_tax ? "internal" : "external"
       });
       product.price_id = created_price.data.id;
     } else {
       product.paddle_prod_id = existing_product.id;
-      const has_trial = product.trial != null;
+      const has_trial = product.is_subscription && product.trial != null;
       const update_product = existing_product.name !== product.name || existing_product.description !== product.description || existing_product.image_url !== product.icon || existing_product.tax_category !== product.tax_category || existing_product.status !== "active";
       if (update_product) {
         if (!await has_create_products_permission()) {
           return;
         }
-        log(0, `Updating product ${product.name}.`);
+        this.server.log(0, `Updating product ${product.name}.`);
         await this._req("PATCH", `/products/${product.paddle_prod_id}`, {
           name: product.name,
           description: product.description,
@@ -395,14 +456,14 @@ class Paddle {
         if (!await has_create_products_permission()) {
           return;
         }
-        log(0, `Creating a price for product ${product.name}.`);
+        this.server.log(0, `Creating a price for product ${product.name}.`);
         const price = await this._req("POST", "/prices", {
           product_id: product.paddle_prod_id,
           name: product.name,
           description: product.description,
           unit_price: { amount: Math.floor(product.price * 100).toString(), currency_code: product.currency },
           billing_cycle: product.is_subscription ? { interval: product.interval, frequency: product.frequency } : null,
-          trial_period: product.trial,
+          trial_period: product.is_subscription ? product.trial : null,
           tax_mode: this.inclusive_tax ? "internal" : "external"
         });
         product.price_id = price.data.id;
@@ -413,14 +474,14 @@ class Paddle {
           if (!await has_create_products_permission()) {
             return;
           }
-          log(0, `Updating the price of product ${product.name}.`);
+          this.server.log(0, `Updating the price of product ${product.name}.`);
           await this._req("PATCH", `/prices/${product.price_id}`, {
             // product_id: product.id, // not allowed.
             name: product.name,
             description: product.description,
             unit_price: { amount: Math.floor(product.price * 100).toString(), currency_code: product.currency },
             billing_cycle: product.is_subscription ? { interval: product.interval, frequency: product.frequency } : null,
-            trial_period: product.trial,
+            trial_period: product.is_subscription ? product.trial : null,
             tax_mode: this.inclusive_tax ? "internal" : "external",
             status: "active"
           });
@@ -617,8 +678,8 @@ class Paddle {
     };
     let sub_products = 0;
     this.products.iterate((product) => {
-      if (product.plans != null) {
-        if (product.plans != null && Array.isArray(product.plans) === false) {
+      if (product.is_subscription) {
+        if (!product.plans || !Array.isArray(product.plans)) {
           throw Error(`Product "${product_index}" has an incorrect value type for attribute "plans", the valid type is "array".`);
         }
         product.id = `sub_${sub_products}`;
@@ -651,18 +712,15 @@ class Paddle {
           }
           initialize_product(plan);
         });
-      } else if (product.frequency != null || product.interval != null) {
-        throw Error(`Subscription products should be nested as plans of a subscription "{... plans: [...]}". Not as a direct product without a subscription parent.`);
       } else {
         product.is_subscription = false;
         initialize_product(product);
       }
     });
     now = this.performance.end("init-products", now);
-    const last_products = await this._settings_db.load(`last_products${this.server.production ? "" : "_demo"}`);
-    if (vlib.Object.eq(last_products, this.products)) {
-      const product_ids2 = await this._settings_db.load(`product_ids${this.server.production ? "" : "_demo"}`);
-      product_ids2.iterate((item) => {
+    const last_products = await this._last_products_db.load({ production: this.server.production, version: 1 });
+    if (last_products && vlib.Object.eq(last_products.last_products, this.products)) {
+      last_products.product_ids.iterate((item) => {
         const product = this.get_product_sync(item.id);
         if (product != null) {
           product.paddle_prod_id = item.paddle_prod_id;
@@ -676,7 +734,7 @@ class Paddle {
       now = this.performance.end("get-prices-and-products", now);
       const product_ids2 = [];
       for (const product of this.products) {
-        if (product.plans != null) {
+        if (product.is_subscription) {
           for (const plan of product.plans) {
             await this._check_product(plan, existing_products, existing_prices);
             product_ids2.append({
@@ -697,31 +755,15 @@ class Paddle {
       }
       ;
       now = this.performance.end("check-products", now);
-      await this._settings_db.save(`last_products${this.server.production ? "" : "_demo"}`, vlib.Object.delete_recursively(vlib.Object.deep_copy(this.products), ["paddle_prod_id", "price_id"]));
-      await this._settings_db.save(`product_ids${this.server.production ? "" : "_demo"}`, product_ids2);
+      await this._last_products_db.set({ production: this.server.production, version: 1 }, {
+        last_products: vlib.Object.delete_recursively(vlib.Object.deep_copy(this.products), ["paddle_prod_id", "price_id"]),
+        product_ids: product_ids2
+      });
       now = this.performance.end("save-products-to-db", now);
     }
   }
   // Initialize the payments.
   async _initialize() {
-    this.performance.start();
-    this._settings_db = await this.server.db.collection({
-      name: "Volt.Paddle.Settings",
-      indexes: ["_path"]
-    });
-    this._sub_db = await this.server.db.collection({
-      name: "Volt.Paddle.Subscriptions",
-      indexes: ["uid", "id"]
-    });
-    this._active_sub_db = await this.server.db.collection({
-      name: "Volt.Paddle.ActiveSubscriptions",
-      indexes: ["uid", "prod_id"]
-    });
-    this._pay_db = await this.server.db.collection({
-      name: "Volt.Paddle.Payments",
-      indexes: ["uid", "id", "tran_id"]
-    });
-    this.performance.end("init-db");
     await this._initialize_products();
     let now = this.performance.start();
     this.server.endpoint({
@@ -730,33 +772,39 @@ class Paddle {
       content_type: "application/json",
       rate_limit: "global",
       params: {
-        items: "array"
+        items: { type: "array", required: true, value_schema: "object" }
+        // add schema for items
       },
       callback: async (stream, params) => {
         if (params.items.length === 0) {
-          return stream.error({ status: import_status.Status.bad_request, data: { error: "Shopping cart is empty." } });
+          return stream.error({ status: import_status.Status.bad_request, message: "Shopping cart is empty." });
         }
         let sub_plan_count = {};
-        const error2 = await params.items.iterate_async_await(async (item) => {
+        let error = void 0;
+        for (const item of params.items) {
           if (item.product.is_subscription) {
             if (stream.uid == null) {
-              return "You must be signed-in to purchase a subscription.";
+              error = "You must be signed-in to purchase a subscription.";
+              break;
             }
             if (item.quantity != null && item.quantity > 1) {
-              return "Subscriptions have a max quantity of 1.";
+              error = "Subscriptions have a max quantity of 1.";
+              break;
             }
             if (sub_plan_count[item.product.subscription_id] == null) {
               sub_plan_count[item.product.subscription_id] = 1;
             } else {
-              return "You can not charge two different subscription plans from the same subscription product.";
+              error = "You can not charge two different subscription plans from the same subscription product.";
+              break;
             }
             if (await this._check_subscription(stream.uid, item.product.id, false)) {
-              return `You are already subscribed to product "${item.product.name}".`;
+              error = `You are already subscribed to product "${item.product.name}".`;
+              break;
             }
           }
-        });
-        if (error2) {
-          return stream.error({ status: import_status.Status.bad_request, data: { error: error2 } });
+        }
+        if (error) {
+          return stream.error({ status: import_status.Status.bad_request, message: error });
         }
         return stream.success({ data: { message: "Successfully initialized the order." } });
       }
@@ -767,7 +815,8 @@ class Paddle {
       content_type: "application/json",
       rate_limit: "global",
       callback: (stream) => {
-        return stream.success({ data: this.products });
+        const data = this.products;
+        return stream.success({ data });
       }
     });
     this.server.endpoint({
@@ -779,7 +828,8 @@ class Paddle {
         id: "string"
       },
       callback: async (stream, params) => {
-        return stream.success({ data: await this._load_payment(params.id) });
+        const data = await this._load_payment_for_public(params.id);
+        return stream.success({ data });
       }
     });
     this.server.endpoint({
@@ -790,8 +840,8 @@ class Paddle {
       rate_limit: "global",
       params: {
         days: { type: "number", default: 30 },
-        limit: { type: "number", default: null },
-        status: { type: "string", default: null }
+        limit: { type: "number", required: false },
+        status: { type: "string", required: false, enum: PaymentStatusValues }
       },
       callback: async (stream, params) => {
         const result = await this.get_payments({
@@ -811,14 +861,14 @@ class Paddle {
       rate_limit: "global",
       params: {
         days: { type: "number", default: 30 },
-        limit: { type: ["null", "number"], default: null },
-        status: { type: ["null", "string"], default: null }
+        limit: { type: "number", required: false }
       },
       callback: async (stream, params) => {
         const result = await this.get_refundable_payments({
           uid: stream.uid,
           days: params.days,
-          limit: params.limit
+          limit: params.limit,
+          for_public: true
         });
         return stream.success({ data: result });
       }
@@ -831,13 +881,14 @@ class Paddle {
       rate_limit: "global",
       params: {
         days: { type: "number", default: 30 },
-        limit: { type: ["null", "number"], default: null }
+        limit: { type: "number", required: false }
       },
       callback: async (stream, params) => {
         const result = await this.get_refunded_payments({
           uid: stream.uid,
           days: params.days,
-          limit: params.limit
+          limit: params.limit,
+          for_public: true
         });
         return stream.success({ data: result });
       }
@@ -849,14 +900,15 @@ class Paddle {
       authenticated: true,
       rate_limit: "global",
       params: {
-        days: { type: ["null", "number"], default: null },
-        limit: { type: ["null", "number"], default: null }
+        days: { type: "number", default: 30 },
+        limit: { type: "number", required: false }
       },
       callback: async (stream, params) => {
         const result = await this.get_refunding_payments({
           uid: stream.uid,
           days: params.days,
-          limit: params.limit
+          limit: params.limit,
+          for_public: true
         });
         return stream.success({ data: result });
       }
@@ -865,14 +917,18 @@ class Paddle {
       method: "POST",
       endpoint: "/volt/payments/refund",
       content_type: "application/json",
+      authenticated: true,
       rate_limit: "global",
       params: {
-        payment: { type: ["string", "object"] },
-        line_items: { type: ["array", "null"], default: null },
+        payment: { type: ["string", "object"], schema: { id: "string" } },
+        line_items: { type: "array", required: false, value_schema: {
+          type: "object",
+          schema: LineItem.Schema
+        } },
         reason: { type: "string", default: "refund" }
       },
       callback: async (stream, params) => {
-        await this.create_refund(params.payment, params.line_items, params.reason);
+        await this.create_refund(typeof params.payment === "string" ? params.payment : params.payment.id, params.line_items, params.reason);
         return stream.success();
       }
     });
@@ -896,9 +952,12 @@ class Paddle {
       content_type: "application/json",
       authenticated: true,
       rate_limit: "global",
-      callback: async (stream, params) => {
+      callback: async (stream) => {
+        const data = {
+          subscriptions: await this.get_active_subscriptions(stream.uid)
+        };
         return stream.success({
-          data: { subscriptions: await this.get_active_subscriptions(stream.uid) }
+          data
         });
       }
     });
@@ -912,8 +971,11 @@ class Paddle {
         product: "string"
       },
       callback: async (stream, params) => {
+        const data = {
+          is_subscribed: await this.is_subscribed(stream.uid, params.product)
+        };
         return stream.success({
-          data: { is_subscribed: await this.is_subscribed(stream.uid, params.product) }
+          data
         });
       }
     });
@@ -932,8 +994,8 @@ class Paddle {
         if (res instanceof Promise) {
           res = await res;
         }
-      } catch (error2) {
-        console.error(error2);
+      } catch (error) {
+        console.error(error);
       }
     }
   }
@@ -948,7 +1010,7 @@ class Paddle {
   // }
   // On a successfull payment webhook event.
   async _payment_webhook(data) {
-    let obj = (await this._req("GET", `/transactions/${data.id}`, { include: ["address", "adjustment", "business", "customer"] })).data;
+    let obj = (await this._req("GET", `/transactions/${data.id}`, { include: ["address", "adjustments", "business", "customer"] })).data;
     const id = `pay_${obj.custom_data.uid == null ? "unauth" : obj.custom_data.uid}_${vlib.String.random(4)}${Date.now()}`;
     const payment = {
       id,
@@ -1029,7 +1091,7 @@ class Paddle {
         payment.status = "past_due";
         break;
       default:
-        error(`Payment Webhook: Unknown payment status "${obj.status}".`);
+        this.server.log.error(`Payment Webhook: Unknown payment status "${obj.status}".`);
         payment.status = "unknown";
         break;
     }
@@ -1043,13 +1105,13 @@ class Paddle {
         // paddle product id.
         quantity: item.quantity,
         tax_rate: parseFloat(item.tax_rate),
-        tax: parseFloat(item.totals.tax / 100),
+        tax: item.totals.tax / 100,
         // should not be changed to unit totals, since mails and invoices depend on this behaviour, just divide by quantity.
-        discount: parseFloat(item.totals.discount / 100),
+        discount: item.totals.discount / 100,
         // should not be changed to unit totals, since mails and invoices depend on this behaviour, just divide by quantity.
-        subtotal: parseFloat(item.totals.subtotal / 100),
+        subtotal: item.totals.subtotal / 100,
         // should not be changed to unit totals, since mails and invoices depend on this behaviour, just divide by quantity.
-        total: parseFloat(item.totals.total / 100),
+        total: item.totals.total / 100,
         // should not be changed to unit totals, since mails and invoices depend on this behaviour, just divide by quantity.
         status: "paid"
         // can be "paid", "refunded", "refunding".
@@ -1059,12 +1121,21 @@ class Paddle {
       obj.adustments.iterate((adj) => {
         switch (adj.action) {
           case "refund":
-          case "cargeback":
-          case "cargeback_warning":
+          case "chargeback":
             adj.items.iterate((adj_item) => {
               payment.line_items.iterate((item) => {
                 if (adj_item.item_id === item.item_id) {
                   item.status = "refunded";
+                  return false;
+                }
+              });
+            });
+            break;
+          case "chargeback_reversal":
+            adj.items.iterate((adj_item) => {
+              payment.line_items.iterate((item) => {
+                if (adj_item.item_id === item.item_id) {
+                  item.status = "paid";
                   return false;
                 }
               });
@@ -1076,18 +1147,18 @@ class Paddle {
       });
     }
     await this._save_payment(payment);
-    const { uid, cus_id } = payment;
-    for (const item of await payment.line_items) {
+    const { uid } = payment;
+    for (const item of payment.line_items) {
       const product = this.get_product_sync(item.product, false);
       if (product == null) {
         continue;
       } else if (product.is_subscription) {
         const subscription = await this.get_product(product.subscription_id, true);
-        for (const plan of subscription.plans ?? []) {
+        for (const plan of subscription?.plans ?? []) {
           if (plan.id != product.id) {
             const { exists, sub_id } = await this._check_subscription(uid, plan.id);
             if (exists) {
-              log(0, `Cancelling subscription "${plan.id}" due too downgrade/upgrade to "${product.id}" of user "${payment.uid}".`);
+              this.server.log(0, `Cancelling subscription "${plan.id}" due too downgrade/upgrade to "${product.id}" of user "${payment.uid}".`);
               await this._cancel_subscription(sub_id);
             }
           }
@@ -1113,11 +1184,11 @@ class Paddle {
     for (const item of data.items) {
       const product = this._get_product_by_paddle_prod_id(item.price.product_id, false);
       if (product == null) {
-        error(`Subscription webhook [#sub1]: Unable to find product with id ${item.price.product_id}. This is a serious error which causes a non activated subscription for a paid transaction. You should manually cancel the subscription. Event: ${JSON.stringify(data, null, 4)}.`);
+        this.server.log.error(`Subscription webhook [#sub1]: Unable to find product with id ${item.price.product_id}. This is a serious error which causes a non activated subscription for a paid transaction. You should manually cancel the subscription. Event: ${JSON.stringify(data, null, 4)}.`);
         continue;
       } else if (product.is_subscription) {
         subscription.plans.append(product.id);
-        log(0, `Activating subscription "${product.id}" of user "${subscription.uid}".`);
+        this.server.log(0, `Activating subscription "${product.id}" of user "${subscription.uid}".`);
         await this._add_subscription(uid, product.id, subscription.id);
         await this._exec_user_callback(this.server.on_subscription, { product, subscription });
       }
@@ -1129,7 +1200,7 @@ class Paddle {
     const subscription = await this._load_subscription(data.id);
     for (const plan_id of subscription.plans) {
       await this._delete_subscription(subscription.uid, plan_id);
-      log(0, `Deactivating subscription "${plan_id}" of user "${subscription.uid}".`);
+      this.server.log(0, `Deactivating subscription "${plan_id}" of user "${subscription.uid}".`);
     }
     subscription.status = "cancelled";
     await this._save_subscription(subscription);
@@ -1163,16 +1234,16 @@ class Paddle {
         await this._save_payment(payment);
       }
       if (is_approved) {
-        log(0, `Refunded items of payment "${payment.id}" of user "${payment.uid}".`);
+        this.server.log(0, `Refunded items of payment "${payment.id}" of user "${payment.uid}".`);
         await this._exec_user_callback(is_refund ? this.server.on_refund : this.server.on_chargeback, { payment, line_items });
       } else {
-        log(0, `Refund denied for items of payment ${payment.id} of user "${payment.uid}".`);
+        this.server.log(0, `Refund denied for items of payment ${payment.id} of user "${payment.uid}".`);
         await this._exec_user_callback(is_refund ? this.server.on_failed_refund : this.server.on_failed_chargeback, { payment, line_items });
       }
     } else if (data.action === "chargeback_reverse" && data.status === "reversed") {
       const payment = await this._load_payment_by_transaction(data.transaction_id);
       if (payment.sub_id != null) {
-        log(0, `Chargeback reversed for payment ${payment.id} from user "${payment.uid}".`);
+        this.server.log(0, `Chargeback reversed for payment ${payment.id} from user "${payment.uid}".`);
       }
       let line_items = [];
       data.items.iterate((adj_item) => {
@@ -1190,7 +1261,7 @@ class Paddle {
   }
   // Create and register the webhook endpoint.
   async _create_webhook() {
-    const webhook_doc = await this._settings_db.load(`webhook${this.server.production ? "" : "_demo"}`);
+    const webhook_doc = await this._webhook_conf_db.load({ production: this.server.production, version: 1 });
     const webhook_settings = {
       description: "volt webhook",
       destination: `${this.server.full_domain}/volt/payments/webhook`,
@@ -1218,29 +1289,29 @@ class Paddle {
       ]
     };
     const register_webhook = async () => {
-      log(0, "Registering payments webhook.");
+      this.server.log(0, "Registering payments webhook.");
       const response = await this._req("POST", "/notification-settings", webhook_settings);
       this.webhook_key = response.data.endpoint_secret_key;
-      await this._settings_db.save(`webhook${this.server.production ? "" : "_demo"}`, {
+      await this._webhook_conf_db.set({ production: this.server.production, version: 1 }, {
         id: response.data.id,
-        key: this.webhook_key
+        key: this.webhook_key,
+        hash: this.server.hash(webhook_settings)
       });
     };
     if (webhook_doc != null) {
       this.webhook_key = webhook_doc.key;
-      const last_webhook = await this._settings_db.load(`last_webhook${this.server.production ? "" : "_demo"}`);
-      if (last_webhook !== this.server.hash(webhook_settings)) {
-        log(0, `Checking payments webhook.`);
+      if (webhook_doc.hash !== this.server.hash(webhook_settings)) {
+        this.server.log(0, `Checking payments webhook.`);
         const webhook_id = webhook_doc.id;
         let registered;
         try {
           registered = await this._req("GET", `/notification-settings/${webhook_id}`);
-        } catch (error2) {
-          if (error2.status === 404 || error2.status_code === 404) {
+        } catch (error) {
+          if (error.status === 404 || error.status_code === 404) {
             registered = void 0;
             await register_webhook();
           } else {
-            throw error2;
+            throw error;
           }
         }
         if (registered) {
@@ -1261,10 +1332,10 @@ class Paddle {
             });
           })();
           if (patch === true) {
-            log(0, "Updating payments webhook.");
+            this.server.log(0, "Updating payments webhook.");
             await this._req("PATCH", `/notification-settings/${webhook_id}`, { ...webhook_settings, active: true });
           }
-          await this._settings_db.save(`last_webhook${this.server.production ? "" : "_demo"}`, this.server.hash(webhook_settings));
+          await this._webhook_conf_db.set({ production: this.server.production, version: 1 }, { hash: this.server.hash(webhook_settings) });
         }
       }
     } else {
@@ -1293,12 +1364,12 @@ class Paddle {
       rate_limit: void 0,
       callback: async (stream) => {
         if (ip_whitelist.includes(stream.ip) === false) {
-          log(0, `POST:/volt/payments/webhook: Warning: Blocking non whitelisted ip "${stream.ip}".`);
+          this.server.log(0, `POST:/volt/payments/webhook: Warning: Blocking non whitelisted ip "${stream.ip}".`);
           return stream.error({ status: import_status.Status.unauthorized });
         }
         const full_signature = stream.headers["paddle-signature"];
         if (full_signature == null) {
-          log(0, "POST:/volt/payments/webhook: Error: No paddle signature found in the request headers.");
+          this.server.log(0, "POST:/volt/payments/webhook: Error: No paddle signature found in the request headers.");
           return stream.error({ status: import_status.Status.unauthorized, data: { error: "Webhook signature verification failed." } });
         }
         const ts_index = full_signature.indexOf(";");
@@ -1306,7 +1377,7 @@ class Paddle {
         const signature = full_signature.substr(ts_index + 4);
         const digest = libcrypto.createHmac("sha256", this.webhook_key).update(`${ts}:${stream.body}`).digest("hex");
         if (libcrypto.timingSafeEqual(Buffer.from(digest, "hex"), Buffer.from(signature, "hex")) !== true) {
-          log(0, "POST:/volt/payments/webhook: Error: Webhook signature verification failed.");
+          this.server.log(0, "POST:/volt/payments/webhook: Error: Webhook signature verification failed.");
           return stream.error({ status: import_status.Status.unauthorized, data: { error: "Webhook signature verification failed." } });
         }
         const event = JSON.parse(stream.body);
@@ -1365,7 +1436,6 @@ class Paddle {
     }
     return product;
   }
-  // Get a payment by id.
   /*  @docs:
       @title: Get Payment.
       @desc: Get a payment by id.
@@ -1375,10 +1445,12 @@ class Paddle {
           @type: string
           @desc: The id of the payment.
   */
-  async get_payment(id) {
+  async get_payment(id, opts) {
+    if (opts?.for_public) {
+      return await this._load_payment_for_public(id);
+    }
     return await this._load_payment(id);
   }
-  // Get payments.
   /*  @docs:
           @title: Get Refunded Payments.
           @desc:
@@ -1407,30 +1479,24 @@ class Paddle {
                   @value: "paid"
                   @desc: Payments that are paid.
       */
-  async get_payments({ uid, days = 30, limit = void 0, status = void 0 }) {
-    const list = await this._pay_db.list_query({ uid });
-    let since = null;
+  async get_payments({ uid, days = 30, limit = 1e4, status = void 0, for_public }) {
+    const query = {
+      uid
+    };
     if (days != null) {
-      since = /* @__PURE__ */ new Date();
+      const since = /* @__PURE__ */ new Date();
       since.setHours(0, 0, 0, 0);
-      since = Math.floor(since.getTime() - 3600 * 24 * 1e3 * days);
+      query.timestamp = { $gte: Math.floor(since.getTime() - 3600 * 24 * 1e3 * days) };
     }
-    const payments = [];
-    const status_is_array = Array.isArray(status);
-    list.iterate((payment) => {
-      if (since == null || payment.timestamp >= since) {
-        if (status == null || status_is_array === false && status === payment.status || status_is_array && status.includes(payment.status)) {
-          payments.append(payment);
-        }
-      }
-      if (limit != null && limit != -1 && payments.length >= limit) {
-        return false;
-      }
-    });
+    if (Array.isArray(status)) {
+      query.status = { $in: status };
+    } else if (typeof status === "string") {
+      query.status = status;
+    }
+    const payments = await this._pay_db.list_query(query, { limit });
     payments.sort((a, b) => b.timestamp - a.timestamp);
-    return payments;
+    return for_public ? payments.map((p) => Payment.anonymize(p)) : payments;
   }
-  // Get all refundable payments.
   /*  @docs:
       @title: Get Refundable Payments.
       @desc: Get all payments that are refundable.
@@ -1446,24 +1512,17 @@ class Paddle {
           @type: number
           @desc: Limit the amount of response payment objects.
   */
-  async get_refundable_payments({ uid, days = 30, limit = void 0 }) {
-    const payments = [];
-    const all_payments = await this.get_payments({ uid, days, limit, status: "paid" });
-    all_payments.iterate((payment) => {
-      const line_items = [];
-      payment.line_items.iterate((item) => {
-        if (item.status === "paid" && item.total > 0) {
-          line_items.push(item);
-        }
-      });
-      if (line_items.length > 0) {
-        payment.line_items = line_items;
-        payments.push(payment);
+  async get_refundable_payments({ uid, days = 30, limit = void 0, for_public }) {
+    const out = [];
+    const all_payments = await this.get_payments({ uid, days, limit, status: "paid", for_public });
+    all_payments.iterate((pmt) => {
+      const refundable = pmt.line_items.filter((li) => li.status === "paid" && li.total > 0);
+      if (refundable.length > 0) {
+        out.push({ ...pmt, line_items: refundable });
       }
     });
-    return payments;
+    return out;
   }
-  // Get all refunded payments.
   /*  @docs:
       @title: Get Refunded Payments.
       @desc: Get all payments that are successfully refunded.
@@ -1479,24 +1538,17 @@ class Paddle {
           @type: number
           @desc: Limit the amount of response payment objects.
   */
-  async get_refunded_payments({ uid, days = 30, limit = void 0 }) {
-    const payments = [];
-    const all_payments = await this.get_payments({ uid, days, limit, status: "paid" });
-    all_payments.iterate((payment) => {
-      const line_items = [];
-      payment.line_items.iterate((item) => {
-        if (item.status === "refunded") {
-          line_items.push(item);
-        }
-      });
-      if (line_items.length > 0) {
-        payment.line_items = line_items;
-        payments.push(payment);
+  async get_refunded_payments({ uid, days = 30, limit = void 0, for_public }) {
+    const out = [];
+    const all_payments = await this.get_payments({ uid, days, limit, status: "paid", for_public });
+    all_payments.iterate((pmt) => {
+      const refundable = pmt.line_items.filter((li) => li.status === "refunded" && li.total > 0);
+      if (refundable.length > 0) {
+        out.push({ ...pmt, line_items: refundable });
       }
     });
-    return payments;
+    return out;
   }
-  // Get all payments that are currently in the refunding process.
   /*  @docs:
       @title: Get Refunding Payments.
       @desc: Get all payments that are currently in the refunding process.
@@ -1512,24 +1564,17 @@ class Paddle {
           @type: number
           @desc: Limit the amount of response payment objects.
   */
-  async get_refunding_payments({ uid, days = void 0, limit = void 0 }) {
-    const payments = [];
-    const all_payments = await this.get_payments({ uid, days, limit, status: "paid" });
-    all_payments.iterate((payment) => {
-      const line_items = [];
-      payment.line_items.iterate((item) => {
-        if (item.status === "refunding") {
-          line_items.push(item);
-        }
-      });
-      if (line_items.length > 0) {
-        payment.line_items = line_items;
-        payments.push(payment);
+  async get_refunding_payments({ uid, days = void 0, limit = void 0, for_public }) {
+    const out = [];
+    const all_payments = await this.get_payments({ uid, days, limit, status: "paid", for_public });
+    all_payments.iterate((pmt) => {
+      const refundable = pmt.line_items.filter((li) => li.status === "refunding" && li.total > 0);
+      if (refundable.length > 0) {
+        out.push({ ...pmt, line_items: refundable });
       }
     });
-    return payments;
+    return out;
   }
-  // Refund a payment.
   /*  @docs:
       @title: Refund Payment.
       @desc: Refund a payment based on the payment id.
@@ -1602,7 +1647,6 @@ class Paddle {
     }
     await this._save_payment(payment);
   }
-  // Cancel a subscription.
   /*  @docs:
       @title: Cancel Subscription.
       @desc: Cancel a subscription based on the retrieved payment object or id.
@@ -1643,7 +1687,6 @@ class Paddle {
       });
     }
   }
-  // Cancel subscription by subscription id.
   /*  @docs:
       @title: Cancel subscription by subscription id.
       @desc: Cancel a subscription based on the retrieved subscription object or id.
@@ -1664,7 +1707,6 @@ class Paddle {
     }
     return await this._cancel_subscription(subscription, immediate);
   }
-  // Get subscriptioms.
   /*  @docs:
       @title: Get active subscriptions
       @desc: Get the active subscriptions of a user.
@@ -1685,7 +1727,6 @@ class Paddle {
   async get_subscriptions(uid) {
     return await this._get_subscriptions(uid);
   }
-  // Is subscribed.
   /*  @docs:
       @title: Is Subscribed
       @desc: Check if a user is subscribed to a product.
@@ -1701,7 +1742,6 @@ class Paddle {
   async is_subscribed(uid, product) {
     return await this._check_subscription(uid, product, false);
   }
-  // Generate an invoice.
   /*  @docs:
           @title: Generate Invoice
           @desc:
@@ -1882,16 +1922,12 @@ class Paddle {
     doc.font("Helvetica-Bold");
     gen_line_item({ unit_cost: "Total Due:", total_cost: `${currency} ${total_due.toFixed(2)}` });
     top_offset -= spacing - 3;
-    const stream = doc.pipe((0, import_blob_stream.default)());
-    doc.end();
-    return new Promise((resolve, reject) => {
-      stream.on("finish", () => {
-        const bytes = stream.toBuffer();
-        resolve(bytes);
-      });
-      stream.on("error", (error2) => {
-        reject(error2);
-      });
+    const chunks = [];
+    return await new Promise((resolve, reject) => {
+      doc.on("data", (chunk) => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", (err) => reject(err));
+      doc.end();
     });
   }
   // ---------------------------------------------------------
@@ -1912,7 +1948,7 @@ class Paddle {
     }
     for (const sub of subs) {
       if (sub.status === "active") {
-        console.log("Cancelling subscription", sub.id);
+        this.server.log("Cancelling subscription ", sub.id);
         await this._req("POST", `/subscriptions/${sub.id}/cancel`, {
           effective_from: "immediately"
         });
@@ -1920,8 +1956,31 @@ class Paddle {
     }
   }
 }
-var stdin_default = Paddle;
+(function(Paddle2) {
+  class RequestError extends Error {
+    status_code;
+    constructor(err, status_code) {
+      super(err);
+      this.status_code = status_code;
+    }
+  }
+  Paddle2.RequestError = RequestError;
+  let Endpoints;
+  (function(Endpoints2) {
+    let IsSubscribed;
+    /* @__PURE__ */ (function(IsSubscribed2) {
+      ;
+    })(IsSubscribed = Endpoints2.IsSubscribed || (Endpoints2.IsSubscribed = {}));
+    let GetActiveSubscriptions;
+    /* @__PURE__ */ (function(GetActiveSubscriptions2) {
+      ;
+    })(GetActiveSubscriptions = Endpoints2.GetActiveSubscriptions || (Endpoints2.GetActiveSubscriptions = {}));
+  })(Endpoints = Paddle2.Endpoints || (Paddle2.Endpoints = {}));
+})(Paddle || (Paddle = {}));
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  Paddle
+  LineItem,
+  Paddle,
+  Payment,
+  PaymentStatusValues
 });

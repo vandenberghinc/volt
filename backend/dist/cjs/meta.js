@@ -30,7 +30,7 @@ class Meta {
   charset;
   viewport;
   favicon;
-  constructor({ author = null, title = null, description = null, image = null, robots = "index, follow", charset = "UTF-8", viewport = "width=device-width, initial-scale=1", favicon = "/favicon.ico" } = {}) {
+  constructor({ author, title, description, image, robots = "index, follow", charset = "UTF-8", viewport = "width=device-width, initial-scale=1", favicon = "/favicon.ico" } = {}) {
     this.author = author;
     this.title = title;
     this.description = description;
@@ -41,12 +41,10 @@ class Meta {
     this.favicon = favicon;
   }
   // Copy.
-  /*  @docs:
-      @title: Copy
-      @description: Create a copy of the current meta object without any references.
-      @param:
-          @name: override
-          @descr: The <Type>Meta</Type> constructor arguments to override.
+  /**
+   * Create a copy of the current meta object without any references.
+   * @param override - The <Type>Meta</Type> constructor arguments to override.
+   * @docs
    */
   copy(override = {}) {
     return new Meta({
@@ -61,12 +59,11 @@ class Meta {
       ...override
     });
   }
-  /* @docs:
-   * @title: Set value
-   * @description: Set value funcs that return the current object.
+  /**
+   * Set value funcs that return the current object.
    * @return: Returns the current <Type>Meta</Type> object.
-   * @type: Meta
-   * @funcs: 8
+   * @funcs 8
+   * @docs
    */
   set_author(value) {
     this.author = value;

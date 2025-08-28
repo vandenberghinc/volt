@@ -27,10 +27,11 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var stdin_exports = {};
 __export(stdin_exports, {
-  Server: () => Server,
-  default: () => stdin_default
+  Server: () => Server
 });
 module.exports = __toCommonJS(stdin_exports);
+var import_url = require("url");
+var path = __toESM(require("path"));
 var http = __toESM(require("http"));
 var http2 = __toESM(require("http2"));
 var crypto = __toESM(require("crypto"));
@@ -49,15 +50,17 @@ var import_database = require("./database/database.js");
 var import_users = require("./users.js");
 var import_paddle = require("./payments/paddle.js");
 var import_rate_limit = require("./rate_limit.js");
-var import_logger = require("./logger.js");
 var import_route = require("./route.js");
 const import_meta = {};
-var __dirname = typeof __dirname !== "undefined" ? __dirname : import_meta.dirname;
-const { log, error, warn } = import_logger.logger;
+const __filename = (0, import_url.fileURLToPath)(import_meta.url);
+const __dirname = path.dirname(__filename);
 const { debug } = vlib;
 class Server {
+  // ---------------------------------------------------------
   // Static attributes.
-  static content_type_mimes = [
+  // ---------------------------------------------------------
+  /** Content type per mime. */
+  static content_type_mimes = /* @__PURE__ */ new Map([
     [".html", "text/html"],
     [".htm", "text/html"],
     [".shtml", "text/html"],
@@ -67,7 +70,7 @@ class Server {
     [".jpeg", "image/jpeg"],
     [".jpg", "image/jpeg"],
     [".js", "application/javascript"],
-    [".ts", "application/javascript"],
+    [".ts", "application/typescript"],
     [".atom", "application/atom+xml"],
     [".rss", "application/rss+xml"],
     [".mml", "text/mathml"],
@@ -163,11 +166,9 @@ class Server {
     [".asf", "video/x-ms-asf"],
     [".wmv", "video/x-ms-wmv"],
     [".avi", "video/x-msvideo"]
-  ];
-  log;
-  warn;
-  error;
-  static compressed_extensions = [
+  ]);
+  /** All file path extensions that are already compressed. */
+  static compressed_extensions = /* @__PURE__ */ new Set([
     ".png",
     ".jpg",
     ".jpeg",
@@ -176,7 +177,7 @@ class Server {
     ".bmp",
     ".tiff",
     ".ico",
-    ".svg",
+    // ".svg",
     ".svgz",
     ".mng",
     ".apng",
@@ -205,68 +206,81 @@ class Server {
     ".mpg",
     ".mpeg",
     ".flv"
-  ];
-  // Instance properties
+  ]);
+  // ---------------------------------------------------------
+  // Attributes.
+  // ---------------------------------------------------------
+  /** The binded ip address. */
   ip;
+  /** The binded http port. */
   port;
+  /** The binded https port. */
   https_port;
+  /** The raw domain. */
   domain;
+  /** The full domain name with http/https depending if tls is enabled. */
   full_domain;
+  /** The persistent storage source directory. */
   source;
-  // vlib.Path type
+  /** Is the primary thread. */
   is_primary;
-  statics;
-  statics_aspect_ratios;
-  favicon;
-  enable_2fa;
-  enable_account_activation;
-  token_expiration;
-  google_tag;
+  /** Is in production mode. */
   production;
-  // public localhost: boolean;
-  multiprocessing;
-  processes;
+  /** The company information. */
   company;
+  /** The default meta information. */
   meta;
-  mail_style;
-  online;
+  /** Is running in offline mode. */
   offline;
-  // private honey_pot_key: string | null;
+  /** The database instance. */
+  db;
+  /** The smpt mailer. */
+  smtp;
+  smtp_sender;
+  // is defined when `smtp` is defined.
+  /** The rate limit instance. */
+  rate_limit;
+  /** The added endpoints. */
+  endpoints = /* @__PURE__ */ new Map();
+  /** The added error endpoints. */
+  err_endpoints = /* @__PURE__ */ new Map();
+  /** A record of keys used for hashing. */
+  keys = {};
+  /** Alias for the `Status` module. */
+  status;
+  /** Alias for the `RateLimits` module. */
+  rate_limits;
+  /** The file logger. */
+  log;
+  /** The users instance. */
+  users;
+  /** The payments instance. */
+  payments;
+  /** Daemon instance to manage a live daemon. */
+  daemon;
+  // Public for internal use:
+  _sys_db;
+  mail_style;
+  csp;
+  statics_aspect_ratios;
+  google_tag;
+  // Private.
+  favicon;
+  statics;
   _keys;
   additional_sitemap_endpoints;
-  log_level;
   tls;
-  // public admin: AdminConfig;
-  // public ts: TypeScriptConfig;
-  lightweight;
   performance;
-  csp;
   default_headers;
   http;
   https;
-  endpoints;
-  err_endpoints;
-  db;
-  _sys_db;
-  // needs to be public for the RateLimit classes.
-  storage;
-  smtp;
-  smtp_sender;
-  rate_limit;
-  blacklist;
-  _hash_key = null;
-  keys = {};
+  threading;
+  /** The master hash key. */
+  _master_hash_key = null;
+  /** User defined callbacks. */
   _on_start = [];
   _on_initialize = [];
   _on_stop = [];
-  // public browser_preview?: BrowserPreview;
-  daemon;
-  _stop_tscompiler_watcher;
-  users;
-  payments;
-  status;
-  rate_limits;
-  logger;
   constructor({
     ip = "127.0.0.1",
     port,
@@ -296,30 +310,30 @@ class Server {
     },
     rate_limit = {
       server: {
-        ip: null,
+        ip: void 0,
         port: import_rate_limit.RateLimitServer.default_port,
-        https: null
+        https: void 0
       },
       client: {
-        ip: null,
+        ip: void 0,
         port: import_rate_limit.RateLimitServer.default_port,
-        url: null
+        url: void 0
       }
     },
     keys = [],
     payments,
     default_headers,
     google_tag = void 0,
-    token_expiration = 86400,
-    enable_2fa = false,
-    enable_account_activation = true,
+    users,
     production = false,
-    multiprocessing = true,
-    processes,
+    threading = {
+      enabled: false,
+      threads: void 0
+    },
     offline = false,
     additional_sitemap_endpoints = [],
     log_level = 0,
-    daemon = {},
+    daemon = false
     // admin = {
     //     password: null,
     //     ips: [],
@@ -329,120 +343,7 @@ class Server {
     //     output: undefined,
     // },
     // browser_preview = undefined,
-    lightweight = false
   }) {
-    vlib.Scheme.validate(arguments[0], { err_prefix: "Server: ", strict: true, scheme: {
-      ip: { type: "string", required: false },
-      port: { type: "number", required: false },
-      domain: "string",
-      statics: { type: "array", default: [] },
-      is_primary: { type: "boolean", default: true },
-      source: "string",
-      database: {
-        type: ["string", "object"],
-        required: false,
-        scheme: { ...import_database.Database.constructor_scheme, _server: void 0 }
-      },
-      favicon: { type: "string", required: false },
-      // honey_pot_key: {type: "string", default: null},
-      company: {
-        type: "object",
-        default: {},
-        scheme: {
-          name: "string",
-          legal_name: "string",
-          street: "string",
-          house_number: "string",
-          postal_code: "string",
-          city: "string",
-          province: "string",
-          country: "string",
-          country_code: "string",
-          tax_id: { type: "string", default: null },
-          icon: { type: "string", default: null },
-          icon_path: { type: "string", default: null },
-          stroke_icon: { type: "string", default: null },
-          stroke_icon_path: { type: "string", default: null }
-        }
-      },
-      meta: { type: "object", required: false },
-      tls: {
-        type: ["object"],
-        required: false,
-        scheme: {
-          cert: "string",
-          key: "string",
-          ca: { type: "string", default: null },
-          passphrase: { type: "string", default: null }
-        }
-      },
-      rate_limit: {
-        type: ["boolean", "object"],
-        default: false,
-        scheme: {
-          server: { type: "object", default: {}, scheme: {
-            ip: { type: "string", default: null },
-            port: { type: "number", default: import_rate_limit.RateLimitServer.default_port },
-            https: { type: "object", default: null }
-          } },
-          client: { type: "object", default: {}, scheme: {
-            ip: { type: "string", default: null },
-            port: { type: "number", default: import_rate_limit.RateLimitServer.default_port },
-            url: { type: "string", default: null }
-          } }
-        }
-      },
-      keys: { type: "array", default: [] },
-      smtp: { type: ["null", "object"], required: false },
-      mail_style: {
-        type: "object",
-        required: false,
-        scheme: {
-          font: { type: "string", default: '"Helvetica", sans-serif' },
-          title_fg: { type: "string", default: "#121B23" },
-          subtitle_fg: { type: "string", default: "#121B23" },
-          text_fg: { type: "string", default: "#1F2F3D" },
-          button_fg: { type: "string", default: "#FFFFFF" },
-          footer_fg: { type: "string", default: "#686B80" },
-          bg: { type: "string", default: "#EEEEEE" },
-          widget_bg: { type: "string", default: "#FFFFFF" },
-          button_bg: { type: "string", default: "#421959" },
-          widget_border: { type: "string", default: "#E6E6E6" },
-          divider_bg: { type: "string", default: "#E6E6E6" }
-        }
-      },
-      payments: { type: ["null", "object"], required: false },
-      default_headers: { type: ["null", "object"], required: false },
-      google_tag: { type: "string", required: false },
-      token_expiration: { type: "number", required: false },
-      enable_2fa: { type: "boolean", required: false },
-      enable_account_activation: { type: "boolean", required: false },
-      production: { type: "boolean", required: false },
-      // localhost: { type: "boolean", required: false },
-      multiprocessing: { type: "boolean", required: false, default: true },
-      processes: { type: "number", required: false, default: null },
-      offline: { type: "boolean", default: false },
-      additional_sitemap_endpoints: { type: "array", default: [] },
-      log_level: { type: "number", default: 0 },
-      daemon: { type: ["object", "boolean"], default: {} },
-      // admin: {type: "object", default: {}, attributes: {
-      //     ips: {type: "array", default: []},
-      //     password: {
-      //         type: "string",
-      //         verify: (param: string, attrs) => (param.length < 10 ? `Parameter "Server.admin.password" must have a length of at least 10 characters.` : undefined),
-      //     },
-      // }},
-      // ts: {
-      //     type: "object",
-      //     required: false,
-      //     scheme: {
-      //         compiler_opts: {type: "object", default: {}},
-      //         output: "string",
-      //     },
-      // },
-      // browser_preview: {type: ["string", "undefined"], required: false, default: undefined},
-      lightweight: { type: "boolean", required: false }
-    } });
     if (production || port == null) {
       this.port = 80;
       this.https_port = 443;
@@ -454,29 +355,37 @@ class Server {
     this.is_primary = is_primary && import_cluster.default.isPrimary;
     this.source = new vlib.Path(source);
     this.favicon = favicon;
-    this.enable_2fa = enable_2fa;
-    this.enable_account_activation = enable_account_activation;
-    this.token_expiration = token_expiration;
     this.google_tag = google_tag;
     this.production = production;
-    this.lightweight = lightweight;
-    this.multiprocessing = multiprocessing;
-    this.processes = processes == null ? os.cpus().length : processes;
     this.company = company;
     this.mail_style = mail_style;
     this.offline = offline;
-    this.online = !offline;
     this._keys = keys;
     this.additional_sitemap_endpoints = additional_sitemap_endpoints;
-    this.log_level = log_level;
     this.tls = tls;
-    this.endpoints = /* @__PURE__ */ new Map();
-    this.err_endpoints = /* @__PURE__ */ new Map();
-    this.performance = new vlib.Performance("Server performance");
+    if (typeof threading === "boolean") {
+      this.threading = {
+        enabled: threading,
+        threads: os.cpus().length
+      };
+    } else {
+      this.threading = {
+        enabled: threading.enabled ?? true,
+        threads: threading.threads ?? os.cpus().length
+      };
+    }
     this.status = import_status.Status;
-    this.logger = import_logger.logger;
     this.rate_limits = import_rate_limit.RateLimits;
-    this.rate_limits.add({ group: "global", interval: 60, limit: 1e3 });
+    this.performance = new vlib.Performance("Server performance");
+    const log_source = this.source.join("logs");
+    if (!log_source.exists()) {
+      log_source.mkdir_sync({ recursive: true });
+    }
+    this.log = new vlib.logging.FileLogger({
+      level: log_level,
+      log_path: log_source.join("logs").str(),
+      error_path: log_source.join("errors").str()
+    });
     if (!this.source.exists()) {
       throw Error(`Source directory "${this.source.str()}" does not exist.`);
     }
@@ -485,9 +394,9 @@ class Server {
     while (this.domain.length > 0 && this.domain.charAt(this.domain.length - 1) === "/") {
       this.domain = this.domain.substr(0, this.domain.length - 1);
     }
-    this.full_domain = `http${tls == null || tls.key == null ? "" : "s"}://${domain}`;
-    while (this.full_domain.charAt(this.full_domain.length - 1) === "/") {
-      this.full_domain = this.full_domain.substr(0, this.full_domain.length - 1);
+    this.full_domain = `http${this.tls ? "s" : ""}://${this.domain}`;
+    while (this.full_domain.endsWith("/")) {
+      this.full_domain = this.full_domain.slice(0, -1);
     }
     this.statics = statics;
     this.statics_aspect_ratios = /* @__PURE__ */ new Map();
@@ -508,23 +417,43 @@ class Server {
     }
     this.meta = meta;
     const base_default_headers = {
-      "Vary": "Origin",
-      "Referrer-Policy": "same-origin",
+      // Cache correctness for CORS/preflight:
+      "Vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+      // Safer default than same-origin, still keeps useful referrers:
+      "Referrer-Policy": "strict-origin-when-cross-origin",
       "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Credentials": "true",
-      "X-XSS-Protection": "1; mode=block",
+      // Let browsers read our rate-limit hint:
+      "Access-Control-Expose-Headers": "X-RateLimit-Reset",
       "X-Content-Type-Options": "nosniff",
-      "frame-ancestors": "none",
       "X-Frame-Options": "DENY",
-      "Strict-Transport-Security": "max-age=31536000"
+      // Helpful isolation defaults (safe for most apps):
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-site",
+      // If you need SharedArrayBuffer, add COEP below (can break some embeds):
+      // "Cross-Origin-Embedder-Policy": "require-corp",
+      "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+      // Lock down powerful APIs by default.
+      // If you need one on a third-party origin, add it beside (self).
+      "Permissions-Policy": "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=(), hid=(), serial=(), xr-spatial-tracking=(), display-capture=(), screen-wake-lock=(), sync-xhr=(), publickey-credentials-get=(self), encrypted-media=(self), autoplay=(self 'https://www.youtube-nocookie.com') fullscreen=(self 'https://www.youtube-nocookie.com'), browsing-topics=()"
+      // Do NOT set Allow-Origin / Credentials statically; set them per-request below.
+      // "X-XSS-Protection": "1; mode=block", // deprecated
     };
     const default_csp = {
-      "default-src": "'self' https://*.google-analytics.com",
-      "img-src": `'self' http://${this.domain} https://${this.domain} https://*.google-analytics.com https://raw.githubusercontent.com/vandenberghinc/ `,
-      "script-src": "'self' 'unsafe-inline' https://ajax.googleapis.com https://www.googletagmanager.com https://googletagmanager.com https://*.google-analytics.com https://code.jquery.com https://cdn.jsdelivr.net/npm/@vandenberghinc/",
-      "style-src": "'self' 'unsafe-inline' https://cdn.jsdelivr.net/npm/@vandenberghinc/"
+      "default-src": "'self'",
+      "base-uri": "'none'",
+      "object-src": "'none'",
+      "form-action": "'self'",
+      "frame-ancestors": "'none'",
+      // Keep GA images; drop explicit http:// to avoid mixed content.
+      "img-src": "'self' data: blob: https://*.google-analytics.com",
+      "script-src": "'self' https://ajax.googleapis.com https://www.googletagmanager.com https://*.google-analytics.com",
+      // Needed for GA/GTAG beacons/fetch:
+      "connect-src": "'self' https://*.google-analytics.com",
+      "style-src": "'self'",
+      "font-src": "'self' data:",
+      // Auto-upgrade stray http URLs where possible:
+      "upgrade-insecure-requests": ""
     };
     if (default_headers == null) {
       this.csp = default_csp;
@@ -541,6 +470,9 @@ class Server {
       });
       this.default_headers = default_headers;
     }
+    if (!this.tls) {
+      delete this.default_headers["Strict-Transport-Security"];
+    }
     if (payments) {
       if (payments.type === "paddle") {
         this.payments = new import_paddle.Paddle({
@@ -551,47 +483,45 @@ class Server {
         throw Error(`Invalid payment processor type "${payments.type}", valid types are ["paddle"].`);
       }
     }
-    this.endpoints = /* @__PURE__ */ new Map();
-    this.err_endpoints = /* @__PURE__ */ new Map();
-    const log_source = this.source.join("logs");
-    if (!log_source.exists()) {
-      log_source.mkdir_sync();
-    }
-    import_logger.logger.log_level.set(this.log_level);
-    if (daemon === false) {
-      import_logger.logger.assign_paths(log_source.join("logs").str(), log_source.join("errors").str());
-    }
-    this.log = import_logger.logger.log.bind(import_logger.logger);
-    this.warn = import_logger.logger.warn.bind(import_logger.logger);
-    this.error = import_logger.logger.error.bind(import_logger.logger);
     if (daemon !== false) {
       const log_source2 = this.source.join("daemon");
       if (!log_source2.exists()) {
-        log_source2.mkdir_sync();
+        log_source2.mkdir_sync({ recursive: true });
       }
       this.daemon = new vlib.Daemon({
         name: this.domain.replaceAll(".", ""),
-        user: daemon.user || os.userInfo().username,
-        group: daemon.group || null,
-        command: "volt --service --start",
-        cwd: this.source.str(),
-        args: daemon.args || [],
-        env: daemon.env || {},
-        description: daemon.description || `Service daemon for website ${this.domain}.`,
-        auto_restart: true,
         logs: daemon.logs || log_source2.join("logs").str(),
-        errors: daemon.errors || log_source2.join("errors").str()
+        errors: daemon.errors || log_source2.join("errors").str(),
+        ...daemon
+        // user: (daemon as Record<string, any>).user || os.userInfo().username,
+        // group: (daemon as Record<string, any>).group || null,
+        // command: "volt --service --start",
+        // cwd: this.source.str(),
+        // args: (daemon as Record<string, any>).args || [],
+        // env: (daemon as Record<string, any>).env || {},
+        // description: (daemon as Record<string, any>).description || `Service daemon for website ${this.domain}.`,
+        // auto_restart: true,
       });
     }
     if (typeof database === "string") {
       this.db = new import_database.Database({ uri: database, _server: this });
-    } else if (database != null) {
+    } else {
       this.db = new import_database.Database({ ...database, _server: this });
     }
-    this.users = new import_users.Users(this);
+    this._sys_db = this.db.collection({
+      name: "Volt.System",
+      indexes: ["_path"]
+    });
+    this.users = new import_users.Users({
+      ...users,
+      _server: this
+    });
     if (smtp) {
       this.smtp_sender = smtp.sender;
-      this.smtp = nodemailer.createTransport(smtp);
+      this.smtp = nodemailer.createTransport({
+        ...smtp,
+        ...smtp.override ?? {}
+      });
     }
     if (rate_limit) {
       if (this.is_primary) {
@@ -606,44 +536,36 @@ class Server {
   }
   // ---------------------------------------------------------
   // Utils.
-  // Get a content type from an extension.
+  /** Get a content type (MIME) from a file extension. */
   get_content_type(extension) {
-    let content_type = Server.content_type_mimes.find((item) => {
-      if (item[0] == extension) {
-        return item[1];
-      }
-    })?.[1];
-    if (content_type == null) {
-      content_type = "application/octet-stream";
-    }
-    return content_type;
+    return Server.content_type_mimes.get(extension.toLowerCase()) ?? "application/octet-stream";
   }
-  // Set log level.
+  /** Set the logging verbosity level. */
   set_log_level(level) {
-    this.log_level = level;
-    import_logger.logger.log_level.set(level);
+    this.log.level.set(level);
   }
   // ---------------------------------------------------------
   // Crypto (private).
-  // Generate a crypto key.
+  /** Generate a cryptographically secure random key as a hex string. */
   generate_crypto_key(length = 32) {
     return crypto.randomBytes(length).toString("hex");
   }
-  // Create a sha hmac with the master key.
+  /** Create an HMAC hash using the provided key and data. */
   hmac(key, data, algo = "sha256") {
     const hmac = crypto.createHmac(algo, key);
     hmac.update(data);
     return hmac.digest("hex");
   }
+  /** Create an HMAC hash using the server's master hash key. */
   _hmac(data) {
-    if (!this._hash_key) {
+    if (!this._master_hash_key) {
       throw new Error("Hash key not initialized");
     }
-    const hmac = crypto.createHmac("sha256", this._hash_key);
+    const hmac = crypto.createHmac("sha256", this._master_hash_key);
     hmac.update(data);
     return hmac.digest("hex");
   }
-  // Hash without a key.
+  /** Create a hash (no key) of the given data using the specified algorithm. */
   hash(data, algo = "sha256") {
     if (typeof data !== "string") {
       data = JSON.stringify(data);
@@ -668,6 +590,23 @@ class Server {
   // Add header defaults.
   _set_header_defaults(stream) {
     stream.set_headers(this.default_headers);
+    const origin = stream.headers.origin;
+    if (origin) {
+      const same_http = `http://${this.domain}`;
+      const same_https = `https://${this.domain}`;
+      if (origin === same_http || origin === same_https) {
+        stream.set_header("Access-Control-Allow-Origin", origin);
+        stream.set_header("Access-Control-Allow-Credentials", "true");
+      } else {
+        stream.set_header("Access-Control-Allow-Origin", "*");
+      }
+      const req_hdrs = stream.headers["access-control-request-headers"];
+      if (req_hdrs)
+        stream.set_header("Access-Control-Allow-Headers", String(req_hdrs));
+      const req_method = stream.headers["access-control-request-method"];
+      if (req_method)
+        stream.set_header("Access-Control-Allow-Methods", String(req_method));
+    }
   }
   _find_endpoint(endpoint, method) {
     let route;
@@ -702,12 +641,12 @@ class Server {
         data: favicon.load_sync({ type: "buffer" }),
         content_type: this.get_content_type(favicon.extension()),
         _is_static: true,
-        _server: this
+        server: this
       });
     }
     const status_dir = this.source.join(".status");
     if (!status_dir.exists()) {
-      status_dir.mkdir_sync();
+      status_dir.mkdir_sync({ recursive: true });
     }
     const status_key_path = status_dir.join("key");
     let status_key;
@@ -758,17 +697,17 @@ class Server {
   }
   // Create the sitemap endpoint.
   async _create_sitemap() {
-    if (this.lightweight) {
-      return;
-    }
-    log(2, "Creating sitemap.");
+    this.log(2, "Creating sitemap.");
     let sitemap = "";
     sitemap += '<?xml version="1.0" encoding="UTF-8"?>\n';
     sitemap += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
     for (const endpoint of this.endpoints.values()) {
       if (endpoint.allow_sitemap) {
+        if (endpoint.route.is_regex)
+          continue;
+        const ep = encodeURI(endpoint.route.endpoint_str.startsWith("/") ? endpoint.route.endpoint_str : `/${endpoint.route.endpoint_str}`);
         sitemap += `<url>
-   <loc>${this.full_domain}/${endpoint.route.endpoint_str}</loc>
+   <loc>${this.full_domain}${ep}</loc>
 </url>
 `;
       }
@@ -793,10 +732,7 @@ class Server {
   }
   // Create the robots.txt endpoint.
   async _create_robots_txt() {
-    if (this.lightweight) {
-      return;
-    }
-    log(2, "Creating robots.txt.");
+    this.log(2, "Creating robots.txt.");
     let robots = "User-agent: *\n";
     let disallowed = 0;
     for (const endpoint of this.endpoints.values()) {
@@ -825,8 +761,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
   /* private _create_admin_endpoint(): void {
   
           // Logs.
-          if (this.lightweight) { return; }
-          log(2, "Creating admin endpoint.");
+          this.log(2, "Creating admin endpoint.");
   
           // Add admin tokens.
           this.admin.tokens = [];
@@ -976,16 +911,16 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       } */
   // Initialize statics.
   async _initialize_statics() {
-    log(2, "Initializing static directories.");
+    this.log(2, "Initializing static directories.");
     const static_paths = [];
-    const add_static_file = async (path, endpoint, cache = true) => {
-      static_paths.push(path.str());
-      const content_type = this.get_content_type(path.extension());
-      if (import_image_endpoint.ImageEndpoint.supported_images.includes(path.extension())) {
+    const add_static_file = async (path2, endpoint, cache = true) => {
+      static_paths.push(path2.str());
+      const content_type = this.get_content_type(path2.extension());
+      if (import_image_endpoint.ImageEndpoint.supported_images.includes(path2.extension())) {
         const e = new import_image_endpoint.ImageEndpoint({
           endpoint,
           content_type,
-          path,
+          path: path2,
           cache,
           rate_limit: "global",
           _is_static: true
@@ -1000,12 +935,12 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
           method: "GET",
           endpoint,
           content_type,
-          compress: !Server.compressed_extensions.includes(path.extension()),
+          compress: !Server.compressed_extensions.has(path2.extension().toLowerCase()),
           cache,
           rate_limit: "global",
-          _static_path: path.str(),
+          file_path: path2,
           _is_static: true
-        })._load_data_by_path(this));
+        }));
       }
     };
     const add_static = async (opts) => {
@@ -1013,9 +948,10 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         return;
       }
       if (typeof opts === "object") {
-        vlib.Scheme.validate(opts, {
-          strict: true,
-          scheme: {
+        vlib.schema.validate(opts, {
+          unknown: false,
+          throw: true,
+          schema: {
             path: "string",
             endpoint: { type: "string", default: null },
             cache: { type: ["boolean", "number"], default: true },
@@ -1023,27 +959,18 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
             exclude: { type: "array", default: [] }
           }
         });
-        const exclude = [/.*\.DS_Store/, /.*\.cache/, /.*\.old/, /.*\.ignore/, ...opts.exclude || []];
         const paths = [];
         const source = new vlib.Path(opts.path).abs();
+        if (!source.exists()) {
+          this.log(1, `Static path "${source.str()}" does not exist; skipping.`);
+          return;
+        }
         const source_len = source.str().length;
         const is_dir = source.is_dir();
-        const is_excluded = (path) => {
-          return exclude.some((pattern) => {
-            if (path instanceof RegExp) {
-              if (pattern instanceof RegExp) {
-                return pattern.source === path.source;
-              } else {
-                return path.test(String(pattern));
-              }
-            } else {
-              if (pattern instanceof RegExp) {
-                return pattern.test(String(path));
-              } else {
-                return path === pattern;
-              }
-            }
-          });
+        const exclude = [/\.DS_Store$/, /\.cache(?:\/|$)/, /\.old(?:\/|$)/, /\.ignore$/, ...opts.exclude || []];
+        const is_excluded = (p) => {
+          const s = typeof p === "string" ? p : p.str();
+          return exclude.some((pattern) => pattern instanceof RegExp ? pattern.test(s) : s === String(pattern));
         };
         opts.endpoint = opts.endpoint || `/${source.full_name()}`;
         if (opts.endpoint.charAt(0) != "/") {
@@ -1055,8 +982,8 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         if (!is_dir) {
           return await add_static_file(source, opts.endpoint, opts.cache);
         }
-        const read_dir = async (path) => {
-          const dir_paths = await path.paths();
+        const read_dir = async (path2) => {
+          const dir_paths = await path2.paths();
           const promises = [];
           for (let i = 0; i < dir_paths.length; i++) {
             if (!is_excluded(dir_paths[i])) {
@@ -1073,9 +1000,9 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         if (is_dir) {
           await read_dir(source);
         }
-        for (const path of paths) {
-          const endpoint = `${opts.endpoint}${path.str().substr(source_len)}`;
-          await add_static_file(path, endpoint, opts.endpoints_cache === void 0 ? opts.cache : opts.endpoints_cache[endpoint] ?? opts.cache);
+        for (const path2 of paths) {
+          const endpoint = `${opts.endpoint}${path2.str().substr(source_len)}`;
+          await add_static_file(path2, endpoint, opts.endpoints_cache === void 0 ? opts.cache : opts.endpoints_cache[endpoint] ?? opts.cache);
         }
       } else if (typeof opts === "string") {
         await add_static({ path: opts });
@@ -1094,34 +1021,30 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
   // Initialize.
   // Initialize.
   async initialize() {
-    log(1, "Initializing server.");
+    this.log(1, "Initializing server.");
     this.performance.start();
     if (this.tls) {
-      this.https = http2.createSecureServer(
-        {
-          key: new vlib.Path(this.tls.key).load_sync({ encoding: "utf8" }),
-          cert: new vlib.Path(this.tls.cert).load_sync({ encoding: "utf8" }),
-          ca: this.tls.ca == null ? void 0 : new vlib.Path(this.tls.ca).load_sync({ encoding: "utf8" }),
-          passphrase: this.tls.passphrase,
-          allowHTTP1: true
-        },
-        // Support for http1.
-        // Does not work, requests get triggered on the stream and on this callback.
-        (req, res) => {
-          if (req.httpVersion.charAt(0) !== "2") {
-            this._serve(void 0, void 0, req, res);
-          }
-        }
-      );
+      this.https = http2.createSecureServer({
+        key: new vlib.Path(this.tls.key).load_sync({ encoding: "utf8" }),
+        cert: new vlib.Path(this.tls.cert).load_sync({ encoding: "utf8" }),
+        ca: this.tls.ca == null ? void 0 : new vlib.Path(this.tls.ca).load_sync({ encoding: "utf8" }),
+        passphrase: this.tls.passphrase,
+        allowHTTP1: true
+      });
       this.https.on("stream", (stream, headers) => {
         this._serve(stream, headers, void 0, void 0);
+      });
+      this.https.on("request", (req, res) => {
+        this._serve(void 0, void 0, req, res);
       });
     } else if (this.production && this.payments) {
       throw Error("Accepting payments in production mode requires HTTPS.");
     }
     if (this.tls) {
       this.http = http.createServer((request, response) => {
-        response.writeHead(301, { Location: `https://${request.headers.host}${request.url}` });
+        const reqUrl = typeof request.url === "string" ? request.url : "/";
+        const location = `https://${this.domain}${reqUrl}`;
+        response.writeHead(308, { Location: location });
         response.end();
       });
     } else {
@@ -1133,11 +1056,6 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     if (this.db) {
       await this.db.initialize();
       this.performance.end("init-db");
-      this._sys_db = await this.db.collection({
-        name: "Volt.System",
-        indexes: ["_path"]
-      });
-      this.performance.end("init-sys-collection");
       const keys_document = await this._sys_db.load("keys");
       const gen_user_crypto_key = (doc, key) => {
         if (typeof key === "string") {
@@ -1160,20 +1078,20 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         }
       };
       if (keys_document == null) {
-        this._hash_key = this.generate_crypto_key(32);
+        this._master_hash_key = this.generate_crypto_key(32);
         const doc = {
-          _master_sha256: this._hash_key
+          _master_sha256: this._master_hash_key
         };
         this._keys.forEach((key) => {
           gen_user_crypto_key(doc, key);
         });
-        await this._sys_db.save("keys", doc);
+        await this._sys_db.set("keys", doc);
       } else {
-        this._hash_key = keys_document._master_sha256;
+        this._master_hash_key = keys_document._master_sha256;
         let perform_save = false;
-        if (this._hash_key === void 0) {
-          this._hash_key = this.generate_crypto_key(32);
-          keys_document._master_sha256 = this._hash_key;
+        if (this._master_hash_key === void 0) {
+          this._master_hash_key = this.generate_crypto_key(32);
+          keys_document._master_sha256 = this._master_hash_key;
           perform_save = true;
         }
         this._keys.forEach((key) => {
@@ -1185,7 +1103,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
           this.keys[name] = keys_document[name];
         });
         if (perform_save) {
-          await this._sys_db.save("keys", keys_document);
+          await this._sys_db.set("keys", keys_document);
         }
       }
       this.performance.end("load-keys");
@@ -1202,20 +1120,20 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     if (this.payments !== void 0) {
       promises.push(this.payments._initialize());
     }
-    if (this._find_endpoint("sitemap.xml") == null) {
+    if (this._find_endpoint("/sitemap.xml") == null) {
       promises.push(this._create_sitemap());
     }
-    if (this._find_endpoint("robots.txt") == null) {
+    if (this._find_endpoint("/robots.txt") == null) {
       promises.push(this._create_robots_txt());
     }
     await Promise.all(promises);
     if (this.company.stroke_icon || this.company.icon) {
       for (const endpoint of this.endpoints.values()) {
         if (this.company.stroke_icon_path == null && endpoint.route.endpoint === this.company.stroke_icon) {
-          this.company.stroke_icon_path = endpoint._static_path ?? void 0;
+          this.company.stroke_icon_path = endpoint.file_path?.str() || void 0;
         }
         if (this.company.icon_path == null && endpoint.route.endpoint === this.company.icon) {
-          this.company.icon_path = endpoint._static_path ?? void 0;
+          this.company.icon_path = endpoint.file_path?.str() || void 0;
         }
       }
       if (this.company.stroke_icon != null && this.company.stroke_icon_path == null) {
@@ -1243,7 +1161,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
    * @param callback The callback to be called when the server is initialized.
    */
   on_initialize(callback) {
-    this._on_initialize.append(callback);
+    this._on_initialize.push(callback);
   }
   // Serve a client.
   // @todo implement rate limiting.
@@ -1254,12 +1172,12 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       let endpoint;
       let method;
       let endpoint_url;
-      const log_endpoint_result = (message = null, status = null) => {
+      const log_endpoint_result = (message, status) => {
         let log_level = endpoint && endpoint.is_static ? 3 : 0;
         if (status == null) {
           status = stream.status_code;
         }
-        log(log_level, `${method}:${endpoint_url}: ${message ? message : import_status.Status.get_description(status)} [${status}] (${stream.ip}).`);
+        this.log(log_level, `${method}:${endpoint_url}: ${message ? message : import_status.Status.get_description(status ?? "unknown")} [${status}] (${stream.ip}).`);
       };
       const serve_error_endpoint = async (status_code) => {
         const is_api_endpoint = endpoint && endpoint.callback != null;
@@ -1303,31 +1221,27 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
             try {
               await err_endpoint._serve(stream, status_code);
             } catch (err) {
-              error(`Error endpoint ${status_code}: `, err);
+              this.log.error(`Error endpoint ${status_code}: `, err);
               stream.send(default_response);
             }
           }
         }
       };
-      if (this.online && this.blacklist !== void 0 && !this.blacklist.verify(stream.ip)) {
-        await serve_error_endpoint(403);
-        log_endpoint_result();
-        return;
-      }
       method = stream.method;
       endpoint_url = stream.endpoint;
-      log(3, "Searching for endpoint: ", `${method}:${endpoint_url}`);
+      this.log(3, "Searching for endpoint: ", `${method}:${endpoint_url}`);
       endpoint = this.endpoints.get(`${method}:${endpoint_url}`);
       if (!endpoint) {
         const route = new import_route.Route(method, endpoint_url);
         for (const e of this.endpoints.values()) {
           if (e.route.is_regex) {
-            if (e.route.match(route)) {
-              log(3, "Matched regex route: ", e.route.id);
+            const matched_params = e.route.match(route);
+            if (matched_params !== false) {
+              this.log(3, "Matched regex route: ", e.route.id);
               endpoint = e;
-              Object.keys(route.matched_params).walk((k) => {
+              Object.keys(matched_params).walk((k) => {
                 if (stream.params[k] == null) {
-                  stream.params[k] = route.matched_params[k];
+                  stream.params[k] = matched_params[k];
                 }
               });
               break;
@@ -1335,7 +1249,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
           }
         }
       } else {
-        log(3, "Matched route: ", endpoint.route.id);
+        this.log(3, "Matched route: ", endpoint.route.id);
       }
       if (!endpoint) {
         if (method === "OPTIONS") {
@@ -1344,10 +1258,6 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
           if (original_endpoint) {
             this._set_header_defaults(stream);
             original_endpoint._set_headers(stream);
-            if (stream.headers.origin && this.default_headers["Access-Control-Allow-Origin"] === "*") {
-              stream.remove_header("Access-Control-Allow-Origin", "access-control-allow-origin");
-              stream.set_header("Access-Control-Allow-Origin", stream.headers.origin);
-            }
             stream.send({ status: import_status.Status.no_content });
             log_endpoint_result();
             return;
@@ -1358,15 +1268,11 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         return;
       }
       this._set_header_defaults(stream);
-      if (stream.headers.origin && this.default_headers["Access-Control-Allow-Origin"] === "*") {
-        stream.remove_header("Access-Control-Allow-Origin", "access-control-allow-origin");
-        stream.set_header("Access-Control-Allow-Origin", stream.headers.origin);
-      }
       if (method === "OPTIONS") {
         try {
           await endpoint._serve_options(stream);
         } catch (err) {
-          error(`${method}:${endpoint_url}: `, err);
+          this.log.error(`${method}:${endpoint_url}: `, err);
           if (!stream.destroyed && !stream.closed) {
             await serve_error_endpoint(500);
             log_endpoint_result();
@@ -1376,7 +1282,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         log_endpoint_result();
         return;
       }
-      if (this.online && this.production && this.rate_limit !== void 0 && endpoint.rate_limit_groups.length > 0) {
+      if (!this.offline && this.production && this.rate_limit !== void 0 && endpoint.rate_limit_groups.length > 0) {
         const result = await this.rate_limit.limit(stream.ip, endpoint.rate_limit_groups);
         if (result != null) {
           stream.send({
@@ -1394,7 +1300,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       try {
         await stream.join();
       } catch (err) {
-        error(`${method}:${endpoint_url}: `, err);
+        this.log.error(`${method}:${endpoint_url}: `, err);
         await serve_error_endpoint(500);
         log_endpoint_result();
         return;
@@ -1402,7 +1308,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       try {
         stream._parse_params();
       } catch (err) {
-        error(`${method}:${endpoint_url}: `, err);
+        this.log.error(`${method}:${endpoint_url}: `, err);
         await serve_error_endpoint(400);
         log_endpoint_result();
         return;
@@ -1421,7 +1327,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       try {
         await endpoint._serve(stream);
       } catch (err) {
-        error(`${method}:${endpoint_url}: `, err);
+        this.log.error(`${method}:${endpoint_url}: `, err);
         if (!stream.destroyed && !stream.closed) {
           await serve_error_endpoint(500);
           log_endpoint_result();
@@ -1429,26 +1335,24 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         return;
       }
       if (!stream.finished) {
-        error(`${method}:${endpoint_url}: `, "Unfinished response.");
+        this.log.error(`${method}:${endpoint_url}: `, "Unfinished response.");
         await serve_error_endpoint(500);
         log_endpoint_result();
         return;
       }
       log_endpoint_result();
     } catch (err) {
-      error("Fatal error:", err);
+      this.log.error("Fatal error:", err);
     }
   }
   // ---------------------------------------------------------
   // Server.
   // Start the server.
-  /*  @docs:
-   *  @title: Start
-   *  @description:
-   *      Start the server.
-   *  @usage:
-   *      ...
-   *      server.start();
+  /**
+   * Start the server.
+   * @example
+   * ...
+   * server.start();
    */
   async start() {
     await this.initialize();
@@ -1465,25 +1369,25 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       this.performance.end("init-rate-limit");
     }
     let forked = false;
-    if (this.production && this.multiprocessing && import_cluster.default.isPrimary && this.processes > 1) {
-      this.log(0, `Starting ${this.processes} threads.`);
+    if (this.production && this.threading.enabled && import_cluster.default.isPrimary && this.threading.threads > 1) {
+      this.log(0, `Starting ${this.threading.threads} threads.`);
       let active_threads = 0;
       const thread_ids = {};
       const restart_limiters = {};
       const start_thread = (thread_id, restart = false) => {
         const worker = import_cluster.default.fork();
-        log(restart ? 0 : 1, `Starting thread ${worker.process.pid}.`);
+        this.log(restart ? 0 : 1, `Starting thread ${worker.process.pid}.`);
         thread_ids[worker.process.pid] = thread_id;
         ++active_threads;
       };
-      for (let i = 0; i < this.processes; i++) {
+      for (let i = 0; i < this.threading.threads; i++) {
         let thread_id;
         while ((thread_id = vlib.String.random(8)) && Object.values(thread_ids).includes(thread_id)) {
         }
         restart_limiters[thread_id] = new vlib.TimeLimiter({ limit: 3, duration: 60 * 1e3 });
         start_thread(thread_id);
       }
-      await this._sys_db.save("status", {
+      await this._sys_db.set("status", {
         running_since: Date.now(),
         total_threads: active_threads,
         running_threads: active_threads
@@ -1491,39 +1395,39 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       import_cluster.default.addListener("exit", async (worker, code, signal) => {
         const thread_id = thread_ids[worker.process.pid];
         delete thread_ids[worker.process.pid];
-        error(`Thread ${worker.process.pid} crashed.`);
+        this.log.error(`Thread ${worker.process.pid} crashed.`);
         const limiter = restart_limiters[thread_id];
         if (limiter != null && limiter.limit()) {
           --active_threads;
           start_thread(thread_id, true);
         } else {
-          error(`Thread ${worker.process.pid} is being shut down due too its periodic restart limit.`);
+          this.log.error(`Thread ${worker.process.pid} is being shut down due to its periodic restart limit.`);
           --active_threads;
-          await this._sys_db.save("status", { running_threads: active_threads });
+          await this._sys_db.set("status", { running_threads: active_threads });
           if (active_threads === 0) {
-            error(`All threads died, stopping server.`);
+            this.log.error(`All threads died, stopping server.`);
             process.exit(0);
           }
         }
       });
     } else {
-      forked = this.production && this.multiprocessing;
+      forked = this.production && this.threading.enabled;
       let is_running = false;
       const on_running = () => {
         if (!is_running) {
           is_running = true;
           if (this.https !== void 0) {
-            log(0, `Running on http://${this.ip}:${this.port} and https://${this.ip}:${this.https_port}.`);
+            this.log(0, `Running on http://${this.ip}:${this.port} and https://${this.ip}:${this.https_port}.`);
           } else {
-            log(0, `Running on http://${this.ip}:${this.port}.`);
+            this.log(0, `Running on http://${this.ip}:${this.port}.`);
           }
         }
       };
-      const on_error = (error2) => {
-        if (error2.syscall !== "listen") {
-          throw error2;
+      const on_error = (error) => {
+        if (error.syscall !== "listen") {
+          throw error;
         }
-        switch (error2.code) {
+        switch (error.code) {
           case "EACCES":
             console.error(`Error: Address ${this.ip}:${this.port} requires elevated privileges.`);
             process.exit(1);
@@ -1533,7 +1437,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
             process.exit(1);
             break;
           default:
-            throw error2;
+            throw error;
         }
       };
       this.http.listen(this.port, this.ip === "*" ? void 0 : this.ip, on_running);
@@ -1542,8 +1446,21 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         this.https.listen(this.https_port, this.ip === "*" ? void 0 : this.ip, on_running);
         this.https.on("error", on_error);
       }
-      process.on("SIGTERM", () => process.exit(0));
-      process.on("SIGINT", () => process.exit(0));
+      let graceful_shutdown_shutting_down = false;
+      const graceful_shutdown = async () => {
+        if (graceful_shutdown_shutting_down)
+          return;
+        graceful_shutdown_shutting_down = true;
+        try {
+          await this.stop();
+        } catch (e) {
+          this.log.error("Shutdown error:", e);
+        } finally {
+          process.exit(0);
+        }
+      };
+      process.on("SIGTERM", graceful_shutdown);
+      process.on("SIGINT", graceful_shutdown);
       if (process.env.VOLT_FILE_WATCHER === "1") {
         new vlib.Path(process.env.VOLT_STARTED_FILE).save_sync("1");
       }
@@ -1557,29 +1474,25 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     }
     debug(2, () => this.performance.dump((v) => v >= 50));
   }
-  /*  @docs:
-   *  @title: On start
-   *  @description:
-   *      Add an (async) callback which will be executed at the end of `server.start()`.
-   *      The callback may take arguments `({forked <boolean>})`.
-   *  @usage:
-   *      ...
-   *      server.on_start(({forked}) => console.log("Hello World!"));
+  /**
+   * Add an (async) callback executed at the end of `server.start()`. The callback may take arguments `({forked <boolean>})`.
+   * @param callback The callback to run; receives `{ forked }`.
+   * @example
+   * ...
+   * server.on_start(({forked}) => console.log("Hello World!"));
    */
   on_start(callback) {
-    this._on_start.append(callback);
+    this._on_start.push(callback);
   }
   // Stop the server.
-  /*  @docs:
-   *  @title: Stop
-   *  @description:
-   *      Stop the server.
-   *  @usage:
-   *      ...
-   *      server.stop();
+  /**
+   * Stop the server.
+   * @example
+   * ...
+   * server.stop();
    */
   async stop() {
-    log(0, "Stopping the server...");
+    this.log(0, "Stopping the server...");
     for (const callback of this._on_stop) {
       const res = callback();
       if (res instanceof Promise) {
@@ -1589,41 +1502,30 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     if (this.rate_limit) {
       await this.rate_limit.stop();
     }
-    if (this._stop_tscompiler_watcher) {
-      log(0, "Stopping typescript watcher.");
-      this._stop_tscompiler_watcher();
-    }
-    if (this.https) {
-      await this.https.close();
-    }
-    if (this.http) {
-      await this.http.close();
-    }
-    if (this.db) {
+    if (this.https)
+      this.https.close();
+    if (this.http)
+      this.http.close();
+    if (this.db)
       await this.db.close();
-    }
-    import_logger.logger.stop();
+    this.log.stop();
   }
-  /*  @docs:
-   *  @title: On stop
-   *  @description:
-   *      Set an (async) callback which will be executed at the start of `server.stop()`.
-   *  @usage:
-   *      ...
-   *      server.on_stop(() => console.log("Hello World!"));
+  /**
+   * Set an (async) callback which will be executed at the start of `server.stop()`.
+   * @param callback The callback to run.
+   * @example
+   * ...
+   * server.on_stop(() => console.log("Hello World!"));
    */
   on_stop(callback) {
-    this._on_stop.append(callback);
+    this._on_stop.push(callback);
   }
   // Fetch status.
-  /*  @docs:
-      @title: Fetch status.
-      @desc: This function is meant to be used when the server is in production mode, it will make an API request to your server through the defined `Server.domain` parameter.
-      @note: This function can be called without initializing the server.
-      @param:
-          @name: type
-          @desc: The wanted output type. Either an `object` or a `string` type for CLI purposes.
-  */
+  /**
+   * This function is meant to be used when the server is in production mode, it will make an API request to your server through the defined `Server.domain` parameter.
+   * @note This function can be called without initializing the server.
+   * @param type The wanted output type. Either an `object` or a `string` type for CLI purposes.
+   */
   async fetch_status(type = "object") {
     const key_path = this.source.join(".status/key");
     if (!key_path.exists()) {
@@ -1656,22 +1558,15 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
   // ---------------------------------------------------------
   // Content Security Policy.
   // Add a csp.
-  /*  @docs:
-   *  @title: Add CSP
-   *  @description: Add an url to the Content-Security-Policy. This function does not overwrite the existing key's value.
-   *  @warning: This function no longer has any effect when `Server.start()` has been called.
-   *  @parameter:
-   *      @name: key
-   *      @description: The Content-Security-Policy key, e.g. `script-src`.
-   *      @type: string
-   *  @parameter:
-   *      @name: value
-   *      @description: The value to add to the Content-Security-Policy key.
-   *      @type: null, string, string[]
-   *  @usage:
-   *      ...
-   *      server.add_csp("script-src", "somewebsite.com");
-   *      server.add_csp("upgrade-insecure-requests");
+  /**
+   * Add an url to the Content-Security-Policy. This function does not overwrite the existing key's value.
+   * @warning This function no longer has any effect when `Server.start()` has been called.
+   * @param key The Content-Security-Policy key, e.g. `script-src`.
+   * @param value The value to add to the Content-Security-Policy key.
+   * @example
+   * ...
+   * server.add_csp("script-src", "somewebsite.com");
+   * server.add_csp("upgrade-insecure-requests");
    */
   add_csp(key, value = null) {
     if (this.csp[key] === void 0) {
@@ -1688,22 +1583,15 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     }
   }
   // Remove a csp.
-  /*  @docs:
-   *  @title: Remove CSP
-   *  @description: Remove an url from the Content-Security-Policy. This function does not overwrite the existing key's value.
-   *  @warning: This function no longer has any effect when `Server.start()` has been called.
-   *  @parameter:
-   *      @name: key
-   *      @description: The Content-Security-Policy key, e.g. `script-src`.
-   *      @type: string
-   *  @parameter:
-   *      @name: value
-   *      @description: The value to remove from the Content-Security-Policy key.
-   *      @type: null, string
-   *  @usage:
-   *      ...
-   *      server.remove_csp("script-src", "somewebsite.com");
-   *      server.remove_csp("upgrade-insecure-requests");
+  /**
+   * Remove an url from the Content-Security-Policy. This function does not overwrite the existing key's value.
+   * @warning This function no longer has any effect when `Server.start()` has been called.
+   * @param key The Content-Security-Policy key, e.g. `script-src`.
+   * @param value The value to remove from the Content-Security-Policy key.
+   * @example
+   * ...
+   * server.remove_csp("script-src", "somewebsite.com");
+   * server.remove_csp("upgrade-insecure-requests");
    */
   remove_csp(key, value = null) {
     if (this.csp[key] === void 0) {
@@ -1716,18 +1604,14 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     }
   }
   // Delete a csp key.
-  /*  @docs:
-   *  @title: Delete CSP
-   *  @description: Delete an key from the Content-Security-Policy.
-   *  @warning: This function no longer has any effect when `Server.start()` has been called.
-   *  @parameter:
-   *      @name: key
-   *      @description: The Content-Security-Policy key, e.g. `script-src`.
-   *      @type: string
-   *  @usage:
-   *      ...
-   *      server.del_csp("script-src");
-   *      server.del_csp("upgrade-insecure-requests");
+  /**
+   * Delete an key from the Content-Security-Policy.
+   * @warning This function no longer has any effect when `Server.start()` has been called.
+   * @param key The Content-Security-Policy key, e.g. `script-src`.
+   * @example
+   * ...
+   * server.del_csp("script-src");
+   * server.del_csp("upgrade-insecure-requests");
    */
   del_csp(key) {
     delete this.csp[key];
@@ -1763,7 +1647,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     }
     const key = new vlib.Path(key_path);
     if (!key.exists()) {
-      throw Error(`Key path "${key.str()}" already exists, remove the file manually to continue.`);
+      throw Error(`Key path "${key.str()}" does not exist.`);
     }
     const csr = new vlib.Path(output_path);
     if (csr.exists()) {
@@ -1780,14 +1664,14 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         "-out",
         csr.str(),
         "-subj",
-        '"/C=' + country_code + "/ST=" + province + "/L=" + city + "/O=" + name + "/OU=" + organization_unit + "/CN=" + domain + '"'
+        `/C=${country_code}/ST=${province}/L=${city}/O=${name}/OU=${organization_unit}/CN=${domain}`
       ],
       opts: { stdio: "inherit" }
     });
     if (proc.exit_status != 0) {
       throw Error(`Encountered an error while generating the CSR [${proc.exit_status}]: ${proc.err}`);
     }
-    log(0, `Generated the tls key with CSR for domain "${this.domain}".`);
+    this.log(0, `Generated the tls key with CSR for domain "${this.domain}".`);
   }
   // ---------------------------------------------------------
   // Endpoints.
@@ -1806,13 +1690,19 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
   /**
    * Add a single endpoint.
    * Only supports a single endpoint due to parameter inference.
+   * @template Response User inputted response type that will be returned as response, optionaly typing used for consistency.
+   * @template S system template for inferring the endpoint callback parameters.
    * @param endpoint The endpoint or endpoint options to add.
+   * @returns A registered endpoint object that can for instance be used to infer the endpoint parameters.
    */
   endpoint(endpoint) {
     const e = endpoint instanceof import_endpoint.Endpoint ? endpoint : new import_endpoint.Endpoint(endpoint);
     this._check_duplicate_route(e.route);
     this.endpoints.set(e.route.id, e);
-    return this;
+    return {
+      params: void 0,
+      Params: void 0
+    };
   }
   // Add an error endpoint.
   /**
@@ -1837,50 +1727,27 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
   // ---------------------------------------------------------
   // Functions.
   // Send a mail.
-  /*  @docs:
-   *  @title: Send Mail
-   *  @description: Send one or multiple mails.
-   *  @note: Make sure the domain's DNS records SPF and DKIM are properly configured when sending attachments.
-   *  @return:
-   *      Returns a promise that will be resolved or rejected when the mail has been sent.
-   *  @parameter:
-   *      @name: sender
-   *      @description:
-   *          The sender address.
-   *          A sender address may either be a string with the email address, e.g. `your@email.com`.
-   *          Or an array with the sender name and email address, e.g. `["Sender", "your@email.com"]`.
-   *      @type: string, array
-   *  @parameter:
-   *      @name: recipients
-   *      @description:
-   *          The recipient addresses.
-   *          A reciepient address may either be a string with the email address, e.g. `your@email.com`.
-   *          Or an array with the sender name and email address, e.g. `["Sender", "your@email.com"]`.
-   *      @type: array[string, array]
-   *  @parameter:
-   *      @name: subject
-   *      @description: The subject text.
-   *      @type: string
-   *  @parameter:
-   *      @name: body
-   *      @description: The body text.
-   *      @type: string
-   *  @parameter:
-   *      @name: attachments
-   *      @description: An array with absolute file paths for attachments, or an array with nodemailer attachment objects.
-   *      @type: array[string], array[object]
-   *  @usage:
-   *      ...
-   *      await server.send_mail({
-   *          sender: ["Sender Name", "sender\@email.com"],
-   *          recipients: [
-   *              ["Recipient Name", "recipient1\@email.com"],
-   *              "recipient2\@email.com",
-   *          },
-   *          subject: "Example Mail",
-   *          body: "Hello World!",
-   *          attachments: ["/path/to/image.png"]
-   *      });
+  /**
+   * Send one or multiple mails.
+   * @note Make sure the domain's DNS records SPF and DKIM are properly configured when sending attachments.
+   * @returns Returns a promise that will be resolved or rejected when the mail has been sent.
+   * @param sender The sender address. Either a string email (e.g. `your@email.com`) or `[name, email]`.
+   * @param recipients The recipient addresses. Each item is either a string email or `[name, email]`.
+   * @param subject The subject text.
+   * @param body The body text or a `MailElement` instance.
+   * @param attachments An array with absolute file paths for attachments, or an array with nodemailer attachment objects.
+   * @example
+   * ...
+   * await server.send_mail({
+   *   sender: ["Sender Name", "sender@email.com"],
+   *   recipients: [
+   *     ["Recipient Name", "recipient1@email.com"],
+   *     "recipient2@email.com",
+   *   ],
+   *   subject: "Example Mail",
+   *   body: "Hello World!",
+   *   attachments: ["/path/to/image.png"]
+   * });
    */
   async send_mail({ sender = void 0, recipients = [], subject = void 0, body = "", attachments = [] }) {
     if (this.smtp === void 0) {
@@ -1908,22 +1775,22 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     recipients.forEach((address) => to.push(format_address(address)));
     let attached_files = [];
     if (attachments != null) {
-      attachments.forEach((path) => {
-        if (path instanceof vlib.Path) {
+      attachments.forEach((path2) => {
+        if (path2 instanceof vlib.Path) {
           attached_files.push({
-            filename: path.full_name(),
-            path: path.str(),
-            content: path.load_sync()
+            filename: path2.full_name(),
+            path: path2.str(),
+            content: path2.load_sync()
           });
-        } else if (typeof path === "string") {
-          const p = new vlib.Path(path);
+        } else if (typeof path2 === "string") {
+          const p = new vlib.Path(path2);
           attached_files.push({
             filename: p.full_name(),
-            path,
+            path: path2,
             content: p.load_sync()
           });
         } else {
-          attached_files.push(path);
+          attached_files.push(path2);
         }
       });
     }
@@ -1935,8 +1802,8 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         html: body,
         attachments: attached_files
       });
-    } catch (error2) {
-      throw new Error(error2.message);
+    } catch (error) {
+      throw new Error(error.message);
     }
   }
   // ---------------------------------------------------------
@@ -1944,62 +1811,53 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
   // These can all be overwritten by the user.
   // @todo add scheme for payment params.
   // On delete user.
-  /*  @docs:
-   *  @title: On delete user
-   *  @description: This function can be overridden with a callback for when a user is deleted.
-   *  @parameter:
-   *      @name: uid
-   *      @description: The uid of the deleted user.
-   *      @type: string, array
-   *  @usage:
-   *      ...
-   *      server.on_delete_user = ({uid}) => {}
+  /**
+   * This function can be overridden with a callback for when a user is deleted.
+   * @param uid The uid of the deleted user.
+   * @example
+   * ...
+   * server.on_delete_user = ({uid}) => {}
    */
   async on_delete_user({ uid }) {
   }
-  // On successfull one-time payment.
-  // This gets called for every product in the payment.
+  /** Called for each product in a successful one-time payment. Override to implement your logic. */
   async on_payment({ product, payment }) {
   }
-  // On successfull subscription.
-  // This gets called for every product in the payment.
+  /** Called for each product in a successful subscription. Override to implement your logic. */
   async on_subscription({ product, payment }) {
   }
   // On failed one-time or recurring payment.
   // async on_failed_payment({ payment }: { payment: any }): Promise<void> {}
-  // On successfull cancellation.
+  /** Called when a cancellation succeeds. Override to implement your logic. */
   async on_cancellation({ payment, line_items }) {
   }
   // On failed cancellation.
   // async on_failed_cancellation({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> {}
-  // On successfull refund.
-  // The line items array are the items were refunded.
+  /** Called when a refund succeeds. The line items array are the items that were refunded. */
   async on_refund({ payment, line_items }) {
   }
-  // On failed refund.
-  // The line items array are the items were the refund failed.
+  /** Called when a refund fails. The line items array are the items where the refund failed. */
   async on_failed_refund({ payment, line_items }) {
   }
-  // On chargeback.
-  // The line items array are the items were charged back.
+  /** Called when a chargeback occurs. The line items array are the items that were charged back. */
   async on_chargeback({ payment, line_items }) {
   }
-  // On failed chargeback.
-  // The line items array are the items were the chargeback failed.
+  /** Called when a chargeback fails. The line items array are the items where the chargeback failed. */
   async on_failed_chargeback({ payment, line_items }) {
   }
   // Mail template.
+  /** Build the base email layout used by the various transactional email builders. */
   _mail_template({ max_width = 400, children = [] }) {
     const style = this.mail_style;
     const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
     let header;
     if (this.company.stroke_icon != null) {
       header = [
-        Image(`${this.full_domain}/${this.company.stroke_icon}`).height(16)
+        Image(`${this.full_domain}${this.company.stroke_icon ?? ""}`).height(16)
       ];
     } else if (this.company.icon != null) {
       header = [
-        Image(`${this.full_domain}/${this.company.icon}`).frame(20, 40)
+        Image(`${this.full_domain}${this.company.icon ?? ""}`).frame(20, 40)
       ];
     }
     if (header) {
@@ -2017,7 +1875,10 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     ).max_width(max_width)).center()).padding(25, 20, 25, 20)).font_family(style.font).background(style.bg);
   }
   // Render payment line items.
+  /** Helper that renders a list of payment line items for use in transactional emails. */
   _render_mail_payment_line_items({ payment, line_items, show_total_due = false }) {
+    if (!this.payments)
+      throw new Error("Payments not initialized");
     const style = this.mail_style;
     const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
     const _render_mail_payment_line_item = ({ name, desc, unit_cost, quantity, total_cost, font_weight = "normal", divider = true, color = style.text_fg }) => {
@@ -2033,14 +1894,16 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     let subtotal = 0;
     let subtotal_tax = 0;
     let total = 0;
-    payment.line_items.iterate((item) => {
+    payment.line_items.walk((item) => {
+      if (!this.payments)
+        throw new Error("Payments not initialized");
       if (typeof item.product === "string") {
         item.product = this.payments.get_product_sync(item.product);
       }
       if (currency == null) {
         const c = import_utils.Utils.get_currency_symbol(item.product.currency);
         if (c == null) {
-          error(`Failed to create a payment mail: `, new Error(`Unable to determine the currency of payment "${payment.id}".`));
+          this.log.error(`Failed to create a payment mail: `, new Error(`Unable to determine the currency of payment "${payment.id}".`));
         }
         currency = c ?? "?";
       }
@@ -2070,6 +1933,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     ];
   }
   // On 2fa mail.
+  /** Build the 2FA verification email content. */
   on_2fa_mail({ code, username, email, date, ip, device }) {
     const style = this.mail_style;
     const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
@@ -2101,6 +1965,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     });
   }
   // On successfull payment mail.
+  /** Build the successful payment email content. */
   on_payment_mail({ payment }) {
     const style = this.mail_style;
     const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
@@ -2115,7 +1980,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
         TableRow(Image(`${this.full_domain}/volt_static/payments/party.png`).frame(60, 60).margin(0, 0, 30, 0)).center(),
         // Title.
         TableRow(Title("Order Summary").color(style.subtitle_fg).font_size(18).margin(0)),
-        TableRow(Text("A summary of your order can be found below or in the attachmed invoice pdf.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
+        TableRow(Text("A summary of your order can be found below or in the attached invoice PDF.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
         // Line items.
         this._render_mail_payment_line_items({ payment, line_items: payment.line_items, show_total_due: true }),
         // Bottom spacing.
@@ -2124,6 +1989,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     });
   }
   // On failed payment mail.
+  /** Build the failed payment email content. */
   on_failed_payment_mail({ payment }) {
     const style = this.mail_style;
     const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = Mail;
@@ -2133,7 +1999,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
         // Title.
         TableRow(Title("Payment Failed").color(style.title_fg).width("fit-content").font_size(26)).center(),
         // Text.
-        TableRow(Text("We regret to inform you that your payment has encountered an issue and could not be processed successfully. We understand the inconvenience this may cause. Please try again, please contact customer support if the problem persists.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()),
+        TableRow(Text("We regret to inform you that your payment could not be processed successfully. We understand the inconvenience this may cause. Please try again, or contact customer support if the problem persists.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()),
         // Image.
         TableRow(ImageMask(`${this.full_domain}/volt_static/payments/error.png`).frame(40, 40).mask_color("#E8454E").margin(0, 0, 30, 0)).center(),
         // Title.
@@ -2147,6 +2013,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     });
   }
   // On cancellation mail.
+  /** Build the successful cancellation email content. */
   on_cancellation_mail({ payment, line_items }) {
     const style = this.mail_style;
     const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
@@ -2154,7 +2021,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
       max_width: 800,
       children: [
         // Title.
-        TableRow(Title("Successfull Cancellation").color(style.title_fg).width("fit-content").font_size(26)).center(),
+        TableRow(Title("Successful Cancellation").color(style.title_fg).width("fit-content").font_size(26)).center(),
         // Text.
         TableRow(Text("Your recent cancellation request has been successfully processed.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()),
         // Image.
@@ -2170,6 +2037,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     });
   }
   // On refund mail.
+  /** Build the failed cancellation email content. */
   on_failed_cancellation_mail({ payment }) {
     const style = this.mail_style;
     const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = Mail;
@@ -2193,6 +2061,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     });
   }
   // On refund mail.
+  /** Build the successful refund email content. */
   on_refund_mail({ payment, line_items }) {
     const style = this.mail_style;
     const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
@@ -2200,7 +2069,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
       max_width: 800,
       children: [
         // Title.
-        TableRow(Title("Successful Refund").color(style.title_fg).width("fit-content").font_size(26)).center(),
+        TableRow(Title("Chargeback Successful").color(style.title_fg).width("fit-content").font_size(26)).center(),
         // Text.
         TableRow(Text("We're delighted to inform you that your recent refund request has been successfully processed. The charged amount will soon be credited back to your account.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()),
         // Image.
@@ -2216,6 +2085,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     });
   }
   // On refund mail.
+  /** Build the failed refund email content. */
   on_failed_refund_mail({ payment, line_items }) {
     const style = this.mail_style;
     const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = Mail;
@@ -2239,6 +2109,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     });
   }
   // On refund mail.
+  /** Build the successful chargeback email content. */
   on_chargeback_mail({ payment, line_items }) {
     const style = this.mail_style;
     const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
@@ -2253,7 +2124,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
         TableRow(Image(`${this.full_domain}/volt_static/payments/party.png`).frame(60, 60).margin(0, 0, 30, 0)).center(),
         // Title.
         TableRow(Title("Chargeback Summary").color(style.subtitle_fg).font_size(18).margin(0)),
-        TableRow(Text("A summary of your refundend products.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
+        TableRow(Text("A summary of the items charged back.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
         // Line items.
         this._render_mail_payment_line_items({ payment, line_items }),
         // Bottom spacing.
@@ -2262,6 +2133,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     });
   }
   // On refund mail.
+  /** Build the failed chargeback email content. */
   on_failed_chargeback_mail({ payment, line_items }) {
     const style = this.mail_style;
     const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = Mail;
@@ -2285,7 +2157,6 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
     });
   }
 }
-var stdin_default = Server;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   Server

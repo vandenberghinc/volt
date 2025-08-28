@@ -1,7 +1,8 @@
 import * as vlib from "@vandenberghinc/vlib";
-import Meta from "./meta.js";
+import { Meta } from "./meta.js";
 import { Endpoint } from "./endpoint.js";
-import Server from "./server.js";
+import { Server } from "./server.js";
+import { SplashScreen } from "./splash_screen.js";
 /**
  * @nav Backend
  * @chapter Endpoints
@@ -86,7 +87,7 @@ export declare class View {
     static includes: Array<string | Record<string, any>>;
     static links: Array<string | Record<string, any>>;
     static body_style: string | null;
-    static splash_screen: any;
+    static splash_screen: SplashScreen | undefined;
     private static _volt_css?;
     private static _vhighlight_css?;
     source: string | null;
@@ -99,7 +100,7 @@ export declare class View {
     jquery: boolean;
     lang: string;
     body_style: string | null;
-    splash_screen: any;
+    splash_screen: SplashScreen | undefined;
     tree_shaking: boolean;
     mangle: boolean;
     _src?: string;
@@ -110,8 +111,8 @@ export declare class View {
     _bundle: any;
     payments?: string | undefined;
     min_device_width?: number;
-    _server?: Server;
-    _endpoint?: Endpoint;
+    server?: Server;
+    endpoint?: Endpoint;
     constructor({ source, callback, includes, links, templates, meta, jquery, lang, body_style, splash_screen, tree_shaking, mangle, min_device_width, _src, }: {
         source?: string | null;
         callback?: Function | null;
@@ -122,7 +123,7 @@ export declare class View {
         jquery?: boolean;
         lang?: string;
         body_style?: string | null;
-        splash_screen?: any;
+        splash_screen?: SplashScreen;
         tree_shaking?: boolean;
         mangle?: boolean;
         min_device_width?: number;
@@ -132,6 +133,8 @@ export declare class View {
     private _dynamic_bundle;
     /** Ensure the view is bundled when required. */
     ensure_bundle(): Promise<void>;
+    /** Create an error HTML file when errors are encountered during the bundle process. */
+    private _build_bundle_err_html;
     _build_html(): Promise<void>;
     _serve(stream: any, status_code?: number): void;
 }

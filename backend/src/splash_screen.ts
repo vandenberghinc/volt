@@ -6,56 +6,23 @@
 import { Stream } from "./stream.js"
 
 // ---------------------------------------------------------
-// Splash screen.
-/*  @docs:
- *  @nav: Backend
- *  @chapter: Endpoints
- *  @title: Splash screen
- *  @description: The splash screen that can be used on the `View` class.
- *  @parameter:
- *      @name: background
- *      @description: The background color of the splash screen.
- *      @type: null, string
- *  @parameter:
- *      @name: image
- *      @description: The image settings. When left undefined, no image will be shown.
- *      @type: null, object
- *      @attr:
- *          @name: src
- *          @description: The image source.
- *          @type: string
- *          @required: true
- *      @attr:
- *          @name: width
- *          @description: The image width in pixels as a number.
- *          @type: number
- *      @attr:
- *          @name: height
- *          @description: The image height in pixels as a number.
- *          @type: number
- *      @attr:
- *          @name: style
- *          @description: The CSS style to for the image element.
- *          @type: null, string
- *  @parameter:
- *      @name: loader
- *      @description: 
- *          The loader settings. When left undefined, no loader will be shown.
+
+/**
+ * The splash screen that can be used on the `View` class.
  *
- *          No loader will be shown when the loader is `null` or `false`. When the loader is `true` or the type is `object` the loader will always be shown. Multiple options can be defined to customize the loader.
- *      @type: null, boolean, object
- *      @attr:
- *          @name: color
- *          @description: The color of the loader.
- *          @type: string
- *      @attr:
- *          @name: size
- *          @description: The loader size in pixels as a number.
- *          @type: number
- *  @parameter:
- *      @name: style
- *      @description: The CSS style to add the main element of the splash screen.
- *      @type: null, string
+ * @param background The background color of the splash screen.
+ * @param image The image settings. When left undefined, no image will be shown.
+ * @param image.src The image source.
+ * @param image.width The image width in pixels as a number.
+ * @param image.height The image height in pixels as a number.
+ * @param image.style The CSS style for the image element.
+ * @param loader The loader settings. When left undefined, no loader will be shown.
+ *
+ * No loader will be shown when the loader is `null` or `false`. When the loader is `true` or the type is `object` the loader will always be shown. Multiple options can be defined to customize the loader.
+ * @param loader.color The color of the loader.
+ * @param loader.size The loader size in pixels as a number.
+ * @param style The CSS style to add to the main element of the splash screen.
+ * @docs
  */
 export class SplashScreen {
 
@@ -74,7 +41,20 @@ export class SplashScreen {
     style: string | null;
     _html: string | undefined;
 
-    // Constructor.
+    /**
+     * Create a new splash screen configuration.
+     *
+     * @param background The background color of the splash screen.
+     * @param image The image settings. When left undefined, no image will be shown.
+     * @param image.src The image source.
+     * @param image.width The image width in pixels as a number.
+     * @param image.height The image height in pixels as a number.
+     * @param image.style The CSS style for the image element.
+     * @param loader The loader settings. When left undefined, no loader will be shown.
+     * @param loader.color The color of the loader.
+     * @param loader.size The loader size in pixels as a number.
+     * @param style The CSS style to add to the main element of the splash screen.
+     */
     constructor({
         background = null,
         image = null,
@@ -106,7 +86,11 @@ export class SplashScreen {
         this._html = undefined;
     }
 
-    // Get html.
+    /**
+     * Generate and return the splash screen HTML. Result is cached after the first call.
+     *
+     * @returns The splash screen HTML markup.
+     */
     get html() {
 
         // Cached.
@@ -122,11 +106,11 @@ export class SplashScreen {
         // Create the image.
         if (this.image != null && this.image.src != null) {
             this._html += "" +
-            `<img src='${this.image.src}' alt='${this.image!.alt || "Icon"}' ` +
-            `${this.image.width ? "width='"+this.image.width+"'" : ""} ${this.image.height ? "height='"+this.image.height+"'" : ""} ` +
-            `style='${this.image.width ? "width: "+this.image.width+";" : ""} ${this.image.height ? "height: "+this.image.height+";" : ""} ` +
-            `${margin_between_img_and_loader ? "margin-bottom: "+margin_between_img_and_loader : ""}; ` +
-            `${this.image.style == null ? "" : this.image.style};'>`
+                `<img src='${this.image.src}' alt='${this.image!.alt || "Icon"}' ` +
+                `${this.image.width ? "width='" + this.image.width + "'" : ""} ${this.image.height ? "height='" + this.image.height + "'" : ""} ` +
+                `style='${this.image.width ? "width: " + this.image.width + ";" : ""} ${this.image.height ? "height: " + this.image.height + ";" : ""} ` +
+                `${margin_between_img_and_loader ? "margin-bottom: " + margin_between_img_and_loader : ""}; ` +
+                `${this.image.style == null ? "" : this.image.style};'>`
         }
 
         // Create loader.
@@ -134,43 +118,43 @@ export class SplashScreen {
             const size = typeof this.loader === 'object' && this.loader.size ? this.loader.size : 60;
             const color = typeof this.loader === 'object' && this.loader.color ? this.loader.color : "#fff";
             this._html += "<style>" +
-            ".__volt_splash_screen_loader {" +
-            "  display: inline-block;" +
-            "  position: relative;" +
-            `  width: calc(${size}px / 2);` +
-            `  height: calc(${size}px / 2);` +
-            `  position: absolute; bottom: 50px;` +
-            "}" +
-            ".__volt_splash_screen_loader div {" +
-            "  box-sizing: border-box;" +
-            "  display: block;" +
-            "  position: absolute;" +
-            `  width: calc(${64 / 80 * size}px / 2);` +
-            `  height: calc(${64 / 80 * size}px / 2);` +
-            `  margin: calc(${8 / 80 * size}px / 2);` +
-            `  border: calc(${8 / 80 * size}px / 2) solid ${color};` +
-            "  border-radius: 50%;" +
-            "  animation: __volt_splash_screen_loader 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;" +
-            `  border-color: ${color} transparent transparent transparent;` +
-            "}" +
-            ".__volt_splash_screen_loader div:nth-child(1) {" +
-            "  animation-delay: -0.45s;" +
-            "}" +
-            ".__volt_splash_screen_loader div:nth-child(2) {" +
-            "  animation-delay: -0.3s;" +
-            "}" +
-            ".__volt_splash_screen_loader div:nth-child(3) {" +
-            "  animation-delay: -0.15s;" +
-            "}" +
-            "@keyframes __volt_splash_screen_loader {" +
-            "  0% {" +
-            "    transform: rotate(0deg);" +
-            "  }" +
-            "  100% {" +
-            "    transform: rotate(360deg);" +
-            "  }" +
-            "}</style>" +
-            `<div class='__volt_splash_screen_loader'><div></div><div></div><div></div><div></div></div>`
+                ".__volt_splash_screen_loader {" +
+                "  display: inline-block;" +
+                "  position: relative;" +
+                `  width: calc(${size}px / 2);` +
+                `  height: calc(${size}px / 2);` +
+                `  position: absolute; bottom: 50px;` +
+                "}" +
+                ".__volt_splash_screen_loader div {" +
+                "  box-sizing: border-box;" +
+                "  display: block;" +
+                "  position: absolute;" +
+                `  width: calc(${64 / 80 * size}px / 2);` +
+                `  height: calc(${64 / 80 * size}px / 2);` +
+                `  margin: calc(${8 / 80 * size}px / 2);` +
+                `  border: calc(${8 / 80 * size}px / 2) solid ${color};` +
+                "  border-radius: 50%;" +
+                "  animation: __volt_splash_screen_loader 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;" +
+                `  border-color: ${color} transparent transparent transparent;` +
+                "}" +
+                ".__volt_splash_screen_loader div:nth-child(1) {" +
+                "  animation-delay: -0.45s;" +
+                "}" +
+                ".__volt_splash_screen_loader div:nth-child(2) {" +
+                "  animation-delay: -0.3s;" +
+                "}" +
+                ".__volt_splash_screen_loader div:nth-child(3) {" +
+                "  animation-delay: -0.15s;" +
+                "}" +
+                "@keyframes __volt_splash_screen_loader {" +
+                "  0% {" +
+                "    transform: rotate(0deg);" +
+                "  }" +
+                "  100% {" +
+                "    transform: rotate(360deg);" +
+                "  }" +
+                "}</style>" +
+                `<div class='__volt_splash_screen_loader'><div></div><div></div><div></div><div></div></div>`
         }
 
         // Close.
@@ -180,11 +164,15 @@ export class SplashScreen {
         return this._html;
     }
 
-    // Serve a client.
+    /**
+     * Serve the splash screen HTML to a client over the provided stream.
+     *
+     * @param stream The stream used to send the HTTP response.
+     */
     _serve(stream: Stream) {
         stream.send({
-            status: 200, 
-            headers: {"Content-Type": "text/html"}, 
+            status: 200,
+            headers: { "Content-Type": "text/html" },
             data: this.html,
         });
     }

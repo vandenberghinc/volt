@@ -111,7 +111,7 @@ export class CheckBoxElement extends (VStackElement as any as VElementBaseSignat
 					toggle() {
 						return this.value(!this.enabled);
 					},
-					value(to = null) { 
+					value(to = undefined) { 
 						if (to == null) { return this.enabled; }
 						else if (to === true) {
 							this.enabled = true;
@@ -208,12 +208,12 @@ export class CheckBoxElement extends (VStackElement as any as VElementBaseSignat
 	}
 
 	// Get or set the value.
-	// @ts-expect-error
-	value(): boolean;
-	// @ts-expect-error
-	value(to: boolean): this;
-	// @ts-expect-error
-	value(to?: boolean): this | boolean { 
+	// @ts-ignore
+    value(): boolean;
+	// @ts-ignore
+    value(to: boolean): this;
+	// @ts-ignore
+    value(to?: boolean): this | boolean { 
 		if (to == null) { return this._circle.enabled; }
 		this._circle.value(to);
 		return this;

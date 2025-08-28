@@ -1,6 +1,6 @@
 import { View } from './view.js';
 import * as vlib from "@vandenberghinc/vlib";
-import { RateLimits, RateLimitGroup } from "./rate_limit.js";
+import { RateLimitGroup, RateLimitData } from "./rate_limit.js";
 import { Stream, AuthStream } from "./stream.js";
 import type { Server } from "./server.js";
 import { Route } from './route.js';
@@ -93,8 +93,7 @@ import { Route } from './route.js';
  *   and only have to be assigned once. The assigned attributes will be overridden when
  *   these attributes are reassigned for the same group.
  */
-export declare class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
-    static rate_limits: Map<string, any>;
+export declare class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
     static compressed_content_types: string[];
     /** Route attributes */
     id: string;
@@ -102,17 +101,19 @@ export declare class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
     /** Requires authentication */
     authenticated: boolean;
     /** Parameter scheme validator */
-    params_val?: vlib.scheme.Validator<object, object, "object">;
+    params_schema?: vlib.Schema.Validator<object>;
     /** The default response headers */
     headers: [string, string][];
     /** Option 1) User callback - defined as method so a derived endpoint can do that as well. */
-    callback?(stream: Stream, params: vlib.scheme.Infer.Scheme<S>): any;
-    callback?(stream: AuthStream, params: vlib.scheme.Infer.Scheme<S>): any;
+    callback?(stream: Stream, params: vlib.Schema.Entries.Infer<S>): any;
+    callback?(stream: AuthStream, params: vlib.Schema.Entries.Infer<S>): any;
     /** Option 2) View based endpoint */
     view?: View;
     /** Option 3) Data endpoint, raw */
-    data: Buffer | string | any[] | Record<any, any>;
+    data?: Buffer | string | any[] | Record<any, any>;
     raw_data?: Buffer | string | any[] | Record<any, any>;
+    /** Option 4 Data endpoint by file path. */
+    file_path?: vlib.Path;
     /** Content length & type */
     content_length?: number;
     content_type?: string;
@@ -122,60 +123,72 @@ export declare class Endpoint<const S extends vlib.scheme.Infer.Scheme.S = {}> {
     allow_sitemap: boolean;
     allow_robots: boolean;
     /** Rate limit groups for internal use. */
-    rate_limit_groups: ReturnType<typeof RateLimits.add>[];
+    rate_limit_groups: RateLimitData[];
     /** Private attributes */
     private _compress;
     private _cache;
-    _static_path?: string;
-    private _templates;
     private ip_whitelist?;
     private _is_compressed?;
     private _initialized;
-    private _server?;
-    constructor({ method, endpoint, authenticated, rate_limit, params, callback, view, data, content_type, // = "text/plain",
-    compress, cache, ip_whitelist, sitemap, robots, allow_unknown_params, _templates, // only used in loading static files.
-    _static_path, _is_static, }: {
+    /** A reference to the server. */
+    server?: Server;
+    constructor({ method, endpoint, authenticated, rate_limit, params, compress, cache, ip_whitelist, sitemap, robots, allow_unknown_params, _is_static, callback, view, data, file_path, content_type, }: {
         method?: string;
         endpoint: string | RegExp;
-        authenticated?: boolean;
-        rate_limit?: string | RateLimitGroup | RateLimitGroup[];
+        rate_limit?: string | RateLimitGroup | (string | RateLimitGroup)[];
         params?: S;
-        callback?: ((stream: Stream, params: vlib.scheme.Infer.Scheme<S>) => any) | ((stream: AuthStream, params: vlib.scheme.Infer.Scheme<S>) => any);
-        data?: any;
         compress?: "auto" | boolean;
         cache?: boolean | number;
         ip_whitelist?: string[];
         sitemap?: boolean;
         robots?: boolean;
-        _templates?: Record<string, any>;
-        _static_path?: string;
         _is_static?: boolean;
         allow_unknown_params?: boolean;
     } & ({
+        data?: Buffer | string | any[] | Record<any, any>;
+        file_path?: never;
+        view?: never;
+        authenticated?: boolean;
+        callback?: never;
+        content_type: string;
+    } | {
+        data?: never;
+        file_path: string | vlib.Path;
+        authenticated?: boolean;
+        callback?: never;
+        view?: never;
+        content_type: string;
+    } | {
+        data?: never;
+        file_path?: never;
+        authenticated?: false;
+        callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any);
+        view?: never;
+        content_type: string;
+    } | {
+        data?: never;
+        file_path?: never;
+        authenticated: true;
+        callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any);
+        view?: never;
+        content_type: string;
+    } | {
+        data?: never;
+        file_path?: never;
+        authenticated?: boolean;
+        callback?: never;
         view: View | View.Opts;
         content_type?: string;
-    } | {
-        view?: null | undefined;
-        content_type: string;
     }));
     /** Initialize with server. */
     _initialize(server: Server): this;
-    /**
-     * Convert a RegExp into a readable path:
-     * - strips ^…$ anchors
-     * - unescapes `\/` → `/`
-     * - `(?<name>…)` → `:name`
-     * - anonymous captures `(…)` → `:param1`, `:param2`, …
-     */
-    _stringify_endpoint_regex(re: RegExp): string;
-    _load_data_by_path(server: any): this;
-    _set_headers(stream: any): void;
-    _refresh(server: any): Promise<void>;
     _dynamic_initialize(): Promise<void>;
+    _set_headers(stream: Stream): void;
     _serve_options(stream: Stream): Promise<void>;
     _serve(stream: Stream, status_code?: number): Promise<void>;
+    private _load_data_by_path;
 }
 export declare namespace Endpoint {
-    /** Constructor options without the `_server` attribute. */
-    type Opts<S extends vlib.scheme.Infer.Scheme.S = {}> = ConstructorParameters<typeof Endpoint<S>>[0];
+    /** Options for constructing an endpoint. */
+    type Opts<S extends vlib.Schema.Entries.Opts = {}> = ConstructorParameters<typeof Endpoint<S>>[0];
 }

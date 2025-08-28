@@ -74,7 +74,7 @@ export class ScrollerElement extends VElementTagMap.div {
             this.position("relative"); // is required for attribute "track" 
         }
         super.overflow("hidden"); // should always be hidden to enable scrolling, and otherwise the thumb not be visible due to overflow width.
-        this.class("hide_scrollbar")
+        this.class("volt_hide_scrollbar")
         this.styles({
             "content-visibility": "auto",
         })
@@ -82,7 +82,7 @@ export class ScrollerElement extends VElementTagMap.div {
         // Content.
         this.content = VStack(...children)
             .parent(this)
-            .class("hide_scrollbar")
+            .class("volt_hide_scrollbar")
             .position("relative") // in case it has absolute children that should scroll, otherwise the content wont scroll without "relative".
             .frame("100%", "100%")
             .flex("1 1 0") // flex-basis 0 otherwise it expands its parent.
@@ -105,7 +105,7 @@ export class ScrollerElement extends VElementTagMap.div {
             .box_shadow("0px 0px 5px #00000005")
         this.track = VStack<{ __background_value__?: string }>(this.thumb)
             .parent(this)
-            .class("hide_scrollbar")
+            .class("volt_hide_scrollbar")
             .position(5, 5, 5, null)
             .width(10)
             .background_color("transparent")
@@ -425,9 +425,9 @@ export class ScrollerElement extends VElementTagMap.div {
     }
 
     // Get the scroll top.
-    scroll_top(): number | string;
+    scroll_top(): number;
     scroll_top(value: number | string): this;
-    scroll_top(value?: number | string): number | string | this {
+    scroll_top(value?: number | string): number | this {
         if (value == null) {
             return this._try_parse_float(this.content.scrollTop, this.content.scrollTop);
         }
@@ -585,31 +585,31 @@ export const Scroller = Elements.wrapper(ScrollerElement);
 export const NullScroller = Elements.create_null(ScrollerElement);
 declare module './any_element.d.ts' { interface AnyElementMap { ScrollerElement: ScrollerElement }}
 
-// Scroller.
-/*  @docs:
-    @nav: Frontend
-    @chapter: Elements
-    @title: Virtual Scroller
-    @experimental: true
-    @note: The `VirtualScrollerElement` is also initializable under function `VirtualScroller`.
-    @description: 
-        The virtual scroller element.
+// Virtual Scroller.
+// /*  @ docs:
+//     @nav: Frontend
+//     @chapter: Elements
+//     @title: Virtual Scroller
+//     @experimental: true
+//     @note: The `VirtualScrollerElement` is also initializable under function `VirtualScroller`.
+//     @description: 
+//         The virtual scroller element.
 
-        Can be initialed with function `VirtualScroller()`.
-    
-        After appending children you should call `render()` otherwise the children will only show up after a scroll event.
+//         Can be initialed with function `VirtualScroller()`.
 
-        The virtual scroller can work in two ways. 
-         1) You must set a fixed height for every direct child.
-         2) You call the member function `update_heights()` after any height involving edits are made and before you call member function `render()` for the first time.
-    @warning: Using content-visibility on the direct or nested children may cause undefined behaviour, it may cause elements to become hidden.
-    @warning: Every element must have a fixed height, Unless you use `update_heights()`. Otherwise the rendering will throw an error. Any incorrect heights may cause undefined behaviour.
-    @warning: Setting padding on element attribute "content" may cause undefined behaviour.
-    @parameter:
-        @name: children
-        @description: The elements children.
-        @type: array[Node]
- */
+//         After appending children you should call `render()` otherwise the children will only show up after a scroll event.
+
+//         The virtual scroller can work in two ways. 
+//          1) You must set a fixed height for every direct child.
+//          2) You call the member function `update_heights()` after any height involving edits are made and before you call member function `render()` for the first time.
+//     @warning: Using content-visibility on the direct or nested children may cause undefined behaviour, it may cause elements to become hidden.
+//     @warning: Every element must have a fixed height, Unless you use `update_heights()`. Otherwise the rendering will throw an error. Any incorrect heights may cause undefined behaviour.
+//     @warning: Setting padding on element attribute "content" may cause undefined behaviour.
+//     @parameter:
+//         @name: children
+//         @description: The elements children.
+//         @type: array[Node]
+//  */
 // @Elements.register
 // export class VirtualScrollerElement extends (ScrollerElement as any as VElementBaseSignature) {
 
@@ -892,16 +892,13 @@ declare module './any_element.d.ts' { interface AnyElementMap { ScrollerElement:
 // export const NullVirtualScroller = Elements.create_null(VirtualScrollerElement);
 // declare module './any_element.d.ts' { interface AnyElementMap { VirtualScrollerElement: VirtualScrollerElement }}
 
-/*  @docs:
-    @nav: Frontend
-    @chapter: Elements
-    @title: Snap Scroller
-    @experimental: true
-    @note: The `SnapScrollerElement` is also initializable under function `SnapScroller`.
-    @description: 
-        Scrolls the windows per window (snap scrolling).
-
-        This class is still experimental.
+/**
+ * Scrolls the windows per window (snap scrolling).
+ * This class is still experimental.
+ * @experimental true
+ * @note The `SnapScrollerElement` is also initializable under function `SnapScroller`.
+ * @nav Frontend/Elements
+ * @docs
  */
 @Elements.create({
     name: "SnapScrollerElement",
@@ -1020,7 +1017,7 @@ class WindowScrollerElement extends Elements.create({
         this.stretch(true);
         this.position("relative");
         this.overflow("hidden scroll");
-        this.class("hide_scrollbar");
+        this.class("volt_hide_scrollbar");
 
         // The event that will be called when the window scrolls.
         this.on_animation_scroll = () => {};

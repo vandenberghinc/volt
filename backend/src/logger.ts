@@ -8,8 +8,6 @@
 
 import * as vlib from "@vandenberghinc/vlib";
 
-export const logger = new vlib.logging.Logger({
-    log_level: 0,
-});
-
-export default logger;
+// export const log = new vlib.logging.FileLogger({
+//     level: 0,
+// });

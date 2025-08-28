@@ -1,0 +1,38 @@
+{
+    "ssh": {
+        "remotes": [
+            {
+                "alias": "dev.vinc",
+                "destination": "/Volumes/persistance/private/dev/vinc/volt/",
+                "enabled": true
+            },
+            {
+                "alias": "vinc",
+                "destination": "/vserver/storages/vinc/volt/",
+                "enabled": true
+            }
+        ]
+    },
+    "git": {
+        "username": "vandenberghinc",
+        "email": "admin@vandenberghinc.com",
+        "remotes": [
+            {
+                "remote": "origin",
+                "branch": "dev",
+                "destination": "git@github.com:vandenberghinc/volt.git",
+                "enabled": true
+            }
+        ]
+    },
+    "npm": {
+        "links": {
+            "@vandenberghinc/vlib": [
+                "../vlib/ts/"
+            ],
+            "@vandenberghinc/vhighlight": [
+                "../vhighlight/"
+            ]
+        }
+    }
+}

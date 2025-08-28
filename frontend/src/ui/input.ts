@@ -76,7 +76,13 @@ export class InputElement extends VElementTagMap.input {
 	// Alias functions.
 	value(): string;
 	value(val: string | number): this;
-	value(val?: string | number): this | string { if (this._e === undefined) { return super.value(val as any); } if (val == null) { return this._e.getAttribute("value") ?? ""; } this._e.setAttribute("value", val.toString()); return this; }
+	value(val?: string | number): this | string {
+        console.log("InputElement.value", val, super.value);
+        if (this._e === undefined) { return super.value(val as any); }
+        if (val == null) { return this._e.getAttribute("value") ?? ""; }
+        this._e.setAttribute("value", val.toString());
+        return this;
+    }
 	required(): boolean;
 	required(val: boolean): this;
 	required(val?: boolean): this | boolean { if (this._e === undefined) { return super.required(val as any); } if (val == null) { return this._e.getAttribute("required") === "true"; } if (!val) { this._e.removeAttribute("required"); } else { this._e.setAttribute("required", val as any); } return this; }
@@ -367,7 +373,7 @@ export class ExtendedInputElement extends (VStackElement as any as VElementBaseS
 		} else {
 			this.input = Input(placeholder, type)	
 		}
-		(this.input as any)
+		(this.input as any as VElement)
 			.parent(this)
 			.color("inherit")
 			.readonly(readonly)

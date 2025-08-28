@@ -22,9 +22,12 @@ export class Blacklist {
     }) {
 
 		// Checks.
-        vlib.Scheme.validate(arguments[0], {strict: true, scheme: {
-            api_key: "string",
-        }});
+        vlib.schema.validate(arguments[0], {
+            unknown: false, throw: true,
+            schema: {
+                api_key: "string",
+            }
+        });
 
 		// Arguments.
 		this.api_key = api_key;

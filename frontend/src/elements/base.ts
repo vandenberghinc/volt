@@ -19,8 +19,10 @@ import { Statics  } from "../modules/statics.js"
 
 import type { AnyElement } from "../ui/any_element.js"
 import { register_element } from "./register_element.js";
+import type { PseudoElement } from "../ui/pseudo.js"
 
 // Vars.
+// @todo convert to Set
 const elements_with_width_attribute = [ // elements that use the "width" etc attribute instead of the "style.width".
     'canvas',
     'embed',
@@ -31,13 +33,42 @@ const elements_with_width_attribute = [ // elements that use the "width" etc att
     'video',
 ];
 
+// Null / undefined alias.
+type none = undefined | null;
+
+// ------------------------------------------------------------------------------------------------
+// The observers for VElement
+
+/** Create the on render observer for VElement. */
+const on_render_observer = new ResizeObserver(
+    (entries, observer) => {
+        entries.forEach(entry => {
+            const target = entry.target as any
+            if (!target.rendered) {
+                target._on_render_callbacks.walk((func) => { func(entry.target) });
+                target.rendered = true;
+                on_render_observer.unobserve(entry.target);
+            }
+        });
+    },
+);
+
+/** Create the on resize observer for VElement. */
+const on_resize_observer = new ResizeObserver(
+    (entries, observer) => {
+        entries.forEach(entry => {
+            (entry.target as any)._on_resize_callbacks.walk((func) => { func(entry.target) });
+        });
+    },
+);
+
+
 // ------------------------------------------------------------------------------------------------
 // The base VElement.
 
 // The VElement user defined extensions.
 declare global {
     export interface VElementExtensions {}
-    // export type none = null | undefined;
 }
 
 // VElement options.
@@ -59,13 +90,13 @@ interface DerivedVElementInitOptions {
 }
 
 // Get/Set methods.
-const element_checked_descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked');// instead of getAttribute("checked")
-const element_disabled_descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'disabled');// instead of getAttribute("disabled")
-const element_selected_descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'selected');// for <option> elements
-const element_href_descriptor = Object.getOwnPropertyDescriptor(HTMLAnchorElement.prototype, 'href');// gives full URL instead of getAttribute("href") which might be relative
-const element_src_descriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');// gives full URL
-const element_id_descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'id');// instead of getAttribute("id")
-const element_value_descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+// const element_checked_descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked');// instead of getAttribute("checked")
+// const element_disabled_descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'disabled');// instead of getAttribute("disabled")
+// const element_selected_descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'selected');// for <option> elements
+// const element_href_descriptor = Object.getOwnPropertyDescriptor(HTMLAnchorElement.prototype, 'href');// gives full URL instead of getAttribute("href") which might be relative
+// const element_src_descriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');// gives full URL
+// const element_id_descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'id');// instead of getAttribute("id")
+// const element_value_descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
 
 // Types.
 export type AppendType = null | undefined | string | Node | VElement | Function | AppendType[];
@@ -117,7 +148,6 @@ export abstract class VElement extends HTMLElement {
     public _timeouts!: Record<string, any>;
     public _on_window_resize_timer!: any;
     public _abs_parent!: any;
-    public _pseudo_stylesheets!: Record<string, any>;
     public _on_resize_rule_evals!: Record<string, any>;
     public _observing_on_resize!: boolean;
     public _observing_on_render!: boolean;
@@ -141,13 +171,13 @@ export abstract class VElement extends HTMLElement {
         },
     };
 
-    private _checked: any;// {get(x: any): void, set(x: any, y: any): void};
-    private _disabled: any;// {get(x: any): void, set(x: any, y: any): void};
-    private _selected: any;// {get(x: any): void, set(x: any, y: any): void};
-    private _href: any;// {get(x: any): void, set(x: any, y: any): void};
-    private _src: any;// {get(x: any): void, set(x: any, y: any): void};
-    private _id: any;// {get(x: any): void, set(x: any, y: any): void};
-    private _value: any;// {get(x: any): void, set(x: any, y: any): void};
+    // private _checked: any;// {get(x: any): void, set(x: any, y: any): void};
+    // private _disabled: any;// {get(x: any): void, set(x: any, y: any): void};
+    // private _selected: any;// {get(x: any): void, set(x: any, y: any): void};
+    // private _href: any;// {get(x: any): void, set(x: any, y: any): void};
+    // private _src: any;// {get(x: any): void, set(x: any, y: any): void};
+    // private _id: any;// {get(x: any): void, set(x: any, y: any): void};
+    // private _value: any;// {get(x: any): void, set(x: any, y: any): void};
 
     // ---------------------------------------------------------
     // Constructor.
@@ -193,7 +223,6 @@ export abstract class VElement extends HTMLElement {
         this._timeouts = {};
         this._on_window_resize_timer = undefined;
         this._abs_parent = undefined;
-        this._pseudo_stylesheets = {};
         this._on_resize_rule_evals = {};
         this._observing_on_resize = false;
         this._observing_on_render = false;
@@ -212,13 +241,13 @@ export abstract class VElement extends HTMLElement {
         this._media_queries = {};
 
         // Copied properties where this.getAttribtue() returns the original instead of the current.
-        this._checked = element_checked_descriptor;
-        this._disabled = element_disabled_descriptor;
-        this._selected = element_selected_descriptor;
-        this._href = element_href_descriptor;
-        this._src = element_src_descriptor;
-        this._id = element_id_descriptor;
-        this._value = element_value_descriptor;
+        // this._checked = element_checked_descriptor;
+        // this._disabled = element_disabled_descriptor;
+        // this._selected = element_selected_descriptor;
+        // this._href = element_href_descriptor;
+        // this._src = element_src_descriptor;
+        // this._id = element_id_descriptor;
+        // this._value = Object.getOwnPropertyDescriptor(super.prototype, 'value')//element_value_descriptor;
 
         // Constructed by html code.
         if (this.hasAttribute !== undefined && this.hasAttribute("created_by_html")) {
@@ -226,10 +255,6 @@ export abstract class VElement extends HTMLElement {
 
         // Constructed by js code.
         else {
-
-            // Always use border-box for all elements.
-            // Defined in css.
-            // this.box_sizing("border-box");
 
             // Default style.
             if (args.default_style != null) {
@@ -4573,13 +4598,13 @@ export abstract class VElement extends HTMLElement {
 
     //             // Determine scroll direction
     //             let scroll_direction = 'unknown';
-    //             if (element._previousY !== null) {
+    //             if (element._previousY != null) {
     //                 scroll_direction = currentY < element._previousY ? 'down' : 'up';
     //             }
     //             element._previousY = currentY;
 
     //             // Initialize previousIntersectionRatio if null
-    //             if (element._previousIntersectionRatio === null) {
+    //             if (element._previousIntersectionRatio == null) {
     //                 element._previousIntersectionRatio = currentIntersectionRatio;
     //                 return; // Skip processing on the first observation
     //             }
@@ -4697,12 +4722,7 @@ export abstract class VElement extends HTMLElement {
             return this._on_theme_updates;
         }   
 
-        const found = Themes.theme_elements.iterate((item) => {
-            if (item.element === this) {
-                return true;
-            }
-        })
-        if (found !== true) {
+        if (!Themes.theme_elements.some(item => item.element === this)) {
             Themes.theme_elements.push({
                 element: this,
             });
@@ -4759,7 +4779,7 @@ export abstract class VElement extends HTMLElement {
         this._on_render_callbacks.push(callback);
         if (!this._observing_on_render) {
             this._observing_on_render = true;
-            Utils.on_render_observer.observe(this as any);
+            on_render_observer.observe(this as any);
         }
         return this;
     }
@@ -4777,7 +4797,7 @@ export abstract class VElement extends HTMLElement {
     remove_on_render(callback: ElementCallback<this>): this {
         this._on_render_callbacks = vlib.Array.drop(this._on_render_callbacks, callback);
         if (this._on_render_callbacks.length === 0) {
-            Utils.on_render_observer.unobserve(this as any);
+            on_render_observer.unobserve(this as any);
             this._observing_on_render = false;
         }
         return this;
@@ -4792,7 +4812,7 @@ export abstract class VElement extends HTMLElement {
      */
     remove_on_renders(): this {
         this._on_render_callbacks = [];
-        Utils.on_render_observer.unobserve(this as any);
+        on_render_observer.unobserve(this as any);
         this._observing_on_render = false;
         return this;
     }
@@ -4871,7 +4891,7 @@ export abstract class VElement extends HTMLElement {
         this._on_resize_callbacks.push(callback);
         if (!this._observing_on_resize) {
             this._observing_on_resize = true;
-            Utils.on_resize_observer.observe(this as any);
+            on_resize_observer.observe(this as any);
         }
         return this;
     }
@@ -4889,7 +4909,7 @@ export abstract class VElement extends HTMLElement {
     remove_on_resize(callback: ElementCallback<this>): this {
         this._on_resize_callbacks = vlib.Array.drop(this._on_resize_callbacks, callback);
         if (this._on_resize_callbacks.length === 0) {
-            Utils.on_resize_observer.unobserve(this as any);
+            on_resize_observer.unobserve(this as any);
             this._observing_on_resize = false;
         }
         return this;
@@ -4907,7 +4927,7 @@ export abstract class VElement extends HTMLElement {
      */
     remove_on_resizes(): this {
         this._on_resize_callbacks = [];
-        Utils.on_resize_observer.unobserve(this as any);
+        on_resize_observer.unobserve(this as any);
         this._observing_on_resize = false;
         return this;
     }
@@ -5006,7 +5026,7 @@ export abstract class VElement extends HTMLElement {
                 } else {
                     const duration = shortcut.duration || 150;
                     if (
-                        this._on_shortcut_time === null ||
+                        this._on_shortcut_time == null ||
                         Date.now() - this._on_shortcut_time > duration
                     ) {
                         return false;
@@ -5043,7 +5063,7 @@ export abstract class VElement extends HTMLElement {
                 } else {
                     const duration = shortcut.duration || 150;
                     if (
-                        this._on_shortcut_time === null ||
+                        this._on_shortcut_time == null ||
                         Date.now() - this._on_shortcut_time > duration
                     ) {
                         return false;
@@ -5605,59 +5625,8 @@ export abstract class VElement extends HTMLElement {
      * @return:
      *     @descr: Returns the instance of the element for chaining.
      */
-    pseudo(type: string, node: any): this {
-        // @note: The node type does not strictly have to be a PseudoElement.
-
-        // Gen id.
-        if (node.pseudo_id === undefined) {
-            node.pseudo_id = "pseudo_" + vlib.String.random(24);
-        }
-
-        // Set content.
-        if (node.style.content == null) {
-            node.style.content = "";
-        }
-
-        // Add the current element to the pseudo's added to elements.
-        if (node.added_to_elements === undefined) {
-            node.added_to_elements = [];
-        }
-        const alread_added = node.added_to_elements.iterate((item: any) => {
-            if (item.node === this && item.type === type) {
-                return true;
-            }
-        });
-        if (alread_added !== true) {
-            node.added_to_elements.append({
-                node: this,
-                type: type,
-            });
-        }
-
-        // Initialize cache object.
-
-        // Add/edit stylesheet.
-        const css = `.${node.pseudo_id}::${type}{${node.style.cssText};content:"";}`;
-        if (this._pseudo_stylesheets[node.pseudo_id] === undefined) {
-            const style = document.createElement('style');
-            style.type = 'text/css';
-            document.head.appendChild(style); // append before insertRule
-            if (style.sheet) {
-                style.sheet.insertRule(css, 0);
-            }
-            this._pseudo_stylesheets[node.pseudo_id] = style;
-        } else {
-            const style = this._pseudo_stylesheets[node.pseudo_id];
-            if (style) {
-                style.sheet.deleteRule(0);
-                style.sheet.insertRule(css, 0);
-            }
-        }
-
-        // Add class.
-        this.classList.add(node.pseudo_id);
-
-        // Response.
+    pseudo(type: string, pseudo: PseudoElement): this {
+        pseudo.apply(this, type);
         return this;
     }
 
@@ -5674,12 +5643,8 @@ export abstract class VElement extends HTMLElement {
      * @return:
      *     @description Returns the instance of the element for chaining.
      */
-    remove_pseudo(node: any): this {
-        if (node && node.pseudo_id) {
-            this.classList.remove(node.pseudo_id);
-        }
-        this._pseudo_stylesheets[node.pseudo_id].remove();
-        delete this._pseudo_stylesheets[node.pseudo_id];
+    remove_pseudo(type: string, pseudo: PseudoElement): this {
+        pseudo.remove_from(this, type);
         return this;
     }
 
@@ -5698,8 +5663,6 @@ export abstract class VElement extends HTMLElement {
                 this.classList.remove(name);
             }
         })
-        Object.values(this._pseudo_stylesheets).forEach(stylesheet => { stylesheet.remove(); })
-        this._pseudo_stylesheets = {};
         return this;
     }
 
@@ -5718,19 +5681,19 @@ export abstract class VElement extends HTMLElement {
      * @return:
      *     @descr: Returns the instance of the element for chaining.
      */
-    pseudo_on_hover(type: string, node: any, set_defaults: boolean = true): this {
+    pseudo_on_hover(type: string, pseudo: PseudoElement, set_defaults: boolean = true): this {
         if (set_defaults) {
-            node.position(0, 0, 0, 0);
+            pseudo.position(0, 0, 0, 0);
             const border_radius = this.border_radius();
-            if (border_radius && typeof node.border_radius === "function") {
-                node.border_radius(border_radius);
+            if (border_radius && typeof pseudo.border_radius === "function") {
+                pseudo.border_radius(border_radius);
             }
             if (this.position() !== "absolute") {
                 this.position("relative")
             }
         }
-        this.on_mouse_over(() => this.pseudo(type, node))
-        this.on_mouse_out(() => this.remove_pseudo(node))
+        this.on_mouse_over(() => pseudo.apply(this, type))
+        this.on_mouse_out(() => pseudo.remove_from(this, type))
         return this;
     }
 
@@ -5942,40 +5905,35 @@ export abstract class VElement extends HTMLElement {
     // Automatically generated CSS functions. 
     // Reference: https://www.w3schools.com/cssref/index.php. 
 
-    /**
-     * @docs:
-     * @title: Accent color
-     * @desc: Specifies an accent color for user-interface controls. The equivalent of CSS attribute `accentColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
+    // ---------------------------------------------------------
+    // Automatically generated CSS functions. 
+    // Reference: https://www.w3schools.com/cssref/index.php. 
+
     accent_color(): string;
     accent_color(value: string): this;
+    /**
+     * {Accent color}
+     * Specifies an accent color for user-interface controls. The equivalent of CSS attribute `accentColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     accent_color(value?: string): string | this {
         if (value == null) { return this.style.accentColor; }
         this.style.accentColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Align Content
-     * @desc: Specifies the alignment between the lines inside a flexible container when the items do not use all available space. 
-     *        The equivalent of CSS attribute `alignContent`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     align_content(): string;
     align_content(value: string): this;
+    /**
+     * {Align Content}
+     * Specifies the alignment between the lines inside a flexible container when the items do not use all available space.
+     * The equivalent of CSS attribute `alignContent`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     align_content(value?: string): string | this {
         if (value == null) { return this.style.alignContent; }
         this.style.alignContent = value;
@@ -5986,20 +5944,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Align Items
-     * @desc: Specifies the alignment for items inside a flexible container, equivalent to the CSS attribute `alignItems`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     align_items(): string;
     align_items(value: string): this;
+    /**
+     * {Align Items}
+     * Specifies the alignment for items inside a flexible container, equivalent to the CSS attribute `alignItems`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     align_items(value?: string): string | this {
         if (value == null) { return this.style.alignItems; }
         this.style.alignItems = value;
@@ -6010,20 +5963,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Align Self
-     * @desc: Specifies the alignment for selected items inside a flexible container. The equivalent of CSS attribute `alignSelf`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     align_self(): string;
     align_self(value: string): this;
+    /**
+     * {Align Self}
+     * Specifies the alignment for selected items inside a flexible container. The equivalent of CSS attribute `alignSelf`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     align_self(value?: string): string | this {
         if (value == null) { return this.style.alignSelf; }
         this.style.alignSelf = value;
@@ -6034,41 +5982,31 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: All
-     * @desc: Resets all properties (except unicode-bidi and direction). The equivalent of CSS attribute `all`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     all(): string;
     all(value: string): this;
+    /**
+     * {All}
+     * Resets all properties (except unicode-bidi and direction). The equivalent of CSS attribute `all`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     all(value?: string): string | this {
         if (value == null) { return this.style.all; }
         this.style.all = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Animation
-     * @desc: A shorthand property for all the animation properties. 
-     *        The equivalent of CSS attribute `animation`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     animation(): string;
     animation(value: string): this;
+    /**
+     * {Animation}
+     * A shorthand property for all the animation properties.
+     * The equivalent of CSS attribute `animation`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     animation(value?: string): string | this {
         if (value == null) { return this.style.animation; }
         this.style.animation = value;
@@ -6079,20 +6017,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Animation Delay
-     * @desc: Specifies a delay for the start of an animation, equivalent to the CSS attribute `animationDelay`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     animation_delay(): string;
     animation_delay(value: string | number): this;
+    /**
+     * {Animation Delay}
+     * Specifies a delay for the start of an animation, equivalent to the CSS attribute `animationDelay`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     animation_delay(value?: string | number): string | this {
         if (value == null) { return this.style.animationDelay; }
         this.style.animationDelay = value as string;
@@ -6103,24 +6036,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Animation Direction
-     * @description: 
-     *     Specifies whether an animation should be played forwards, backwards or in alternate cycles.
-     *     The equivalent of CSS attribute `animationDirection`.
-     *     
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     animation_direction(): string;
     animation_direction(value: string): this;
+    /**
+     * {Animation Direction}
+     * Specifies whether an animation should be played forwards, backwards or in alternate cycles.
+     * The equivalent of CSS attribute `animationDirection`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     animation_direction(value?: string): string | this {
         if (value == null) { return this.style.animationDirection; }
         this.style.animationDirection = value as string;
@@ -6131,20 +6056,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Animation Duration
-     * @desc: Specifies how long an animation should take to complete one cycle. The equivalent of CSS attribute `animationDuration`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     animation_duration(): string;
     animation_duration(value: string | number): this;
+    /**
+     * {Animation Duration}
+     * Specifies how long an animation should take to complete one cycle. The equivalent of CSS attribute `animationDuration`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     animation_duration(value?: string | number): string | this {
         if (value == null) { return this.style.animationDuration; }
         this.style.animationDuration = value as string;
@@ -6155,20 +6075,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Animation Fill Mode
-     * @desc: Specifies a style for the element when the animation is not playing, akin to the CSS `animation-fill-mode` property. 
-     *        Use this method to set or retrieve the current fill mode value.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign to the animation fill mode. Pass `null` to retrieve the current value.
-     * @return:
-     *     @description Returns the instance of the element for chaining when a value is set. If `null` is passed, returns the current value of the animation fill mode.
-     * @funcs: 2
-     */
     animation_fill_mode(): string;
     animation_fill_mode(value: string): this;
+    /**
+     * {Animation Fill Mode}
+     * Specifies a style for the element when the animation is not playing, akin to the CSS `animation-fill-mode` property.
+     * Use this method to set or retrieve the current fill mode value.
+     * @param value The value to assign to the animation fill mode. Pass `null` to retrieve the current value.
+     * @returns ription Returns the instance of the element for chaining when a value is set. If `null` is passed, returns the current value of the animation fill mode.
+     * @docs
+     */
     animation_fill_mode(value?: string): string | this {
         if (value == null) { return this.style.animationFillMode; }
         this.style.animationFillMode = value;
@@ -6179,19 +6095,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Animation Iteration Count
-     * @desc: Specifies the number of times an animation should be played. The equivalent of CSS attribute `animationIterationCount`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     animation_iteration_count(): string;
     animation_iteration_count(value: string | number): this;
+    /**
+     * {Animation Iteration Count}
+     * Specifies the number of times an animation should be played. The equivalent of CSS attribute `animationIterationCount`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     animation_iteration_count(value?: string | number): string | this {
         if (value == null) { return this.style.animationIterationCount; }
         this.style.animationIterationCount = value as string;
@@ -6202,20 +6114,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Animation Name
-     * @desc: Specifies a name for the \@keyframes animation, equivalent to the CSS attribute `animationName`. 
-     *        When the parameter `value` is null, it retrieves the current attribute value.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign for the animation name. Use null to retrieve the current value.
-     * @return:
-     *     @description Returns the current animation name when `value` is null, otherwise returns the instance for chaining.
-     * @funcs: 2
-     */
     animation_name(): string;
     animation_name(value: string): this;
+    /**
+     * {Animation Name}
+     * Specifies a name for the \@keyframes animation, equivalent to the CSS attribute `animationName`.
+     * When the parameter `value` is null, it retrieves the current attribute value.
+     * @param value The value to assign for the animation name. Use null to retrieve the current value.
+     * @returns ription Returns the current animation name when `value` is null, otherwise returns the instance for chaining.
+     * @docs
+     */
     animation_name(value?: string): string | this {
         if (value == null) { return this.style.animationName; }
         this.style.animationName = value;
@@ -6226,21 +6134,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Animation Play State
-     * @desc: Specifies whether the animation is running or paused. 
-     *        The equivalent of CSS attribute `animationPlayState`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     animation_play_state(): string;
     animation_play_state(value: string): this;
+    /**
+     * {Animation Play State}
+     * Specifies whether the animation is running or paused.
+     * The equivalent of CSS attribute `animationPlayState`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     animation_play_state(value?: string): string | this {
         if (value == null) { return this.style.animationPlayState; }
         this.style.animationPlayState = value;
@@ -6251,20 +6154,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Animation Timing Function
-     * @desc: Specifies the speed curve of an animation. The equivalent of CSS attribute `animationTimingFunction`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     animation_timing_function(): string;
     animation_timing_function(value: string): this;
+    /**
+     * {Animation Timing Function}
+     * Specifies the speed curve of an animation. The equivalent of CSS attribute `animationTimingFunction`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     animation_timing_function(value?: string): string | this {
         if (value == null) { return this.style.animationTimingFunction; }
         this.style.animationTimingFunction = value;
@@ -6275,40 +6173,30 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Aspect ratio
-     * @desc: Specifies preferred aspect ratio of an element. The equivalent of CSS attribute `aspectRatio`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     aspect_ratio(): string;
     aspect_ratio(value: string): this;
+    /**
+     * {Aspect ratio}
+     * Specifies preferred aspect ratio of an element. The equivalent of CSS attribute `aspectRatio`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     aspect_ratio(value?: string): this | string {
         if (value == null) { return this.style.aspectRatio; }
         this.style.aspectRatio = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Backdrop Filter
-     * @desc: Defines a graphical effect to the area behind an element. The equivalent of CSS attribute `backdropFilter`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     backdrop_filter(): string;
     backdrop_filter(value: string): this;
+    /**
+     * {Backdrop Filter}
+     * Defines a graphical effect to the area behind an element. The equivalent of CSS attribute `backdropFilter`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     backdrop_filter(value?: string): string | this {
         if (value == null) { return this.style.backdropFilter; }
         this.style.backdropFilter = value;
@@ -6319,21 +6207,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Backface Visibility
-     * @desc: Defines whether or not the back face of an element should be visible when facing the user. 
-     *        The equivalent of CSS attribute `backfaceVisibility`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     backface_visibility(): string;
     backface_visibility(value: string): this;
+    /**
+     * {Backface Visibility}
+     * Defines whether or not the back face of an element should be visible when facing the user.
+     * The equivalent of CSS attribute `backfaceVisibility`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     backface_visibility(value?: string): string | this {
         if (value == null) { return this.style.backfaceVisibility; }
         this.style.backfaceVisibility = value;
@@ -6344,62 +6227,47 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Attachment
-     * @desc: Sets whether a background image scrolls with the rest of the page, or is fixed. 
-     *        The equivalent of CSS attribute `backgroundAttachment`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     background_attachment(): string;
     background_attachment(value: string): this;
+    /**
+     * {Background Attachment}
+     * Sets whether a background image scrolls with the rest of the page, or is fixed.
+     * The equivalent of CSS attribute `backgroundAttachment`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     background_attachment(value?: string): string | this {
         if (value == null) { return this.style.backgroundAttachment; }
         this.style.backgroundAttachment = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Blend Mode
-     * @desc: Specifies the blending mode of each background layer (color/image). The equivalent of CSS attribute `backgroundBlendMode`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     background_blend_mode(): string;
     background_blend_mode(value: string): this;
+    /**
+     * {Background Blend Mode}
+     * Specifies the blending mode of each background layer (color/image). The equivalent of CSS attribute `backgroundBlendMode`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     background_blend_mode(value?: string): string | this {
         if (value == null) { return this.style.backgroundBlendMode; }
         this.style.backgroundBlendMode = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Clip
-     * @desc: Defines how far the background (color or image) should extend within an element. 
-     *        The equivalent of CSS attribute `backgroundClip`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     background_clip(): string;
     background_clip(value: string): this;
+    /**
+     * {Background Clip}
+     * Defines how far the background (color or image) should extend within an element.
+     * The equivalent of CSS attribute `backgroundClip`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     background_clip(value?: string): string | this {
         if (value == null) { return this.style.backgroundClip; }
         this.style.backgroundClip = value;
@@ -6410,60 +6278,46 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Color
-     * @desc: Specifies the background color of an element. The equivalent of CSS attribute `backgroundColor`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     background_color(): string;
     background_color(value: string): this;
+    /**
+     * {Background Color}
+     * Specifies the background color of an element. The equivalent of CSS attribute `backgroundColor`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     background_color(value?: string): string | this {
         if (value == null) { return this.style.backgroundColor; }
         this.style.backgroundColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Image
-     * @desc: Specifies one or more background images for an element. 
-     *        The equivalent of CSS attribute `backgroundImage`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     background_image(): string;
     background_image(value: string): this;
+    /**
+     * {Background Image}
+     * Specifies one or more background images for an element.
+     * The equivalent of CSS attribute `backgroundImage`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     background_image(value?: string): string | this {
         if (value == null) { return this.style.backgroundImage; }
         this.style.backgroundImage = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Origin
-     * @desc: Specifies the origin position of a background image, equivalent to the CSS attribute `backgroundOrigin`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign for the background origin. Leave `null` to retrieve the attribute's current value.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining unless `value` is `null`, then the current attribute value is returned.
-     * @funcs: 2
-     */
     background_origin(): string;
     background_origin(value: string): this;
+    /**
+     * {Background Origin}
+     * Specifies the origin position of a background image, equivalent to the CSS attribute `backgroundOrigin`.
+     * @param value The value to assign for the background origin. Leave `null` to retrieve the attribute's current value.
+     * @returns r: Returns the instance of the element for chaining unless `value` is `null`, then the current attribute value is returned.
+     * @docs
+     */
     background_origin(value?: string): string | this {
         if (value == null) { return this.style.backgroundOrigin; }
         this.style.backgroundOrigin = value;
@@ -6474,101 +6328,76 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Position
-     * @desc: Specifies the position of a background image, equivalent to the CSS attribute `backgroundPosition`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     background_position(): string;
     background_position(value: string): this;
+    /**
+     * {Background Position}
+     * Specifies the position of a background image, equivalent to the CSS attribute `backgroundPosition`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     background_position(value?: string): string | this {
         if (value == null) { return this.style.backgroundPosition; }
         this.style.backgroundPosition = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Position X
-     * @desc: Specifies the position of a background image on x-axis. 
-     *        The equivalent of CSS attribute `backgroundPositionX`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     background_position_x(): string;
     background_position_x(value: string | number): this;
+    /**
+     * {Background Position X}
+     * Specifies the position of a background image on x-axis.
+     * The equivalent of CSS attribute `backgroundPositionX`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     background_position_x(value?: string | number): string | this {
         if (value == null) { return this.style.backgroundPositionX; }
         this.style.backgroundPositionX = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Position Y
-     * @desc: Specifies the position of a background image on the y-axis, equivalent to the CSS attribute `backgroundPositionY`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     background_position_y(): string;
     background_position_y(value: string | number): this;
+    /**
+     * {Background Position Y}
+     * Specifies the position of a background image on the y-axis, equivalent to the CSS attribute `backgroundPositionY`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     background_position_y(value?: string | number): this | string {
         if (value == null) { return this.style.backgroundPositionY; }
         this.style.backgroundPositionY = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Repeat
-     * @desc: Sets if/how a background image will be repeated. This corresponds to the CSS property `backgroundRepeat`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
-     * @funcs: 2
-     */
     background_repeat(): string;
     background_repeat(value: string): this;
+    /**
+     * {Background Repeat}
+     * Sets if/how a background image will be repeated. This corresponds to the CSS property `backgroundRepeat`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @docs
+     */
     background_repeat(value?: string): string | this {
         if (value == null) { return this.style.backgroundRepeat; }
         this.style.backgroundRepeat = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Background Size
-     * @desc: Specifies the size of the background images. The equivalent of CSS attribute `backgroundSize`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     background_size(): string;
     background_size(value: string | number): this;
+    /**
+     * {Background Size}
+     * Specifies the size of the background images. The equivalent of CSS attribute `backgroundSize`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     background_size(value?: string | number): string | this {
         if (value == null) { return this.style.backgroundSize; }
         this.style.backgroundSize = this.pad_numeric(value);
@@ -6579,21 +6408,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Block size
-     * @desc: Specifies the size of an element in block direction. 
-     *        The equivalent of CSS attribute `blockSize`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     block_size(): string;
     block_size(value: string | number): this;
+    /**
+     * {Block size}
+     * Specifies the size of an element in block direction.
+     * The equivalent of CSS attribute `blockSize`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     block_size(value?: string | number): string | this {
         if (value == null) { return this.style.blockSize; }
         this.style.blockSize = this.pad_numeric(value);
@@ -6607,370 +6431,283 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Border Block
-     * @desc: A shorthand property for border-block-width, border-block-style and border-block-color.
-     *        The equivalent of CSS attribute `borderBlock`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_block(): string;
     border_block(value: string): this | string;
+    /**
+     * {Border Block}
+     * A shorthand property for border-block-width, border-block-style and border-block-color.
+     * The equivalent of CSS attribute `borderBlock`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_block(value?: string): this | string {
         if (value == null) { return this.style.borderBlock; }
         this.style.borderBlock = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Block Color
-     * @desc: Sets the color of the borders at start and end in the block direction. 
-     *        The equivalent of CSS attribute `borderBlockColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     border_block_color(): string;
     border_block_color(value: string): this;
+    /**
+     * {Border Block Color}
+     * Sets the color of the borders at start and end in the block direction.
+     * The equivalent of CSS attribute `borderBlockColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     border_block_color(value?: string): string | this {
         if (value == null) { return this.style.borderBlockColor; }
         this.style.borderBlockColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Block End Color
-     * @desc: Sets the color of the border at the end in the block direction. The equivalent of CSS attribute `borderBlockEndColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_block_end_color(): string;
     border_block_end_color(value: string): this;
+    /**
+     * {Border Block End Color}
+     * Sets the color of the border at the end in the block direction. The equivalent of CSS attribute `borderBlockEndColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_block_end_color(value?: string): string | this {
         if (value == null) { return this.style.borderBlockEndColor; }
         this.style.borderBlockEndColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Block End Style
-     * @desc: Sets the style of the border at the end in the block direction. 
-     *        The equivalent of CSS attribute `borderBlockEndStyle`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     border_block_end_style(): string;
     border_block_end_style(value: string): this;
+    /**
+     * {Border Block End Style}
+     * Sets the style of the border at the end in the block direction.
+     * The equivalent of CSS attribute `borderBlockEndStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     border_block_end_style(value?: string): string | this {
         if (value == null) { return this.style.borderBlockEndStyle; }
         this.style.borderBlockEndStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Block End Width
-     * @desc: Sets the width of the border at the end in the block direction. 
-     *        The equivalent of CSS attribute `borderBlockEndWidth`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     border_block_end_width(): string;
     border_block_end_width(value: string | number): this;
+    /**
+     * {Border Block End Width}
+     * Sets the width of the border at the end in the block direction.
+     * The equivalent of CSS attribute `borderBlockEndWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     border_block_end_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderBlockEndWidth; }
         this.style.borderBlockEndWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Block Start Color
-     * @desc: Sets the color of the border at the start in the block direction. 
-     *        The equivalent of CSS attribute `borderBlockStartColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_block_start_color(): string;
     border_block_start_color(value: string): this;
+    /**
+     * {Border Block Start Color}
+     * Sets the color of the border at the start in the block direction.
+     * The equivalent of CSS attribute `borderBlockStartColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_block_start_color(value?: string): string | this {
         if (value == null) { return this.style.borderBlockStartColor; }
         this.style.borderBlockStartColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Block Start Style
-     * @desc: Sets the style of the border at the start in the block direction. 
-     * The equivalent of CSS attribute `borderBlockStartStyle`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     border_block_start_style(): string;
     border_block_start_style(value: string): this;
+    /**
+     * {Border Block Start Style}
+     * Sets the style of the border at the start in the block direction.
+     * The equivalent of CSS attribute `borderBlockStartStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     border_block_start_style(value?: string): string | this {
         if (value == null) { return this.style.borderBlockStartStyle; }
         this.style.borderBlockStartStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Block Start Width
-     * @desc: Sets the width of the border at the start in the block direction. The equivalent of CSS attribute `borderBlockStartWidth`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_block_start_width(): string;
     border_block_start_width(value: string | number): this;
+    /**
+     * {Border Block Start Width}
+     * Sets the width of the border at the start in the block direction. The equivalent of CSS attribute `borderBlockStartWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_block_start_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderBlockStartWidth; }
         this.style.borderBlockStartWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Block Style
-     * @desc: Sets the style of the borders at start and end in the block direction. 
-     *        The equivalent of CSS attribute `borderBlockStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_block_style(): string;
     border_block_style(value: string): this;
+    /**
+     * {Border Block Style}
+     * Sets the style of the borders at start and end in the block direction.
+     * The equivalent of CSS attribute `borderBlockStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_block_style(value?: string): string | this {
         if (value == null) { return this.style.borderBlockStyle; }
         this.style.borderBlockStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Block Width
-     * @desc: Sets the width of the borders at start and end in the block direction. 
-     *        The equivalent of CSS attribute `borderBlockWidth`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_block_width(): string;
     border_block_width(value: string | number): this;
+    /**
+     * {Border Block Width}
+     * Sets the width of the borders at start and end in the block direction.
+     * The equivalent of CSS attribute `borderBlockWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_block_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderBlockWidth; }
         this.style.borderBlockWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Bottom Color
-     * @desc: Sets the color of the bottom border. The equivalent of CSS attribute `borderBottomColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_bottom_color(): string;
     border_bottom_color(value: string): this;
+    /**
+     * {Border Bottom Color}
+     * Sets the color of the bottom border. The equivalent of CSS attribute `borderBottomColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_bottom_color(value?: string): string | this {
         if (value == null) { return this.style.borderBottomColor; }
         this.style.borderBottomColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Bottom Left Radius
-     * @desc: Defines the radius of the border of the bottom-left corner. 
-     *        The equivalent of CSS attribute `borderBottomLeftRadius`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     border_bottom_left_radius(): string;
     border_bottom_left_radius(value: string | number): this;
+    /**
+     * {Border Bottom Left Radius}
+     * Defines the radius of the border of the bottom-left corner.
+     * The equivalent of CSS attribute `borderBottomLeftRadius`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     border_bottom_left_radius(value?: string | number): string | this {
         if (value == null) { return this.style.borderBottomLeftRadius; }
         this.style.borderBottomLeftRadius = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Bottom Right Radius
-     * @desc: Defines the radius of the border of the bottom-right corner. 
-     *        The equivalent of CSS attribute `borderBottomRightRadius`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     border_bottom_right_radius(): string;
     border_bottom_right_radius(value: string | number): this;
+    /**
+     * {Border Bottom Right Radius}
+     * Defines the radius of the border of the bottom-right corner.
+     * The equivalent of CSS attribute `borderBottomRightRadius`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     border_bottom_right_radius(value?: string | number): string | this {
         if (value == null) { return this.style.borderBottomRightRadius; }
         this.style.borderBottomRightRadius = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Bottom Style
-     * @desc: Sets the style of the bottom border, equivalent to the CSS attribute `borderBottomStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_bottom_style(): string;
     border_bottom_style(value: string): this;
+    /**
+     * {Border Bottom Style}
+     * Sets the style of the bottom border, equivalent to the CSS attribute `borderBottomStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_bottom_style(value?: string): string | this {
         if (value == null) { return this.style.borderBottomStyle; }
         this.style.borderBottomStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Bottom Width
-     * @desc: Sets the width of the bottom border. The equivalent of CSS attribute `borderBottomWidth`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_bottom_width(): string;
     border_bottom_width(value: string | number): this;
+    /**
+     * {Border Bottom Width}
+     * Sets the width of the bottom border. The equivalent of CSS attribute `borderBottomWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_bottom_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderBottomWidth; }
         this.style.borderBottomWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Collapse
-     * @desc: Sets whether table borders should collapse into a single border or be separated. 
-     * The equivalent of CSS attribute `borderCollapse`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_collapse(): string;
     border_collapse(value: string): this;
+    /**
+     * {Border Collapse}
+     * Sets whether table borders should collapse into a single border or be separated.
+     * The equivalent of CSS attribute `borderCollapse`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_collapse(value?: string): string | this {
         if (value == null) { return this.style.borderCollapse; }
         this.style.borderCollapse = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Color
-     * @desc: Sets the color of the four borders. This is equivalent to the CSS attribute `borderColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. Unless parameter `value` is `null`, 
-     *                  then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_color(): string;
     border_color(value: string): this;
+    /**
+     * {Border Color}
+     * Sets the color of the four borders. This is equivalent to the CSS attribute `borderColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`,
+     * then the attribute's value is returned.
+     * @docs
+     */
     border_color(value?: string): string | this {
         if (value == null) { return this.style.borderColor; }
         this.style.borderColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Image
-     * @desc: A shorthand property for all the border-image properties. 
-     *        The equivalent of CSS attribute `borderImage`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_image(): string;
     border_image(value: string): this;
+    /**
+     * {Border Image}
+     * A shorthand property for all the border-image properties.
+     * The equivalent of CSS attribute `borderImage`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_image(value?: string): string | this {
         if (value == null) { return this.style.borderImage; }
         this.style.borderImage = value;
@@ -6981,392 +6718,294 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border image outset
-     * @desc: Specifies the amount by which the border image area extends beyond the border box. The equivalent of CSS attribute `borderImageOutset`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_image_outset(): string;
     border_image_outset(value: string | number): this;
+    /**
+     * {Border image outset}
+     * Specifies the amount by which the border image area extends beyond the border box. The equivalent of CSS attribute `borderImageOutset`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_image_outset(value?: string | number): string | this {
         if (value == null) { return this.style.borderImageOutset; }
         this.style.borderImageOutset = value as string;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Image Repeat
-     * @desc: Specifies whether the border image should be repeated, rounded or stretched. 
-     *        The equivalent of CSS attribute `borderImageRepeat`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_image_repeat(): string;
     border_image_repeat(value: string): this;
+    /**
+     * {Border Image Repeat}
+     * Specifies whether the border image should be repeated, rounded or stretched.
+     * The equivalent of CSS attribute `borderImageRepeat`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_image_repeat(value?: string): string | this {
         if (value == null) { return this.style.borderImageRepeat; }
         this.style.borderImageRepeat = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Image Slice
-     * @desc: Specifies how to slice the border image, equivalent to the CSS attribute `borderImageSlice`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_image_slice(): string;
     border_image_slice(value: string | number): this;
+    /**
+     * {Border Image Slice}
+     * Specifies how to slice the border image, equivalent to the CSS attribute `borderImageSlice`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_image_slice(value?: string | number): string | this {
         if (value == null) { return this.style.borderImageSlice; }
         this.style.borderImageSlice = value as string;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Image Source
-     * @desc: Specifies the path to the image to be used as a border. 
-     *        The equivalent of CSS attribute `borderImageSource`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_image_source(): string;
     border_image_source(value: string): this;
+    /**
+     * {Border Image Source}
+     * Specifies the path to the image to be used as a border.
+     * The equivalent of CSS attribute `borderImageSource`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_image_source(value?: string): string | this {
         if (value == null) { return this.style.borderImageSource; }
         this.style.borderImageSource = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Image Width
-     * @desc: Specifies the width of the border image, equivalent to the CSS attribute `borderImageWidth`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
-     * @funcs: 2
-     */
     border_image_width(): string;
     border_image_width(value: string | number): this;
+    /**
+     * {Border Image Width}
+     * Specifies the width of the border image, equivalent to the CSS attribute `borderImageWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
+     * @docs
+     */
     border_image_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderImageWidth; }
         this.style.borderImageWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border inline
-     * @desc: A shorthand property for border-inline-width, border-inline-style and border-inline-color. 
-     *        The equivalent of CSS attribute `borderInline`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_inline(): string;
     border_inline(value: string | number): this;
+    /**
+     * {Border inline}
+     * A shorthand property for border-inline-width, border-inline-style and border-inline-color.
+     * The equivalent of CSS attribute `borderInline`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_inline(value?: string | number): string | this {
         if (value == null) { return this.style.borderInline; }
         this.style.borderInline = value as string;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Inline Color
-     * @desc: Sets the color of the borders at start and end in the inline direction. 
-     *        The equivalent of CSS attribute `borderInlineColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_inline_color(): string;
     border_inline_color(value: string): this;
+    /**
+     * {Border Inline Color}
+     * Sets the color of the borders at start and end in the inline direction.
+     * The equivalent of CSS attribute `borderInlineColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_inline_color(value?: string): string | this {
         if (value == null) { return this.style.borderInlineColor; }
         this.style.borderInlineColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Inline End Color
-     * @desc: Sets the color of the border at the end in the inline direction. 
-     * The equivalent of CSS attribute `borderInlineEndColor`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_inline_end_color(): string;
     border_inline_end_color(value: string): this;
+    /**
+     * {Border Inline End Color}
+     * Sets the color of the border at the end in the inline direction.
+     * The equivalent of CSS attribute `borderInlineEndColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_inline_end_color(value?: string): string | this {
         if (value == null) { return this.style.borderInlineEndColor; }
         this.style.borderInlineEndColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Inline End Style
-     * @desc: Sets the style of the border at the end in the inline direction. 
-     *        The equivalent of CSS attribute `borderInlineEndStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_inline_end_style(): string;
     border_inline_end_style(value: string): this;
+    /**
+     * {Border Inline End Style}
+     * Sets the style of the border at the end in the inline direction.
+     * The equivalent of CSS attribute `borderInlineEndStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_inline_end_style(value?: string): string | this {
         if (value == null) { return this.style.borderInlineEndStyle; }
         this.style.borderInlineEndStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Inline End Width
-     * @desc: Sets the width of the border at the end in the inline direction. 
-     * The equivalent of CSS attribute `borderInlineEndWidth`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_inline_end_width(): string;
     border_inline_end_width(value: string | number): this;
+    /**
+     * {Border Inline End Width}
+     * Sets the width of the border at the end in the inline direction.
+     * The equivalent of CSS attribute `borderInlineEndWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_inline_end_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderInlineEndWidth; }
         this.style.borderInlineEndWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border inline start color
-     * @desc: Sets the color of the border at the start in the inline direction. The equivalent of CSS attribute `borderInlineStartColor`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_inline_start_color(): string;
     border_inline_start_color(value: string): this;
+    /**
+     * {Border inline start color}
+     * Sets the color of the border at the start in the inline direction. The equivalent of CSS attribute `borderInlineStartColor`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_inline_start_color(value?: string): string | this {
         if (value == null) { return this.style.borderInlineStartColor; }
         this.style.borderInlineStartColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border inline start style
-     * @desc: Sets the style of the border at the start in the inline direction.
-     *        The equivalent of CSS attribute `borderInlineStartStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_inline_start_style(): string;
     border_inline_start_style(value: string): this;
+    /**
+     * {Border inline start style}
+     * Sets the style of the border at the start in the inline direction.
+     * The equivalent of CSS attribute `borderInlineStartStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_inline_start_style(value?: string): string | this {
         if (value == null) { return this.style.borderInlineStartStyle; }
         this.style.borderInlineStartStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Inline Start Width
-     * @desc: Sets the width of the border at the start in the inline direction. 
-     * The equivalent of CSS attribute `borderInlineStartWidth`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type number | null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_inline_start_width(): string;
     border_inline_start_width(value: string | number): this;
+    /**
+     * {Border Inline Start Width}
+     * Sets the width of the border at the start in the inline direction.
+     * The equivalent of CSS attribute `borderInlineStartWidth`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_inline_start_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderInlineStartWidth; }
         this.style.borderInlineStartWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Inline Style
-     * @desc: Sets the style of the borders at start and end in the inline direction. 
-     * The equivalent of CSS attribute `borderInlineStyle`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_inline_style(): string;
     border_inline_style(value: string): this;
+    /**
+     * {Border Inline Style}
+     * Sets the style of the borders at start and end in the inline direction.
+     * The equivalent of CSS attribute `borderInlineStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_inline_style(value?: string): string | this {
         if (value == null) { return this.style.borderInlineStyle; }
         this.style.borderInlineStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Inline Width
-     * @desc: Sets the width of the borders at start and end in the inline direction. 
-     *        The equivalent of CSS attribute `borderInlineWidth`. 
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_inline_width(): string;
     border_inline_width(value: string | number): this;
+    /**
+     * {Border Inline Width}
+     * Sets the width of the borders at start and end in the inline direction.
+     * The equivalent of CSS attribute `borderInlineWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_inline_width(value?: string | number): this | string {
         if (value == null) { return this.style.borderInlineWidth; }
         this.style.borderInlineWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Left Color
-     * @desc: Sets the color of the left border. The equivalent of CSS attribute `borderLeftColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_left_color(): string;
     border_left_color(value: string): this;
+    /**
+     * {Border Left Color}
+     * Sets the color of the left border. The equivalent of CSS attribute `borderLeftColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_left_color(value?: string): string | this {
         if (value == null) { return this.style.borderLeftColor; }
         this.style.borderLeftColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Left Style
-     * @desc: Sets the style of the left border. The equivalent of CSS attribute `borderLeftStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_left_style(): string;
     border_left_style(value: string): this;
+    /**
+     * {Border Left Style}
+     * Sets the style of the left border. The equivalent of CSS attribute `borderLeftStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_left_style(value?: string): string | this {
         if (value == null) { return this.style.borderLeftStyle; }
         this.style.borderLeftStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Left Width
-     * @desc: Sets the width of the left border. The equivalent of CSS attribute `borderLeftWidth`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_left_width(): string;
     border_left_width(value: string | number): this;
+    /**
+     * {Border Left Width}
+     * Sets the width of the left border. The equivalent of CSS attribute `borderLeftWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_left_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderLeftWidth; }
         this.style.borderLeftWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border radius
-     * @desc: A shorthand property for the four border-radius properties. The equivalent of CSS attribute `borderRadius`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_radius(): string;
     border_radius(value: string | number): this;
+    /**
+     * {Border radius}
+     * A shorthand property for the four border-radius properties. The equivalent of CSS attribute `borderRadius`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_radius(value?: string | number): string | this {
         if (value == null) { return this.style.borderRadius; }
         this.style.borderRadius = this.pad_numeric(value);
@@ -7377,305 +7016,230 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Right Color
-     * @desc: Sets the color of the right border. This is equivalent to the CSS attribute `borderRightColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_right_color(): string;
     border_right_color(value: string): this;
+    /**
+     * {Border Right Color}
+     * Sets the color of the right border. This is equivalent to the CSS attribute `borderRightColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_right_color(value?: string): string | this {
         if (value == null) { return this.style.borderRightColor; }
         this.style.borderRightColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Right Style
-     * @desc: Sets the style of the right border. The equivalent of CSS attribute `borderRightStyle`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_right_style(): string;
     border_right_style(value: string): this;
+    /**
+     * {Border Right Style}
+     * Sets the style of the right border. The equivalent of CSS attribute `borderRightStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_right_style(value?: string): string | this {
         if (value == null) { return this.style.borderRightStyle; }
         this.style.borderRightStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Right Width
-     * @desc: Sets the width of the right border. The equivalent of CSS attribute `borderRightWidth`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_right_width(): string;
     border_right_width(value: string | number): this;
+    /**
+     * {Border Right Width}
+     * Sets the width of the right border. The equivalent of CSS attribute `borderRightWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_right_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderRightWidth; }
         this.style.borderRightWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Spacing
-     * @desc: Sets the distance between the borders of adjacent cells. 
-     * The equivalent of CSS attribute `borderSpacing`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_spacing(): string;
     border_spacing(value: string | number): this;
+    /**
+     * {Border Spacing}
+     * Sets the distance between the borders of adjacent cells.
+     * The equivalent of CSS attribute `borderSpacing`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_spacing(value?: string | number): string | this {
         if (value == null) { return this.style.borderSpacing; }
         this.style.borderSpacing = value as string;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Style
-     * @desc: Sets the style of the four borders. The equivalent of CSS attribute `borderStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
-     * @funcs: 2
-     */
     border_style(): string;
     border_style(value: string): this;
+    /**
+     * {Border Style}
+     * Sets the style of the four borders. The equivalent of CSS attribute `borderStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
+     * @docs
+     */
     border_style(value?: string): string | this {
         if (value == null) { return this.style.borderStyle; }
         this.style.borderStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Top Color
-     * @desc: Sets the color of the top border. The equivalent of CSS attribute `borderTopColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_top_color(): string;
     border_top_color(value: string): this;
+    /**
+     * {Border Top Color}
+     * Sets the color of the top border. The equivalent of CSS attribute `borderTopColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_top_color(value?: string): string | this {
         if (value == null) { return this.style.borderTopColor; }
         this.style.borderTopColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Top Left Radius
-     * @desc: Defines the radius of the border of the top-left corner. The equivalent of CSS attribute `borderTopLeftRadius`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_top_left_radius(): string;
     border_top_left_radius(value: string | number): this;
+    /**
+     * {Border Top Left Radius}
+     * Defines the radius of the border of the top-left corner. The equivalent of CSS attribute `borderTopLeftRadius`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_top_left_radius(value?: string | number): string | this {
         if (value == null) { return this.style.borderTopLeftRadius; }
         this.style.borderTopLeftRadius = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Top Right Radius
-     * @desc: Defines the radius of the border of the top-right corner. 
-     *        The equivalent of CSS attribute `borderTopRightRadius`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
-     * @funcs: 2
-     */
     border_top_right_radius(): string;
     border_top_right_radius(value: string | number): this;
+    /**
+     * {Border Top Right Radius}
+     * Defines the radius of the border of the top-right corner.
+     * The equivalent of CSS attribute `borderTopRightRadius`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
+     * @docs
+     */
     border_top_right_radius(value?: string | number): string | this {
         if (value == null) { return this.style.borderTopRightRadius; }
         this.style.borderTopRightRadius = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Top Style
-     * @desc: Sets the style of the top border. The equivalent of CSS attribute `borderTopStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_top_style(): string;
     border_top_style(value: string): this;
+    /**
+     * {Border Top Style}
+     * Sets the style of the top border. The equivalent of CSS attribute `borderTopStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     border_top_style(value?: string): string | this {
         if (value == null) { return this.style.borderTopStyle; }
         this.style.borderTopStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Top Width
-     * @desc: Sets the width of the top border, equivalent to the CSS attribute `borderTopWidth`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
-     * @funcs: 2
-     */
     border_top_width(): string;
     border_top_width(value: string | number): this;
+    /**
+     * {Border Top Width}
+     * Sets the width of the top border, equivalent to the CSS attribute `borderTopWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
+     * @docs
+     */
     border_top_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderTopWidth; }
         this.style.borderTopWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border Width
-     * @desc: Sets the width of the four borders, equivalent to the CSS attribute `borderWidth`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless the parameter `value` is `null`, 
-     *                  then the attribute's value is returned.
-     * @funcs: 2
-     */
     border_width(): string;
     border_width(value: string | number): this;
+    /**
+     * {Border Width}
+     * Sets the width of the four borders, equivalent to the CSS attribute `borderWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless the parameter `value` is `null`,
+     * then the attribute's value is returned.
+     * @docs
+     */
     border_width(value?: string | number): string | this {
         if (value == null) { return this.style.borderWidth; }
         this.style.borderWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Bottom
-     * @desc: Sets the elements position, from the bottom of its parent element. 
-     *        The equivalent of CSS attribute `bottom`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     bottom(): string;
     bottom(value: string | number): this;
+    /**
+     * {Bottom}
+     * Sets the elements position, from the bottom of its parent element.
+     * The equivalent of CSS attribute `bottom`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     bottom(value?: string | number): string | this {
         if (value == null) { return this.style.bottom; }
         this.style.bottom = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Box decoration break
-     * @desc: Sets the behavior of the background and border of an element at page-break, or, for in-line elements, at line-break. The equivalent of CSS attribute `boxDecorationBreak`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
-     * @funcs: 2
-     */
     box_decoration_break(): string;
     box_decoration_break(value: string): this;
+    /**
+     * {Box decoration break}
+     * Sets the behavior of the background and border of an element at page-break, or, for in-line elements, at line-break. The equivalent of CSS attribute `boxDecorationBreak`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @docs
+     */
     box_decoration_break(value?: string): string | this {
         if (value == null) { return (this.style as any).boxDecorationBreak ?? ""; }
         (this.style as any).boxDecorationBreak = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Box reflect
-     * @desc: The box-reflect property is used to create a reflection of an element. 
-     *        The equivalent of CSS attribute `boxReflect`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     box_reflect(): string;
     box_reflect(value: string): this;
+    /**
+     * {Box reflect}
+     * The box-reflect property is used to create a reflection of an element.
+     * The equivalent of CSS attribute `boxReflect`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     box_reflect(value?: string): string | this {
         if (value == null) { return (this.style as any).boxReflect; }
         (this.style as any).boxReflect = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Box shadow
-     * @desc: Attaches one or more shadows to an element. The equivalent of CSS attribute `boxShadow`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, 
-     *                  then the attribute's value is returned.
-     * @funcs: 2
-     */
     box_shadow(): string;
     box_shadow(value: string): this;
+    /**
+     * {Box shadow}
+     * Attaches one or more shadows to an element. The equivalent of CSS attribute `boxShadow`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`,
+     * then the attribute's value is returned.
+     * @docs
+     */
     box_shadow(value?: string): string | this {
         if (value == null) { return this.style.boxShadow; }
         this.style.boxShadow = value;
@@ -7686,19 +7250,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Box sizing
-     * @desc: Defines how the width and height of an element are calculated: should they include padding and borders, or not. The equivalent of CSS attribute `boxSizing`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     box_sizing(): string;
     box_sizing(value: string): this;
+    /**
+     * {Box sizing}
+     * Defines how the width and height of an element are calculated: should they include padding and borders, or not. The equivalent of CSS attribute `boxSizing`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     box_sizing(value?: string): string | this {
         if (value == null) { return this.style.boxSizing; }
         this.style.boxSizing = value;
@@ -7709,144 +7269,106 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Break After
-     * @desc: Specifies whether or not a page-, column-, or region-break should occur after the specified element. The equivalent of CSS attribute `breakAfter`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     break_after(): string | this;
     break_after(value: string): this;
+    /**
+     * {Break After}
+     * Specifies whether or not a page-, column-, or region-break should occur after the specified element. The equivalent of CSS attribute `breakAfter`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     break_after(value?: string): string | this {
         if (value == null) { return this.style.breakAfter; }
         this.style.breakAfter = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Break Before
-     * @description: 
-     *     Specifies whether or not a page-, column-, or region-break should occur before the specified element.
-     *     The equivalent of CSS attribute `breakBefore`.
-     *     
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     break_before(): string;
     break_before(value: string): this;
+    /**
+     * {Break Before}
+     * Specifies whether or not a page-, column-, or region-break should occur before the specified element.
+     * The equivalent of CSS attribute `breakBefore`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     break_before(value?: string): string | this {
         if (value == null) { return this.style.breakBefore; }
         this.style.breakBefore = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Break Inside
-     * @desc: Specifies whether or not a page-, column-, or region-break should occur inside the specified element. The equivalent of CSS attribute `breakInside`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     break_inside(): string;
     break_inside(value: string): this;
+    /**
+     * {Break Inside}
+     * Specifies whether or not a page-, column-, or region-break should occur inside the specified element. The equivalent of CSS attribute `breakInside`. Returns the attribute value when parameter `value` is `null`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     break_inside(value?: string): string | this {
         if (value == null) { return this.style.breakInside; }
         this.style.breakInside = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Caption Side
-     * @desc: Specifies the placement of a table caption. The equivalent of CSS attribute `captionSide`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     caption_side(): string;
     caption_side(value: string): this;
+    /**
+     * {Caption Side}
+     * Specifies the placement of a table caption. The equivalent of CSS attribute `captionSide`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     caption_side(value?: string): string | this {
         if (value == null) { return this.style.captionSide; }
         this.style.captionSide = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Caret color
-     * @desc: Specifies the color of the cursor (caret) in inputs, textareas, or any element that is editable. 
-     *        The equivalent of CSS attribute `caretColor`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     caret_color(): string;
     caret_color(value: string): this;
+    /**
+     * {Caret color}
+     * Specifies the color of the cursor (caret) in inputs, textareas, or any element that is editable.
+     * The equivalent of CSS attribute `caretColor`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     caret_color(value?: string): string | this {
         if (value == null) { return this.style.caretColor; }
         this.style.caretColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Clear
-     * @desc: Specifies what should happen with the element that is next to a floating element. 
-     *        The equivalent of CSS attribute `clear`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     clear(): string;
     clear(value: string): this;
+    /**
+     * {Clear}
+     * Specifies what should happen with the element that is next to a floating element.
+     * The equivalent of CSS attribute `clear`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     clear(value?: string): string | this {
         if (value == null) { return this.style.clear; }
         this.style.clear = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Clip
-     * @desc: Clips an absolutely positioned element. The equivalent of CSS attribute `clip`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     clip(): string;
     clip(value: string): this;
+    /**
+     * {Clip}
+     * Clips an absolutely positioned element. The equivalent of CSS attribute `clip`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     clip(value?: string): string | this {
         if (value == null) { return this.style.clip; }
         this.style.clip = value;
@@ -7860,21 +7382,16 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Column Count
-     * @desc: Specifies the number of columns an element should be divided into. 
-     *        The equivalent of CSS attribute `columnCount`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     column_count(): null | number;
     column_count(value: string | number): this;
+    /**
+     * {Column Count}
+     * Specifies the number of columns an element should be divided into.
+     * The equivalent of CSS attribute `columnCount`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     column_count(value?: string | number): this | null | number {
         if (value == null) { return this._try_parse_float(this.style.columnCount, null); }
         value = value.toString();
@@ -7886,42 +7403,31 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Column Fill
-     * @description: 
-     *     Specifies how to fill columns, balanced or not. 
-     *     The equivalent of CSS attribute `columnFill`. 
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     column_fill(): string;
     column_fill(value: string): this;
+    /**
+     * {Column Fill}
+     * Specifies how to fill columns, balanced or not.
+     * The equivalent of CSS attribute `columnFill`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     column_fill(value?: string): string | this {
         if (value == null) { return this.style.columnFill; }
         this.style.columnFill = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Column Gap
-     * @desc: Specifies the gap between the columns. The equivalent of CSS attribute `columnGap`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     column_gap(): string;
     column_gap(value: string | number): this;
+    /**
+     * {Column Gap}
+     * Specifies the gap between the columns. The equivalent of CSS attribute `columnGap`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     column_gap(value?: string | number): string | this {
         if (value == null) { return this.style.columnGap; }
         value = this.pad_numeric(value);
@@ -7933,23 +7439,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Column Rule
-     * @description: 
-     *     A shorthand property for all the column-rule properties.
-     *     The equivalent of CSS attribute `columnRule`.
-     *      
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     column_rule(): string;
     column_rule(value: string): this;
+    /**
+     * {Column Rule}
+     * A shorthand property for all the column-rule properties.
+     * The equivalent of CSS attribute `columnRule`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     column_rule(value?: string): string | this {
         if (value == null) { return this.style.columnRule; }
         this.style.columnRule = value;
@@ -7960,20 +7459,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Column Rule Color
-     * @desc: Specifies the color of the rule between columns. This is equivalent to the CSS attribute `columnRuleColor`. 
-     *         Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     column_rule_color(): string;
     column_rule_color(value: string): this;
+    /**
+     * {Column Rule Color}
+     * Specifies the color of the rule between columns. This is equivalent to the CSS attribute `columnRuleColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     column_rule_color(value?: string): string | this {
         if (value == null) { return this.style.columnRuleColor; }
         this.style.columnRuleColor = value;
@@ -7984,20 +7478,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Column Rule Style
-     * @desc: Specifies the style of the rule between columns, equivalent to the CSS attribute `columnRuleStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
-     * @funcs: 2
-     */
     column_rule_style(): string;
     column_rule_style(value: string): this;
+    /**
+     * {Column Rule Style}
+     * Specifies the style of the rule between columns, equivalent to the CSS attribute `columnRuleStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @docs
+     */
     column_rule_style(value?: string): this | string {
         if (value == null) { return this.style.columnRuleStyle; }
         this.style.columnRuleStyle = value;
@@ -8008,20 +7497,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Column Rule Width
-     * @desc: Specifies the width of the rule between columns. This is equivalent to the CSS attribute `columnRuleWidth`. 
-     *         Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
-     * @funcs: 2
-     */
     column_rule_width(): string;
     column_rule_width(value: string | number): this;
+    /**
+     * {Column Rule Width}
+     * Specifies the width of the rule between columns. This is equivalent to the CSS attribute `columnRuleWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @docs
+     */
     column_rule_width(value?: string | number): string | this {
         if (value == null) { return this.style.columnRuleWidth; }
         value = this.pad_numeric(value);
@@ -8033,41 +7517,31 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Column Span
-     * @desc: Specifies how many columns an element should span across. 
-     *        The equivalent of CSS attribute `columnSpan`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     column_span(): null | number;
     column_span(value: number): this;
+    /**
+     * {Column Span}
+     * Specifies how many columns an element should span across.
+     * The equivalent of CSS attribute `columnSpan`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     column_span(value?: number): this | null | number {
         if (value == null) { return this._try_parse_float(this.style.columnSpan, null); }
         this.style.columnSpan = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Column Width
-     * @desc: Specifies the column width, equivalent to the CSS attribute `columnWidth`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     column_width(): string;
     column_width(value: string | number): this;
+    /**
+     * {Column Width}
+     * Specifies the column width, equivalent to the CSS attribute `columnWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     column_width(value?: string | number): string | this {
         if (value == null) { return this.style.columnWidth; }
         value = this.pad_numeric(value);
@@ -8079,39 +7553,30 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Columns
-     * @desc: A shorthand property for column-width and column-count. The equivalent of CSS attribute `columns`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     columns(): string;
     columns(value: string | number): this;
+    /**
+     * {Columns}
+     * A shorthand property for column-width and column-count. The equivalent of CSS attribute `columns`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     columns(value?: string | number): string | this {
         if (value == null) { return this.style.columns; }
         this.style.columns = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Content
-     * @desc: Used with the :before and :after pseudo-elements, to insert generated content. The equivalent of CSS attribute `content`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     content(): string;
     content(value: string | number): this;
+    /**
+     * {Content}
+     * Used with the :before and :after pseudo-elements, to insert generated content. The equivalent of CSS attribute `content`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     content(value?: string | number): string | this {
         if (value == null) {
             return this.style.content ?? "";
@@ -8120,82 +7585,62 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Counter Increment
-     * @desc: Increases or decreases the value of one or more CSS counters. 
-     *        The equivalent of CSS attribute `counterIncrement`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     counter_increment(): string;
     counter_increment(value: string | number): this;
+    /**
+     * {Counter Increment}
+     * Increases or decreases the value of one or more CSS counters.
+     * The equivalent of CSS attribute `counterIncrement`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     counter_increment(value?: string | number): string | this {
         if (value == null) { return this.style.counterIncrement; }
         this.style.counterIncrement = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Counter reset
-     * @desc: Creates or resets one or more CSS counters. The equivalent of CSS attribute `counterReset`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     counter_reset(): string;
     counter_reset(value: string): this;
+    /**
+     * {Counter reset}
+     * Creates or resets one or more CSS counters. The equivalent of CSS attribute `counterReset`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     counter_reset(value?: string): string | this {
         if (value == null) { return this.style.counterReset; }
         this.style.counterReset = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Cursor
-     * @desc: Specifies the mouse cursor to be displayed when pointing over an element. 
-     *        The equivalent of CSS attribute `cursor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     cursor(): string;
     cursor(value: string): this;
+    /**
+     * {Cursor}
+     * Specifies the mouse cursor to be displayed when pointing over an element.
+     * The equivalent of CSS attribute `cursor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     cursor(value?: string): string | this {
         if (value == null) { return this.style.cursor; }
         this.style.cursor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Direction
-     * @desc: Specifies the text direction/writing direction. The equivalent of CSS attribute `direction`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     direction(): string;
     direction(value: string): this;
+    /**
+     * {Direction}
+     * Specifies the text direction/writing direction. The equivalent of CSS attribute `direction`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     direction(value?: string): string | this {
         if (value == null) { return this.style.direction; }
         this.style.direction = value;
@@ -8209,43 +7654,31 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Empty Cells
-     * @desc: Specifies whether or not to display borders and background on empty cells in a table. The equivalent of CSS attribute `emptyCells`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     empty_cells(): string;
     empty_cells(value: string): this;
+    /**
+     * {Empty Cells}
+     * Specifies whether or not to display borders and background on empty cells in a table. The equivalent of CSS attribute `emptyCells`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     empty_cells(value?: string): string | this {
         if (value == null) { return this.style.emptyCells ?? ""; }
         this.style.emptyCells = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Filter
-     * @desc: 
-     * Defines effects (e.g. blurring or color shifting) on an element before the element is displayed.
-     * The equivalent of CSS attribute `filter`.
-     * 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     filter(): string;
     filter(value: string): this;
+    /**
+     * {Filter}
+     * Defines effects (e.g. blurring or color shifting) on an element before the element is displayed.
+     * The equivalent of CSS attribute `filter`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     filter(value?: string): string | this {
         if (value == null) { return this.style.filter; }
         this.style.filter = value;
@@ -8256,21 +7689,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Flex
-     * @description: 
-     *     A shorthand property for the flex-grow, flex-shrink, and the flex-basis properties.
-     *     The equivalent of CSS attribute `flex`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     flex(): string;
     flex(value: boolean | number | string): this;
+    /**
+     * {Flex}
+     * A shorthand property for the flex-grow, flex-shrink, and the flex-basis properties.
+     * The equivalent of CSS attribute `flex`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     flex(value?: boolean | number | string): string | this {
         if (value == null) { return this.style.flex; }
         if (value === true) { value = 1; }
@@ -8284,20 +7712,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Flex Basis
-     * @desc: Specifies the initial length of a flexible item. The equivalent of CSS attribute `flexBasis`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     flex_basis(): string;
     flex_basis(value: string | number): this;
+    /**
+     * {Flex Basis}
+     * Specifies the initial length of a flexible item. The equivalent of CSS attribute `flexBasis`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     flex_basis(value?: string | number): string | this {
         if (value == null) { return this.style.flexBasis; }
         value = value.toString();
@@ -8309,20 +7732,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Flex Direction
-     * @desc: Specifies the direction of the flexible items. This is the equivalent of the CSS attribute `flexDirection`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If `value` is `null`, returns the current attribute's value.
-     * @funcs: 2
-     */
     flex_direction(): string;
     flex_direction(value: string): this;
+    /**
+     * {Flex Direction}
+     * Specifies the direction of the flexible items. This is the equivalent of the CSS attribute `flexDirection`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining. If `value` is `null`, returns the current attribute's value.
+     * @docs
+     */
     flex_direction(value?: string): string | this {
         if (value == null) { return this.style.flexDirection; }
         this.style.flexDirection = value;
@@ -8333,21 +7751,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Flex Flow
-     * @desc: A shorthand property for the flex-direction and the flex-wrap properties. 
-     *        The equivalent of CSS attribute `flexFlow`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     flex_flow(): string;
     flex_flow(value: string): this;
+    /**
+     * {Flex Flow}
+     * A shorthand property for the flex-direction and the flex-wrap properties.
+     * The equivalent of CSS attribute `flexFlow`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     flex_flow(value?: string): string | this {
         if (value == null) { return this.style.flexFlow; }
         this.style.flexFlow = value;
@@ -8358,19 +7771,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Flex Grow
-     * @desc: Specifies how much the item will grow relative to the rest. The equivalent of CSS attribute `flexGrow`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     flex_grow(): null | number;
     flex_grow(value: string | number): this;
+    /**
+     * {Flex Grow}
+     * Specifies how much the item will grow relative to the rest. The equivalent of CSS attribute `flexGrow`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     flex_grow(value?: string | number): null | number | this {
         if (value == null) { return this._try_parse_float(this.style.flexGrow, null); }
         value = value.toString();
@@ -8382,21 +7791,17 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Flex Shrink
-     * @desc: Specifies how the item will shrink relative to the rest. 
-     *        The equivalent of CSS attribute `flexShrink`. 
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute value when parameter `value` is `null`. 
-     *                   Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     flex_shrink(): null | number;
     flex_shrink(value: string | number): this;
+    /**
+     * {Flex Shrink}
+     * Specifies how the item will shrink relative to the rest.
+     * The equivalent of CSS attribute `flexShrink`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute value when parameter `value` is `null`.
+     * Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     flex_shrink(value?: string | number): null | number | this {
         if (value == null) { return this._try_parse_float(this.style.flexShrink, null); }
         value = value.toString();
@@ -8408,20 +7813,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Flex Wrap
-     * @desc: Specifies whether the flexible items should wrap or not. The equivalent of CSS attribute `flexWrap`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     flex_wrap(): string;
     flex_wrap(value: string): this;
+    /**
+     * {Flex Wrap}
+     * Specifies whether the flexible items should wrap or not. The equivalent of CSS attribute `flexWrap`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     flex_wrap(value?: string): string | this {
         if (value == null) { return this.style.flexWrap; }
         this.style.flexWrap = value;
@@ -8432,792 +7832,594 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Float
-     * @desc: Specifies whether an element should float to the left, right, or not at all. 
-     *        The equivalent of CSS attribute `float`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     float(): string;
     float(value: string): this;
+    /**
+     * {Float}
+     * Specifies whether an element should float to the left, right, or not at all.
+     * The equivalent of CSS attribute `float`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     float(value?: string): string | this {
         if (value == null) { return this.style.float; }
         this.style.float = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font
-     * @desc: A shorthand property for the font-style, font-variant, font-weight, font-size/line-height, and the font-family properties. 
-     *        The equivalent of CSS attribute `font`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the instance of the element for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font(): string;
     font(value: string): this;
+    /**
+     * {Font}
+     * A shorthand property for the font-style, font-variant, font-weight, font-size/line-height, and the font-family properties.
+     * The equivalent of CSS attribute `font`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the instance of the element for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font(value?: string): string | this {
         if (value == null) { return this.style.font; }
         this.style.font = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Family
-     * @desc: Specifies the font family for text. This is the equivalent of the CSS attribute `fontFamily`. 
-     *         Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
-     * @funcs: 2
-     */
     font_family(): string;
     font_family(value: string): this;
+    /**
+     * {Font Family}
+     * Specifies the font family for text. This is the equivalent of the CSS attribute `fontFamily`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
+     * @docs
+     */
     font_family(value?: string): this | string {
         if (value == null) { return this.style.fontFamily; }
         this.style.fontFamily = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Feature Settings
-     * @desc: Allows control over advanced typographic features in OpenType fonts. The equivalent of CSS attribute `fontFeatureSettings`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_feature_settings(): string;
     font_feature_settings(value: string): this;
+    /**
+     * {Font Feature Settings}
+     * Allows control over advanced typographic features in OpenType fonts. The equivalent of CSS attribute `fontFeatureSettings`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_feature_settings(value?: string): string | this {
         if (value == null) { return this.style.fontFeatureSettings; }
         this.style.fontFeatureSettings = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Kerning
-     * @desc: Controls the usage of the kerning information (how letters are spaced). The equivalent of CSS attribute `fontKerning`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_kerning(): string;
     font_kerning(value: string): this;
+    /**
+     * {Font Kerning}
+     * Controls the usage of the kerning information (how letters are spaced). The equivalent of CSS attribute `fontKerning`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_kerning(value?: string): string | this {
         if (value == null) { return this.style.fontKerning; }
         this.style.fontKerning = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Language Override
-     * @description: 
-     *     Controls the usage of language-specific glyphs in a typeface.
-     *     The equivalent of CSS attribute `fontLanguageOverride`.
-     *     
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
-     * @funcs: 2
-     */
     font_language_override(): string;
     font_language_override(value: string): this;
+    /**
+     * {Font Language Override}
+     * Controls the usage of language-specific glyphs in a typeface.
+     * The equivalent of CSS attribute `fontLanguageOverride`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
+     * @docs
+     */
     font_language_override(value?: string): string | this {
         if (value == null) { return (this.style as any).fontLanguageOverride; }
         (this.style as any).fontLanguageOverride = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font size
-     * @desc: Specifies the font size of text. The equivalent of CSS attribute `fontSize`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_size(): string;
     font_size(value: string | number): this;
+    /**
+     * {Font size}
+     * Specifies the font size of text. The equivalent of CSS attribute `fontSize`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_size(value?: string | number): string | this {
         if (value == null) { return this.style.fontSize; }
         this.style.fontSize = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Size Adjust
-     * @desc: Preserves the readability of text when font fallback occurs. The equivalent of CSS attribute `fontSizeAdjust`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_size_adjust(): string;
     font_size_adjust(value: string): this;
+    /**
+     * {Font Size Adjust}
+     * Preserves the readability of text when font fallback occurs. The equivalent of CSS attribute `fontSizeAdjust`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_size_adjust(value?: string): string | this {
         if (value == null) { return this.style.fontSizeAdjust; }
         this.style.fontSizeAdjust = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Stretch
-     * @desc: Selects a normal, condensed, or expanded face from a font family. 
-     *        The equivalent of CSS attribute `fontStretch`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_stretch(): string;
     font_stretch(value: string): this;
+    /**
+     * {Font Stretch}
+     * Selects a normal, condensed, or expanded face from a font family.
+     * The equivalent of CSS attribute `fontStretch`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_stretch(value?: string): string | this {
         if (value == null) { return this.style.fontStretch; }
         this.style.fontStretch = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Style
-     * @desc: Specifies the font style for text. The equivalent of CSS attribute `fontStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_style(): string;
     font_style(value: string): this;
+    /**
+     * {Font Style}
+     * Specifies the font style for text. The equivalent of CSS attribute `fontStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_style(value?: string): string | this {
         if (value == null) { return this.style.fontStyle; }
         this.style.fontStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font synthesis
-     * @desc: Controls which missing typefaces (bold or italic) may be synthesized by the browser. The equivalent of CSS attribute `fontSynthesis`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_synthesis(): string;
     font_synthesis(value: string): this;
+    /**
+     * {Font synthesis}
+     * Controls which missing typefaces (bold or italic) may be synthesized by the browser. The equivalent of CSS attribute `fontSynthesis`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_synthesis(value?: string): string | this {
         if (value == null) { return this.style.fontSynthesis; }
         this.style.fontSynthesis = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Variant
-     * @desc: Specifies whether or not a text should be displayed in a small-caps font. The equivalent of CSS attribute `fontVariant`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_variant(): string;
     font_variant(value: string): this;
+    /**
+     * {Font Variant}
+     * Specifies whether or not a text should be displayed in a small-caps font. The equivalent of CSS attribute `fontVariant`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_variant(value?: string): string | this {
         if (value == null) { return this.style.fontVariant; }
         this.style.fontVariant = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font variant alternates
-     * @desc: Controls the usage of alternate glyphs associated to alternative names defined in \@font-feature-values. 
-     *        The equivalent of CSS attribute `fontVariantAlternates`. 
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     font_variant_alternates(): string;
     font_variant_alternates(value: string): this;
+    /**
+     * {Font variant alternates}
+     * Controls the usage of alternate glyphs associated to alternative names defined in \@font-feature-values.
+     * The equivalent of CSS attribute `fontVariantAlternates`.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     font_variant_alternates(value?: string): string | this {
         if (value == null) { return this.style.fontVariantAlternates; }
         this.style.fontVariantAlternates = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Variant Caps
-     * @desc: Controls the usage of alternate glyphs for capital letters. The equivalent of CSS attribute `fontVariantCaps`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_variant_caps(): string;
     font_variant_caps(value: string): this;
+    /**
+     * {Font Variant Caps}
+     * Controls the usage of alternate glyphs for capital letters. The equivalent of CSS attribute `fontVariantCaps`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_variant_caps(value?: string): string | this {
         if (value == null) { return this.style.fontVariantCaps; }
         this.style.fontVariantCaps = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Variant East Asian
-     * @desc: Controls the usage of alternate glyphs for East Asian scripts (e.g Japanese and Chinese).
-     *        The equivalent of CSS attribute `fontVariantEastAsian`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     font_variant_east_asian(): string;
     font_variant_east_asian(value: string): this;
+    /**
+     * {Font Variant East Asian}
+     * Controls the usage of alternate glyphs for East Asian scripts (e.g Japanese and Chinese).
+     * The equivalent of CSS attribute `fontVariantEastAsian`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     font_variant_east_asian(value?: string): string | this {
         if (value == null) { return this.style.fontVariantEastAsian; }
         this.style.fontVariantEastAsian = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Variant Ligatures
-     * @desc: Controls which ligatures and contextual forms are used in textual content of the elements it applies to. The equivalent of CSS attribute `fontVariantLigatures`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_variant_ligatures(): string;
     font_variant_ligatures(value: string): this;
+    /**
+     * {Font Variant Ligatures}
+     * Controls which ligatures and contextual forms are used in textual content of the elements it applies to. The equivalent of CSS attribute `fontVariantLigatures`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_variant_ligatures(value?: string): string | this {
         if (value == null) { return this.style.fontVariantLigatures; }
         this.style.fontVariantLigatures = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Variant Numeric
-     * @description: 
-     *      Controls the usage of alternate glyphs for numbers, fractions, and ordinal markers.
-     *      The equivalent of CSS attribute `fontVariantNumeric`.
-     *      
-     *      Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_variant_numeric(): string;
     font_variant_numeric(value: string): this;
+    /**
+     * {Font Variant Numeric}
+     * Controls the usage of alternate glyphs for numbers, fractions, and ordinal markers.
+     * The equivalent of CSS attribute `fontVariantNumeric`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_variant_numeric(value?: string): string | this {
         if (value == null) { return this.style.fontVariantNumeric; }
         this.style.fontVariantNumeric = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Variant Position
-     * @description: 
-     *     Controls the usage of alternate glyphs of smaller size positioned as superscript or subscript regarding the baseline of the font.
-     *     The equivalent of CSS attribute `fontVariantPosition`.
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     font_variant_position(): string;
     font_variant_position(value: string): this;
+    /**
+     * {Font Variant Position}
+     * Controls the usage of alternate glyphs of smaller size positioned as superscript or subscript regarding the baseline of the font.
+     * The equivalent of CSS attribute `fontVariantPosition`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     font_variant_position(value?: string): string | this {
         if (value == null) { return this.style.fontVariantPosition; }
         this.style.fontVariantPosition = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Font Weight
-     * @desc: Specifies the weight of a font, equivalent to the CSS attribute `fontWeight`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
-     * @funcs: 2
-     */
     font_weight(): string;
     font_weight(value: string | number): this;
+    /**
+     * {Font Weight}
+     * Specifies the weight of a font, equivalent to the CSS attribute `fontWeight`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
+     * @docs
+     */
     font_weight(value?: string | number): string | this {
         if (value == null) { return this.style.fontWeight; }
         this.style.fontWeight = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Gap
-     * @desc: A shorthand property for the row-gap and the column-gap properties. The equivalent of CSS attribute `gap`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     gap(): string;
     gap(value: string | number): this;
+    /**
+     * {Gap}
+     * A shorthand property for the row-gap and the column-gap properties. The equivalent of CSS attribute `gap`.
+     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     gap(value?: string | number): string | this {
         if (value == null) { return this.style.gap; }
         this.style.gap = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid
-     * @desc: A shorthand property for the grid-template-rows, grid-template-columns, grid-template-areas, grid-auto-rows, grid-auto-columns, and the grid-auto-flow properties. The equivalent of CSS attribute `grid`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     grid(): string;
     grid(value: string): this;
+    /**
+     * {Grid}
+     * A shorthand property for the grid-template-rows, grid-template-columns, grid-template-areas, grid-auto-rows, grid-auto-columns, and the grid-auto-flow properties. The equivalent of CSS attribute `grid`. Returns the attribute value when parameter `value` is `null`.
+     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     grid(value?: string): string | this {
         if (value == null) { return this.style.grid; }
         this.style.grid = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Area
-     * @desc: Either specifies a name for the grid item, or serves as a shorthand for grid-row-start, grid-column-start, grid-row-end, and grid-column-end properties. 
-     *        The equivalent of CSS attribute `gridArea`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless `value` is `null`, in which case the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_area(): string;
     grid_area(value: string): this;
+    /**
+     * {Grid Area}
+     * Either specifies a name for the grid item, or serves as a shorthand for grid-row-start, grid-column-start, grid-row-end, and grid-column-end properties.
+     * The equivalent of CSS attribute `gridArea`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless `value` is `null`, in which case the attribute's value is returned.
+     * @docs
+     */
     grid_area(value?: string): string | this {
         if (value == null) { return this.style.gridArea; }
         this.style.gridArea = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Auto Columns
-     * @desc: Specifies a default column size, equivalent to the CSS attribute `gridAutoColumns`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_auto_columns(): string;
     grid_auto_columns(value: string | number): this;
+    /**
+     * {Grid Auto Columns}
+     * Specifies a default column size, equivalent to the CSS attribute `gridAutoColumns`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_auto_columns(value?: string | number): string | this {
         if (value == null) { return this.style.gridAutoColumns; }
         this.style.gridAutoColumns = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Auto Flow
-     * @desc: Specifies how auto-placed items are inserted in the grid. The equivalent of CSS attribute `gridAutoFlow`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     grid_auto_flow(): string;
     grid_auto_flow(value: string): this;
+    /**
+     * {Grid Auto Flow}
+     * Specifies how auto-placed items are inserted in the grid. The equivalent of CSS attribute `gridAutoFlow`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     grid_auto_flow(value?: string): string | this {
         if (value == null) { return this.style.gridAutoFlow; }
         this.style.gridAutoFlow = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid auto rows
-     * @desc: Specifies a default row size, equivalent to the CSS attribute `gridAutoRows`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_auto_rows(): string;
     grid_auto_rows(value: string | number): this;
+    /**
+     * {Grid auto rows}
+     * Specifies a default row size, equivalent to the CSS attribute `gridAutoRows`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_auto_rows(value?: string | number): string | this {
         if (value == null) { return this.style.gridAutoRows; }
         this.style.gridAutoRows = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Column
-     * @description: 
-     *     A shorthand property for the grid-column-start and the grid-column-end properties.
-     *     The equivalent of CSS attribute `gridColumn`.
-     *     
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_column(): string;
     grid_column(value: string): this;
+    /**
+     * {Grid Column}
+     * A shorthand property for the grid-column-start and the grid-column-end properties.
+     * The equivalent of CSS attribute `gridColumn`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_column(value?: string): string | this {
         if (value == null) { return this.style.gridColumn; }
         this.style.gridColumn = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Column End
-     * @desc: Specifies where to end the grid item. The equivalent of CSS attribute `gridColumnEnd`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_column_end(): string;
     grid_column_end(value: string | number): this;
+    /**
+     * {Grid Column End}
+     * Specifies where to end the grid item. The equivalent of CSS attribute `gridColumnEnd`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_column_end(value?: string | number): string | this {
         if (value == null) { return this.style.gridColumnEnd; }
         this.style.gridColumnEnd = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Column Gap
-     * @desc: Specifies the size of the gap between columns. The equivalent of CSS attribute `gridColumnGap`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_column_gap(): string;
     grid_column_gap(value: string | number): this;
+    /**
+     * {Grid Column Gap}
+     * Specifies the size of the gap between columns. The equivalent of CSS attribute `gridColumnGap`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_column_gap(value?: string | number): this | string {
         if (value == null) { return this.style.gridColumnGap; }
         this.style.gridColumnGap = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Column Start
-     * @desc: Specifies where to start the grid item. This is the equivalent of the CSS attribute `gridColumnStart`. 
-     *         Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the current value of the grid column start when `null` is passed, otherwise returns the instance for chaining.
-     * @funcs: 2
-     */
     grid_column_start(): string;
     grid_column_start(value: string | number): this;
+    /**
+     * {Grid Column Start}
+     * Specifies where to start the grid item. This is the equivalent of the CSS attribute `gridColumnStart`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the current value of the grid column start when `null` is passed, otherwise returns the instance for chaining.
+     * @docs
+     */
     grid_column_start(value?: string | number): string | this {
         if (value == null) { return this.style.gridColumnStart; }
         this.style.gridColumnStart = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Gap
-     * @desc: A shorthand property for the grid-row-gap and grid-column-gap properties. 
-     *        The equivalent of CSS attribute `gridGap`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_gap(): string;
     grid_gap(value: string | number): this;
+    /**
+     * {Grid Gap}
+     * A shorthand property for the grid-row-gap and grid-column-gap properties.
+     * The equivalent of CSS attribute `gridGap`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_gap(value?: string | number): string | this {
         if (value == null) { return this.style.gridGap; }
         this.style.gridGap = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Row
-     * @description: 
-     * A shorthand property for the grid-row-start and the grid-row-end properties.
-     * The equivalent of CSS attribute `gridRow`.
-     * 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_row(): string;
     grid_row(value: string): this;
+    /**
+     * {Grid Row}
+     * A shorthand property for the grid-row-start and the grid-row-end properties.
+     * The equivalent of CSS attribute `gridRow`.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_row(value?: string): string | this {
         if (value == null) { return this.style.gridRow; }
         this.style.gridRow = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Row End
-     * @desc: Specifies where to end the grid item. The equivalent of CSS attribute `gridRowEnd`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_row_end(): string;
     grid_row_end(value: string): this;
+    /**
+     * {Grid Row End}
+     * Specifies where to end the grid item. The equivalent of CSS attribute `gridRowEnd`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_row_end(value?: string): string | this {
         if (value == null) { return this.style.gridRowEnd; }
         this.style.gridRowEnd = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Row Gap
-     * @desc: Specifies the size of the gap between rows. The equivalent of CSS attribute `gridRowGap`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_row_gap(): string;
     grid_row_gap(value: string | number): this;
+    /**
+     * {Grid Row Gap}
+     * Specifies the size of the gap between rows. The equivalent of CSS attribute `gridRowGap`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_row_gap(value?: string | number): string | this {
         if (value == null) { return this.style.gridRowGap; }
         this.style.gridRowGap = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Row Start
-     * @desc: Specifies where to start the grid item, equivalent to CSS attribute `gridRowStart`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_row_start(): string;
     grid_row_start(value: string | number): this;
+    /**
+     * {Grid Row Start}
+     * Specifies where to start the grid item, equivalent to CSS attribute `gridRowStart`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_row_start(value?: string | number): string | this {
         if (value == null) { return this.style.gridRowStart; }
         this.style.gridRowStart = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Template
-     * @desc: A shorthand property for the grid-template-rows, grid-template-columns and grid-areas properties. 
-     *        The equivalent of CSS attribute `gridTemplate`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_template(): string;
     grid_template(value: string): this;
+    /**
+     * {Grid Template}
+     * A shorthand property for the grid-template-rows, grid-template-columns and grid-areas properties.
+     * The equivalent of CSS attribute `gridTemplate`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_template(value?: string): string | this {
         if (value == null) { return this.style.gridTemplate; }
         this.style.gridTemplate = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Template Areas
-     * @desc: Specifies how to display columns and rows, using named grid items. The equivalent of CSS attribute `gridTemplateAreas`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_template_areas(): string;
     grid_template_areas(value: string): this;
+    /**
+     * {Grid Template Areas}
+     * Specifies how to display columns and rows, using named grid items. The equivalent of CSS attribute `gridTemplateAreas`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_template_areas(value?: string): string | this {
         if (value == null) { return this.style.gridTemplateAreas; }
         this.style.gridTemplateAreas = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Template Columns
-     * @desc: Specifies the size of the columns and how many columns in a grid layout. 
-     *        The equivalent of CSS attribute `gridTemplateColumns`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_template_columns(): string;
     grid_template_columns(value: string): this;
+    /**
+     * {Grid Template Columns}
+     * Specifies the size of the columns and how many columns in a grid layout.
+     * The equivalent of CSS attribute `gridTemplateColumns`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_template_columns(value?: string): string | this {
         if (value == null) { return this.style.gridTemplateColumns; }
         this.style.gridTemplateColumns = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Grid Template Rows
-     * @desc: Specifies the size of the rows in a grid layout, equivalent to the CSS attribute `gridTemplateRows`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     grid_template_rows(): string;
     grid_template_rows(value: string | number): this;
+    /**
+     * {Grid Template Rows}
+     * Specifies the size of the rows in a grid layout, equivalent to the CSS attribute `gridTemplateRows`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     grid_template_rows(value?: string | number): string | this {
         if (value == null) { return this.style.gridTemplateRows; }
         this.style.gridTemplateRows = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Hanging punctuation
-     * @desc: Specifies whether a punctuation character may be placed outside the line box. The equivalent of CSS attribute `hangingPunctuation`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     hanging_punctuation(): string;
     hanging_punctuation(value: string): this;
+    /**
+     * {Hanging punctuation}
+     * Specifies whether a punctuation character may be placed outside the line box. The equivalent of CSS attribute `hangingPunctuation`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     hanging_punctuation(value?: string): string | this {
         if (value == null) { return (this.style as any).hangingPunctuation; }
         (this.style as any).hangingPunctuation = value;
@@ -9231,243 +8433,189 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Hyphens
-     * @desc: Sets how to split words to improve the layout of paragraphs. The equivalent of CSS attribute `hyphens`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     hyphens(): string;
     hyphens(value: string): this | string;
+    /**
+     * {Hyphens}
+     * Sets how to split words to improve the layout of paragraphs. The equivalent of CSS attribute `hyphens`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     hyphens(value?: string): this | string {
         if (value == null) { return this.style.hyphens; }
         this.style.hyphens = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Image Rendering
-     * @desc: Specifies the type of algorithm to use for image scaling. The equivalent of CSS attribute `imageRendering`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     image_rendering(): string;
     image_rendering(value: string): this;
+    /**
+     * {Image Rendering}
+     * Specifies the type of algorithm to use for image scaling. The equivalent of CSS attribute `imageRendering`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     image_rendering(value?: string): string | this {
         if (value == null) { return this.style.imageRendering; }
         this.style.imageRendering = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Inline Size
-     * @desc: Specifies the size of an element in the inline direction. 
-     *        The equivalent of CSS attribute `inlineSize`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     inline_size(): string;
     inline_size(value: string | number): this;
+    /**
+     * {Inline Size}
+     * Specifies the size of an element in the inline direction.
+     * The equivalent of CSS attribute `inlineSize`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     inline_size(value?: string | number): string | this {
         if (value == null) { return this.style.inlineSize; }
         this.style.inlineSize = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Inset
-     * @desc: Specifies the distance between an element and the parent element. 
-     *        The equivalent of CSS attribute `inset`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     inset(): string;
     inset(value: string | number): this;
+    /**
+     * {Inset}
+     * Specifies the distance between an element and the parent element.
+     * The equivalent of CSS attribute `inset`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     inset(value?: string | number): string | this {
         if (value == null) { return this.style.inset; }
         this.style.inset = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Inset Block
-     * @desc: Specifies the distance between an element and the parent element in the block direction. 
-     *        The equivalent of CSS attribute `insetBlock`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     inset_block(): string | undefined;
     inset_block(value: string | number): this;
+    /**
+     * {Inset Block}
+     * Specifies the distance between an element and the parent element in the block direction.
+     * The equivalent of CSS attribute `insetBlock`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     inset_block(value?: string | number): string | this | undefined {
         if (value == null) { return this.style.insetBlock; }
         this.style.insetBlock = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Inset Block End
-     * @desc: Specifies the distance between the end of an element and the parent element in the block direction.
-     *        The equivalent of CSS attribute `insetBlockEnd`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     inset_block_end(): string;
     inset_block_end(value: string | number): this;
+    /**
+     * {Inset Block End}
+     * Specifies the distance between the end of an element and the parent element in the block direction.
+     * The equivalent of CSS attribute `insetBlockEnd`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     inset_block_end(value?: string | number): string | this {
         if (value == null) { return this.style.insetBlockEnd ?? ""; }
         this.style.insetBlockEnd = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Inset Block Start
-     * @desc: Specifies the distance between the start of an element and the parent element in the block direction. 
-     *        The equivalent of CSS attribute `insetBlockStart`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     inset_block_start(): string;
     inset_block_start(value: string | number): this;
+    /**
+     * {Inset Block Start}
+     * Specifies the distance between the start of an element and the parent element in the block direction.
+     * The equivalent of CSS attribute `insetBlockStart`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     inset_block_start(value?: string | number): string | this {
         if (value == null) { return this.style.insetBlockStart; }
         this.style.insetBlockStart = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Inset inline
-     * @desc: Specifies the distance between an element and the parent element in the inline direction. 
-     *        The equivalent of CSS attribute `insetInline`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     inset_inline(): string;
     inset_inline(value: string | number): this;
+    /**
+     * {Inset inline}
+     * Specifies the distance between an element and the parent element in the inline direction.
+     * The equivalent of CSS attribute `insetInline`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     inset_inline(value?: string | number): this | string {
         if (value == null) { return this.style.insetInline; }
         this.style.insetInline = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Inset Inline End
-     * @desc: Specifies the distance between the end of an element and the parent element in the inline direction.
-     *        The equivalent of CSS attribute `insetInlineEnd`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     inset_inline_end(): string;
     inset_inline_end(value: string | number): this;
+    /**
+     * {Inset Inline End}
+     * Specifies the distance between the end of an element and the parent element in the inline direction.
+     * The equivalent of CSS attribute `insetInlineEnd`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     inset_inline_end(value?: string | number): string | this {
         if (value == null) { return this.style.insetInlineEnd; }
         this.style.insetInlineEnd = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Inset Inline Start
-     * @desc: Specifies the distance between the start of an element and the parent element in the inline direction. 
-     *        The equivalent of CSS attribute `insetInlineStart`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     inset_inline_start(): string;
     inset_inline_start(value: string | number): this;
+    /**
+     * {Inset Inline Start}
+     * Specifies the distance between the start of an element and the parent element in the inline direction.
+     * The equivalent of CSS attribute `insetInlineStart`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     inset_inline_start(value?: string | number): this | string {
         if (value == null) { return this.style.insetInlineStart; }
         this.style.insetInlineStart = this.pad_numeric(value);;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Isolation
-     * @description: 
-     *     Defines whether an element must create a new stacking content.
-     *     The equivalent of CSS attribute `isolation`. 
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     isolation(): string;
     isolation(value: string): this;
+    /**
+     * {Isolation}
+     * Defines whether an element must create a new stacking content.
+     * The equivalent of CSS attribute `isolation`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     isolation(value?: string): string | this {
         if (value == null) { return this.style.isolation; }
         this.style.isolation = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Justify Content
-     * @desc: Specifies the alignment between the items inside a flexible container when the items do not use all available space. The equivalent of CSS attribute `justifyContent`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     justify_content(): string;
     justify_content(value: string): this;
+    /**
+     * {Justify Content}
+     * Specifies the alignment between the items inside a flexible container when the items do not use all available space. The equivalent of CSS attribute `justifyContent`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     justify_content(value?: string): string | this {
         if (value == null) { return this.style.justifyContent; }
         this.style.justifyContent = value;
@@ -9478,347 +8626,263 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Justify Items
-     * @desc: Sets the alignment of grid items in the inline direction on the grid container.
-     * The equivalent of the CSS attribute `justify-items`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     justify_items(): string;
     justify_items(value: string): this;
+    /**
+     * {Justify Items}
+     * Sets the alignment of grid items in the inline direction on the grid container.
+     * The equivalent of the CSS attribute `justify-items`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     justify_items(value?: string): string | this {
         if (value == null) { return this.style.justifyItems; }
         this.style.justifyItems = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Justify Self
-     * @desc: Sets the alignment of the grid item in the inline direction. This corresponds to the CSS attribute `justify-self`. 
-     *          When the parameter `value` is `null`, it retrieves the current attribute value.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign for alignment. Passing `null` retrieves the current value.
-     * @return:
-     *     @description Returns the current alignment value if `value` is `null`, otherwise returns the instance for chaining.
-     * @funcs: 2
-     */
     justify_self(): string;
     justify_self(value: string): this;
+    /**
+     * {Justify Self}
+     * Sets the alignment of the grid item in the inline direction. This corresponds to the CSS attribute `justify-self`.
+     * When the parameter `value` is `null`, it retrieves the current attribute value.
+     * @param value The value to assign for alignment. Passing `null` retrieves the current value.
+     * @returns ription Returns the current alignment value if `value` is `null`, otherwise returns the instance for chaining.
+     * @docs
+     */
     justify_self(value?: string): string | this {
         if (value == null) { return this.style.justifySelf; }
         this.style.justifySelf = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Left
-     * @desc: Specifies the left position of a positioned element. The equivalent of CSS attribute `left`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     left(): string;
     left(value: string | number): this;
+    /**
+     * {Left}
+     * Specifies the left position of a positioned element. The equivalent of CSS attribute `left`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     left(value?: string | number): string | this {
         if (value == null) { return this.style.left; }
         this.style.left = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Letter spacing
-     * @desc: Increases or decreases the space between characters in a text. 
-     *        The equivalent of CSS attribute `letterSpacing`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     letter_spacing(): string;
     letter_spacing(value: string | number): this;
+    /**
+     * {Letter spacing}
+     * Increases or decreases the space between characters in a text.
+     * The equivalent of CSS attribute `letterSpacing`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     letter_spacing(value?: string | number): string | this {
         if (value == null) { return this.style.letterSpacing; }
         this.style.letterSpacing = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Line Break
-     * @desc: Specifies how/if to break lines. The equivalent of CSS attribute `lineBreak`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     line_break(): string;
     line_break(value: string): this;
+    /**
+     * {Line Break}
+     * Specifies how/if to break lines. The equivalent of CSS attribute `lineBreak`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     line_break(value?: string): string | this {
         if (value == null) { return this.style.lineBreak; }
         this.style.lineBreak = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Line Height
-     * @desc: Sets the line height, equivalent to the CSS attribute `lineHeight`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     line_height(): string;
     line_height(value: string | number): this;
+    /**
+     * {Line Height}
+     * Sets the line height, equivalent to the CSS attribute `lineHeight`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     line_height(value?: string | number): string | this {
         if (value == null) { return this.style.lineHeight; }
         this.style.lineHeight = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: List Style
-     * @desc: Sets all the properties for a list in one declaration. The equivalent of CSS attribute `listStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     list_style(): string;
     list_style(value: string): this;
+    /**
+     * {List Style}
+     * Sets all the properties for a list in one declaration. The equivalent of CSS attribute `listStyle`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     list_style(value?: string): string | this {
         if (value == null) { return this.style.listStyle; }
         this.style.listStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: List style image
-     * @desc: Specifies an image as the list-item marker. The equivalent of CSS attribute `listStyleImage`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     list_style_image(): string;
     list_style_image(value: string): this;
+    /**
+     * {List style image}
+     * Specifies an image as the list-item marker. The equivalent of CSS attribute `listStyleImage`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     list_style_image(value?: string): string | this {
         if (value == null) { return this.style.listStyleImage; }
         this.style.listStyleImage = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: List Style Position
-     * @desc: Specifies the position of the list-item markers (bullet points). 
-     *        The equivalent of CSS attribute `listStylePosition`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     list_style_position(): string;
     list_style_position(value: string): this;
+    /**
+     * {List Style Position}
+     * Specifies the position of the list-item markers (bullet points).
+     * The equivalent of CSS attribute `listStylePosition`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     list_style_position(value?: string): string | this {
         if (value == null) { return this.style.listStylePosition; }
         this.style.listStylePosition = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: List style type
-     * @desc: Specifies the type of list-item marker. The equivalent of CSS attribute `listStyleType`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     list_style_type(): string;
     list_style_type(value: string): this;
+    /**
+     * {List style type}
+     * Specifies the type of list-item marker. The equivalent of CSS attribute `listStyleType`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     list_style_type(value?: string): string | this {
         if (value == null) { return this.style.listStyleType; }
         this.style.listStyleType = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Margin Block
-     * @desc: Specifies the margin in the block direction. 
-     *        The equivalent of CSS attribute `marginBlock`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     margin_block(): string;
     margin_block(value: string | number): this;
+    /**
+     * {Margin Block}
+     * Specifies the margin in the block direction.
+     * The equivalent of CSS attribute `marginBlock`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     margin_block(value?: string | number): this | string {
         if (value == null) { return this.style.marginBlock; }
         this.style.marginBlock = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Margin Block End
-     * @desc: Specifies the margin at the end in the block direction. 
-     *        The equivalent of CSS attribute `marginBlockEnd`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     margin_block_end(): string;
     margin_block_end(value: string | number): this;
+    /**
+     * {Margin Block End}
+     * Specifies the margin at the end in the block direction.
+     * The equivalent of CSS attribute `marginBlockEnd`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     margin_block_end(value?: string | number): string | this {
         if (value == null) { return this.style.marginBlockEnd; }
         this.style.marginBlockEnd = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Margin Block Start
-     * @desc: Specifies the margin at the start in the block direction. 
-     *        The equivalent of CSS attribute `marginBlockStart`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     margin_block_start(): string;
     margin_block_start(value: string | number): this;
+    /**
+     * {Margin Block Start}
+     * Specifies the margin at the start in the block direction.
+     * The equivalent of CSS attribute `marginBlockStart`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     margin_block_start(value?: string | number): this | string {
         if (value == null) { return this.style.marginBlockStart; }
         this.style.marginBlockStart = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Margin Inline
-     * @desc: Specifies the margin in the inline direction. The equivalent of CSS attribute `marginInline`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     margin_inline(): string;
     margin_inline(value: string | number): this;
+    /**
+     * {Margin Inline}
+     * Specifies the margin in the inline direction. The equivalent of CSS attribute `marginInline`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     margin_inline(value?: string | number): string | this {
         if (value == null) { return this.style.marginInline; }
         this.style.marginInline = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Margin Inline End
-     * @desc: Specifies the margin at the end in the inline direction. This is the equivalent of the CSS attribute `marginInlineEnd`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     margin_inline_end(): string;
     margin_inline_end(value: string | number): this;
+    /**
+     * {Margin Inline End}
+     * Specifies the margin at the end in the inline direction. This is the equivalent of the CSS attribute `marginInlineEnd`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     margin_inline_end(value?: string | number): string | this {
         if (value == null) { return this.style.marginInlineEnd; }
         this.style.marginInlineEnd = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Margin Inline Start
-     * @desc: Specifies the margin at the start in the inline direction. 
-     *        The equivalent of CSS attribute `marginInlineStart`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     margin_inline_start(): string;
     margin_inline_start(value: string | number): this;
+    /**
+     * {Margin Inline Start}
+     * Specifies the margin at the start in the inline direction.
+     * The equivalent of CSS attribute `marginInlineStart`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     margin_inline_start(value?: string | number): string | this {
         if (value == null) { return this.style.marginInlineStart; }
         this.style.marginInlineStart = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mask
-     * @desc: Hides parts of an element by masking or clipping an image at specific places. 
-     *        The equivalent of CSS attribute `mask`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mask(): string;
     mask(value: string): this;
+    /**
+     * {Mask}
+     * Hides parts of an element by masking or clipping an image at specific places.
+     * The equivalent of CSS attribute `mask`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mask(value?: string): string | this {
         if (value == null) { return this.style.mask; }
         this.style.mask = value;
@@ -9829,41 +8893,30 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mask clip
-     * @desc: Specifies the mask area. The equivalent of CSS attribute `maskClip`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mask_clip(): string;
     mask_clip(value: string): this;
+    /**
+     * {Mask clip}
+     * Specifies the mask area. The equivalent of CSS attribute `maskClip`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mask_clip(value?: string): string | this {
         if (value == null) { return this.style.maskClip; }
         this.style.maskClip = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mask Composite
-     * @desc: Represents a compositing operation used on the current mask layer with the mask layers below it. 
-     *        The equivalent of CSS attribute `maskComposite`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mask_composite(): string;
     mask_composite(value: string): this;
+    /**
+     * {Mask Composite}
+     * Represents a compositing operation used on the current mask layer with the mask layers below it.
+     * The equivalent of CSS attribute `maskComposite`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mask_composite(value?: string): string | this {
         if (value == null) { return this.style.maskComposite; }
         this.style.maskComposite = value;
@@ -9874,20 +8927,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mask Image
-     * @desc: Specifies an image to be used as a mask layer for an element. 
-     *        The equivalent of CSS attribute `maskImage`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mask_image(): string;
     mask_image(value: string): this;
+    /**
+     * {Mask Image}
+     * Specifies an image to be used as a mask layer for an element.
+     * The equivalent of CSS attribute `maskImage`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mask_image(value?: string): string | this {
         if (value == null) { return this.style.maskImage; }
         this.style.maskImage = value;
@@ -9898,401 +8947,308 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mask Mode
-     * @description: 
-     *     Specifies whether the mask layer image is treated as a luminance mask or as an alpha mask.
-     *     The equivalent of CSS attribute `maskMode`.
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mask_mode(): string;
     mask_mode(value: string): this;
+    /**
+     * {Mask Mode}
+     * Specifies whether the mask layer image is treated as a luminance mask or as an alpha mask.
+     * The equivalent of CSS attribute `maskMode`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mask_mode(value?: string): string | this {
         if (value == null) { return this.style.maskMode; }
         this.style.maskMode = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mask origin
-     * @desc: Specifies the origin position (the mask position area) of a mask layer image. The equivalent of CSS attribute `maskOrigin`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mask_origin(): string;
     mask_origin(value: string): this;
+    /**
+     * {Mask origin}
+     * Specifies the origin position (the mask position area) of a mask layer image. The equivalent of CSS attribute `maskOrigin`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mask_origin(value?: string): string | this {
         if (value == null) { return this.style.maskOrigin; }
         this.style.maskOrigin = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mask Position
-     * @desc: Sets the starting position of a mask layer image (relative to the mask position area).
-     *        The equivalent of CSS attribute `maskPosition`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mask_position(): string;
     mask_position(value: string): this;
+    /**
+     * {Mask Position}
+     * Sets the starting position of a mask layer image (relative to the mask position area).
+     * The equivalent of CSS attribute `maskPosition`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mask_position(value?: string): string | this {
         if (value == null) { return this.style.maskPosition; }
         this.style.maskPosition = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mask Repeat
-     * @desc: Specifies how the mask layer image is repeated. The equivalent of CSS attribute `maskRepeat`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mask_repeat(): string;
     mask_repeat(value: string): this;
+    /**
+     * {Mask Repeat}
+     * Specifies how the mask layer image is repeated. The equivalent of CSS attribute `maskRepeat`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mask_repeat(value?: string): string | this {
         if (value == null) { return this.style.maskRepeat; }
         this.style.maskRepeat = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mask Size
-     * @desc: Specifies the size of a mask layer image. The equivalent of CSS attribute `maskSize`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mask_size(): string;
     mask_size(value: string | number): this;
+    /**
+     * {Mask Size}
+     * Specifies the size of a mask layer image. The equivalent of CSS attribute `maskSize`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mask_size(value?: string | number): this | string {
         if (value == null) { return this.style.maskSize; }
         this.style.maskSize = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mask type
-     * @desc: Specifies whether an SVG \<mask> element is treated as a luminance mask or as an alpha mask. 
-     *        The equivalent of CSS attribute `maskType`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mask_type(): string;
     mask_type(value: string): this;
+    /**
+     * {Mask type}
+     * Specifies whether an SVG \<mask> element is treated as a luminance mask or as an alpha mask.
+     * The equivalent of CSS attribute `maskType`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mask_type(value?: string): string | this {
         if (value == null) { return this.style.maskType; }
         this.style.maskType = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Max height
-     * @desc: Sets the maximum height of an element. This is the equivalent of the CSS attribute `maxHeight`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @descr: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     max_height(): number | string;
     max_height(value: string | number): this;
+    /**
+     * {Max height}
+     * Sets the maximum height of an element. This is the equivalent of the CSS attribute `maxHeight`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     max_height(value?: string | number): this | number | string {
         if (value == null) { return this.style.maxHeight; }
         this.style.maxHeight = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Max Width
-     * @desc: Sets the maximum width of an element. The equivalent of CSS attribute `maxWidth`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     max_width(): number | string;
     max_width(value: string | number): this;
+    /**
+     * {Max Width}
+     * Sets the maximum width of an element. The equivalent of CSS attribute `maxWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     max_width(value?: string | number): this | number | string {
         if (value == null) { return this.style.maxWidth; }
         this.style.maxWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Max Block Size
-     * @desc: Sets the maximum size of an element in the block direction. 
-     * The equivalent of CSS attribute `maxBlockSize`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     max_block_size(): string;
     max_block_size(value: string | number): this;
+    /**
+     * {Max Block Size}
+     * Sets the maximum size of an element in the block direction.
+     * The equivalent of CSS attribute `maxBlockSize`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     max_block_size(value?: string | number): this | string {
         if (value == null) { return this.style.maxBlockSize; }
         this.style.maxBlockSize = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Max inline size
-     * @desc: Sets the maximum size of an element in the inline direction. 
-     *        The equivalent of CSS attribute `maxInlineSize`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     max_inline_size(): string | number;
     max_inline_size(value: string | number): this;
+    /**
+     * {Max inline size}
+     * Sets the maximum size of an element in the inline direction.
+     * The equivalent of CSS attribute `maxInlineSize`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     max_inline_size(value?: string | number): string | number | this {
         if (value == null) { return this.style.maxInlineSize; }
         this.style.maxInlineSize = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Min Block Size
-     * @desc: Sets the minimum size of an element in the block direction. The equivalent of CSS attribute `minBlockSize`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     min_block_size(): null | number;
     min_block_size(value: number): this;
+    /**
+     * {Min Block Size}
+     * Sets the minimum size of an element in the block direction. The equivalent of CSS attribute `minBlockSize`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     min_block_size(value?: number): this | null | number {
         if (value == null) { return this._try_parse_float(this.style.minBlockSize, null); }
         this.style.minBlockSize = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Min Inline Size
-     * @desc: Sets the minimum size of an element in the inline direction. The equivalent of CSS attribute `minInlineSize`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     min_inline_size(): string;
     min_inline_size(value: string | number): this;
+    /**
+     * {Min Inline Size}
+     * Sets the minimum size of an element in the inline direction. The equivalent of CSS attribute `minInlineSize`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     min_inline_size(value?: string | number): string | this {
         if (value == null) { return this.style.minInlineSize; }
         this.style.minInlineSize = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Mix Blend Mode
-     * @desc: Specifies how an element's content should blend with its direct parent background, equivalent to the CSS attribute `mixBlendMode`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     mix_blend_mode(): string;
     mix_blend_mode(value: string): this;
+    /**
+     * {Mix Blend Mode}
+     * Specifies how an element's content should blend with its direct parent background, equivalent to the CSS attribute `mixBlendMode`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     mix_blend_mode(value?: string): string | this {
         if (value == null) { return this.style.mixBlendMode; }
         this.style.mixBlendMode = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Object fit
-     * @desc: Specifies how the contents of a replaced element should be fitted to the box established by its used height and width. 
-     *        The equivalent of CSS attribute `objectFit`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     object_fit(): string;
     object_fit(value: string): this;
+    /**
+     * {Object fit}
+     * Specifies how the contents of a replaced element should be fitted to the box established by its used height and width.
+     * The equivalent of CSS attribute `objectFit`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     object_fit(value?: string): string | this {
         if (value == null) { return this.style.objectFit; }
         this.style.objectFit = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Object position
-     * @desc: Specifies the alignment of the replaced element inside its box. The equivalent of CSS attribute `objectPosition`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     object_position(): string;
     object_position(value: string): this;
+    /**
+     * {Object position}
+     * Specifies the alignment of the replaced element inside its box. The equivalent of CSS attribute `objectPosition`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     object_position(value?: string): string | this {
         if (value == null) { return this.style.objectPosition; }
         this.style.objectPosition = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Offset
-     * @desc: Is a shorthand, and specifies how to animate an element along a path. The equivalent of CSS attribute `offset`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     offset(): string;
     offset(value: string | number): this;
+    /**
+     * {Offset}
+     * Is a shorthand, and specifies how to animate an element along a path. The equivalent of CSS attribute `offset`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     offset(value?: string | number): this | string {
         if (value == null) { return this.style.offset; }
         this.style.offset = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Offset Anchor
-     * @desc: Specifies a point on an element that is fixed to the path it is animated along. The equivalent of CSS attribute `offsetAnchor`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     offset_anchor(): string;
     offset_anchor(value: string): this;
+    /**
+     * {Offset Anchor}
+     * Specifies a point on an element that is fixed to the path it is animated along. The equivalent of CSS attribute `offsetAnchor`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     offset_anchor(value?: string): string | this {
         if (value == null) { return this.style.offsetAnchor; }
         this.style.offsetAnchor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Offset distance
-     * @desc: Specifies the position along a path where an animated element is placed. 
-     *        The equivalent of CSS attribute `offsetDistance`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, number, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     offset_distance(): string;
     offset_distance(value: string | number): this;
+    /**
+     * {Offset distance}
+     * Specifies the position along a path where an animated element is placed.
+     * The equivalent of CSS attribute `offsetDistance`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     offset_distance(value?: string | number): string | this {
         if (value == null) { return this.style.offsetDistance; }
         this.style.offsetDistance = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Offset Path
-     * @desc: Specifies the path an element is animated along. 
-     *        The equivalent of CSS attribute `offsetPath`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     offset_path(): string;
     offset_path(value: string): this;
+    /**
+     * {Offset Path}
+     * Specifies the path an element is animated along.
+     * The equivalent of CSS attribute `offsetPath`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     offset_path(value?: string): string | this {
         if (value == null) { return this.style.offsetPath; }
         this.style.offsetPath = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Offset Rotate
-     * @desc: Specifies rotation of an element as it is animated along a path. 
-     *        The equivalent of CSS attribute `offsetRotate`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     offset_rotate(): string;
     offset_rotate(value: string | number): this;
+    /**
+     * {Offset Rotate}
+     * Specifies rotation of an element as it is animated along a path.
+     * The equivalent of CSS attribute `offsetRotate`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     offset_rotate(value?: string | number): string | this {
         if (value == null) { return this.style.offsetRotate; }
         this.style.offsetRotate = value as string;
@@ -10306,20 +9262,15 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Order
-     * @desc: Sets the order of the flexible item, relative to the rest. The equivalent of CSS attribute `order`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     order(): string;
     order(value: string | number): this;
+    /**
+     * {Order}
+     * Sets the order of the flexible item, relative to the rest. The equivalent of CSS attribute `order`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     order(value?: string | number): string | this {
         if (value == null) { return this.style.order ?? ""; }
         value = value.toString();
@@ -10331,326 +9282,252 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Orphans
-     * @desc: Sets the minimum number of lines that must be left at the bottom of a page or column. 
-     *        The equivalent of CSS attribute `orphans`. Returns the attribute value when parameter 
-     *        `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If `value` is `null`, the attribute's value is returned.
-     * @funcs: 2
-     */
     orphans(): null | number;
     orphans(value: number): this;
+    /**
+     * {Orphans}
+     * Sets the minimum number of lines that must be left at the bottom of a page or column.
+     * The equivalent of CSS attribute `orphans`. Returns the attribute value when parameter
+     * `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining. If `value` is `null`, the attribute's value is returned.
+     * @docs
+     */
     orphans(value?: number): this | number | null {
         if (value == null) { return this._try_parse_float(this.style.orphans, null); }
         this.style.orphans = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Outline
-     * @desc: A shorthand property for the outline-width, outline-style, and the outline-color properties. 
-     *        The equivalent of CSS attribute `outline`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     outline(): string;
     outline(value: string): this;
+    /**
+     * {Outline}
+     * A shorthand property for the outline-width, outline-style, and the outline-color properties.
+     * The equivalent of CSS attribute `outline`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     outline(value?: string): string | this {
         if (value == null) { return this.style.outline; }
         this.style.outline = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Outline Color
-     * @desc: Sets the color of an outline. This is the equivalent of the CSS attribute `outlineColor`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless the parameter `value` is `null`, 
-     *                  in which case the attribute's value is returned.
-     * @funcs: 2
-     */
     outline_color(): string;
     outline_color(value: string): this;
+    /**
+     * {Outline Color}
+     * Sets the color of an outline. This is the equivalent of the CSS attribute `outlineColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless the parameter `value` is `null`,
+     * in which case the attribute's value is returned.
+     * @docs
+     */
     outline_color(value?: string): string | this {
         if (value == null) { return this.style.outlineColor; }
         this.style.outlineColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Outline Offset
-     * @desc: Offsets an outline, and draws it beyond the border edge. The equivalent of CSS attribute `outlineOffset`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     outline_offset(): string;
     outline_offset(value: string | number): this;
+    /**
+     * {Outline Offset}
+     * Offsets an outline, and draws it beyond the border edge. The equivalent of CSS attribute `outlineOffset`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     outline_offset(value?: string | number): string | this {
         if (value == null) { return this.style.outlineOffset; }
         this.style.outlineOffset = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Outline Style
-     * @desc: Sets the style of an outline. The equivalent of CSS attribute `outlineStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     outline_style(): string;
     outline_style(value: string): this;
+    /**
+     * {Outline Style}
+     * Sets the style of an outline. The equivalent of CSS attribute `outlineStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     outline_style(value?: string): string | this {
         if (value == null) { return this.style.outlineStyle; }
         this.style.outlineStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Outline Width
-     * @desc: Sets the width of an outline, equivalent to the CSS attribute `outlineWidth`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     outline_width(): string;
     outline_width(value: string | number): this;
+    /**
+     * {Outline Width}
+     * Sets the width of an outline, equivalent to the CSS attribute `outlineWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     outline_width(value?: string | number): string | this {
         if (value == null) { return this.style.outlineWidth; }
         this.style.outlineWidth = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Overflow
-     * @desc: Specifies what happens if content overflows an element's box. 
-     *        The equivalent of CSS attribute `overflow`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     overflow(): string;
     overflow(value: string): this;
+    /**
+     * {Overflow}
+     * Specifies what happens if content overflows an element's box.
+     * The equivalent of CSS attribute `overflow`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     overflow(value?: string): string | this {
         if (value == null) { return this.style.overflow; }
         this.style.overflow = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Overflow Anchor
-     * @desc: Specifies whether or not content in viewable area in a scrollable container should be pushed down when new content is loaded above. 
-     *        The equivalent of CSS attribute `overflowAnchor`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     overflow_anchor(): string;
     overflow_anchor(value: string): this;
+    /**
+     * {Overflow Anchor}
+     * Specifies whether or not content in viewable area in a scrollable container should be pushed down when new content is loaded above.
+     * The equivalent of CSS attribute `overflowAnchor`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     overflow_anchor(value?: string): string | this {
         if (value == null) { return this.style.overflowAnchor; }
         this.style.overflowAnchor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Overflow Wrap
-     * @desc: Specifies whether or not the browser can break lines with long words, if they overflow the container. The equivalent of CSS attribute `overflowWrap`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     overflow_wrap(): string;
     overflow_wrap(value: string): this;
+    /**
+     * {Overflow Wrap}
+     * Specifies whether or not the browser can break lines with long words, if they overflow the container. The equivalent of CSS attribute `overflowWrap`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     overflow_wrap(value?: string): string | this {
         if (value == null) { return this.style.overflowWrap; }
         this.style.overflowWrap = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Overflow x
-     * @desc: Specifies whether or not to clip the left/right edges of the content, if it overflows the element's content area. 
-     *        The equivalent of CSS attribute `overflowX`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     overflow_x(): string;
     overflow_x(value: string): this;
+    /**
+     * {Overflow x}
+     * Specifies whether or not to clip the left/right edges of the content, if it overflows the element's content area.
+     * The equivalent of CSS attribute `overflowX`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     overflow_x(value?: string): string | this {
         if (value == null) { return this.style.overflowX; }
         this.style.overflowX = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Overflow Y
-     * @desc: Specifies whether or not to clip the top/bottom edges of the content, if it overflows the element's content area. 
-     *        The equivalent of CSS attribute `overflowY`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     overflow_y(): string;
     overflow_y(value: string): this;
+    /**
+     * {Overflow Y}
+     * Specifies whether or not to clip the top/bottom edges of the content, if it overflows the element's content area.
+     * The equivalent of CSS attribute `overflowY`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     overflow_y(value?: string): string | this {
         if (value == null) { return this.style.overflowY; }
         this.style.overflowY = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Overscroll behavior
-     * @desc: Specifies whether to have scroll chaining or overscroll affordance in x- and y-directions. The equivalent of CSS attribute `overscrollBehavior`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     overscroll_behavior(): string;
     overscroll_behavior(value: string): this;
+    /**
+     * {Overscroll behavior}
+     * Specifies whether to have scroll chaining or overscroll affordance in x- and y-directions. The equivalent of CSS attribute `overscrollBehavior`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     overscroll_behavior(value?: string): string | this {
         if (value == null) { return this.style.overscrollBehavior; }
         this.style.overscrollBehavior = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Overscroll behavior block
-     * @desc: Specifies whether to have scroll chaining or overscroll affordance in the block direction.
-     *        The equivalent of CSS attribute `overscrollBehaviorBlock`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     overscroll_behavior_block(): string;
     overscroll_behavior_block(value: string): this;
+    /**
+     * {Overscroll behavior block}
+     * Specifies whether to have scroll chaining or overscroll affordance in the block direction.
+     * The equivalent of CSS attribute `overscrollBehaviorBlock`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     overscroll_behavior_block(value?: string): string | this {
         if (value == null) { return this.style.overscrollBehaviorBlock; }
         this.style.overscrollBehaviorBlock = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Overscroll Behavior Inline
-     * @desc: Specifies whether to have scroll chaining or overscroll affordance in the inline direction. 
-     *        The equivalent of CSS attribute `overscrollBehaviorInline`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If `value` is `null`, returns the attribute's value.
-     * @funcs: 2
-     */
     overscroll_behavior_inline(): string;
     overscroll_behavior_inline(value: string): this;
+    /**
+     * {Overscroll Behavior Inline}
+     * Specifies whether to have scroll chaining or overscroll affordance in the inline direction.
+     * The equivalent of CSS attribute `overscrollBehaviorInline`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining. If `value` is `null`, returns the attribute's value.
+     * @docs
+     */
     overscroll_behavior_inline(value?: string): string | this {
         if (value == null) { return this.style.overscrollBehaviorInline; }
         this.style.overscrollBehaviorInline = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Overscroll Behavior X
-     * @description: 
-     *     Specifies whether to have scroll chaining or overscroll affordance in x-direction.
-     *     The equivalent of CSS attribute `overscrollBehaviorX`.
-     *     
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     overscroll_behavior_x(): string;
     overscroll_behavior_x(value: string): this;
+    /**
+     * {Overscroll Behavior X}
+     * Specifies whether to have scroll chaining or overscroll affordance in x-direction.
+     * The equivalent of CSS attribute `overscrollBehaviorX`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     overscroll_behavior_x(value?: string): string | this {
         if (value == null) { return this.style.overscrollBehaviorX; }
         this.style.overscrollBehaviorX = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Overscroll behavior y
-     * @desc: 
-     *     Specifies whether to have scroll chaining or overscroll affordance in y-directions.
-     *     The equivalent of CSS attribute `overscrollBehaviorY`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the `VElement` object for chaining.
-     * @funcs: 2
-     */
     overscroll_behavior_y(): string;
     overscroll_behavior_y(value: string): this;
+    /**
+     * {Overscroll behavior y}
+     * Specifies whether to have scroll chaining or overscroll affordance in y-directions.
+     * The equivalent of CSS attribute `overscrollBehaviorY`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the `VElement` object for chaining.
+     * @docs
+     */
     overscroll_behavior_y(value?: string): string | this {
         if (value == null) { return this.style.overscrollBehaviorY; }
         this.style.overscrollBehaviorY = value;
@@ -10664,221 +9541,166 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Padding Block
-     * @desc: Specifies the padding in the block direction. The equivalent of CSS attribute `paddingBlock`. 
-     *         Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     padding_block(): string | undefined;
     padding_block(value: string | number): this;
+    /**
+     * {Padding Block}
+     * Specifies the padding in the block direction. The equivalent of CSS attribute `paddingBlock`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     padding_block(value?: string | number): string | this | undefined {
         if (value == null) { return this.style.paddingBlock; }
         this.style.paddingBlock = this.pad_numeric(value);;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Padding Block End
-     * @desc: Specifies the padding at the end in the block direction. The equivalent of CSS attribute `paddingBlockEnd`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     padding_block_end(): string;
     padding_block_end(value: string | number): this;
+    /**
+     * {Padding Block End}
+     * Specifies the padding at the end in the block direction. The equivalent of CSS attribute `paddingBlockEnd`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     padding_block_end(value?: string | number): string | this {
         if (value == null) { return this.style.paddingBlockEnd; }
         this.style.paddingBlockEnd = this.pad_numeric(value);;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Padding Block Start
-     * @desc: Specifies the padding at the start in the block direction. 
-     *        The equivalent of CSS attribute `paddingBlockStart`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     padding_block_start(): string;
     padding_block_start(value: string | number): this;
+    /**
+     * {Padding Block Start}
+     * Specifies the padding at the start in the block direction.
+     * The equivalent of CSS attribute `paddingBlockStart`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     padding_block_start(value?: string | number): string | this {
         if (value == null) { return this.style.paddingBlockStart; }
         this.style.paddingBlockStart = this.pad_numeric(value);;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Padding Inline
-     * @desc: Specifies the padding in the inline direction. The equivalent of CSS attribute `paddingInline`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     padding_inline(): string;
     padding_inline(value: string | number): this;
+    /**
+     * {Padding Inline}
+     * Specifies the padding in the inline direction. The equivalent of CSS attribute `paddingInline`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     padding_inline(value?: string | number): string | this {
         if (value == null) { return this.style.paddingInline ?? ""; }
         this.style.paddingInline = this.pad_numeric(value);;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Padding Inline End
-     * @desc: Specifies the padding at the end in the inline direction. 
-     *        The equivalent of CSS attribute `paddingInlineEnd`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     padding_inline_end(): string;
     padding_inline_end(value: string | number): this;
+    /**
+     * {Padding Inline End}
+     * Specifies the padding at the end in the inline direction.
+     * The equivalent of CSS attribute `paddingInlineEnd`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     padding_inline_end(value?: string | number): string | this {
         if (value == null) { return this.style.paddingInlineEnd; }
         this.style.paddingInlineEnd = this.pad_numeric(value);;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Padding Inline Start
-     * @desc: Specifies the padding at the start in the inline direction. The equivalent of CSS attribute `paddingInlineStart`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
-     * @funcs: 2
-     */
     padding_inline_start(): string;
     padding_inline_start(value: string | number): this;
+    /**
+     * {Padding Inline Start}
+     * Specifies the padding at the start in the inline direction. The equivalent of CSS attribute `paddingInlineStart`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
+     * @docs
+     */
     padding_inline_start(value?: string | number): string | this {
         if (value == null) { return this.style.paddingInlineStart; }
         this.style.paddingInlineStart = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Page break after
-     * @desc: Sets the page-break behavior after an element. The equivalent of CSS attribute `pageBreakAfter`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     page_break_after(): string;
     page_break_after(value: string): this;
+    /**
+     * {Page break after}
+     * Sets the page-break behavior after an element. The equivalent of CSS attribute `pageBreakAfter`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     page_break_after(value?: string): string | this {
         if (value == null) { return this.style.pageBreakAfter; }
         this.style.pageBreakAfter = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Page break before
-     * @desc: Sets the page-break behavior before an element. The equivalent of CSS attribute `pageBreakBefore`.
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     page_break_before(): string;
     page_break_before(value: string): this;
+    /**
+     * {Page break before}
+     * Sets the page-break behavior before an element. The equivalent of CSS attribute `pageBreakBefore`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     page_break_before(value?: string): string | this {
         if (value == null) { return this.style.pageBreakBefore; }
         this.style.pageBreakBefore = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Page Break Inside
-     * @desc: Sets the page-break behavior inside an element. The equivalent of CSS attribute `pageBreakInside`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     page_break_inside(): string;
     page_break_inside(value: string): this;
+    /**
+     * {Page Break Inside}
+     * Sets the page-break behavior inside an element. The equivalent of CSS attribute `pageBreakInside`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     page_break_inside(value?: string): string | this {
         if (value == null) { return this.style.pageBreakInside; }
         this.style.pageBreakInside = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Paint Order
-     * @desc: Sets the order of how an SVG element or text is painted. The equivalent of CSS attribute `paintOrder`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     paint_order(): string;
     paint_order(value: string): this;
+    /**
+     * {Paint Order}
+     * Sets the order of how an SVG element or text is painted. The equivalent of CSS attribute `paintOrder`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     paint_order(value?: string): string | this {
         if (value == null) { return this.style.paintOrder; }
         this.style.paintOrder = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Perspective
-     * @desc: Gives a 3D-positioned element some perspective. The equivalent of CSS attribute `perspective`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     perspective(): string;
     perspective(value: string | number): this;
+    /**
+     * {Perspective}
+     * Gives a 3D-positioned element some perspective. The equivalent of CSS attribute `perspective`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     perspective(value?: string | number): string | this {
         if (value == null) { return this.style.perspective; }
         value = this.pad_numeric(value);
@@ -10890,19 +9712,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Perspective origin
-     * @desc: Defines at which position the user is looking at the 3D-positioned element. The equivalent of CSS attribute `perspectiveOrigin`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     perspective_origin(): string;
     perspective_origin(value: string): this;
+    /**
+     * {Perspective origin}
+     * Defines at which position the user is looking at the 3D-positioned element. The equivalent of CSS attribute `perspectiveOrigin`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     perspective_origin(value?: string): string | this {
         if (value == null) { return this.style.perspectiveOrigin; }
         this.style.perspectiveOrigin = value;
@@ -10913,81 +9731,62 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Place Content
-     * @desc: Specifies align-content and justify-content property values for flexbox and grid layouts.
-     *        The equivalent of CSS attribute `placeContent`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     place_content(): string;
     place_content(value: string): this;
+    /**
+     * {Place Content}
+     * Specifies align-content and justify-content property values for flexbox and grid layouts.
+     * The equivalent of CSS attribute `placeContent`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     place_content(value?: string): string | this {
         if (value == null) { return this.style.placeContent; }
         this.style.placeContent = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Place items
-     * @desc: Specifies align-items and justify-items property values for grid layouts. The equivalent of CSS attribute `placeItems`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     place_items(): string;
     place_items(value: string): this;
+    /**
+     * {Place items}
+     * Specifies align-items and justify-items property values for grid layouts. The equivalent of CSS attribute `placeItems`.
+     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     place_items(value?: string): string | this {
         if (value == null) { return this.style.placeItems; }
         this.style.placeItems = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Place Self
-     * @desc: Specifies align-self and justify-self property values for grid layouts. 
-     *        The equivalent of CSS attribute `placeSelf`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. 
-     *                  Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     place_self(): string;
     place_self(value: string): this;
+    /**
+     * {Place Self}
+     * Specifies align-self and justify-self property values for grid layouts.
+     * The equivalent of CSS attribute `placeSelf`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`.
+     * Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     place_self(value?: string): string | this {
         if (value == null) { return this.style.placeSelf; }
         this.style.placeSelf = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Pointer events
-     * @desc: Defines whether or not an element reacts to pointer events, equivalent to the CSS attribute `pointerEvents`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     pointer_events(): string;
     pointer_events(value: string): this;
+    /**
+     * {Pointer events}
+     * Defines whether or not an element reacts to pointer events, equivalent to the CSS attribute `pointerEvents`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     pointer_events(value?: string): string | this {
         if (value == null) { return this.style.pointerEvents; }
         this.style.pointerEvents = value;
@@ -11001,303 +9800,235 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Quotes
-     * @desc: Sets the type of quotation marks for embedded quotations. The equivalent of CSS attribute `quotes`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     quotes(): string;
     quotes(value: string): this;
+    /**
+     * {Quotes}
+     * Sets the type of quotation marks for embedded quotations. The equivalent of CSS attribute `quotes`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     quotes(value?: string): string | this {
         if (value == null) { return this.style.quotes; }
         this.style.quotes = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Resize
-     * @desc: Defines if (and how) an element is resizable by the user. 
-     *        The equivalent of CSS attribute `resize`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     resize(): string;
     resize(value: string): this;
+    /**
+     * {Resize}
+     * Defines if (and how) an element is resizable by the user.
+     * The equivalent of CSS attribute `resize`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     resize(value?: string): string | this {
         if (value == null) { return this.style.resize; }
         this.style.resize = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Right
-     * @desc: Specifies the right position of a positioned element. The equivalent of CSS attribute `right`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type number, string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     right(): string;
     right(value: number | string): this;
+    /**
+     * {Right}
+     * Specifies the right position of a positioned element. The equivalent of CSS attribute `right`. Returns the attribute value when parameter `value` is `null`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     right(value?: number | string): string | this {
         if (value == null) { return this.style.right; }
         this.style.right = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Row Gap
-     * @desc: Specifies the gap between the grid rows. The equivalent of CSS attribute `rowGap`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     row_gap(): string;
     row_gap(value: string | number): this;
+    /**
+     * {Row Gap}
+     * Specifies the gap between the grid rows. The equivalent of CSS attribute `rowGap`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     row_gap(value?: string | number): string | this {
         if (value == null) { return this.style.rowGap; }
         this.style.rowGap = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scale
-     * @desc: Specifies the size of an element by scaling up or down. The equivalent of CSS attribute `scale`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scale(): null | number;
     scale(value: number): this;
+    /**
+     * {Scale}
+     * Specifies the size of an element by scaling up or down. The equivalent of CSS attribute `scale`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scale(value?: number): this | null | number {
         if (value == null) { return this._try_parse_float(this.style.scale, null); }
         this.style.scale = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Behavior
-     * @desc: Specifies whether to smoothly animate the scroll position in a scrollable box, instead of a straight jump. 
-     *        The equivalent of CSS attribute `scrollBehavior`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_behavior(): string;
     scroll_behavior(value: string): this;
+    /**
+     * {Scroll Behavior}
+     * Specifies whether to smoothly animate the scroll position in a scrollable box, instead of a straight jump.
+     * The equivalent of CSS attribute `scrollBehavior`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_behavior(value?: string): string | this {
         if (value == null) { return this.style.scrollBehavior; }
         this.style.scrollBehavior = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Margin
-     * @desc: Specifies the margin between the snap position and the container. 
-     *        The equivalent of CSS attribute `scrollMargin`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_margin(): string;
     scroll_margin(value: string | number): this;
+    /**
+     * {Scroll Margin}
+     * Specifies the margin between the snap position and the container.
+     * The equivalent of CSS attribute `scrollMargin`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_margin(value?: string | number): string | this {
         if (value == null) { return this.style.scrollMargin; }
         this.style.scrollMargin = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Margin Block
-     * @desc: Specifies the margin between the snap position and the container in the block direction. 
-     *        The equivalent of CSS attribute `scrollMarginBlock`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     scroll_margin_block(): string;
     scroll_margin_block(value: string | number): this;
+    /**
+     * {Scroll Margin Block}
+     * Specifies the margin between the snap position and the container in the block direction.
+     * The equivalent of CSS attribute `scrollMarginBlock`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     scroll_margin_block(value?: string | number): string | this {
         if (value == null) { return this.style.scrollMarginBlock; }
         this.style.scrollMarginBlock = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll margin block end
-     * @desc: Specifies the end margin between the snap position and the container in the block direction.
-     * The equivalent of CSS attribute `scrollMarginBlockEnd`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_margin_block_end(): string;
     scroll_margin_block_end(value: string | number): this;
+    /**
+     * {Scroll margin block end}
+     * Specifies the end margin between the snap position and the container in the block direction.
+     * The equivalent of CSS attribute `scrollMarginBlockEnd`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_margin_block_end(value?: string | number): string | this {
         if (value == null) { return this.style.scrollMarginBlockEnd; }
         this.style.scrollMarginBlockEnd = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll margin block start
-     * @desc: Specifies the start margin between the snap position and the container in the block direction.
-     *        The equivalent of CSS attribute `scrollMarginBlockStart`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     scroll_margin_block_start(): string;
     scroll_margin_block_start(value: string | number): this;
+    /**
+     * {Scroll margin block start}
+     * Specifies the start margin between the snap position and the container in the block direction.
+     * The equivalent of CSS attribute `scrollMarginBlockStart`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     scroll_margin_block_start(value?: string | number): string | this {
         if (value == null) { return this.style.scrollMarginBlockStart; }
         this.style.scrollMarginBlockStart = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll margin bottom
-     * @desc: Specifies the margin between the snap position on the bottom side and the container.
-     * The equivalent of CSS attribute `scrollMarginBottom`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_margin_bottom(): string;
     scroll_margin_bottom(value: string | number): this;
+    /**
+     * {Scroll margin bottom}
+     * Specifies the margin between the snap position on the bottom side and the container.
+     * The equivalent of CSS attribute `scrollMarginBottom`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_margin_bottom(value?: string | number): string | this {
         if (value == null) { return this.style.scrollMarginBottom; }
         this.style.scrollMarginBottom = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Margin Inline
-     * @desc: Specifies the margin between the snap position and the container in the inline direction.
-     *        The equivalent of CSS attribute `scrollMarginInline`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_margin_inline(): string;
     scroll_margin_inline(value: string | number): this;
+    /**
+     * {Scroll Margin Inline}
+     * Specifies the margin between the snap position and the container in the inline direction.
+     * The equivalent of CSS attribute `scrollMarginInline`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_margin_inline(value?: string | number): string | this {
         if (value == null) { return this.style.scrollMarginInline; }
         this.style.scrollMarginInline = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll margin inline end
-     * @desc: Specifies the end margin between the snap position and the container in the inline direction.
-     *        The equivalent of CSS attribute `scrollMarginInlineEnd`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_margin_inline_end(): string;
     scroll_margin_inline_end(value: string | number): this;
+    /**
+     * {Scroll margin inline end}
+     * Specifies the end margin between the snap position and the container in the inline direction.
+     * The equivalent of CSS attribute `scrollMarginInlineEnd`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_margin_inline_end(value?: string | number): this | string {
         if (value == null) { return this.style.scrollMarginInlineEnd; }
         this.style.scrollMarginInlineEnd = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll margin inline start
-     * @desc: Specifies the start margin between the snap position and the container in the inline direction. 
-     *        The equivalent of CSS attribute `scrollMarginInlineStart`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_margin_inline_start(): string;
     scroll_margin_inline_start(value: string): this;
+    /**
+     * {Scroll margin inline start}
+     * Specifies the start margin between the snap position and the container in the inline direction.
+     * The equivalent of CSS attribute `scrollMarginInlineStart`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_margin_inline_start(value?: string): string | this {
         if (value == null) { return this.style.scrollMarginInlineStart; }
         this.style.scrollMarginInlineStart = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Margin Left
-     * @desc: Specifies the margin between the snap position on the left side and the container. 
-     *        The equivalent of CSS attribute `scrollMarginLeft`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_margin_left(): string;
     scroll_margin_left(value: string | number): this;
+    /**
+     * {Scroll Margin Left}
+     * Specifies the margin between the snap position on the left side and the container.
+     * The equivalent of CSS attribute `scrollMarginLeft`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_margin_left(value?: string | number): string | this {
         if (value == null) { return this.style.scrollMarginLeft; }
         this.style.scrollMarginLeft = this.pad_numeric(value);
@@ -11305,363 +10036,284 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Scroll Margin Right
-     * @desc: Specifies the margin between the snap position on the right side and the container.
-     *        The equivalent of CSS attribute `scrollMarginRight`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Scroll Margin Right}
+     * Specifies the margin between the snap position on the right side and the container.
+     * The equivalent of CSS attribute `scrollMarginRight`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     scroll_margin_right(): string;
-    scroll_margin_right(value: string | number): this 
+    scroll_margin_right(value: string | number): this
     scroll_margin_right(value?: string | number): this | string {
         if (value == null) { return this.style.scrollMarginRight; }
         this.style.scrollMarginRight = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Margin Top
-     * @desc: Specifies the margin between the snap position on the top side and the container.
-     *        The equivalent of CSS attribute `scrollMarginTop`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @descr: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_margin_top(): string;
     scroll_margin_top(value: string | number): this;
+    /**
+     * {Scroll Margin Top}
+     * Specifies the margin between the snap position on the top side and the container.
+     * The equivalent of CSS attribute `scrollMarginTop`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_margin_top(value?: string | number): string | this {
         if (value == null) { return this.style.scrollMarginTop; }
         this.style.scrollMarginTop = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Padding
-     * @desc: Specifies the distance from the container to the snap position on the child elements. 
-     *        The equivalent of CSS attribute `scrollPadding`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, 
-     *                  then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_padding(): string;
     scroll_padding(value: string | number): this;
+    /**
+     * {Scroll Padding}
+     * Specifies the distance from the container to the snap position on the child elements.
+     * The equivalent of CSS attribute `scrollPadding`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`,
+     * then the attribute's value is returned.
+     * @docs
+     */
     scroll_padding(value?: string | number): this | string {
         if (value == null) { return this.style.scrollPadding; }
         this.style.scrollPadding = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll padding block
-     * @desc: Specifies the distance in block direction from the container to the snap position on the child elements. 
-     *        The equivalent of CSS attribute `scrollPaddingBlock`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, number, null
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     scroll_padding_block(): string;
     scroll_padding_block(value: string | number): this;
+    /**
+     * {Scroll padding block}
+     * Specifies the distance in block direction from the container to the snap position on the child elements.
+     * The equivalent of CSS attribute `scrollPaddingBlock`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     scroll_padding_block(value?: string | number): string | this {
         if (value == null) { return this.style.scrollPaddingBlock; }
         this.style.scrollPaddingBlock = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Padding Block End
-     * @desc: Specifies the distance in block direction from the end of the container to the snap position on the child elements. 
-     *        The equivalent of CSS attribute `scrollPaddingBlockEnd`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_padding_block_end(): string;
     scroll_padding_block_end(value: string | number): this;
+    /**
+     * {Scroll Padding Block End}
+     * Specifies the distance in block direction from the end of the container to the snap position on the child elements.
+     * The equivalent of CSS attribute `scrollPaddingBlockEnd`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_padding_block_end(value?: string | number): string | this {
         if (value == null) { return this.style.scrollPaddingBlockEnd; }
         this.style.scrollPaddingBlockEnd = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll padding block start
-     * @desc: Specifies the distance in block direction from the start of the container to the snap position on the child elements. The equivalent of CSS attribute `scrollPaddingBlockStart`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_padding_block_start(): string;
     scroll_padding_block_start(value: string | number): this;
+    /**
+     * {Scroll padding block start}
+     * Specifies the distance in block direction from the start of the container to the snap position on the child elements. The equivalent of CSS attribute `scrollPaddingBlockStart`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_padding_block_start(value?: string | number): string | this {
         if (value == null) { return this.style.scrollPaddingBlockStart; }
         this.style.scrollPaddingBlockStart = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Padding Bottom
-     * @desc: Specifies the distance from the bottom of the container to the snap position on the child elements.
-     *        The equivalent of CSS attribute `scrollPaddingBottom`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_padding_bottom(): string;
     scroll_padding_bottom(value: string | number): this;
+    /**
+     * {Scroll Padding Bottom}
+     * Specifies the distance from the bottom of the container to the snap position on the child elements.
+     * The equivalent of CSS attribute `scrollPaddingBottom`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_padding_bottom(value?: string | number): string | this {
         if (value == null) { return this.style.scrollPaddingBottom; }
         this.style.scrollPaddingBottom = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Padding Inline
-     * @desc: Specifies the distance in inline direction from the container to the snap position on the child elements.
-     *        The equivalent of CSS attribute `scrollPaddingInline`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     scroll_padding_inline(): string;
     scroll_padding_inline(value: string | number): this;
+    /**
+     * {Scroll Padding Inline}
+     * Specifies the distance in inline direction from the container to the snap position on the child elements.
+     * The equivalent of CSS attribute `scrollPaddingInline`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     scroll_padding_inline(value?: string | number): string | this {
         if (value == null) { return this.style.scrollPaddingInline; }
         this.style.scrollPaddingInline = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll padding inline end
-     * @desc: Specifies the distance in inline direction from the end of the container to the snap position on the child elements.
-     *        The equivalent of CSS attribute `scrollPaddingInlineEnd`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_padding_inline_end(): string;
     scroll_padding_inline_end(value: string | number): this;
+    /**
+     * {Scroll padding inline end}
+     * Specifies the distance in inline direction from the end of the container to the snap position on the child elements.
+     * The equivalent of CSS attribute `scrollPaddingInlineEnd`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_padding_inline_end(value?: string | number): string | this {
         if (value == null) { return this.style.scrollPaddingInlineEnd; }
         this.style.scrollPaddingInlineEnd = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll padding inline start
-     * @desc: Specifies the distance in inline direction from the start of the container to the snap position on the child elements.
-     *        The equivalent of CSS attribute `scrollPaddingInlineStart`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_padding_inline_start(): string;
     scroll_padding_inline_start(value: string | number): this;
+    /**
+     * {Scroll padding inline start}
+     * Specifies the distance in inline direction from the start of the container to the snap position on the child elements.
+     * The equivalent of CSS attribute `scrollPaddingInlineStart`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_padding_inline_start(value?: string | number): this | string {
         if (value == null) { return this.style.scrollPaddingInlineStart ?? ""; }
         this.style.scrollPaddingInlineStart = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Padding Left
-     * @desc: Specifies the distance from the left side of the container to the snap position on the child elements.
-     * The equivalent of CSS attribute `scrollPaddingLeft`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_padding_left(): string;
     scroll_padding_left(value: string | number): this;
+    /**
+     * {Scroll Padding Left}
+     * Specifies the distance from the left side of the container to the snap position on the child elements.
+     * The equivalent of CSS attribute `scrollPaddingLeft`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_padding_left(value?: string | number): string | this {
         if (value == null) { return this.style.scrollPaddingLeft; }
         this.style.scrollPaddingLeft = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Padding Right
-     * @desc: Specifies the distance from the right side of the container to the snap position on the child elements.
-     * The equivalent of CSS attribute `scrollPaddingRight`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_padding_right(): string;
     scroll_padding_right(value: string | number): this;
+    /**
+     * {Scroll Padding Right}
+     * Specifies the distance from the right side of the container to the snap position on the child elements.
+     * The equivalent of CSS attribute `scrollPaddingRight`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_padding_right(value?: string | number): string | this {
         if (value == null) { return this.style.scrollPaddingRight; }
         this.style.scrollPaddingRight = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Padding Top
-     * @desc: Specifies the distance from the top of the container to the snap position on the child elements. 
-     *        The equivalent of CSS attribute `scrollPaddingTop`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_padding_top(): string;
     scroll_padding_top(value: string | number): this;
+    /**
+     * {Scroll Padding Top}
+     * Specifies the distance from the top of the container to the snap position on the child elements.
+     * The equivalent of CSS attribute `scrollPaddingTop`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_padding_top(value?: string | number): string | this {
         if (value == null) { return this.style.scrollPaddingTop; }
         this.style.scrollPaddingTop = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Snap Align
-     * @desc: Specifies where to position elements when the user stops scrolling. 
-     *        The equivalent of CSS attribute `scrollSnapAlign`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_snap_align(): string;
     scroll_snap_align(value: string): this;
+    /**
+     * {Scroll Snap Align}
+     * Specifies where to position elements when the user stops scrolling.
+     * The equivalent of CSS attribute `scrollSnapAlign`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_snap_align(value?: string): string | this {
         if (value == null) { return this.style.scrollSnapAlign; }
         this.style.scrollSnapAlign = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Snap Stop
-     * @desc: Specifies scroll behaviour after fast swipe on trackpad or touch screen. 
-     *        The equivalent of CSS attribute `scrollSnapStop`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_snap_stop(): string;
     scroll_snap_stop(value: string): this;
+    /**
+     * {Scroll Snap Stop}
+     * Specifies scroll behaviour after fast swipe on trackpad or touch screen.
+     * The equivalent of CSS attribute `scrollSnapStop`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_snap_stop(value?: string): string | this {
         if (value == null) { return this.style.scrollSnapStop; }
         this.style.scrollSnapStop = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scroll Snap Type
-     * @desc: Specifies how snap behaviour should be when scrolling. The equivalent of CSS attribute `scrollSnapType`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scroll_snap_type(): string;
     scroll_snap_type(value: string): this;
+    /**
+     * {Scroll Snap Type}
+     * Specifies how snap behaviour should be when scrolling. The equivalent of CSS attribute `scrollSnapType`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scroll_snap_type(value?: string): string | this {
         if (value == null) { return this.style.scrollSnapType; }
         this.style.scrollSnapType = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scrollbar color
-     * @desc: Specifies the color of the scrollbar of an element. The equivalent of CSS attribute `scrollbarColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scrollbar_color(): string;
     scrollbar_color(value: string): this;
+    /**
+     * {Scrollbar color}
+     * Specifies the color of the scrollbar of an element. The equivalent of CSS attribute `scrollbarColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scrollbar_color(value?: string): string | this {
         if (value == null) { return this.style.scrollbarColor; }
         this.style.scrollbarColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Tab Size
-     * @desc: Specifies the width of a tab character, equivalent to the CSS attribute `tabSize`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     tab_size(): string;
     tab_size(value: string | number): this;
+    /**
+     * {Tab Size}
+     * Specifies the width of a tab character, equivalent to the CSS attribute `tabSize`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     tab_size(value?: string | number): string | this {
         if (value == null) { return this.style.tabSize; }
         value = value.toString();
@@ -11673,382 +10325,288 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Table Layout
-     * @desc: Defines the algorithm used to lay out table cells, rows, and columns. 
-     *        The equivalent of CSS attribute `tableLayout`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     table_layout(): string;
     table_layout(value: string): this;
+    /**
+     * {Table Layout}
+     * Defines the algorithm used to lay out table cells, rows, and columns.
+     * The equivalent of CSS attribute `tableLayout`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     table_layout(value?: string): string | this {
         if (value == null) { return this.style.tableLayout; }
         this.style.tableLayout = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Align
-     * @desc: Specifies the horizontal alignment of text, equivalent to the CSS `textAlign` attribute. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign for text alignment. Leave `null` to retrieve the current attribute's value.
-     * @return:
-     *     @description Returns the current value of `textAlign` if no argument is provided; otherwise returns the instance for chaining.
-     * @funcs: 2
-     */
     text_align(): string;
     text_align(value: string): this;
+    /**
+     * {Text Align}
+     * Specifies the horizontal alignment of text, equivalent to the CSS `textAlign` attribute.
+     * @param value The value to assign for text alignment. Leave `null` to retrieve the current attribute's value.
+     * @returns ription Returns the current value of `textAlign` if no argument is provided; otherwise returns the instance for chaining.
+     * @docs
+     */
     text_align(value?: string): string | this {
         if (value == null) { return this.style.textAlign; }
         this.style.textAlign = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Align Last
-     * @desc: Describes how the last line of a block or a line right before a forced line break is aligned when text-align is "justify". 
-     *        The equivalent of CSS attribute `textAlignLast`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_align_last(): string;
     text_align_last(value: string): this;
+    /**
+     * {Text Align Last}
+     * Describes how the last line of a block or a line right before a forced line break is aligned when text-align is "justify".
+     * The equivalent of CSS attribute `textAlignLast`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_align_last(value?: string): string | this {
         if (value == null) { return this.style.textAlignLast; }
         this.style.textAlignLast = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Combine Upright
-     * @desc: Specifies the combination of multiple characters into the space of a single character.
-     *        The equivalent of CSS attribute `textCombineUpright`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_combine_upright(): string;
     text_combine_upright(value: string): this;
+    /**
+     * {Text Combine Upright}
+     * Specifies the combination of multiple characters into the space of a single character.
+     * The equivalent of CSS attribute `textCombineUpright`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_combine_upright(value?: string): string | this {
         if (value == null) { return this.style.textCombineUpright; }
         this.style.textCombineUpright = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Decoration
-     * @desc: Specifies the decoration added to text. The equivalent of CSS attribute `textDecoration`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_decoration(): string;
     text_decoration(value: string): this;
+    /**
+     * {Text Decoration}
+     * Specifies the decoration added to text. The equivalent of CSS attribute `textDecoration`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_decoration(value?: string): string | this {
         if (value == null) { return this.style.textDecoration; }
         this.style.textDecoration = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Decoration Color
-     * @desc: Specifies the color of the text-decoration. The equivalent of CSS attribute `textDecorationColor`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_decoration_color(): string;
     text_decoration_color(value: string): this;
+    /**
+     * {Text Decoration Color}
+     * Specifies the color of the text-decoration. The equivalent of CSS attribute `textDecorationColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_decoration_color(value?: string): this | string {
         if (value == null) { return this.style.textDecorationColor; }
         this.style.textDecorationColor = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Decoration Line
-     * @desc: Specifies the type of line in a text-decoration. The equivalent of CSS attribute `textDecorationLine`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_decoration_line(): string;
     text_decoration_line(value: string): this;
+    /**
+     * {Text Decoration Line}
+     * Specifies the type of line in a text-decoration. The equivalent of CSS attribute `textDecorationLine`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_decoration_line(value?: string): string | this {
         if (value == null) { return this.style.textDecorationLine; }
         this.style.textDecorationLine = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Decoration Style
-     * @desc: Specifies the style of the line in a text decoration, equivalent to the CSS attribute `textDecorationStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_decoration_style(): string;
     text_decoration_style(value: string): this;
+    /**
+     * {Text Decoration Style}
+     * Specifies the style of the line in a text decoration, equivalent to the CSS attribute `textDecorationStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_decoration_style(value?: string): string | this {
         if (value == null) { return this.style.textDecorationStyle; }
         this.style.textDecorationStyle = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Decoration Thickness
-     * @desc: Specifies the thickness of the decoration line. The equivalent of CSS attribute `textDecorationThickness`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_decoration_thickness(): string;
     text_decoration_thickness(value: string | number): this;
+    /**
+     * {Text Decoration Thickness}
+     * Specifies the thickness of the decoration line. The equivalent of CSS attribute `textDecorationThickness`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_decoration_thickness(value?: string | number): string | this {
         if (value == null) { return this.style.textDecorationThickness; }
         this.style.textDecorationThickness = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Emphasis
-     * @desc: Applies emphasis marks to text, equivalent to the CSS attribute `textEmphasis`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_emphasis(): string;
     text_emphasis(value: string): this;
+    /**
+     * {Text Emphasis}
+     * Applies emphasis marks to text, equivalent to the CSS attribute `textEmphasis`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_emphasis(value?: string): string | this {
         if (value == null) { return this.style.textEmphasis; }
         this.style.textEmphasis = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Indent
-     * @desc: Specifies the indentation of the first line in a text-block, equivalent to the CSS `textIndent` property. 
-     *        Retrieves the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign for the text indent. Pass `null` to retrieve the current value.
-     * @return:
-     *     @description Returns the instance of the element for chaining when a value is set. If `null` is passed, returns the current text indent value.
-     * @funcs: 2
-     */
     text_indent(): string;
     text_indent(value: string | number): this;
+    /**
+     * {Text Indent}
+     * Specifies the indentation of the first line in a text-block, equivalent to the CSS `textIndent` property.
+     * Retrieves the attribute value when the parameter `value` is `null`.
+     * @returns ription Returns the instance of the element for chaining when a value is set. If `null` is passed, returns the current text indent value.
+     * @docs
+     */
     text_indent(value?: string | number): string | this {
         if (value == null) { return this.style.textIndent; }
         this.style.textIndent = value.toString();
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Justify
-     * @desc: Specifies the justification method used when text-align is "justify". The equivalent of CSS attribute `textJustify`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_justify(): string;
     text_justify(value: string): this;
+    /**
+     * {Text Justify}
+     * Specifies the justification method used when text-align is "justify". The equivalent of CSS attribute `textJustify`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_justify(value?: string): string | this {
         if (value == null) { return (this.style as any).textJustify; }
         (this.style as any).textJustify = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Orientation
-     * @desc: Defines the orientation of characters in a line, equivalent to the CSS attribute `textOrientation`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_orientation(): string;
     text_orientation(value: string): this;
+    /**
+     * {Text Orientation}
+     * Defines the orientation of characters in a line, equivalent to the CSS attribute `textOrientation`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_orientation(value?: string): string | this {
         if (value == null) { return this.style.textOrientation; }
         this.style.textOrientation = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Overflow
-     * @desc: Specifies what should happen when text overflows the containing element. The equivalent of CSS attribute `textOverflow`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_overflow(): string;
     text_overflow(value: string): this;
+    /**
+     * {Text Overflow}
+     * Specifies what should happen when text overflows the containing element. The equivalent of CSS attribute `textOverflow`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_overflow(value?: string): string | this {
         if (value == null) { return this.style.textOverflow; }
         this.style.textOverflow = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Shadow
-     * @desc: Adds shadow to text. The equivalent of CSS attribute `textShadow`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_shadow(): string;
     text_shadow(value: string): this;
+    /**
+     * {Text Shadow}
+     * Adds shadow to text. The equivalent of CSS attribute `textShadow`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_shadow(value?: string): string | this {
         if (value == null) { return this.style.textShadow; }
         this.style.textShadow = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Transform
-     * @desc: Controls the capitalization of text. The equivalent of CSS attribute `textTransform`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_transform(): string;
     text_transform(value: string): this;
+    /**
+     * {Text Transform}
+     * Controls the capitalization of text. The equivalent of CSS attribute `textTransform`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_transform(value?: string): string | this {
         if (value == null) { return this.style.textTransform; }
         this.style.textTransform = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Text Underline Position
-     * @desc: Specifies the position of the underline which is set using the text-decoration property. 
-     *        The equivalent of CSS attribute `textUnderlinePosition`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     text_underline_position(): string;
     text_underline_position(value: string): this;
+    /**
+     * {Text Underline Position}
+     * Specifies the position of the underline which is set using the text-decoration property.
+     * The equivalent of CSS attribute `textUnderlinePosition`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     text_underline_position(value?: string): string | this {
         if (value == null) { return this.style.textUnderlinePosition; }
         this.style.textUnderlinePosition = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Top
-     * @desc: Specifies the top position of a positioned element. The equivalent of CSS attribute `top`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     top(): string;
     top(value: string | number): this;
+    /**
+     * {Top}
+     * Specifies the top position of a positioned element. The equivalent of CSS attribute `top`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     top(value?: string | number): string | this {
         if (value == null) { return this.style.top; }
         this.style.top = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Transform
-     * @desc: Applies a 2D or 3D transformation to an element. The equivalent of CSS attribute `transform`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     transform(): string;
     transform(value: string): this;
+    /**
+     * {Transform}
+     * Applies a 2D or 3D transformation to an element. The equivalent of CSS attribute `transform`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     transform(value?: string): string | this {
         if (value == null) { return this.style.transform; }
         this.style.transform = value;
@@ -12059,19 +10617,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Transform Origin
-     * @desc: Allows you to change the position on transformed elements. The equivalent of CSS attribute `transformOrigin`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     transform_origin(): string;
     transform_origin(value: string): this;
+    /**
+     * {Transform Origin}
+     * Allows you to change the position on transformed elements. The equivalent of CSS attribute `transformOrigin`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     transform_origin(value?: string): string | this {
         if (value == null) { return this.style.transformOrigin; }
         this.style.transformOrigin = value;
@@ -12082,21 +10636,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Transform Style
-     * @desc: Specifies how nested elements are rendered in 3D space. 
-     *        The equivalent of CSS attribute `transformStyle`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     transform_style(): string;
     transform_style(value: string): this;
+    /**
+     * {Transform Style}
+     * Specifies how nested elements are rendered in 3D space.
+     * The equivalent of CSS attribute `transformStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     transform_style(value?: string): string | this {
         if (value == null) { return this.style.transformStyle; }
         this.style.transformStyle = value;
@@ -12107,20 +10656,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Transition
-     * @desc: A shorthand property for all the transition properties. The equivalent of CSS attribute `transition`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     transition(): string;
     transition(value: string): this;
+    /**
+     * {Transition}
+     * A shorthand property for all the transition properties. The equivalent of CSS attribute `transition`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     transition(value?: string): string | this {
         if (value == null) { return this.style.transition; }
         this.style.transition = value;
@@ -12131,19 +10675,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Transition Delay
-     * @desc: Specifies when the transition effect will start. This corresponds to the CSS attribute `transitionDelay`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     transition_delay(): string;
     transition_delay(value: string | number): this;
+    /**
+     * {Transition Delay}
+     * Specifies when the transition effect will start. This corresponds to the CSS attribute `transitionDelay`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     transition_delay(value?: string | number): string | this {
         if (value == null) { return this.style.transitionDelay; }
         value = value.toString();
@@ -12155,21 +10695,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Transition Duration
-     * @desc: Specifies how many seconds or milliseconds a transition effect takes to complete. 
-     *        The equivalent of CSS attribute `transitionDuration`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     transition_duration(): string | undefined;
     transition_duration(value: string | number): this;
+    /**
+     * {Transition Duration}
+     * Specifies how many seconds or milliseconds a transition effect takes to complete.
+     * The equivalent of CSS attribute `transitionDuration`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     transition_duration(value?: string | number): string | this | undefined {
         if (value == null) { return this.style.transitionDuration; }
         value = value.toString();
@@ -12181,21 +10716,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Transition Property
-     * @desc: Specifies the name of the CSS property the transition effect is for. 
-     *        The equivalent of CSS attribute `transitionProperty`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     transition_property(): string;
     transition_property(value: string): this;
+    /**
+     * {Transition Property}
+     * Specifies the name of the CSS property the transition effect is for.
+     * The equivalent of CSS attribute `transitionProperty`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     transition_property(value?: string): string | this {
         if (value == null) { return this.style.transitionProperty; }
         this.style.transitionProperty = value;
@@ -12206,21 +10736,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Transition Timing Function
-     * @desc: Specifies the speed curve of the transition effect. 
-     *        The equivalent of CSS attribute `transitionTimingFunction`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     transition_timing_function(): string;
     transition_timing_function(value: string): this;
+    /**
+     * {Transition Timing Function}
+     * Specifies the speed curve of the transition effect.
+     * The equivalent of CSS attribute `transitionTimingFunction`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     transition_timing_function(value?: string): string | this {
         if (value == null) { return this.style.transitionTimingFunction; }
         this.style.transitionTimingFunction = value;
@@ -12232,16 +10757,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Translate
-     * @desc: Specifies the position of an element. The equivalent of CSS attribute `translate`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Translate}
+     * Specifies the position of an element. The equivalent of CSS attribute `translate`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     // @ts-ignore
     translate(): string;
@@ -12254,43 +10774,32 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Unicode Bidi
-     * @desc: 
-     *     Used together with the direction property to set or return whether the text should be overridden to support multiple languages in the same document.
-     *     The equivalent of CSS attribute `unicodeBidi`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     unicode_bidi(): string;
     unicode_bidi(value: string): this;
+    /**
+     * {Unicode Bidi}
+     * Used together with the direction property to set or return whether the text should be overridden to support multiple languages in the same document.
+     * The equivalent of CSS attribute `unicodeBidi`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     unicode_bidi(value?: string): string | this {
         if (value == null) { return this.style.unicodeBidi ?? ""; }
         this.style.unicodeBidi = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: User Select
-     * @description: 
-     *     Specifies whether the text of an element can be selected.
-     *     The equivalent of CSS attribute `userSelect`.
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     user_select(): string;
     user_select(value: string): this;
+    /**
+     * {User Select}
+     * Specifies whether the text of an element can be selected.
+     * The equivalent of CSS attribute `userSelect`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     user_select(value?: string): string | this {
         if (value == null) { return this.style.userSelect; }
         this.style.userSelect = value;
@@ -12308,59 +10817,46 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Visibility
-     * @desc: Specifies whether or not an element is visible. The equivalent of CSS attribute `visibility`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     visibility(): string;
     visibility(value: string): this;
+    /**
+     * {Visibility}
+     * Specifies whether or not an element is visible. The equivalent of CSS attribute `visibility`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     visibility(value?: string): string | this {
         if (value == null) { return this.style.visibility; }
         this.style.visibility = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: White space
-     * @desc: Specifies how white-space inside an element is handled. The equivalent of CSS attribute `whiteSpace`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     white_space(): string;
     white_space(value: string): this;
+    /**
+     * {White space}
+     * Specifies how white-space inside an element is handled. The equivalent of CSS attribute `whiteSpace`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     white_space(value?: string): string | this {
         if (value == null) { return this.style.whiteSpace; }
         this.style.whiteSpace = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Widows
-     * @desc: Sets the minimum number of lines that must be left at the top of a page or column. 
-     *        The equivalent of CSS attribute `widows`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     widows(): string;
     widows(value: string | number): this;
+    /**
+     * {Widows}
+     * Sets the minimum number of lines that must be left at the top of a page or column.
+     * The equivalent of CSS attribute `widows`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     widows(value?: string | number): string | this {
         if (value == null) { return this.style.widows; }
         this.style.widows = value.toString();
@@ -12374,79 +10870,61 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Word break
-     * @desc: Specifies how words should break when reaching the end of a line. 
-     *        The equivalent of CSS attribute `wordBreak`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     word_break(): string;
     word_break(value: string): this;
+    /**
+     * {Word break}
+     * Specifies how words should break when reaching the end of a line.
+     * The equivalent of CSS attribute `wordBreak`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     word_break(value?: string): string | this {
         if (value == null) { return this.style.wordBreak; }
         this.style.wordBreak = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Word spacing
-     * @desc: Increases or decreases the space between words in a text. The equivalent of CSS attribute `wordSpacing`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     word_spacing(): string;
     word_spacing(value: string | number): this;
+    /**
+     * {Word spacing}
+     * Increases or decreases the space between words in a text. The equivalent of CSS attribute `wordSpacing`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     word_spacing(value?: string | number): string | this {
         if (value == null) { return this.style.wordSpacing; }
         this.style.wordSpacing = this.pad_numeric(value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Word wrap
-     * @desc: Allows long, unbreakable words to be broken and wrap to the next line. The equivalent of CSS attribute `wordWrap`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     word_wrap(): string;
     word_wrap(value: string): this;
+    /**
+     * {Word wrap}
+     * Allows long, unbreakable words to be broken and wrap to the next line. The equivalent of CSS attribute `wordWrap`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     word_wrap(value?: string): string | this {
         if (value == null) { return this.style.wordWrap; }
         this.style.wordWrap = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Writing mode
-     * @desc: Specifies whether lines of text are laid out horizontally or vertically. The equivalent of CSS attribute `writingMode`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     writing_mode(): string;
     writing_mode(value: string): this;
+    /**
+     * {Writing mode}
+     * Specifies whether lines of text are laid out horizontally or vertically. The equivalent of CSS attribute `writingMode`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     writing_mode(value?: string): string | this {
         if (value == null) { return this.style.writingMode; }
         this.style.writingMode = value;
@@ -12457,19 +10935,15 @@ export abstract class VElement extends HTMLElement {
     // Attribute functions
     // Reference: https://www.w3schools.com/tags/ref_attributes.asp. 
 
-    /**
-     * @docs:
-     * @title: Focusable
-     * @desc: Sets or gets the focusable state of the element based on the `tabindex` attribute.
-     * @param:
-     *     @name: value
-     *     @descr: Boolean value to set focusable state or null to get current state.
-     * @return:
-     *     @description When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the current focusable state.
-     * @funcs: 2
-     */
     focusable(): boolean;
     focusable(value: boolean): this;
+    /**
+     * {Focusable}
+     * Sets or gets the focusable state of the element based on the `tabindex` attribute.
+     * @param value Boolean value to set focusable state or null to get current state.
+     * @returns ription When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the current focusable state.
+     * @docs
+     */
     focusable(value?: boolean | null): boolean | this {
         if (value == null) {
             return super.tabIndex !== -1;
@@ -12480,20 +10954,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Alt
-     * @desc: Specifies an alternate text when the original element fails to display. The equivalent of HTML attribute `alt`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     alt(): string;
     alt(value: string): this;
+    /**
+     * {Alt}
+     * Specifies an alternate text when the original element fails to display. The equivalent of HTML attribute `alt`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     alt(value?: string): string | this {
         // if (value == null) { return this.getAttribute("alt") ?? ""; }
         if (value == null) { return this.getAttribute("alt") ?? ""; }
@@ -12502,20 +10971,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Readonly
-     * @desc: Specifies that the element is read-only, equivalent to the HTML attribute `readonly`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     readonly(): boolean;
     readonly(value: boolean): this;
+    /**
+     * {Readonly}
+     * Specifies that the element is read-only, equivalent to the HTML attribute `readonly`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     readonly(value?: boolean): boolean | this {
         if (value == null) { return this._try_parse_boolean(this.getAttribute("readonly")); }
         if (!value) {
@@ -12527,227 +10991,178 @@ export abstract class VElement extends HTMLElement {
         // Had some bugs with code below.
         // if (value == null) { return this._try_parse_boolean((this as any as HTMLInputElement).readOnly); }
         // (this as any as HTMLInputElement).readOnly = value;
-        
+
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Download
-     * @desc: Specifies that the target will be downloaded when a user clicks on the hyperlink. The equivalent of HTML attribute `download`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     download(): string;
     download(value: string): this;
+    /**
+     * {Download}
+     * Specifies that the target will be downloaded when a user clicks on the hyperlink. The equivalent of HTML attribute `download`.
+     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     download(value?: string): string | this {
         if (value == null) { return this.getAttribute("download") ?? ""; }
         this.setAttribute("download", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Accept
-     * @desc: Specifies the types of files that the server accepts (only for type="file"). The equivalent of HTML attribute `accept`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     accept(): string;
     accept(value: string): this;
+    /**
+     * {Accept}
+     * Specifies the types of files that the server accepts (only for type="file"). The equivalent of HTML attribute `accept`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     accept(value?: string): string | this {
         if (value == null) { return this.getAttribute("accept") ?? ""; }
         this.setAttribute("accept", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Accept Charset
-     * @desc: Specifies the character encodings that are to be used for the form submission. 
-     *        The equivalent of HTML attribute `accept_charset`. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     accept_charset(): string;
     accept_charset(value: string): this;
+    /**
+     * {Accept Charset}
+     * Specifies the character encodings that are to be used for the form submission.
+     * The equivalent of HTML attribute `accept_charset`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     accept_charset(value?: string): string | this {
         if (value == null) { return super.acceptCharset ?? ""; }
         super.acceptCharset = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Action
-     * @desc: Specifies where to send the form-data when a form is submitted. 
-     *        The equivalent of HTML attribute `action`. 
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     action(): string;
     action(value: string): this;
+    /**
+     * {Action}
+     * Specifies where to send the form-data when a form is submitted.
+     * The equivalent of HTML attribute `action`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @docs
+     */
     action(value?: string): string | this {
         if (value == null) { return this.getAttribute("action") ?? ""; }
         this.setAttribute("action", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Async
-     * @desc: Specifies that the script is executed asynchronously (only for external scripts). 
-     *        The equivalent of HTML attribute `async`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     async(): boolean;
     async(value: boolean): this;
+    /**
+     * {Async}
+     * Specifies that the script is executed asynchronously (only for external scripts).
+     * The equivalent of HTML attribute `async`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     async(value?: boolean): boolean | this {
         if (value == null) { return this._try_parse_boolean(this.getAttribute("async")); }
         this.setAttribute("async", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Auto complete
-     * @desc: Specifies whether the \<form> or the \<input> element should have autocomplete enabled. 
-     *        The equivalent of HTML attribute `autocomplete`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     auto_complete(): "" | "on" | "off";
     auto_complete(value: "" | "on" | "off"): this;
+    /**
+     * {Auto complete}
+     * Specifies whether the \<form> or the \<input> element should have autocomplete enabled.
+     * The equivalent of HTML attribute `autocomplete`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     auto_complete(value?: "" | "on" | "off"): "" | "on" | "off" | this {
         if (value == null) { return super.autocomplete ?? ""; }
         super.autocomplete = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Auto Focus
-     * @desc: Specifies that the element should automatically get focus when the page loads. 
-     *        The equivalent of HTML attribute `autofocus`. 
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     auto_focus(): boolean;
     auto_focus(value: boolean): this;
+    /**
+     * {Auto Focus}
+     * Specifies that the element should automatically get focus when the page loads.
+     * The equivalent of HTML attribute `autofocus`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     auto_focus(value?: boolean): boolean | this {
         if (value == null) { return super.autofocus ?? false; }
         super.autofocus = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Auto Play
-     * @desc: Specifies that the audio/video will start playing as soon as it is ready. 
-     *        The equivalent of HTML attribute `autoplay`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     auto_play(): boolean;
     auto_play(value: boolean): this;
+    /**
+     * {Auto Play}
+     * Specifies that the audio/video will start playing as soon as it is ready.
+     * The equivalent of HTML attribute `autoplay`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     auto_play(value?: boolean): this | boolean {
         if (value == null) { return this._try_parse_boolean(super.autoplay); }
         super.autoplay = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Charset
-     * @desc: Specifies the character encoding, equivalent to the HTML attribute `charset`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     charset(): string;
     charset(value: string): this;
+    /**
+     * {Charset}
+     * Specifies the character encoding, equivalent to the HTML attribute `charset`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     charset(value?: string): this | string {
         if (value == null) { return this.getAttribute("charset") ?? ""; }
         this.setAttribute("charset", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Checked
-     * @desc: Specifies that an \<input> element should be pre-selected when the page loads (for type="checkbox" or type="radio"). The equivalent of HTML attribute `checked`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     checked(): boolean;
     checked(value: boolean): this;
+    /**
+     * {Checked}
+     * Specifies that an \<input> element should be pre-selected when the page loads (for type="checkbox" or type="radio"). The equivalent of HTML attribute `checked`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     checked(value?: boolean): this | boolean {
-        if (value == null) { return this._try_parse_boolean(this._checked.get.call(this)); }
-        this._checked.set.call(this, value)
-        // if (value == null) { return this._try_parse_boolean(this.getAttribute("checked")); }
-        // this.setAttribute("checked", value);
+        // if (value == null) { return this._try_parse_boolean(super.checked); }
+        // super.checked = value;
+        if (value == null) { return this._try_parse_boolean(this.getAttribute("checked")); }
+        this.setAttribute("checked", value);
+        // if (value == null) { return this._try_parse_boolean(this._checked.get.call(this)); }
+        // this._checked.set.call(this, value)
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Cite
-     * @desc: Specifies a URL which explains the quote/deleted/inserted text. The equivalent of HTML attribute `cite`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     cite(): string;
     cite(value: string): this;
+    /**
+     * {Cite}
+     * Specifies a URL which explains the quote/deleted/inserted text. The equivalent of HTML attribute `cite`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     cite(value?: string): string | this {
         if (value == null) { return this.getAttribute("cite") ?? ""; }
         this.setAttribute("cite", value);
@@ -12761,40 +11176,30 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Cols
-     * @desc: Specifies the visible width of a text area, equivalent to the HTML attribute `cols`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     cols(): null | number;
     cols(value: number): this;
+    /**
+     * {Cols}
+     * Specifies the visible width of a text area, equivalent to the HTML attribute `cols`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     cols(value?: number): this | null | number {
         if (value == null) { return this._try_parse_float(super.getAttribute("cols"), null); }
         this.setAttribute("cols", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Colspan
-     * @desc: Specifies the number of columns a table cell should span. The equivalent of HTML attribute `colspan`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     colspan(): null | number;
     colspan(value: number): this;
+    /**
+     * {Colspan}
+     * Specifies the number of columns a table cell should span. The equivalent of HTML attribute `colspan`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     colspan(value?: number): this | null | number {
         if (value == null) { return this._try_parse_float(this.getAttribute("cols"), null); }
         this.setAttribute("colspan", value);
@@ -12803,17 +11208,17 @@ export abstract class VElement extends HTMLElement {
 
     // @duplicate
     /**
-     * docs:
-     * @title: Content
-     * @desc: Retrieves or sets the value associated with the http-equiv or name attribute. 
-     *        When `value` is `null`, the current attribute value is returned. 
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the current attribute value if `value` is `null`, otherwise returns the instance for chaining.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: Content
+        * @desc: Retrieves or sets the value associated with the http-equiv or name attribute. 
+        *        When `value` is `null`, the current attribute value is returned. 
+        * @param:
+        *     @name: value
+        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+        * @return:
+        *     @descr: Returns the current attribute value if `value` is `null`, otherwise returns the instance for chaining.
+        * @funcs: 2
+        */
     // content(): string;
     // content(value: string | number): this;
     // content(value?: string | number): string | this {
@@ -12822,140 +11227,108 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Content editable
-     * @desc: Specifies whether the content of an element is editable or not. 
-     *        The equivalent of HTML attribute `contenteditable`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     content_editable(): boolean;
     content_editable(value: boolean): this;
+    /**
+     * {Content editable}
+     * Specifies whether the content of an element is editable or not.
+     * The equivalent of HTML attribute `contenteditable`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     content_editable(value?: boolean): boolean | this {
         if (value == null) { return this._try_parse_boolean(super.contentEditable); }
         super.contentEditable = value ? "true" : "false";
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Controls
-     * @desc: Specifies that audio/video controls should be displayed (such as a play/pause button etc). The equivalent of HTML attribute `controls`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     controls(): boolean;
     controls(value: boolean): this;
+    /**
+     * {Controls}
+     * Specifies that audio/video controls should be displayed (such as a play/pause button etc). The equivalent of HTML attribute `controls`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     controls(value?: boolean): this | boolean {
         if (value == null) { return this._try_parse_boolean(super.getAttribute("controls")); }
         this.setAttribute("controls", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Coords
-     * @desc: Specifies the coordinates of the area, equivalent to the HTML attribute `coords`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
-     * @funcs: 2
-     */
     coords(): string;
     coords(value: string): this;
+    /**
+     * {Coords}
+     * Specifies the coordinates of the area, equivalent to the HTML attribute `coords`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
+     * @docs
+     */
     coords(value?: string): string | this {
         if (value == null) { return this.getAttribute("coords") ?? ""; }
         this.setAttribute("coords", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Data
-     * @desc: Specifies the URL of the resource to be used by the object. 
-     *        The equivalent of HTML attribute `data`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     data(): string;
     data(value: string | number): this;
+    /**
+     * {Data}
+     * Specifies the URL of the resource to be used by the object.
+     * The equivalent of HTML attribute `data`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     data(value?: string | number): this | string {
         if (value == null) { return this.getAttribute("data") ?? ""; }
         this.setAttribute("data", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Datetime
-     * @desc: Specifies the date and time. The equivalent of HTML attribute `datetime`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     datetime(): string;
     datetime(value: string): this;
+    /**
+     * {Datetime}
+     * Specifies the date and time. The equivalent of HTML attribute `datetime`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     datetime(value?: string): string | this {
         if (value == null) { return super.dateTime ?? ""; }
         super.dateTime = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Default
-     * @desc: Specifies that the track is to be enabled if the user's preferences do not indicate that another track would be more appropriate. The equivalent of HTML attribute `default`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     default(): boolean;
     default(value: boolean): this;
+    /**
+     * {Default}
+     * Specifies that the track is to be enabled if the user's preferences do not indicate that another track would be more appropriate. The equivalent of HTML attribute `default`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     default(value?: boolean): boolean | this {
         if (value == null) { return this._try_parse_boolean(this.getAttribute("default")); }
         this.setAttribute("default", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Defer
-     * @desc: Specifies that the script is executed when the page has finished parsing (only for external scripts). 
-     *        The equivalent of HTML attribute `defer`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     defer(): boolean;
     defer(value: boolean): this;
+    /**
+     * {Defer}
+     * Specifies that the script is executed when the page has finished parsing (only for external scripts).
+     * The equivalent of HTML attribute `defer`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     defer(value?: boolean): this | boolean {
         if (value == null) { return this._try_parse_boolean(this.getAttribute("defer")); }
         this.setAttribute("defer", value);
@@ -12963,16 +11336,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Dir
-     * @desc: Specifies the text direction for the content in an element. The equivalent of HTML attribute `dir`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Dir}
+     * Specifies the text direction for the content in an element. The equivalent of HTML attribute `dir`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     // @ts-ignore
     dir(): string;
@@ -12985,59 +11353,47 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Dirname
-     * @desc: Specifies that the text direction will be submitted. The equivalent of HTML attribute `dirname`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     dirname(): string;
     dirname(value: string): this;
+    /**
+     * {Dirname}
+     * Specifies that the text direction will be submitted. The equivalent of HTML attribute `dirname`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     dirname(value?: string): string | this {
         if (value == null) { return this.getAttribute("dirname") ?? ""; }
         this.setAttribute("dirname", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Disabled
-     * @desc: Specifies that the specified element/group of elements should be disabled. 
-     *        The equivalent of HTML attribute `disabled`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     disabled(): boolean;
     disabled(value: boolean): this;
+    /**
+     * {Disabled}
+     * Specifies that the specified element/group of elements should be disabled.
+     * The equivalent of HTML attribute `disabled`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     disabled(value?: boolean): boolean | this {
-        if (value == null) { return this._try_parse_boolean(this._disabled.get.call(this)); }
-        this._disabled.set.call(this, value)
-        // if (value == null) { return this._try_parse_boolean(this.getAttribute("disabled")); }
-        // this.setAttribute("disabled", value);
+        // if (value == null) { return this._try_parse_boolean(super.disabled); }
+        // super.disabled = value;
+        if (value == null) { return this._try_parse_boolean(this.getAttribute("disabled")); }
+        this.setAttribute("disabled", value);
+        // if (value == null) { return this._try_parse_boolean(this._disabled.get.call(this)); }
+        // this._disabled.set.call(this, value)
         return this;
     }
 
     /**
-     * @docs:
-     * @title: Draggable
-     * @desc: Specifies whether an element is draggable or not. The equivalent of HTML attribute `draggable`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Draggable}
+     * Specifies whether an element is draggable or not. The equivalent of HTML attribute `draggable`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     // @ts-ignore
     draggable(): boolean;
@@ -13050,40 +11406,32 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Enctype
-     * @desc: Specifies how the form-data should be encoded when submitting it to the server (only for method="post"). 
-     *        The equivalent of HTML attribute `enctype`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     enctype(): string;
     enctype(value: string): this;
+    /**
+     * {Enctype}
+     * Specifies how the form-data should be encoded when submitting it to the server (only for method="post").
+     * The equivalent of HTML attribute `enctype`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     enctype(value?: string): string | this {
         if (value == null) { return this.getAttribute("enctype") ?? ""; }
         this.setAttribute("enctype", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: For
-     * @desc: Specifies which form element(s) a label/calculation is bound to. 
-     *        The equivalent of HTML attribute `for`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     for(): string;
     for(value: string): this;
+    /**
+     * {For}
+     * Specifies which form element(s) a label/calculation is bound to.
+     * The equivalent of HTML attribute `for`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     for(value?: string): string | this {
         if (value == null) { return this.getAttribute("for") ?? ""; }
         this.setAttribute("for", value);
@@ -13091,16 +11439,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Form
-     * @desc: Specifies the name of the form the element belongs to. The equivalent of HTML attribute `form`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object when a value is set. If `null`, returns the attribute's value.
-     * @funcs: 2
+     * {Form}
+     * Specifies the name of the form the element belongs to. The equivalent of HTML attribute `form`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object when a value is set. If `null`, returns the attribute's value.
+     * @docs
      */
     // @ts-ignore
     // form(): undefined | HTMLFormElement;
@@ -13113,40 +11456,32 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Form Action
-     * @desc: Specifies where to send the form-data when a form is submitted. Only for type="submit". 
-     *        The equivalent of HTML attribute `formaction`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     form_action(): string;
     form_action(value: string): this;
+    /**
+     * {Form Action}
+     * Specifies where to send the form-data when a form is submitted. Only for type="submit".
+     * The equivalent of HTML attribute `formaction`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     form_action(value?: string): string | this {
         if (value == null) { return super.formAction ?? ""; }
         super.formAction = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Headers
-     * @desc: Specifies one or more headers cells a cell is related to. 
-     *        The equivalent of HTML attribute `headers`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     headers(): string;
     headers(value: string): this;
+    /**
+     * {Headers}
+     * Specifies one or more headers cells a cell is related to.
+     * The equivalent of HTML attribute `headers`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     headers(value?: string): this | string {
         if (value == null) { return this.getAttribute("headers") ?? ""; }
         this.setAttribute("headers", value);
@@ -13167,82 +11502,64 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-     * @docs:
-     * @title: High
-     * @desc: Specifies the range that is considered to be a high value. The equivalent of HTML attribute `high`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     high(): string;
     high(value: string | number): this;
+    /**
+     * {High}
+     * Specifies the range that is considered to be a high value. The equivalent of HTML attribute `high`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     high(value?: string | number): string | this {
         if (value == null) { return this.getAttribute("high") ?? ""; }
         this.setAttribute("high", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Href
-     * @desc: Specifies the URL of the page the link goes to. The equivalent of HTML attribute `href`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     href(): string;
     href(value: string): this;
+    /**
+     * {Href}
+     * Specifies the URL of the page the link goes to. The equivalent of HTML attribute `href`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     href(value?: string): string | this {
-        if (value == null) { return this._href.get.call(this) ?? ""; }
-        this._href.set.call(this, value);
-        // if (value == null) { return this.getAttribute("href") ?? ""; }
-        // this.setAttribute("href", value);
+        // if (value == null) { return super.href ?? ""; }
+        // super.href = value;
+        if (value == null) { return this.getAttribute("href") ?? ""; }
+        this.setAttribute("href", value);
+        // if (value == null) { return this._href.get.call(this) ?? ""; }
+        // this._href.set.call(this, value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Href lang
-     * @desc: Specifies the language of the linked document. The equivalent of HTML attribute `hreflang`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     href_lang(): string;
     href_lang(value: string): this;
+    /**
+     * {Href lang}
+     * Specifies the language of the linked document. The equivalent of HTML attribute `hreflang`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     href_lang(value?: string): string | this {
         if (value == null) { return super.hreflang ?? ""; }
         super.hreflang = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Http Equiv
-     * @desc: Provides an HTTP header for the information/value of the content attribute. 
-     *        The equivalent of HTML attribute `http_equiv`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     http_equiv(): string;
     http_equiv(value: string): this;
+    /**
+     * {Http Equiv}
+     * Provides an HTTP header for the information/value of the content attribute.
+     * The equivalent of HTML attribute `http_equiv`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     http_equiv(value?: string): this | string {
         if (value == null) { return super.httpEquiv ?? ""; }
         super.httpEquiv = value;
@@ -13250,16 +11567,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Id
-     * @desc: Specifies a unique id for an element, equivalent to the HTML attribute `id`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Id}
+     * Specifies a unique id for an element, equivalent to the HTML attribute `id`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     // @ts-ignore
     id(): string;
@@ -13267,68 +11579,53 @@ export abstract class VElement extends HTMLElement {
     id(value: string): this;
     // @ts-ignore
     id(value?: string): string | this {
-        if (value == null) { return this._id.get.call(this) ?? ""; }
-        this._id.set.call(this, value);
+        if (value == null) { return super.id ?? ""; }
+        super.id = value;
         // if (value == null) { return this.getAttribute("id") ?? ""; }
         // this.setAttribute("id", value);
+        // if (value == null) { return this._id.get.call(this) ?? ""; }
+        // this._id.set.call(this, value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Is Map
-     * @desc: Specifies an image as a server-side image map. The equivalent of HTML attribute `ismap`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type boolean, null
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     is_map(): boolean;
     is_map(value: boolean): this;
+    /**
+     * {Is Map}
+     * Specifies an image as a server-side image map. The equivalent of HTML attribute `ismap`.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     is_map(value?: boolean): boolean | this {
         if (value == null) { return this._try_parse_boolean(super.isMap); }
         super.isMap = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Kind
-     * @desc: Specifies the kind of text track. The equivalent of HTML attribute `kind`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     kind(): string;
     kind(value: string): this;
+    /**
+     * {Kind}
+     * Specifies the kind of text track. The equivalent of HTML attribute `kind`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     kind(value?: string): string | this {
         if (value == null) { return this.getAttribute("kind") ?? ""; }
         this.setAttribute("kind", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Label
-     * @desc: Specifies the title of the text track, equivalent to the HTML attribute `label`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     label(): string;
     label(value: string): this;
+    /**
+     * {Label}
+     * Specifies the title of the text track, equivalent to the HTML attribute `label`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     label(value?: string): string | this {
         if (value == null) { return this.getAttribute("label") ?? ""; }
         this.setAttribute("label", value);
@@ -13336,16 +11633,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Lang
-     * @desc: Specifies the language of the element's content, equivalent to the HTML attribute `lang`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Lang}
+     * Specifies the language of the element's content, equivalent to the HTML attribute `lang`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     // @ts-ignore
     lang(): string;
@@ -13359,16 +11651,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: List
-     * @desc: Refers to a \<datalist> element that contains pre-defined options for an \<input> element. 
-     *        The equivalent of HTML attribute `list`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {List}
+     * Refers to a \<datalist> element that contains pre-defined options for an \<input> element.
+     * The equivalent of HTML attribute `list`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     // // @ts-ignore
     // list(): string;
@@ -13381,80 +11669,61 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Loop
-     * @desc: Specifies that the audio/video will start over again, every time it is finished. 
-     *        The equivalent of HTML attribute `loop`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     loop(): boolean;
     loop(value: boolean): this;
+    /**
+     * {Loop}
+     * Specifies that the audio/video will start over again, every time it is finished.
+     * The equivalent of HTML attribute `loop`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     loop(value?: boolean): this | boolean {
         if (value == null) { return this._try_parse_boolean(this.getAttribute("loop")); }
         this.setAttribute("loop", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Low
-     * @desc: Specifies the range that is considered to be a low value. The equivalent of HTML attribute `low`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @descr: Returns the `VElement` object for chaining. If `value` is `null`, the attribute's value is returned.
-     * @funcs: 2
-     */
     low(): string;
     low(value: string | number): this;
+    /**
+     * {Low}
+     * Specifies the range that is considered to be a low value. The equivalent of HTML attribute `low`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining. If `value` is `null`, the attribute's value is returned.
+     * @docs
+     */
     low(value?: string | number): string | this {
         if (value == null) { return this.getAttribute("low") ?? ""; }
         this.setAttribute("low", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Max
-     * @desc: Specifies the maximum value, equivalent to the HTML attribute `max`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
-     * @funcs: 2
-     */
     max(): string;
     max(value: string): this;
+    /**
+     * {Max}
+     * Specifies the maximum value, equivalent to the HTML attribute `max`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @docs
+     */
     max(value?: string): string | this {
         if (value == null) { return this.getAttribute("max") ?? ""; }
         this.setAttribute("max", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Max Length
-     * @desc: Specifies the maximum number of characters allowed in an element. The equivalent of HTML attribute `maxlength`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     max_length(): null | number;
     max_length(value: number): this;
+    /**
+     * {Max Length}
+     * Specifies the maximum number of characters allowed in an element. The equivalent of HTML attribute `maxlength`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     max_length(value?: number): this | null | number {
         if (value == null) { return this._try_parse_float(super.maxlength, null); }
         super.maxlength = value;
@@ -13468,20 +11737,15 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Method
-     * @desc: Specifies the HTTP method to use when sending form-data. The equivalent of HTML attribute `method`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     method(): string;
     method(value: string): this;
+    /**
+     * {Method}
+     * Specifies the HTTP method to use when sending form-data. The equivalent of HTML attribute `method`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     method(value?: string): this | string {
         if (value == null) { return this.getAttribute("method") ?? ""; }
         this.setAttribute("method", value);
@@ -13489,16 +11753,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Min
-     * @desc: Specifies a minimum value, equivalent to the HTML attribute `min`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Min}
+     * Specifies a minimum value, equivalent to the HTML attribute `min`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     // @ts-ignore
     min(): string;
@@ -13511,42 +11770,31 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Multiple
-     * @desc: Specifies that a user can enter more than one value. The equivalent of HTML attribute `multiple`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     multiple(): boolean;
     multiple(value: boolean): this;
+    /**
+     * {Multiple}
+     * Specifies that a user can enter more than one value. The equivalent of HTML attribute `multiple`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     multiple(value?: boolean): boolean | this {
         if (value == null) { return this._try_parse_boolean(this.getAttribute("multiple")); }
         this.setAttribute("multiple", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Muted
-     * @desc: Specifies that the audio output of the video should be muted. 
-     *        The equivalent of HTML attribute `muted`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type boolean, null
-     * @return:
-     *     @description: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     muted(): boolean;
     muted(value: boolean): this;
+    /**
+     * {Muted}
+     * Specifies that the audio output of the video should be muted.
+     * The equivalent of HTML attribute `muted`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     muted(value?: boolean): boolean | this {
         if (value == null) { return this._try_parse_boolean(super.getAttribute("muted")); }
         this.setAttribute("muted", value);
@@ -13560,368 +11808,282 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-     * @docs:
-     * @title: No validate
-     * @desc: Specifies that the form should not be validated when submitted. The equivalent of HTML attribute `novalidate`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     no_validate(): boolean;
     no_validate(value: boolean): this;
+    /**
+     * {No validate}
+     * Specifies that the form should not be validated when submitted. The equivalent of HTML attribute `novalidate`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     no_validate(value?: boolean): this | boolean {
         if (value == null) { return this._try_parse_boolean(super.novalidate); }
         super.novalidate = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Open
-     * @desc: Specifies that the details should be visible (open) to the user. 
-     *        The equivalent of HTML attribute `open`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type boolean, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     open(): boolean;
     open(value: boolean): this;
+    /**
+     * {Open}
+     * Specifies that the details should be visible (open) to the user.
+     * The equivalent of HTML attribute `open`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     open(value?: boolean): boolean | this {
         if (value == null) { return this._try_parse_boolean(super.getAttribute("open")); }
         this.setAttribute("open", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Optimum
-     * @desc: Specifies what value is the optimal value for the gauge. The equivalent of HTML attribute `optimum`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     optimum(): null | number;
     optimum(value: number): this;
+    /**
+     * {Optimum}
+     * Specifies what value is the optimal value for the gauge. The equivalent of HTML attribute `optimum`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     optimum(value?: number): this | null | number {
         if (value == null) { return this._try_parse_float(super.getAttribute("optimum"), null); }
         this.setAttribute("optimum", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Pattern
-     * @desc: Specifies a regular expression that an \<input> element's value is checked against. 
-     *        The equivalent of HTML attribute `pattern`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     pattern(): string;
     pattern(value: string): this;
+    /**
+     * {Pattern}
+     * Specifies a regular expression that an \<input> element's value is checked against.
+     * The equivalent of HTML attribute `pattern`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     pattern(value?: string): string | this {
         if (value == null) { return this.getAttribute("pattern") ?? ""; }
         this.setAttribute("pattern", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Placeholder
-     * @desc: Specifies a short hint that describes the expected value of the element. 
-     *        The equivalent of HTML attribute `placeholder`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     placeholder(): string;
     placeholder(value: string): this;
+    /**
+     * {Placeholder}
+     * Specifies a short hint that describes the expected value of the element.
+     * The equivalent of HTML attribute `placeholder`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     placeholder(value?: string): string | this {
         if (value == null) { return this.getAttribute("placeholder") ?? ""; }
         this.setAttribute("placeholder", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Poster
-     * @desc: Specifies an image to be shown while the video is downloading, or until the user hits the play button. 
-     *        The equivalent of HTML attribute `poster`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     poster(): string;
     poster(value: string): this;
+    /**
+     * {Poster}
+     * Specifies an image to be shown while the video is downloading, or until the user hits the play button.
+     * The equivalent of HTML attribute `poster`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     poster(value?: string): string | this {
         if (value == null) { return this.getAttribute("poster") ?? ""; }
         this.setAttribute("poster", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Preload
-     * @desc: Specifies if and how the author thinks the audio/video should be loaded when the page loads. 
-     *        The equivalent of HTML attribute `preload`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     preload(): string;
     preload(value: string): this;
+    /**
+     * {Preload}
+     * Specifies if and how the author thinks the audio/video should be loaded when the page loads.
+     * The equivalent of HTML attribute `preload`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     preload(value?: string): string | this {
         if (value == null) { return this.getAttribute("preload") ?? ""; }
         this.setAttribute("preload", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Rel
-     * @desc: Specifies the relationship between the current document and the linked document. 
-     *        The equivalent of HTML attribute `rel`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     rel(): string;
     rel(value: string): this;
+    /**
+     * {Rel}
+     * Specifies the relationship between the current document and the linked document.
+     * The equivalent of HTML attribute `rel`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     rel(value?: string): string | this {
         if (value == null) { return this.getAttribute("rel") ?? ""; }
         this.setAttribute("rel", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Required
-     * @desc: Specifies that the element must be filled out before submitting the form. The equivalent of HTML attribute `required`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object when a value is assigned. Returns the attribute's value when `value` is `null`.
-     * @funcs: 2
-     */
     required(): boolean;
     required(value: boolean): this;
+    /**
+     * {Required}
+     * Specifies that the element must be filled out before submitting the form. The equivalent of HTML attribute `required`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object when a value is assigned. Returns the attribute's value when `value` is `null`.
+     * @docs
+     */
     required(value?: boolean): boolean | this {
         if (value == null) { return this._try_parse_boolean(this.getAttribute("required")); }
         this.setAttribute("required", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Reversed
-     * @desc: Specifies that the list order should be descending (9,8,7...). This is the equivalent of the HTML attribute `reversed`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     reversed(): boolean;
     reversed(value: boolean): this;
+    /**
+     * {Reversed}
+     * Specifies that the list order should be descending (9,8,7...). This is the equivalent of the HTML attribute `reversed`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     reversed(value?: boolean): this | boolean {
         if (value == null) { return this._try_parse_boolean(this.getAttribute("reversed")); }
         this.setAttribute("reversed", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Rows
-     * @desc: Specifies the visible number of lines in a text area. 
-     *        The equivalent of HTML attribute `rows`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     rows(): null | number;
     rows(value: number): this;
+    /**
+     * {Rows}
+     * Specifies the visible number of lines in a text area.
+     * The equivalent of HTML attribute `rows`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     rows(value?: number): null | number | this {
         if (value == null) { return this._try_parse_float(this.getAttribute("rows"), null); }
         this.setAttribute("rows", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Row Span
-     * @desc: Specifies the number of rows a table cell should span. 
-     *        The equivalent of HTML attribute `rowspan`. 
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type number, null
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, 
-     *                  then the attribute's value is returned.
-     * @funcs: 2
-     */
     row_span(): null | number;
     row_span(value: number): this;
+    /**
+     * {Row Span}
+     * Specifies the number of rows a table cell should span.
+     * The equivalent of HTML attribute `rowspan`.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`,
+     * then the attribute's value is returned.
+     * @docs
+     */
     row_span(value?: number): this | null | number {
         if (value == null) { return this._try_parse_float(super.rowspan, null); }
         super.rowspan = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Sandbox
-     * @desc: Enables an extra set of restrictions for the content in an \<iframe>. The equivalent of HTML attribute `sandbox`. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     sandbox(): string;
     sandbox(value: string): this;
+    /**
+     * {Sandbox}
+     * Enables an extra set of restrictions for the content in an \<iframe>. The equivalent of HTML attribute `sandbox`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     sandbox(value?: string): string | this {
         if (value == null) { return this.getAttribute("sandbox") ?? ""; }
         this.setAttribute("sandbox", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Scope
-     * @desc: Specifies whether a header cell is a header for a column, row, or group of columns or rows. 
-     *        The equivalent of HTML attribute `scope`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     scope(): string;
     scope(value: string): this;
+    /**
+     * {Scope}
+     * Specifies whether a header cell is a header for a column, row, or group of columns or rows.
+     * The equivalent of HTML attribute `scope`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     scope(value?: string): string | this {
-        if (value == null) { return  this.getAttribute("scope") ?? ""; }
+        if (value == null) { return this.getAttribute("scope") ?? ""; }
         this.setAttribute("scope", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Selected
-     * @desc: Specifies that an option should be pre-selected when the page loads. The equivalent of HTML attribute `selected`. 
-     *         Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     selected(): boolean;
     selected(value: boolean): this;
+    /**
+     * {Selected}
+     * Specifies that an option should be pre-selected when the page loads. The equivalent of HTML attribute `selected`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     selected(value?: boolean): boolean | this {
-        if (value == null) { return this._try_parse_boolean(this._selected.get.call(this)); }
-        this._selected.set.call(this, value)
-        // if (value == null) { return this._try_parse_boolean(this.getAttribute("selected")); }
-        // this.setAttribute("selected", value);
+        // if (value == null) { return this._try_parse_boolean(super.selected); }
+        // super.selected = value;
+        if (value == null) { return this._try_parse_boolean(this.getAttribute("selected")); }
+        this.setAttribute("selected", value);
+        // if (value == null) { return this._try_parse_boolean(this._selected.get.call(this)); }
+        // this._selected.set.call(this, value)
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Shape
-     * @desc: Specifies the shape of the area. The equivalent of HTML attribute `shape`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type string, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     shape(): string;
     shape(value: string): this;
+    /**
+     * {Shape}
+     * Specifies the shape of the area. The equivalent of HTML attribute `shape`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     shape(value?: string): string | this {
         if (value == null) { return this.getAttribute("shape") ?? ""; }
         this.setAttribute("shape", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Size
-     * @desc: Specifies the width, in characters (for \<input>) or specifies the number of visible options (for \<select>). 
-     *        The equivalent of HTML attribute `size`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
-     */
     size(): null | number;
     size(value: number): this;
+    /**
+     * {Size}
+     * Specifies the width, in characters (for \<input>) or specifies the number of visible options (for \<select>).
+     * The equivalent of HTML attribute `size`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @docs
+     */
     size(value?: number): null | number | this {
         if (value == null) { return this._try_parse_float(super.getAttribute("size"), null); }
         this.setAttribute("size", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Sizes
-     * @desc: Specifies the size of the linked resource. The equivalent of HTML attribute `sizes`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     sizes(): string;
     sizes(value: string): this;
+    /**
+     * {Sizes}
+     * Specifies the size of the linked resource. The equivalent of HTML attribute `sizes`.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     sizes(value?: string): string | this {
         if (value == null) { return this.getAttribute("sizes") ?? ""; }
         this.setAttribute("sizes", value);
@@ -13929,17 +12091,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Span
-     * @desc: Specifies the number of columns to span. The equivalent of HTML attribute `span`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type number, null
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Span}
+     * Specifies the number of columns to span. The equivalent of HTML attribute `span`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     // @ts-ignore
     span(): null | number;
@@ -13952,20 +12108,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Spell Check
-     * @desc: Specifies whether the element is to have its spelling and grammar checked or not. 
-     *        The equivalent of HTML attribute `spellcheck`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     spell_check(): boolean;
     spell_check(value: boolean): this;
+    /**
+     * {Spell Check}
+     * Specifies whether the element is to have its spelling and grammar checked or not.
+     * The equivalent of HTML attribute `spellcheck`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     spell_check(value?: boolean): boolean | this {
         if (value == null) { return this._try_parse_boolean(super.spellcheck); }
         this.spellcheck = value;
@@ -13973,27 +12125,22 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Src
-     * @desc: Specifies the URL of the media file, equivalent to the HTML attribute `src`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Src}
+     * Specifies the URL of the media file, equivalent to the HTML attribute `src`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     // @ts-ignore
     src(): string;
     // @ts-ignore
     src(value: string, set_aspect_ratio?: boolean): this;
     // @ts-ignore
-    src(value ?: string, set_aspect_ratio: boolean = false): string | this {
-        if (value == null) { return this._src.get.call(this) ?? ""; }
-        this._src.set.call(this, value);
-        // if (value == null) { return this.getAttribute("src") ?? ""; }
-        // console.log("Set aspect ratio?", set_aspect_ratio, "from src", value)
+    src(value?: string, set_aspect_ratio: boolean = false): string | this {
+        // if (value == null) { return this._src.get.call(this) ?? ""; }
+        // this._src.set.call(this, value);
+        if (value == null) { return this.getAttribute("src") ?? ""; }
+        console.log("Set aspect ratio?", set_aspect_ratio, "from src", value)
         if (set_aspect_ratio) {
             const aspect_ratio = Statics.aspect_ratio(value);
             if (aspect_ratio != null) {
@@ -14004,106 +12151,80 @@ export abstract class VElement extends HTMLElement {
             //     console.log("Unknown aspect ratio from src", value)
             // }
         }
-        // this.setAttribute("src", value);
+        this.setAttribute("src", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Src doc
-     * @desc: Specifies the HTML content of the page to show in the \<iframe>. The equivalent of HTML attribute `srcdoc`.
-     *         Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     src_doc(): string;
     src_doc(value: string): this;
+    /**
+     * {Src doc}
+     * Specifies the HTML content of the page to show in the \<iframe>. The equivalent of HTML attribute `srcdoc`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     src_doc(value?: string): string | this {
         if (value == null) { return super.srcdoc ?? ""; }
         super.srcdoc = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Src lang
-     * @desc: Specifies the language of the track text data (required if kind="subtitles"). The equivalent of HTML attribute `srclang`. 
-     *          Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     src_lang(): string;
     src_lang(value: string): this;
+    /**
+     * {Src lang}
+     * Specifies the language of the track text data (required if kind="subtitles"). The equivalent of HTML attribute `srclang`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     src_lang(value?: string): string | this {
         if (value == null) { return super.srclang ?? ""; }
         super.srclang = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Rrsrc set
-     * @desc: Specifies the URL of the image to use in different situations. 
-     *        The equivalent of HTML attribute `srcset`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     rrsrc_set(): string;
     rrsrc_set(value: string): this;
+    /**
+     * {Rrsrc set}
+     * Specifies the URL of the image to use in different situations.
+     * The equivalent of HTML attribute `srcset`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     rrsrc_set(value?: string): this | string {
         if (value == null) { return super.srcset ?? ""; }
         super.srcset = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Start
-     * @desc: Specifies the start value of an ordered list. The equivalent of HTML attribute `start`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     *     @type number, null
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     start(): null | number;
     start(value: number): this;
+    /**
+     * {Start}
+     * Specifies the start value of an ordered list. The equivalent of HTML attribute `start`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     start(value?: number): number | null | this {
         if (value == null) { return this._try_parse_float(super.getAttribute("start"), null); }
         this.setAttribute("start", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Step
-     * @desc: Specifies the legal number intervals for an input field. The equivalent of HTML attribute `step`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     step(): string;
     step(value: string): this;
+    /**
+     * {Step}
+     * Specifies the legal number intervals for an input field. The equivalent of HTML attribute `step`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     step(value?: string): this | string {
         if (value == null) { return this.getAttribute("step") ?? ""; }
         this.setAttribute("step", value);
@@ -14117,19 +12238,15 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-     * @docs:
-     * @title: Tab index
-     * @desc: Specifies the tabbing order of an element, equivalent to the HTML attribute `tabindex`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
-     * @funcs: 2
-     */
     tab_index(): null | number;
     tab_index(value: number): this;
+    /**
+     * {Tab index}
+     * Specifies the tabbing order of an element, equivalent to the HTML attribute `tabindex`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @docs
+     */
     tab_index(value?: number): this | null | number {
         if (value == null) { return this._try_parse_float(super.tabIndex, null); }
         super.tabIndex = value;
@@ -14137,16 +12254,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Target
-     * @desc: Specifies the target for where to open the linked document or where to submit the form. 
-     *        The equivalent of HTML attribute `target`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Target}
+     * Specifies the target for where to open the linked document or where to submit the form.
+     * The equivalent of HTML attribute `target`. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     // @ts-ignore
     target(): string;
@@ -14160,16 +12273,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Title
-     * @desc: Specifies extra information about an element, equivalent to the HTML attribute `title`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Title}
+     * Specifies extra information about an element, equivalent to the HTML attribute `title`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     // @ts-ignore
     title(): string;
@@ -14183,84 +12291,69 @@ export abstract class VElement extends HTMLElement {
     }
 
 
-    /**
-     * @docs:
-     * @title: Type
-     * @desc: Specifies the type of element, equivalent to the HTML attribute `type`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     type(): string;
     type(value: string): this;
+    /**
+     * {Type}
+     * Specifies the type of element, equivalent to the HTML attribute `type`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     type(value?: string): string | this {
         if (value == null) { return this.getAttribute("type") ?? ""; }
         this.setAttribute("type", value);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Use Map
-     * @desc: Specifies an image as a client-side image map, equivalent to the HTML attribute `usemap`.
-     *         Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     use_map(): string;
     use_map(value: string): this;
+    /**
+     * {Use Map}
+     * Specifies an image as a client-side image map, equivalent to the HTML attribute `usemap`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     use_map(value?: string): string | this {
         if (value == null) { return super.useMap ?? ""; }
         super.useMap = value;
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Value
-     * @desc: Specifies the value of the element, equivalent to the HTML attribute `value`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     value(): string;
     value(value: string): this;
+    /**
+     * {Value}
+     * Specifies the value of the element, equivalent to the HTML attribute `value`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     value(value?: string): string | this {
-        if (value == null) {
-            return this._value.get.call(this) ?? "";
-        }
-        this._value.set.call(this, value); // throws an error when used on non input element but that is fine.
-        // if (value == null) {
-        //     return this.getAttribute("value") ?? "";
-        // }
-        // this.setAttribute("value", value);
+        /**
+            * @warning
+            * The actual implementation of for inputs is overriden
+            * in {@link VInputElement.value} and {@link VTextAreaElement.value}, so this method is not used in those classes.
+            * Otherwise the `value` attribute cant be retrieved correctly.
+            */
+        if (value == null) return this.getAttribute("value") ?? "";
+        this.setAttribute("value", value);
         return this;
     }
 
     /**
-     * docs:
-     * @title: On after print
-     * @desc: Script to be run after the document is printed. The equivalent of HTML attribute `onafterprint`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute after printing. It receives the `VElement` object and the event.
-     * @return:
-     *     @description Returns the `VElement` object unless the parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On after print
+        * @desc: Script to be run after the document is printed. The equivalent of HTML attribute `onafterprint`. 
+        *        The first parameter of the callback is the `VElement` object. 
+        * @param:
+        *     @name: callback
+        *     @descr: The callback function to execute after printing. It receives the `VElement` object and the event.
+        * @return:
+        *     @description Returns the `VElement` object unless the parameter `callback` is `null`, then the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_after_print(): Function | undefined;
     // on_after_print(callback: (element: VElement, event:  Event) => any): this;
     // on_after_print(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -14271,16 +12364,16 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * docs:
-     * @title: On before print
-     * @desc: Script to be run before the document is printed. The equivalent of HTML attribute `onbeforeprint`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be executed before printing, receiving the `VElement` object as the first parameter.
-     * @return:
-     *     @description Returns the instance of the element for chaining unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On before print
+        * @desc: Script to be run before the document is printed. The equivalent of HTML attribute `onbeforeprint`.
+        * @param:
+        *     @name: callback
+        *     @descr: The function to be executed before printing, receiving the `VElement` object as the first parameter.
+        * @return:
+        *     @description Returns the instance of the element for chaining unless parameter `callback` is `null`, then the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_before_print(): Function | undefined;
     // on_before_print(callback: (element: VElement, event:  Event) => any): this;
     // on_before_print(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -14291,18 +12384,18 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * docs:
-     * @title: On Before Unload
-     * @desc: Script to be run when the document is about to be unloaded. 
-     *        This is the equivalent of the HTML attribute `onbeforeunload`. 
-     *        The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: callback
-     *     @description: The callback function to execute before unloading the document.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On Before Unload
+        * @desc: Script to be run when the document is about to be unloaded. 
+        *        This is the equivalent of the HTML attribute `onbeforeunload`. 
+        *        The first parameter of the callback is the `VElement` object.
+        * @param:
+        *     @name: callback
+        *     @descr: The callback function to execute before unloading the document.
+        * @return:
+        *     @descr: Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_before_unload(): Function | undefined;
     // on_before_unload(callback: (element: VElement, event:  Event) => any): this;
     // on_before_unload(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -14313,22 +12406,21 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * docs:
-     * @title: On hash change
-     * @desc: 
-     *     Script to be run when there has been changes to the anchor part of a URL.
-     *     The equivalent of HTML attribute `onhashchange`.
-     *     
-     *     The first parameter of the callback is the `VElement` object.
-     *     
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute on hash change.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If parameter `value` is `null`, the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On hash change
+        * @desc: 
+        *     Script to be run when there has been changes to the anchor part of a URL.
+        *     The equivalent of HTML attribute `onhashchange`.
+        *     
+        *     The first parameter of the callback is the `VElement` object.
+        *     
+        * @param:
+        *     @name: callback
+        *     @descr: The callback function to execute on hash change.
+        * @return:
+        *     @description Returns the `VElement` object for chaining. If parameter `value` is `null`, the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_hash_change(): Function | undefined;
     // on_hash_change(callback: (element: VElement, event:  Event) => any): this;
     // on_hash_change(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -14340,21 +12432,19 @@ export abstract class VElement extends HTMLElement {
 
     // Fires after the page is finished loading.
     /*  DEPRC docs:
-     *  @title: On load
-     *  @description: 
-     *      Fires after the page is finished loading.
-     *      The equivalent of HTML attribute `onload`.
-     *      
-     *      The first parameter of the callback is the `VElement` object.
-     *      
-     *      Returns the attribute value when parameter `value` is `null`.
-     *  @return: 
-     *      Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     *  @parameter:
-     *      @name: value
-     *      @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     *  @inherit: false
-     */ 
+        *  @title: On load
+        *  @descr: 
+        *      Fires after the page is finished loading.
+        *      The equivalent of HTML attribute `onload`.
+        *      
+        *      The first parameter of the callback is the `VElement` object.
+        *      
+        *  @return: 
+        *  @parameter:
+        *      @name: value
+        *      @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+        *  @inherit: false
+        */
     // on_load(callback) {
     //  if (callback == null) { return this.onload; }
     //  const e = this;
@@ -14363,22 +12453,21 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * docs:
-     * @title: On message
-     * @desc: 
-     *     Script to be run when the message is triggered.
-     *     The equivalent of HTML attribute `onmessage`.
-     *     
-     *     The first parameter of the callback is the `VElement` object.
-     *     
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On message
+        * @desc: 
+        *     Script to be run when the message is triggered.
+        *     The equivalent of HTML attribute `onmessage`.
+        *     
+        *     The first parameter of the callback is the `VElement` object.
+        *     
+        * @param:
+        *     @name: value
+        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+        * @return:
+        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_message(): Function | undefined;
     // on_message(callback: (element: VElement, event:  Event) => any): this;
     // on_message(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -14389,17 +12478,17 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * docs:
-     * @title: On Offline
-     * @desc: Script to be run when the browser starts to work offline. The equivalent of HTML attribute `onoffline`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On Offline
+        * @desc: Script to be run when the browser starts to work offline. The equivalent of HTML attribute `onoffline`. 
+        *        The first parameter of the callback is the `VElement` object. 
+        * @param:
+        *     @name: value
+        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+        * @return:
+        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_offline(): Function | undefined;
     // on_offline(callback: (element: VElement, event:  Event) => any): this;
     // on_offline(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -14410,18 +12499,18 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * docs:
-     * @title: On online
-     * @desc: Script to be run when the browser starts to work online. 
-     *        The equivalent of HTML attribute `ononline`. 
-     *        The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On online
+        * @desc: Script to be run when the browser starts to work online. 
+        *        The equivalent of HTML attribute `ononline`. 
+        *        The first parameter of the callback is the `VElement` object.
+        * @param:
+        *     @name: value
+        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+        * @return:
+        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_online(): Function | undefined;
     // on_online(callback: (element: VElement, event:  Event) => any): this;
     // on_online(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -14432,18 +12521,18 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * docs:
-     * @title: On page hide
-     * @desc: 
-     *     Script to be run when a user navigates away from a page.
-     *     The equivalent of HTML attribute `onpagehide`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On page hide
+        * @desc: 
+        *     Script to be run when a user navigates away from a page.
+        *     The equivalent of HTML attribute `onpagehide`.
+        * @param:
+        *     @name: value
+        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+        * @return:
+        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_page_hide(): Function | undefined;
     // on_page_hide(callback: (element: VElement, event:  Event) => any): this;
     // on_page_hide(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -14454,19 +12543,19 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * docs:
-     * @title: On page show
-     * @desc: 
-     *     Script to be run when a user navigates to a page.
-     *     The equivalent of HTML attribute `onpageshow`.
-     *     The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On page show
+        * @desc: 
+        *     Script to be run when a user navigates to a page.
+        *     The equivalent of HTML attribute `onpageshow`.
+        *     The first parameter of the callback is the `VElement` object.
+        * @param:
+        *     @name: value
+        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+        * @return:
+        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_page_show(): Function | undefined;
     // on_page_show(callback: ElementEvent<this>): this;
     // on_page_show(callback?: ElementEvent<this>): this | Function | undefined {
@@ -14477,17 +12566,17 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * docs:
-     * @title: On Popstate
-     * @desc: Script to be run when the window's history changes. The equivalent of HTML attribute `onpopstate`. 
-     *        The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute on popstate event.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On Popstate
+        * @desc: Script to be run when the window's history changes. The equivalent of HTML attribute `onpopstate`. 
+        *        The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
+        * @param:
+        *     @name: callback
+        *     @descr: The callback function to execute on popstate event.
+        * @return:
+        *     @description Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_popstate(): Function | undefined;
     // on_popstate(callback: (element: VElement, event: PopStateEvent) => any): this;
     // on_popstate(callback?: (element: VElement, event: PopStateEvent) => any): this | Function | undefined {
@@ -14498,18 +12587,18 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * docs:
-     * @title: On Storage
-     * @desc: Script to be run when a Web Storage area is updated. 
-     *        The equivalent of HTML attribute `onstorage`. 
-     *        The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be executed when storage is updated.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+        * docs:
+        * @title: On Storage
+        * @desc: Script to be run when a Web Storage area is updated. 
+        *        The equivalent of HTML attribute `onstorage`. 
+        *        The first parameter of the callback is the `VElement` object.
+        * @param:
+        *     @name: callback
+        *     @descr: The function to be executed when storage is updated.
+        * @return:
+        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+        * @funcs: 2
+        */
     // on_storage(): Function | undefined;
     // on_storage(callback: (element: VElement, event:  Event) => any): this;
     // on_storage(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -14522,21 +12611,17 @@ export abstract class VElement extends HTMLElement {
     // @deprecated
     // on_unload();
 
-    /**
-     * @docs:
-     * @title: On Blur
-     * @desc: Fires the moment that the element loses focus, similar to the HTML attribute `onblur`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when the element loses focus.
-     * @return:
-     *     @description Returns the `VElement` object unless the parameter `callback` is `null`, 
-     *                  then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_blur(): Function | undefined;
     on_blur(callback: ElementEvent<this>): this;
+    /**
+     * {On Blur}
+     * Fires the moment that the element loses focus, similar to the HTML attribute `onblur`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The function to call when the element loses focus.
+     * @returns ription Returns the `VElement` object unless the parameter `callback` is `null`,
+     * then the attribute's value is returned.
+     * @docs
+     */
     on_blur(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onblur ?? undefined; }
         const e = this;
@@ -14544,19 +12629,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Change
-     * @desc: Fires the moment when the value of the element is changed. The equivalent of HTML attribute `onchange`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when the value changes, receiving the `VElement` object and the event as parameters.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onchange` value.
-     * @funcs: 2
-     */
     on_change(): Function | undefined;
     on_change(callback: ElementEvent<this>): this;
+    /**
+     * {On Change}
+     * Fires the moment when the value of the element is changed. The equivalent of HTML attribute `onchange`. Returns the attribute value when parameter `value` is `null`.
+     * @param callback The function to call when the value changes, receiving the `VElement` object and the event as parameters.
+     * @returns ription Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onchange` value.
+     * @docs
+     */
     on_change(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onchange ?? undefined; }
         const e = this;
@@ -14564,20 +12645,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Focus
-     * @desc: Fires the moment when the element gets focus. This is the equivalent of the HTML attribute `onfocus`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be called when the element gets focus.
-     * @return:
-     *     @description Returns the `VElement` object unless the parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_focus(): Function | undefined;
     on_focus(callback: ElementEvent<this>): this;
+    /**
+     * {On Focus}
+     * Fires the moment when the element gets focus. This is the equivalent of the HTML attribute `onfocus`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The function to be called when the element gets focus.
+     * @returns ription Returns the `VElement` object unless the parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_focus(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onfocus ?? undefined; }
         const e = this;
@@ -14585,22 +12662,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Input
-     * @desc: 
-     *     Script to be run when an element gets user input.
-     *     The equivalent of HTML attribute `oninput`. 
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when user input is detected.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, or the attribute's value if the parameter is `null`.
-     * @funcs: 2
-     */
     on_input(): ElementEvent<this> | undefined;
     on_input(callback: ElementEvent<this>): this;
+    /**
+     * {On Input}
+     * Script to be run when an element gets user input.
+     * The equivalent of HTML attribute `oninput`.
+     * @param callback The function to call when user input is detected.
+     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if the parameter is `null`.
+     * @docs
+     */
     on_input(callback?: ElementEvent<this>): this | ElementEvent<this> | undefined {
         if (callback == null) { return (this.oninput as any) ?? undefined; }
         const e = this;
@@ -14608,19 +12679,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Input
-     * @desc: Script to be run before an element gets user input. The equivalent of HTML attribute `onbeforeinput`.
-     * @param:
-     *     @name: callback
-     *     @description: The function to execute before user input. Receives the `VElement` object and the event as parameters.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining. If `callback` is `null`, returns the current value of `onbeforeinput`.
-     * @funcs: 2
-     */
     on_before_input(): Function | undefined;
     on_before_input(callback: ElementEvent<this>): this;
+    /**
+     * {On Input}
+     * Script to be run before an element gets user input. The equivalent of HTML attribute `onbeforeinput`.
+     * @param callback The function to execute before user input. Receives the `VElement` object and the event as parameters.
+     * @returns r: Returns the `VElement` object for chaining. If `callback` is `null`, returns the current value of `onbeforeinput`.
+     * @docs
+     */
     on_before_input(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return (this.onbeforeinput as any) ?? undefined; }
         const e = this;
@@ -14628,20 +12695,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Invalid
-     * @desc: Script to be run when an element is invalid. The equivalent of HTML attribute `oninvalid`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_invalid(): Function | undefined;
     on_invalid(callback: ElementEvent<this>): this;
+    /**
+     * {On Invalid}
+     * Script to be run when an element is invalid. The equivalent of HTML attribute `oninvalid`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_invalid(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.oninvalid ?? undefined; }
         const e = this;
@@ -14649,20 +12712,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Reset
-     * @desc: Fires when the Reset button in a form is clicked. The equivalent of HTML attribute `onreset`.
-     *         The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when the Reset button is clicked.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_reset(): Function | undefined;
     on_reset(callback: ElementEvent<this>): this;
+    /**
+     * {On Reset}
+     * Fires when the Reset button in a form is clicked. The equivalent of HTML attribute `onreset`.
+     * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
+     * @param callback The function to call when the Reset button is clicked.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_reset(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onreset ?? undefined; }
         const e = this;
@@ -14673,19 +12732,15 @@ export abstract class VElement extends HTMLElement {
     // @deprecated
     // on_search();
 
-    /**
-     * @docs:
-     * @title: On Select
-     * @desc: Fires after some text has been selected in an element. The equivalent of HTML attribute `onselect`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when text is selected. It receives the `VElement` object as the first parameter.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_select(): Function | undefined;
     on_select(callback: ElementEvent<this>): this;
+    /**
+     * {On Select}
+     * Fires after some text has been selected in an element. The equivalent of HTML attribute `onselect`. Returns the attribute value when parameter `value` is `null`.
+     * @param callback The callback function to execute when text is selected. It receives the `VElement` object as the first parameter.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_select(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onselect ?? undefined; }
         const e = this;
@@ -14693,20 +12748,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Submit
-     * @desc: Fires when a form is submitted, similar to the HTML attribute `onsubmit`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute on form submission.
-     * @return:
-     *     @description Returns the instance of the element for chaining. If `callback` is null, returns the current `onsubmit` attribute value.
-     * @funcs: 2
-     */
     on_submit(): Function | undefined;
     on_submit(callback: ElementEvent<this>): this;
+    /**
+     * {On Submit}
+     * Fires when a form is submitted, similar to the HTML attribute `onsubmit`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The callback function to execute on form submission.
+     * @returns ription Returns the instance of the element for chaining. If `callback` is null, returns the current `onsubmit` attribute value.
+     * @docs
+     */
     on_submit(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onsubmit ?? undefined; }
         const e = this;
@@ -14714,21 +12765,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Key Down
-     * @desc: Fires when a user is pressing a key. The equivalent of HTML attribute `onkeydown`. 
-     * The first parameter of the callback is the `VElement` object. 
-     * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when the key is pressed.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If the parameter `callback` is `null`, the current attribute's value is returned.
-     * @funcs: 2
-     */
     on_key_down(): Function | undefined;
     on_key_down(callback: ElementKeyboardEvent<this>): this;
+    /**
+     * {On Key Down}
+     * Fires when a user is pressing a key. The equivalent of HTML attribute `onkeydown`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The callback function to execute when the key is pressed.
+     * @returns ription Returns the `VElement` object for chaining. If the parameter `callback` is `null`, the current attribute's value is returned.
+     * @docs
+     */
     on_key_down(callback?: ElementKeyboardEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onkeydown ?? undefined; }
         const e = this;
@@ -14736,20 +12782,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Key Press
-     * @desc: Fires when a user presses a key, similar to the HTML `onkeypress` attribute.
-     * The first parameter of the callback is the `VElement` object, allowing for dynamic handling of key events.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when a key is pressed. Receives the `VElement` and event as parameters.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If `callback` is `null`, the current attribute value is returned.
-     * @funcs: 2
-     */
     on_key_press(): Function | undefined;
     on_key_press(callback: ElementKeyboardEvent<this>): this;
+    /**
+     * {On Key Press}
+     * Fires when a user presses a key, similar to the HTML `onkeypress` attribute.
+     * The first parameter of the callback is the `VElement` object, allowing for dynamic handling of key events.
+     * @param callback The function to call when a key is pressed. Receives the `VElement` and event as parameters.
+     * @returns ription Returns the `VElement` object for chaining. If `callback` is `null`, the current attribute value is returned.
+     * @docs
+     */
     on_key_press(callback?: ElementKeyboardEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onkeypress ?? undefined; }
         const e = this;
@@ -14757,22 +12799,18 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Key Up
-     * @desc: Fires when a user releases a key, similar to the HTML attribute `onkeyup`. 
-     *        The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when the key is released. 
-     *              Leave `null` to retrieve the current attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless `callback` is `null`, 
-     *                  in which case the current attribute's value is returned.
-     * @funcs: 2
-     */
     on_key_up(): Function | undefined;
     on_key_up(callback: ElementKeyboardEvent<this>): this;
+    /**
+     * {On Key Up}
+     * Fires when a user releases a key, similar to the HTML attribute `onkeyup`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The function to call when the key is released.
+     * Leave `null` to retrieve the current attribute's value.
+     * @returns ription Returns the `VElement` object for chaining, unless `callback` is `null`,
+     * in which case the current attribute's value is returned.
+     * @docs
+     */
     on_key_up(callback?: ElementKeyboardEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onkeyup ?? undefined; }
         const e = this;
@@ -14780,21 +12818,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On dbl click
-     * @desc: Fires on a mouse double-click on the element. The equivalent of HTML attribute `ondblclick`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to execute on double-click. Receives the `VElement` and the event as parameters.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If `callback` is null, returns the current attribute value.
-     * @funcs: 2
-     */
     on_dbl_click(): Function | undefined;
     on_dbl_click(callback: ElementMouseEvent<this>): this;
+    /**
+     * {On dbl click}
+     * Fires on a mouse double-click on the element. The equivalent of HTML attribute `ondblclick`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The function to execute on double-click. Receives the `VElement` and the event as parameters.
+     * @returns ription Returns the `VElement` object for chaining. If `callback` is null, returns the current attribute value.
+     * @docs
+     */
     on_dbl_click(callback?: ElementMouseEvent<this>): this | Function | undefined {
         if (callback == null) { return this.ondblclick ?? undefined; }
         const e = this;
@@ -14802,20 +12835,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Mouse Down
-     * @desc: Fires when a mouse button is pressed down on an element. The equivalent of HTML attribute `onmousedown`. 
-     *        The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to execute when the mouse button is pressed down.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If the parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_mouse_down(): Function | undefined;
     on_mouse_down(callback: ElementMouseEvent<this>): this;
+    /**
+     * {On Mouse Down}
+     * Fires when a mouse button is pressed down on an element. The equivalent of HTML attribute `onmousedown`.
+     * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
+     * @param callback The function to execute when the mouse button is pressed down.
+     * @returns ription Returns the `VElement` object for chaining. If the parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_mouse_down(callback?: ElementMouseEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onmousedown ?? undefined; }
         const e = this;
@@ -14823,42 +12852,33 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Mouse Move
-     * @desc: Fires when the mouse pointer is moving while it is over an element. 
-     *        The equivalent of HTML attribute `onmousemove`. Invokes the callback with the element and event.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when the mouse moves over the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the event is returned.
-     * @funcs: 2
-     */
     on_mouse_move(): Function | undefined;
     on_mouse_move(callback: ElementMouseEvent<this>): this;
-    on_mouse_move(callback?: ElementMouseEvent<this>): this | Function | undefined  {
+    /**
+     * {On Mouse Move}
+     * Fires when the mouse pointer is moving while it is over an element.
+     * The equivalent of HTML attribute `onmousemove`. Invokes the callback with the element and event.
+     * @param callback The function to call when the mouse moves over the element.
+     * @returns ription Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the event is returned.
+     * @docs
+     */
+    on_mouse_move(callback?: ElementMouseEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onmousemove ?? undefined; }
         const e = this;
         this.onmousemove = (t) => callback(e, t);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On mouse out
-     * @desc: Fires when the mouse pointer moves out of an element. The equivalent of HTML attribute `onmouseout`. 
-     *         The first parameter of the callback is the `VElement` object. 
-     *         Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @description: The callback function to execute when the mouse moves out.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, or the attribute's value if the callback is `null`.
-     * @funcs: 2
-     */
     on_mouse_out(): Function | undefined;
     on_mouse_out(callback: ElementMouseEvent<this>): this;
+    /**
+     * {On mouse out}
+     * Fires when the mouse pointer moves out of an element. The equivalent of HTML attribute `onmouseout`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The callback function to execute when the mouse moves out.
+     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if the callback is `null`.
+     * @docs
+     */
     on_mouse_out(callback?: ElementMouseEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onmouseout ?? undefined; }
         const e = this;
@@ -14870,19 +12890,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Mouse Over
-     * @desc: Fires when the mouse pointer moves over an element, similar to the HTML `onmouseover` attribute.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when the mouse is over the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining. If `callback` is null, returns the current `onmouseover` attribute value.
-     * @funcs: 2
-     */
     on_mouse_over(): Function | undefined;
     on_mouse_over(callback: ElementMouseEvent<this>): this;
+    /**
+     * {On Mouse Over}
+     * Fires when the mouse pointer moves over an element, similar to the HTML `onmouseover` attribute.
+     * @param callback The callback function to execute when the mouse is over the element.
+     * @returns ription Returns the instance of the element for chaining. If `callback` is null, returns the current `onmouseover` attribute value.
+     * @docs
+     */
     on_mouse_over(callback?: ElementMouseEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onmouseover ?? undefined; }
         const e = this;
@@ -14894,20 +12910,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Mouse Up
-     * @desc: Fires when a mouse button is released over an element. The equivalent of HTML attribute `onmouseup`.
-     *         The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when the mouse button is released.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onmouseup` value.
-     * @funcs: 2
-     */
     on_mouse_up(): Function | undefined;
     on_mouse_up(callback: ElementMouseEvent<this>): this;
+    /**
+     * {On Mouse Up}
+     * Fires when a mouse button is released over an element. The equivalent of HTML attribute `onmouseup`.
+     * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
+     * @param callback The callback function to execute when the mouse button is released.
+     * @returns ription Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onmouseup` value.
+     * @docs
+     */
     on_mouse_up(callback?: ElementMouseEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onmouseup ?? undefined; }
         const e = this;
@@ -14918,20 +12930,16 @@ export abstract class VElement extends HTMLElement {
     // @deprecated onmousewheel.
     // on_mouse_wheel();
 
-    /**
-     * @docs:
-     * @title: On Wheel
-     * @desc: Fires when the mouse wheel rolls up or down over an element. The equivalent of HTML attribute `onwheel`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute on wheel event.
-     * @return:
-     *     @description Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_wheel(): Function | undefined;
     on_wheel(callback: (element: this, event: WheelEvent) => any): this;
+    /**
+     * {On Wheel}
+     * Fires when the mouse wheel rolls up or down over an element. The equivalent of HTML attribute `onwheel`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The callback function to execute on wheel event.
+     * @returns ription Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_wheel(callback?: (element: this, event: WheelEvent) => any): this | Function | undefined {
         if (callback == null) { return this.onwheel ?? undefined; }
         const e = this;
@@ -14939,20 +12947,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Drag
-     * @desc: Script to be run when an element is dragged. The equivalent of HTML attribute `ondrag`. 
-     *        The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when the element is dragged.
-     * @return:
-     *     @description Returns the instance of the element for chaining unless the parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_drag(): Function | undefined;
     on_drag(callback: ElementDragEvent<this>): this;
+    /**
+     * {On Drag}
+     * Script to be run when an element is dragged. The equivalent of HTML attribute `ondrag`.
+     * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
+     * @param callback The callback function to execute when the element is dragged.
+     * @returns ription Returns the instance of the element for chaining unless the parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_drag(callback?: ElementDragEvent<this>): this | Function | undefined {
         if (callback == null) { return this.ondrag ?? undefined; }
         const e = this;
@@ -14960,20 +12964,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Drag End
-     * @desc: Script to be run at the end of a drag operation. The equivalent of HTML attribute `ondragend`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute at the end of the drag operation.
-     * @return:
-     *     @description Returns the `VElement` object unless the parameter `value` is `null`, in which case the attribute's value is returned.
-     * @funcs: 2
-     */
     on_drag_end(): Function | undefined;
     on_drag_end(callback: ElementDragEvent<this>): this;
+    /**
+     * {On Drag End}
+     * Script to be run at the end of a drag operation. The equivalent of HTML attribute `ondragend`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The callback function to execute at the end of the drag operation.
+     * @returns ription Returns the `VElement` object unless the parameter `value` is `null`, in which case the attribute's value is returned.
+     * @docs
+     */
     on_drag_end(callback?: ElementDragEvent<this>): this | Function | undefined {
         if (callback == null) { return this.ondragend ?? undefined; }
         const e = this;
@@ -14981,51 +12981,35 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Drag Enter
-     * @desc: 
-     *     Script to be run when an element has been dragged to a valid drop target.
-     *     The equivalent of HTML attribute `ondragenter`.
-     *     
-     *     The first parameter of the callback is the `VElement` object.
-     *     
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to execute when the drag enters the target.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_drag_enter(): Function | undefined;
     on_drag_enter(callback: ElementDragEvent<this>): this;
-    on_drag_enter(callback?: ElementDragEvent<this>): this | Function | undefined{
+    /**
+     * {On Drag Enter}
+     * Script to be run when an element has been dragged to a valid drop target.
+     * The equivalent of HTML attribute `ondragenter`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The function to execute when the drag enters the target.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
+    on_drag_enter(callback?: ElementDragEvent<this>): this | Function | undefined {
         if (callback == null) { return this.ondragenter ?? undefined; }
         const e = this;
         this.ondragenter = (t) => callback(e, t);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On drag leave
-     * @desc: 
-     *     Script to be run when an element leaves a valid drop target.
-     *     The equivalent of HTML attribute `ondragleave`.
-     *     
-     *     The first parameter of the callback is the `VElement` object.
-     *     
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_drag_leave(): Function | undefined;
     on_drag_leave(callback: ElementDragEvent<this>): this;
+    /**
+     * {On drag leave}
+     * Script to be run when an element leaves a valid drop target.
+     * The equivalent of HTML attribute `ondragleave`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_drag_leave(callback?: ElementDragEvent<this>): this | Function | undefined {
         if (callback == null) { return this.ondragleave ?? undefined; }
         const e = this;
@@ -15033,63 +13017,49 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On drag over
-     * @desc: 
-     *     Script to be run when an element is being dragged over a valid drop target.
-     *     The equivalent of HTML attribute `ondragover`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to execute when the drag over event occurs.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_drag_over(): Function | undefined;
     on_drag_over(callback: ElementDragEvent<this>): this;
-    on_drag_over(callback?: ElementDragEvent<this>): this | Function | undefined{
+    /**
+     * {On drag over}
+     * Script to be run when an element is being dragged over a valid drop target.
+     * The equivalent of HTML attribute `ondragover`.
+     * @param callback The function to execute when the drag over event occurs.
+     * @returns ription Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
+    on_drag_over(callback?: ElementDragEvent<this>): this | Function | undefined {
         if (callback == null) { return this.ondragover ?? undefined; }
         const e = this;
         this.ondragover = (t) => callback(e, t);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Drag Start
-     * @desc: Script to be run at the start of a drag operation. The equivalent of HTML attribute `ondragstart`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when the drag starts.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_drag_start(): Function | undefined;
     on_drag_start(callback: ElementDragEvent<this>): this;
-    on_drag_start(callback?: ElementDragEvent<this>): this | Function | undefined{
+    /**
+     * {On Drag Start}
+     * Script to be run at the start of a drag operation. The equivalent of HTML attribute `ondragstart`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The function to call when the drag starts.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
+    on_drag_start(callback?: ElementDragEvent<this>): this | Function | undefined {
         if (callback == null) { return this.ondragstart ?? undefined; }
         const e = this;
         this.ondragstart = (t) => callback(e, t);
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On drop
-     * @desc: Script to be run when dragged element is being dropped. The equivalent of HTML attribute `ondrop`. The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_drop(): Function | undefined;
     on_drop(callback: ElementEvent<this>): this;
+    /**
+     * {On drop}
+     * Script to be run when dragged element is being dropped. The equivalent of HTML attribute `ondrop`. The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_drop(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.ondrop ?? undefined; }
         const e = this;
@@ -15105,20 +13075,16 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-     * @docs:
-     * @title: On Copy
-     * @desc: Fires when the user copies the content of an element. The equivalent of HTML attribute `oncopy`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be called when the copy event occurs.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     */
     on_copy(): Function | undefined;
     on_copy(callback: ElementEvent<this>): this;
+    /**
+     * {On Copy}
+     * Fires when the user copies the content of an element. The equivalent of HTML attribute `oncopy`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The function to be called when the copy event occurs.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_copy(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.oncopy ?? undefined; }
         const e = this;
@@ -15126,20 +13092,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Cut
-     * @desc: Fires when the user cuts the content of an element, equivalent to the HTML attribute `oncut`.
-     *        The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when the cut event occurs.
-     * @return:
-     *     @description Returns the `VElement` object unless the parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_cut(): Function | undefined;
     on_cut(callback: ElementEvent<this>): this;
+    /**
+     * {On Cut}
+     * Fires when the user cuts the content of an element, equivalent to the HTML attribute `oncut`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The function to call when the cut event occurs.
+     * @returns ription Returns the `VElement` object unless the parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_cut(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.oncut ?? undefined; }
         const e = this;
@@ -15147,20 +13109,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Paste
-     * @desc: Fires when the user pastes some content in an element. The equivalent of HTML attribute `onpaste`. 
-     *        The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when the paste event occurs.
-     * @return:
-     *     @description Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onpaste` attribute value.
-     * @funcs: 2
-     */
     on_paste(): Function | undefined;
     on_paste(callback: ElementEvent<this>): this;
+    /**
+     * {On Paste}
+     * Fires when the user pastes some content in an element. The equivalent of HTML attribute `onpaste`.
+     * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
+     * @param callback The function to call when the paste event occurs.
+     * @returns ription Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onpaste` attribute value.
+     * @docs
+     */
     on_paste(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.onpaste ?? undefined; }
         const e = this;
@@ -15168,21 +13126,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Abort
-     * @desc: Script to be run on abort, equivalent to the HTML attribute `onabort`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute on abort event.
-     * @return:
-     *     @description Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_abort(): Function | undefined;
     on_abort(callback: ElementEvent<this>): this;
+    /**
+     * {On Abort}
+     * Script to be run on abort, equivalent to the HTML attribute `onabort`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The callback function to execute on abort event.
+     * @returns ription Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_abort(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.onabort ?? undefined; }
         const e = this;
@@ -15190,21 +13143,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Can Play
-     * @desc: Script to be run when a file is ready to start playing (when it has buffered enough to begin). 
-     *        The equivalent of HTML attribute `oncanplay`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when the event occurs.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_canplay(): Function | undefined;
     on_canplay(callback: ElementEvent<this>): this;
+    /**
+     * {On Can Play}
+     * Script to be run when a file is ready to start playing (when it has buffered enough to begin).
+     * The equivalent of HTML attribute `oncanplay`.
+     * @param callback The callback function to execute when the event occurs.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_canplay(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.oncanplay ?? undefined; }
         const e = this;
@@ -15212,20 +13160,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Can Play Through
-     * @desc: Script to be run when a file can be played all the way to the end without pausing for buffering. 
-     *        The equivalent of HTML attribute `oncanplaythrough`.
-     * @param:
-     *     @name: callback
-     *     @description: The callback function to execute when the event occurs.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_canplay_through(): Function | undefined;
     on_canplay_through(callback: ElementEvent<this>): this;
+    /**
+     * {On Can Play Through}
+     * Script to be run when a file can be played all the way to the end without pausing for buffering.
+     * The equivalent of HTML attribute `oncanplaythrough`.
+     * @param callback The callback function to execute when the event occurs.
+     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_canplay_through(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.oncanplaythrough ?? undefined; }
         const e = this;
@@ -15233,22 +13177,18 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Cue Change
-     * @desc: Script to be run when the cue changes in a \<track> element. 
-     *        The equivalent of HTML attribute `oncuechange`. 
-     *        The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when the cue changes.
-     * @return:
-     *     @description Returns the instance of the element for chaining. 
-     *                  Unless the parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_cue_change(): Function | undefined;
     on_cue_change(callback: ElementEvent<this>): this;
+    /**
+     * {On Cue Change}
+     * Script to be run when the cue changes in a \<track> element.
+     * The equivalent of HTML attribute `oncuechange`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The function to call when the cue changes.
+     * @returns ription Returns the instance of the element for chaining.
+     * Unless the parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_cue_change(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.oncuechange ?? undefined; }
         const e = this;
@@ -15256,20 +13196,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Duration Change
-     * @desc: Script to be run when the length of the media changes. The equivalent of HTML attribute `ondurationchange`. 
-     *        The first parameter of the callback is the `VElement` object. 
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute on duration change.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-    * @funcs: 2
-     */
     on_duration_change(): Function | undefined;
     on_duration_change(callback: ElementEvent<this>): this;
+    /**
+     * {On Duration Change}
+     * Script to be run when the length of the media changes. The equivalent of HTML attribute `ondurationchange`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback The callback function to execute on duration change.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_duration_change(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.ondurationchange ?? undefined; }
         const e = this;
@@ -15277,20 +13213,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Emptied
-     * @desc: Script to be run when something bad happens and the file is suddenly unavailable (like unexpectedly disconnects).
-     *        The equivalent of HTML attribute `onemptied`. The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: callback
-     *     @description: The callback function to execute when the event occurs.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-    * @funcs: 2
-     */
     on_emptied(): Function | undefined;
     on_emptied(callback: ElementEvent<this>): this;
+    /**
+     * {On Emptied}
+     * Script to be run when something bad happens and the file is suddenly unavailable (like unexpectedly disconnects).
+     * The equivalent of HTML attribute `onemptied`. The first parameter of the callback is the `VElement` object.
+     * @param callback The callback function to execute when the event occurs.
+     * @returns r: Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_emptied(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.onemptied ?? undefined; }
         const e = this;
@@ -15298,21 +13230,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On ended
-     * @desc: 
-     *     Script to be run when the media has reach the end (a useful event for messages like "thanks for listening").
-     *     The equivalent of HTML attribute `onended`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to call when the media ends. Leave `null` to retrieve the current callback.
-     * @return:
-     *     @description Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the current callback function is returned.
-     * @funcs: 2
-     */
     on_ended(): Function | undefined;
     on_ended(callback: ElementEvent<this>): this;
+    /**
+     * {On ended}
+     * Script to be run when the media has reach the end (a useful event for messages like "thanks for listening").
+     * The equivalent of HTML attribute `onended`.
+     * @param callback The function to call when the media ends. Leave `null` to retrieve the current callback.
+     * @returns ription Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the current callback function is returned.
+     * @docs
+     */
     on_ended(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.onended ?? undefined; }
         const e = this;
@@ -15320,20 +13247,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Error
-     * @desc: Script to be run when an error occurs while loading the file, similar to HTML's `onerror` attribute. 
-     *        The first parameter of the callback is the `VElement` object. Returns the attribute value if `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute on error. It receives the `VElement` object and the error event.
-     * @return:
-     *     @description Returns the instance of the element for chaining, unless `callback` is `null`, then the current `onerror` attribute value is returned.
-     * @funcs: 2
-     */
     on_error(): Function | undefined;
     on_error(callback: (element: this, error: string | Event) => any): this;
+    /**
+     * {On Error}
+     * Script to be run when an error occurs while loading the file, similar to HTML's `onerror` attribute.
+     * The first parameter of the callback is the `VElement` object. Returns the attribute value if `value` is `null`.
+     * @param callback The callback function to execute on error. It receives the `VElement` object and the error event.
+     * @returns ription Returns the instance of the element for chaining, unless `callback` is `null`, then the current `onerror` attribute value is returned.
+     * @docs
+     */
     on_error(callback?: (element: this, error: string | Event) => any): undefined | Function | this {
         if (callback == null) { return this.onerror ?? undefined; }
         const e = this;
@@ -15341,20 +13264,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Loaded Data
-     * @desc: Script to be run when media data is loaded. The equivalent of HTML attribute `onloadeddata`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function that receives the `VElement` object and the event.
-     * @return:
-     *     @description Returns the `VElement` object unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_loaded_data(): Function | undefined;
     on_loaded_data(callback: ElementEvent<this>): this;
+    /**
+     * {On Loaded Data}
+     * Script to be run when media data is loaded. The equivalent of HTML attribute `onloadeddata`.
+     * @param callback The callback function that receives the `VElement` object and the event.
+     * @returns ription Returns the `VElement` object unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_loaded_data(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.onloadeddata ?? undefined; }
         const e = this;
@@ -15362,21 +13280,17 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On loaded metadata
-     * @desc: Script to be run when meta data (like dimensions and duration) are loaded. 
-     *        The equivalent of HTML attribute `onloadedmetadata`. 
-     *        The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: callback
-     *     @descr: A function to be executed when metadata is loaded.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_loaded_metadata(): Function | undefined;
     on_loaded_metadata(callback: ElementEvent<this>): this;
+    /**
+     * {On loaded metadata}
+     * Script to be run when meta data (like dimensions and duration) are loaded.
+     * The equivalent of HTML attribute `onloadedmetadata`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param callback A function to be executed when metadata is loaded.
+     * @returns ription Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_loaded_metadata(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.onloadedmetadata ?? undefined; }
         const e = this;
@@ -15384,25 +13298,17 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On load start
-     * @desc: 
-     *     Script to be run just as the file begins to load before anything is actually loaded.
-     *     The equivalent of HTML attribute `onloadstart`.
-     *     
-     *     The first parameter of the callback is the `VElement` object.
-     *     
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_load_start(): Function | undefined;
     on_load_start(callback: ElementEvent<this>): this;
+    /**
+     * {On load start}
+     * Script to be run just as the file begins to load before anything is actually loaded.
+     * The equivalent of HTML attribute `onloadstart`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_load_start(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.onloadstart ?? undefined; }
         const e = this;
@@ -15410,19 +13316,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Pause
-     * @desc: Script to be run when the media is paused either by the user or programmatically. The equivalent of HTML attribute `onpause`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when the media is paused. Leave `null` to retrieve the current attribute's value.
-     * @return:
-     *     @description Returns the instance of the element for chaining unless the parameter is `null`, then the current attribute's value is returned.
-     * @funcs: 2
-     */
     on_pause(): Function | undefined;
     on_pause(callback: ElementEvent<this>): this;
+    /**
+     * {On Pause}
+     * Script to be run when the media is paused either by the user or programmatically. The equivalent of HTML attribute `onpause`.
+     * @param callback The callback function to execute when the media is paused. Leave `null` to retrieve the current attribute's value.
+     * @returns ription Returns the instance of the element for chaining unless the parameter is `null`, then the current attribute's value is returned.
+     * @docs
+     */
     on_pause(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.onpause ?? undefined; }
         const e = this;
@@ -15430,20 +13332,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Play
-     * @desc: Script to be run when the media is ready to start playing. The equivalent of HTML attribute `onplay`. 
-     *        The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be executed when the media starts playing.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_play(): Function | undefined;
     on_play(callback: ElementEvent<this>): this;
+    /**
+     * {On Play}
+     * Script to be run when the media is ready to start playing. The equivalent of HTML attribute `onplay`.
+     * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
+     * @param callback The function to be executed when the media starts playing.
+     * @returns ription Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_play(callback?: ElementEvent<this>): undefined | Function | this {
         if (callback == null) { return this.onplay ?? undefined; }
         const e = this;
@@ -15451,19 +13349,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
+    on_playing(): Function | undefined;
+    on_playing(callback: (element: this, time: any) => any): this;
     /**
-     * @docs:
-     * @title: On Playing
-     * @desc: Script to be run when the media actually has started playing. This is the equivalent of the HTML attribute `onplaying`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to execute when the media starts playing. It receives the `VElement` object as the first parameter.
-     * @return:
-     *     @description Returns the instance of the element for chaining. If `null` is passed, it returns the current `onplaying` callback.
-     * @funcs: 2
+     * {On Playing}
+     * Script to be run when the media actually has started playing. This is the equivalent of the HTML attribute `onplaying`.
+     * @param callback The function to execute when the media starts playing. It receives the `VElement` object as the first parameter.
+     * @returns ription Returns the instance of the element for chaining. If `null` is passed, it returns the current `onplaying` callback.
+     * @docs
      */
-    on_playing() : Function | undefined;
-    on_playing(callback: (element: this, time: any) => any) : this;
     on_playing(callback?: (element: this, time: any) => any): this | Function | undefined {
         if (callback == null) { return this.onplaying ?? undefined; }
         const e = this;
@@ -15471,21 +13365,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Onprogress
-     * @desc: 
-     *     Script to be run when the browser is in the process of getting the media data.
-     *     The equivalent of HTML attribute `onprogress`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be executed when the media data is being loaded.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_progress(): Function | undefined;
     on_progress(callback: ElementEvent<this>): this;
+    /**
+     * {Onprogress}
+     * Script to be run when the browser is in the process of getting the media data.
+     * The equivalent of HTML attribute `onprogress`. Returns the attribute value when parameter `value` is `null`.
+     * @param callback The function to be executed when the media data is being loaded.
+     * @returns ription Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_progress(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onprogress ?? undefined; }
         const e = this;
@@ -15493,20 +13382,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Rate Change
-     * @desc: Script to be run each time the playback rate changes (like when a user switches to a slow motion or fast forward mode). 
-     *        The equivalent of HTML attribute `onratechange`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute on rate change.
-     * @return:
-     *     @description Returns the `VElement` object unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_rate_change(): Function | undefined;
     on_rate_change(callback: ElementEvent<this>): this;
+    /**
+     * {On Rate Change}
+     * Script to be run each time the playback rate changes (like when a user switches to a slow motion or fast forward mode).
+     * The equivalent of HTML attribute `onratechange`. Returns the attribute value when parameter `value` is `null`.
+     * @param callback The callback function to execute on rate change.
+     * @returns ription Returns the `VElement` object unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_rate_change(callback?: ElementEvent<this>): undefined | this | Function {
         if (callback == null) { return this.onratechange ?? undefined; }
         const e = this;
@@ -15514,21 +13399,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On seeked
-     * @desc: 
-     *     Script to be run when the seeking attribute is set to false indicating that seeking has ended.
-     *     The equivalent of HTML attribute `onseeked`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when seeking ends.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_seeked(): Function | undefined;
     on_seeked(callback: (element: this, time: any) => any): this;
+    /**
+     * {On seeked}
+     * Script to be run when the seeking attribute is set to false indicating that seeking has ended.
+     * The equivalent of HTML attribute `onseeked`.
+     * @param callback The callback function to execute when seeking ends.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_seeked(callback?: (element: this, time: any) => any): this | Function | undefined {
         if (callback == null) { return this.onseeked ?? undefined; }
         const e = this;
@@ -15536,20 +13416,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Seeking
-     * @desc: Script to be run when the seeking attribute is set to true indicating that seeking is active. 
-     *        The equivalent of HTML attribute `onseeking`. 
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when seeking occurs.
-     * @return:
-     *     @description Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_seeking(): Function | undefined;
     on_seeking(callback: (element: this, time: any) => any): this;
+    /**
+     * {On Seeking}
+     * Script to be run when the seeking attribute is set to true indicating that seeking is active.
+     * The equivalent of HTML attribute `onseeking`.
+     * @param callback The callback function to execute when seeking occurs.
+     * @returns ription Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_seeking(callback?: (element: this, time: any) => any): this | Function | undefined {
         if (callback == null) { return this.onseeking ?? undefined; }
         const e = this;
@@ -15557,19 +13433,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Stalled
-     * @desc: Script to be run when the browser is unable to fetch the media data for whatever reason. This is the equivalent of the HTML attribute `onstalled`. The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_stalled(): Function | undefined;
     on_stalled(callback: ElementEvent<this>): this;
+    /**
+     * {On Stalled}
+     * Script to be run when the browser is unable to fetch the media data for whatever reason. This is the equivalent of the HTML attribute `onstalled`. The first parameter of the callback is the `VElement` object.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns r: Returns the `VElement` object unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_stalled(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onstalled ?? undefined; }
         const e = this;
@@ -15577,19 +13449,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Suspend
-     * @desc: Script to be run when fetching the media data is stopped before it is completely loaded for whatever reason. The equivalent of HTML attribute `onsuspend`.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be executed when the suspend event occurs. The first parameter of the callback is the `VElement` object.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_suspend(): Function | undefined;
     on_suspend(callback: Function): this;
+    /**
+     * {On Suspend}
+     * Script to be run when fetching the media data is stopped before it is completely loaded for whatever reason. The equivalent of HTML attribute `onsuspend`.
+     * @param callback The function to be executed when the suspend event occurs. The first parameter of the callback is the `VElement` object.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_suspend(callback?: Function): this | Function | undefined {
         if (callback == null) { return this.onsuspend ?? undefined; }
         const e = this;
@@ -15597,19 +13465,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Time Update
-     * @desc: Script to be run when the playing position has changed (like when the user fast forwards to a different point in the media). The equivalent of HTML attribute `ontimeupdate`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when the time updates. The first parameter of the callback is the `VElement` object.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_time_update(): Function | undefined;
     on_time_update(callback: ElementEvent<this>): this;
+    /**
+     * {On Time Update}
+     * Script to be run when the playing position has changed (like when the user fast forwards to a different point in the media). The equivalent of HTML attribute `ontimeupdate`.
+     * @param callback The callback function to execute when the time updates. The first parameter of the callback is the `VElement` object.
+     * @returns ription Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_time_update(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.ontimeupdate ?? undefined; }
         const e = this;
@@ -15617,20 +13481,16 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Volume Change
-     * @desc: Script to be run each time the volume is changed which includes setting the volume to "mute". 
-     *        The equivalent of HTML attribute `onvolumechange`. The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute on volume change.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_volume_change(): Function | undefined;
     on_volume_change(callback: ElementEvent<this>): this;
+    /**
+     * {On Volume Change}
+     * Script to be run each time the volume is changed which includes setting the volume to "mute".
+     * The equivalent of HTML attribute `onvolumechange`. The first parameter of the callback is the `VElement` object.
+     * @param callback The callback function to execute on volume change.
+     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_volume_change(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.onvolumechange ?? undefined; }
         const e = this;
@@ -15638,19 +13498,15 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On Waiting
-     * @desc: Script to be run when the media has paused but is expected to resume (like when the media pauses to buffer more data). The equivalent of HTML attribute `onwaiting`.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to execute when the media is waiting.
-     * @return:
-     *     @description Returns the `VElement` object unless parameter `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
     on_waiting(): Function | undefined;
     on_waiting(callback: (element: this, time: any) => any): this;
+    /**
+     * {On Waiting}
+     * Script to be run when the media has paused but is expected to resume (like when the media pauses to buffer more data). The equivalent of HTML attribute `onwaiting`.
+     * @param callback The callback function to execute when the media is waiting.
+     * @returns ription Returns the `VElement` object unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_waiting(callback?: (element: this, time: any) => any): this | Function | undefined {
         if (callback == null) { return this.onwaiting ?? undefined; }
         const e = this;
@@ -15658,21 +13514,17 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: On toggle
-     * @desc: Fires when the user opens or closes the \<details> element. 
-     *        The equivalent of HTML attribute `ontoggle`. 
-     *        The first parameter of the callback is the `VElement` object.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
-    on_toggle() : Function | undefined;
+    on_toggle(): Function | undefined;
     on_toggle(callback: ElementEvent<this>): this;
+    /**
+     * {On toggle}
+     * Fires when the user opens or closes the \<details> element.
+     * The equivalent of HTML attribute `ontoggle`.
+     * The first parameter of the callback is the `VElement` object.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     on_toggle(callback?: ElementEvent<this>): this | Function | undefined {
         if (callback == null) { return this.ontoggle ?? undefined; }
         const e = this;
@@ -15697,10 +13549,12 @@ export function is_velement(type: any): type is VElement {
 
 // Mixin function.
 const mixed_classes = [] as any[];
-function mixin(derived: any) {
+function mixin(derived: any, opts?: {
+    ignore_methods?: string[];
+}) {
 
     Object.getOwnPropertyNames(VElement.prototype).forEach((name) => {
-        if (name !== "constructor") {
+        if (name !== "constructor" && (!opts?.ignore_methods || !opts.ignore_methods.includes(name))) {
             const descriptor = Object.getOwnPropertyDescriptor(VElement.prototype, name);
             if (descriptor) {
                 Object.defineProperty(derived.prototype, name, descriptor);
@@ -15757,8 +13611,12 @@ export function extend<T extends Record<string, ((this: VElement & ThisType<VEle
 };
 
 // Post process velement.
-function postprocess(type: any): void {
-    mixin(type);
+function postprocess(type: any, opts?: {
+    mixin?: {
+        ignore_methods?: string[];
+    }
+}): void {
+    mixin(type, opts?.mixin);
     register_element(type);
 }
 
@@ -16223,18 +14081,83 @@ declare module '../ui/any_element.d.ts' { interface AnyElementMap { VImageElemen
 export class VInputElement extends (HTMLInputElement as unknown as VElementBaseSignature2) {
     static element_name = "VInputElement";
     static element_tag = "input";
+    private static value_property = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
     constructor(args: DerivedVElementInitOptions = {}) {
         super();
         args.derived ??= VInputElement;
         this._init_sys_velement(args as BaseVElementInitOptions);
     }
+
+    // This function MUST be defined here due to the mixin and InputElement value method override.
+    value(): string;
+    value(value: string): this;
+    /**
+     * Value
+     * Specifies the value of the element, equivalent to the HTML attribute `value`.
+     *        Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     */
+    value(value?: string): string | this {
+        // @ts-ignore
+        // if (value == null) return super.value ?? "";
+        // @ts-ignore
+        // super.value = value;
+        // if (value == null) return this.getAttribute("value") ?? "";
+        // this.setAttribute("value", value);
+        if (value == null) return VInputElement.value_property.get.call(this) ?? "";
+        VInputElement.value_property!.set!.call(this, value); // throws an error when used on non input element but that is fine.
+        return this;
+    }
 }
 // @ts-ignore
 // export interface VInputElement extends HTMLInputElement, VElement, VElementExtensions {};
-postprocess(VInputElement);
+postprocess(VInputElement, { mixin: { ignore_methods: ["value"] } });
 export const VInput = wrapper(VInputElement);
 export const NullVInput = create_null(VInputElement);
 declare module '../ui/any_element.d.ts' { interface AnyElementMap { VInputElement: VInputElement }}
+
+// Base class VTextAreaElement derived from HTMLTextAreaElement.
+// @ts-ignore
+export class VTextAreaElement extends (HTMLTextAreaElement as unknown as VElementBaseSignature2) {
+    static element_name = "VTextAreaElement";
+    static element_tag = "textarea";
+    private static value_property = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+    constructor(args: DerivedVElementInitOptions = {}) {
+        super();
+        args.derived ??= VTextAreaElement;
+        this._init_sys_velement(args as BaseVElementInitOptions);
+    }
+    
+    // This function MUST be defined here due to the mixin and InputElement value method override.
+    value(): string;
+    value(value: string): this;
+    /**
+     * Value
+     * Specifies the value of the element, equivalent to the HTML attribute `value`.
+     *        Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     */
+    value(value?: string): string | this {
+        // @ts-ignore
+        // if (value == null) return super.value ?? "";
+        // @ts-ignore
+        // super.value = value;
+        // if (value == null) return this.getAttribute("value") ?? "";
+        // this.setAttribute("value", value);
+        if (value == null) return VTextAreaElement.value_property.get.call(this) ?? "";
+        VTextAreaElement.value_property!.set!.call(this, value); // throws an error when used on non input element but that is fine.
+        return this;
+    }
+}
+// @ts-ignore
+// export interface VTextAreaElement extends HTMLTextAreaElement, VElement, VElementExtensions {};
+postprocess(VTextAreaElement, { mixin: { ignore_methods: ["value"] } });
+export const VTextArea = wrapper(VTextAreaElement);
+export const NullVTextArea = create_null(VTextAreaElement);
+declare module '../ui/any_element.d.ts' { interface AnyElementMap { VTextAreaElement: VTextAreaElement } }
+
 
 // Base class VModElement derived from HTMLModElement.
 // @ts-ignore
@@ -16775,24 +14698,6 @@ postprocess(VTemplateElement);
 export const VTemplate = wrapper(VTemplateElement);
 export const NullVTemplate = create_null(VTemplateElement);
 declare module '../ui/any_element.d.ts' { interface AnyElementMap { VTemplateElement: VTemplateElement }}
-
-// Base class VTextAreaElement derived from HTMLTextAreaElement.
-// @ts-ignore
-export class VTextAreaElement extends (HTMLTextAreaElement as unknown as VElementBaseSignature2) {
-    static element_name = "VTextAreaElement";
-    static element_tag = "textarea";
-    constructor(args: DerivedVElementInitOptions = {}) {
-        super();
-        args.derived ??= VTextAreaElement;
-        this._init_sys_velement(args as BaseVElementInitOptions);
-    }
-}
-// @ts-ignore
-// export interface VTextAreaElement extends HTMLTextAreaElement, VElement, VElementExtensions {};
-postprocess(VTextAreaElement);
-export const VTextArea = wrapper(VTextAreaElement);
-export const NullVTextArea = create_null(VTextAreaElement);
-declare module '../ui/any_element.d.ts' { interface AnyElementMap { VTextAreaElement: VTextAreaElement }}
 
 // Base class VTimeElement derived from HTMLTimeElement.
 // @ts-ignore

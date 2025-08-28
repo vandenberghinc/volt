@@ -9,17 +9,17 @@ interface ThemeElement {
 }
 
 // Themes module.
-export const Themes = {
-    theme_elements: [] as ThemeElement[],
+export namespace Themes {
+    export const theme_elements: ThemeElement[] = [];
 
     // Call the on-theme-update callbacks on all elements that have it defined.
-    apply_theme_update() {
-        this.theme_elements.forEach((theme) => {
+    export function apply_theme_update() {
+        for (const theme of theme_elements) {
             const e = theme.element;
             if (e !== undefined && Array.isArray(e._on_theme_updates)) {
-                e._on_theme_updates.forEach((func: Function) => func(e));
+                for (const func of e._on_theme_updates) func(e);
             }
-        });
+        }
     }
 };
 export { Themes as themes }; // also export as lowercase for compatibility.

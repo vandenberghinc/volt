@@ -7,44 +7,36 @@
 import { Google } from "./google.js";
 
 // Cookies object.
-const Cookies = {
-    _cookies: {} as { [key: string]: string },
-    _last_cookies: '',
-    _disabled: false,
+export namespace Cookies {
+    let _cookies: { [key: string]: string } = {};
+    let _last_cookies = '';
+    export let enabled = false;
 
-    // Check if the cookies need to be parsed again.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Cookies
-        @title: Is Parse Required
-        @desc: Checks if cookies need to be parsed again.
-    */
-    is_parse_required(): boolean {
-        return document.cookie !== this._last_cookies;
-    },
+    /**
+     * Checks if cookies need to be parsed again.
+     * @docs
+     */
+    export function is_parse_required(): boolean {
+        return document.cookie !== _last_cookies;
+    }
 
-    // Get the cookies or a cookie by name.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Cookies
-        @title: Get cookie
-        @desc: Get a cookie by name.
-        @experimental: true
-        @param: 
-            @name: name
-            @description The name of the cookie.
-    */
-    get(name: string | null = null): string | { [key: string]: string } | undefined {
-        if (document.cookie === this._last_cookies) {
+    /**
+     * Get cookies or a specific cookie by name.
+     * @experimental true
+     * @param name The name of the cookie.
+     * @docs
+     */
+    export function get(name: string | null = null): string | { [key: string]: string } | undefined {
+        if (document.cookie === _last_cookies) {
             if (name != null) {
-                return this._cookies[name];
+                return _cookies[name];
             }
-            return this._cookies;
+            return _cookies;
         }
 
         // Attributes.
-        this._cookies = {};
-        this._last_cookies = document.cookie;
+        _cookies = {};
+        _last_cookies = document.cookie;
 
         // Vars.
         let is_key = true, is_str: string | null = null;
@@ -53,7 +45,7 @@ const Cookies = {
         // Wrapper.
         const append = () => {
             if (key.length > 0) {
-                this._cookies[key] = value;
+                _cookies[key] = value;
             }
             value = "";
             key = "";
@@ -101,83 +93,58 @@ const Cookies = {
         }
         append();
         if (name != null) {
-            return this._cookies[name];
+            return _cookies[name];
         }
-        return this._cookies;
-    },
+        return _cookies;
+    }
 
-    // Check if all the cookies are accepted.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Cookies
-        @title: Has Preference
-        @desc: Checks if the user has set a cookie preference (enabled or disabled).
-    */
-    has_preference(): boolean {
+    /**
+     * Checks if the user has set a cookie preference (enabled or disabled).
+     * @docs
+     */
+    export function has_preference(): boolean {
         const pref = localStorage.getItem("volt_cookies_enabled");
         return pref === "true" || pref === "false";
-    },
+    }
 
     // Check if all the cookies are accepted.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Cookies
-        @title: Is Accepted
-        @desc: Checks if cookies are accepted by the user.
-    */
-    is_accepted(): boolean {
+    /**
+     * Checks if cookies are accepted by the user.
+     * @docs
+     */
+    export function is_accepted(): boolean {
         return localStorage.getItem("volt_cookies_enabled") === "true";
-    },
+    }
 
-    // Enable cookies (opt-in).
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Cookies
-        @title: Enable Cookies
-        @desc: Enables cookies (opt-in) and updates the user's preference.
-        @param:
-            @name: _set_storage
-            @description Whether to update the localStorage preference (default: true).
-    */
-    enable(_set_storage: boolean = true): void {
-        this._disabled = true;
+    /**
+     * Enables cookies (opt-in) and updates the user's preference.
+     * @param _set_storage Whether to update the localStorage preference (default: true).
+     * @docs
+     */
+    export function enable(_set_storage: boolean = true): void {
+        enabled = true;
         if (_set_storage) {
             localStorage.setItem("volt_cookies_enabled", "true");
         }
         Google.disable_tracking();
-    },
+    }
 
-    // Disable cookies (opt-out).
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Cookies
-        @title: Disable Cookies
-        @desc: Disables cookies (opt-out) and updates the user's preference.
-        @param:
-            @name: _set_storage
-            @description Whether to update the localStorage preference (default: true).
-    */
-    disable(_set_storage: boolean = true): void {
-        this._disabled = false;
+    /**
+     * Disables cookies (opt-out) and updates the user's preference.
+     * @param _set_storage Whether to update the localStorage preference (default: true).
+     * @docs
+     */
+    export function disable(_set_storage: boolean = true): void {
+        enabled = false;
         if (_set_storage) {
             localStorage.setItem("volt_cookies_enabled", "false");
         }
         Google.enable_tracking();
-    },
-
-    // Initialize the cookies.
-    _init(): void {
-        if (this.is_accepted()) {
-            this.enable(false);
-        } else {
-            this.disable(false);
-        }
     }
-};
 
-// Initialize cookies on load.
-Cookies._init();
-
-// Export.
-export { Cookies };
+    // Initialize cookies.
+    if (is_accepted()) enable(false);
+    else disable(false);
+}
 export { Cookies as cookies }; // also export as lowercase for compatibility.
+

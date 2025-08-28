@@ -5,15 +5,13 @@
 
 // HTTP response status.
 // - Does not include all status codes.
-/* 	@docs:
- *	@nav: Backend
- * 	@chapter: Server
- * 	@title: Status
- * 	@description: HTTP status codes.
- * 	@usage:
- * 		#include <vlib/sockets/http.h>
- * 		short success = vlib::http::status::success;
- * 	@show_code: true
+/**
+ * HTTP status codes.
+ * @example
+ * 	#include <vlib/sockets/http.h>
+ * 	short success = vlib::http::status::success;
+ * @nav Backend/Server
+ * @docs
  */
 export const Status = {
 	undefined: 							0,
@@ -75,7 +73,7 @@ export const Status = {
     two_factor_auth_required:          	418, // i am a teapot, should not be changed, used by volt js.
 
     // Get description.
-    get_description(status: number): string {
+    get_description(status: number | "unknown"): string {
     	switch (status) {
 	        case 0:
 	            return "Undefined";

@@ -4,75 +4,53 @@
  */
 
 // Events module.
-const Events = {
-    events: new Map<string, Array<[any, (element: any, args: any) => void]>>(),
+export namespace Events {
+    export const events = new Map<string, Array<[any, (element: any, args: any) => void]>>();
 
     // Emit an event.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Events
-        @title: Emit
-        @desc: Emit a registered event.
-        @param: 
-            @name: id
-            @description The id of the registered event to emit.
-        @param: 
-            @name: args
-            @description The arguments that will be passed to the registered callbacks.
-    */
-    emit(id: string, args: Record<string, any> = {}): void {
-        const callbacks = this.events.get(id);
+    /**
+     * Emit a registered event.
+     * @param id The id of the registered event to emit.
+     * @param args The arguments that will be passed to the registered callbacks.
+     * @docs
+     */
+    export function emit(id: string, args: Record<string, any> = {}): void {
+        const callbacks = events.get(id);
         if (callbacks == null) {
             return;
         }
         callbacks.forEach((i) => {
             i[1](i[0], args);
         });
-    },
+    }
 
     // On event.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Events
-        @title: On event
-        @desc: Set a callback for an event.
-        @param: 
-            @name: id
-            @description The id of the registered event to emit.
-        @param: 
-            @name: element
-            @description The element.
-        @param: 
-            @name: callback
-            @description The callback function, accepts parameters `(element, args)`.
-    */
-    on<T extends object>(id: string, element: T, callback: (element: T, args: Record<string, any>) => void): void {
-        let callbacks = this.events.get(id);
+    /**
+     * Set a callback for an event.
+     * @param id The id of the registered event to emit.
+     * @param element The element.
+     * @param callback The callback function, accepts parameters `(element, args)`.
+     * @docs
+     */
+    export function on<T extends object>(id: string, element: T, callback: (element: T, args: Record<string, any>) => void): void {
+        let callbacks = events.get(id);
         if (callbacks == null) {
             callbacks = [];
-            this.events.set(id, callbacks);
+            events.set(id, callbacks);
         }
         callbacks.push([element, callback]);
-    },
+    }
 
     // Remove a callback for an event.
-    /*  @docs:
-        @nav: Frontend
-        @chapter: Events
-        @title: Remove callback
-        @desc: Remove a callback for an event.
-        @param: 
-            @name: id
-            @description The id of the registered event to emit.
-        @param: 
-            @name: element
-            @description The element.
-        @param: 
-            @name: callback
-            @description The callback function to remove. When left undefined, all callbacks matching to that element will be removed.
-    */
-    remove<T extends object>(id: string, element: T, callback?: (element: T, args: Record<string, any>) => void): void {
-        const callbacks = this.events.get(id);
+    /**
+     * Remove a callback for an event.
+     * @param id The id of the registered event to emit.
+     * @param element The element.
+     * @param callback The callback function to remove. When left undefined, all callbacks matching to that element will be removed.
+     * @docs
+     */
+    export function remove<T extends object>(id: string, element: T, callback?: (element: T, args: Record<string, any>) => void): void {
+        const callbacks = events.get(id);
         if (callbacks == null) {
             return;
         }
@@ -83,15 +61,15 @@ const Events = {
             }
             filtered.push(i);
         });
-        this.events.set(id, filtered);
+        events.set(id, filtered);
     }
-};
+}
+export { Events as events }; // also export as lowercase for compatibility.
 
 // Fire the onload event.
+/**
+ * Fires the `volt.on_load` event when the window finishes loading.
+ */
 window.onload = () => {
     Events.emit("volt.on_load");
 }
-
-// Export.
-export { Events };
-export { Events as events }; // also export as lowercase for compatibility.

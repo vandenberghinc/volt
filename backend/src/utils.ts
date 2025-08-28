@@ -22,12 +22,13 @@ class BaseError extends Error {
     public status: number;
     public data?: any[] | Record<string, any>;
     public invalid_fields: Record<string, string>;
-    constructor({ type = "APIError", message, status, data, invalid_fields }: {
+    constructor({ type = "APIError", message, status, data, invalid_fields, cause }: {
         type?: string,
         message: string,
         status?: number,
         data?: any,
         invalid_fields?: Record<string, string>,
+        cause?: unknown
     }) {
         super(message);
         this.name = "APIError";
@@ -35,6 +36,7 @@ class BaseError extends Error {
         this.status = status ?? Status.internal_server_error;
         this.data = data;
         this.invalid_fields = invalid_fields ?? {};
+        this.cause = cause;
     }
     serve(stream: Stream) {
         stream.error({
@@ -86,75 +88,6 @@ export class InternalError extends BaseError {
         return this;
     }
 }
-
-/*  @docs:
- *  @nav: Backend
-    @parent: Utils
-    @chapter: Exceptions
-    @title: Frontend Error
-    @description: 
-        The frontend error class can be used to throw an error that will be presented to the user. All other errors will result in an internal server error response without the error's message.
-    @usage:
-        throw new volt.FrontendError("Some error occured.");
-        throw new volt.FrontendError("Bad request.", volt.status.bad_request);
-    @param:
-        @name: message
-        @descr: The error message.
-        @type: string
-    @param:
-        @name: status
-        @descr: The http error status.
-        @type: number
-    @param:
-        @name: data
-        @descr: The error body data.
-        @type: any
- */
-// export class FrontendError extends Error {
-//     public name: string;
-//     public status?: number;
-//     public data?: any;
-//     public invalid_fields: Record<string, string> = {};
-//     constructor(message: string, status?: number, data?: any, invalid_fields?: Record<string, string>) {
-//         super(message);
-//         this.name = "FrontendError";
-//         this.status = status;
-//         this.data = data;
-//         if (invalid_fields !== undefined) {
-//             this.invalid_fields = invalid_fields;
-//         }
-//     }
-// }
-
-/*  @docs:
- *  @nav: Backend
-    @parent: Utils
-    @chapter: Exceptions
-    @title: API Error
-    @description: 
-        The api error class can be used to throw an error that will be presented to the user. All other errors will result in an internal server error response without the error's message.
-    @usage:
-        throw new volt.APIError("Some error occured.");
-        throw new volt.APIError("Bad request.", volt.status.bad_request);
-    @param:
-        @name: message
-        @descr: The error message.
-        @type: string
-    @param:
-        @name: status
-        @descr: The http error status.
-        @type: number
-    @param:
-        @name: data
-        @descr: The error body data.
-        @type: any
- */
-// export class APIError extends FrontendError {
-//     constructor(message: string, status?: number, data?: any, invalid_fields?: Record<string, string>) {
-//         super(message, status, data, invalid_fields);
-//         this.name = "APIError";
-//     }
-// }
 
 // Define interface with overloads
 interface UtilsInt {

@@ -15,15 +15,13 @@ export class FrameNodes extends Array<VElement> {
 
 type OnSet = (mode: string, nodes: FrameNodes) => any
 
-// Frame mode used to switch easily between frames.
-/*	@docs:
-	@title: Frame Modes
-	@descr:
-		Frame modes used to switch easily between frame nodes.
-
-		Initialize the class with the wanted frame modes, then call `.exec(MyMode.my_mode.push)` on the nodes.
-
-		Afterwards the mode can be set using `MyMode.set("my_mode")`.
+/**
+ * Frame modes used to switch easily between frame nodes.
+ * 
+ * Initialize the class with the wanted frame modes, then call `.exec(MyMode.my_mode.push)` on the nodes.
+ * 
+ * Afterwards the mode can be set using `MyMode.set("my_mode")`.
+ * @docs
  */
 export class FrameModes {
 
@@ -99,14 +97,10 @@ declare global {
 Elements.extend({
 
 	/**
-	 * @docs:
-	 * @title: Frame Mode
-	 * @desc: Adds a node to a FrameMode. Can accept a single argument to push the current instance or two arguments to specify a FrameModesType and an index.
-	 * @param:
-	 *     @name: args
-	 *     @descr: Arguments to determine the operation to perform for adding a node.
-	 * @return:
-	 *     @description Returns the instance of the element for chaining.
+     * Adds a node to a FrameMode. Can accept a single argument to push the current instance or two arguments to specify a FrameModesType and an index.
+     * @param args Arguments to determine the operation to perform for adding a node.
+     * @returns Returns the instance of the element for chaining.
+	 * @docs
 	 */
 	frame_mode(this: VElement, ...args) {
 		if (args.length === 1) {

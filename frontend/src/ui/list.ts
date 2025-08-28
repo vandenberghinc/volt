@@ -5,7 +5,7 @@
 
 // Imports.
 import { Elements, VElementBaseSignature, VElement, VElementTagMap } from "../elements/module.js"
-import { Scheme } from "@vandenberghinc/vlib/frontend";
+import { Schema } from "@vandenberghinc/vlib/frontend";
 
 // List item.
 @Elements.create({
@@ -30,6 +30,9 @@ declare module './any_element.d.ts' { interface AnyElementMap { ListItemElement:
 // Unordered List.
 @Elements.create({
     name: "UnorderedListElement",
+    default_style: {
+        "padding-left": "1.5em", // add some left padding to ensure the ::marker is visible.
+    }
 })
 export class UnorderedListElement extends VElementTagMap.ul {
 	
@@ -43,7 +46,7 @@ export class UnorderedListElement extends VElementTagMap.ul {
 		if (Array.isArray(items)) {
 			items.iterate(node => {this.append_item(node)})
 		} else {
-			console.error(`Invalid type "${Scheme.value_type(items)}" for parameter "items" the valid type is "array".`)
+			console.error(`Invalid type "${Schema.value_type(items)}" for parameter "items" the valid type is "array".`)
 		}
 	}
 
@@ -63,6 +66,9 @@ declare module './any_element.d.ts' { interface AnyElementMap { UnorderedListEle
 // Ordered List.
 @Elements.create({
     name: "OrderedListElement",
+    default_style: {
+        "padding-left": "1.5em", // add some left padding to ensure the ::marker is visible.
+    }
 })
 export class OrderedListElement extends VElementTagMap.ol {
 
@@ -76,7 +82,7 @@ export class OrderedListElement extends VElementTagMap.ol {
 		if (Array.isArray(items)) {
 			items.iterate(node => {this.append_item(node)})
 		} else {
-			console.error(`Invalid type "${Scheme.value_type(items)}" for parameter "items" the valid type is "array".`)
+			console.error(`Invalid type "${Schema.value_type(items)}" for parameter "items" the valid type is "array".`)
 		}
 	}
 

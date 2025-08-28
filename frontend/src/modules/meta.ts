@@ -4,10 +4,10 @@
  */
 
 // Meta module.
-export const Meta = {
+export namespace Meta {
 	
 	// Set title.
-	set({
+	export function set({
 		author,
 		title,
 		description,
@@ -55,6 +55,6 @@ export const Meta = {
 			set_content_og("og:image", image);
 			set_content_og("twitter:image", description);
 		}
-	},
+	}
 }
 export { Meta as meta }; // also export as lowercase for compatibility.

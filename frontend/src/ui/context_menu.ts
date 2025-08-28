@@ -143,19 +143,14 @@ declare global {
 Elements.extend({
 	_context_menu: undefined as any,
 
-	/**
-	 * @docs:
-	 * @parent: VElement
-	 * @title: On Context Menu
-	 * @desc: 
-	 *     Script to be run when a context menu is triggered. This function can set or get the context menu callback.
-	 * @param:
-	 *     @name: callback
-	 *     @descr: 
-	 *         The parameter may either be a callback function, a ContextMenu object, or an Array as the ContextMenu parameter.
-	 * @return:
-	 *     @description Returns the `VElement` object. If `callback` is `null`, then the attribute's value is returned.
-	 * @funcs: 2
+    /**
+	 * Script to be run when a context menu is triggered. This function can set or get the context menu callback.
+     * 
+	 * @param callback The parameter may either be a callback function, a ContextMenu object, or an Array as the ContextMenu parameter.
+	 * @parent VElement
+     * @funcs 2
+     * @docs
+     * @returns Returns the `VElement` object. If `callback` is `null`, then the attribute's value is returned.
 	 */
 	on_context_menu(this, callback) {
 		if (callback == null) {

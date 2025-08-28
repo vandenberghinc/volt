@@ -4,116 +4,59 @@
  */
 
 // Imports.
+import type { Users as UsersBackend } from "../../../backend/src/users.js";
 import { Utils } from "./utils.js"
 
 // Support module.
-const Support = {
-    
-    /* 	@docs:
-     *  @nav: Frontend
-     * 	@chapter: Support
-     * 	@title: Submit Support
-     *	@description: 
-     *		Submit a support contact form. The server will send an email to your registered SMTP mail.
-     *	
-     *		All provided argument keys will be included in the support mail, even the undefined parameters.
-     *	@type: Promise
-     *	@return: Returns a promise with a successful submit response or a request error on a failed request.
-     *	@param:
-     *		@name: subject
-     *		@desc: The support subject.
-     *		@required: false
-     *	@param:
-     *		@name: type
-     *		@desc: The support type for internal purpose only.
-     *		@required: false
-     *		@type: string
-     *	@param:
-     *		@name: support_pin
-     *		@desc: The user's support pin. This parameter will automatically be assigned when the user is authenticated.
-     *		@required: false
-     *		@advised: true
-     *		@type: string
-     *	@param:
-     *		@name: email
-     *		@desc: The user's email. This parameter will automatically be assigned when the user is authenticated.
-     *		@required: false
-     *		@advised: true
-     *		@type: string
-     *	@param:
-     *		@name: first_name
-     *		@desc: The user's first name. This parameter will automatically be assigned when the user is authenticated.
-     *		@required: false
-     *		@advised: true
-     *		@type: string
-     *	@param:
-     *		@name: last_name
-     *		@desc: The user's last name. This parameter will automatically be assigned when the user is authenticated.
-     *		@required: false
-     *		@advised: true
-     *		@type: string
-     *	@param:
-     *		@name: recipient
-     *		@desc: The recipient email, by default the `Server.smtp_sender` email will be used.
-     *		@required: false
-     *		@type: string
-     *	@param:
-     *		@name: summary
-     *		@desc: A summary of the support request.
-     *		@required: false
-     *		@type: string
-     *	@param:
-     *		@name: detailed
-     *		@desc: A detailed description of the support request.
-     *		@required: false
-     *		@type: string
-     *	@param:
-     *		@name: attachments
-     *		@desc: An object with attachments, assigned as `{file_name: raw_file_data}`.
-     *		@required: false
-     *		@type: object
+export namespace Support {
+
+    /**
+     * Submit a support contact form. The server will send an email to your registered SMTP mail.
+     *
+     * All provided argument keys will be included in the support mail, even the undefined parameters.
+     * Allows for a maximum of 5 attachments, each up to 5 MB in size.
+     * @nav Frontend/Support
+     * @returns Returns a promise with a successful submit response or a request error on a failed request.
+     * @param payload The request payload, see {@link UsersBackend.Endpoints.SubmitSupport.Params}.
+     * @docs
      */
-    submit(data: {
-        subject?: string;
-        type?: string;
-        support_pin?: string;
-        email?: string;
-        first_name?: string;
-        last_name?: string;
-        recipient?: string;
-        summary?: string;
-        detailed?: string;
-        attachments?: { [fileName: string]: any };
-    } = {}) {
-        return Utils.request_v1({
+    export function submit(
+        payload: UsersBackend.Endpoints.SubmitSupport.Params
+    ): Utils.RequestResultPromise<UsersBackend.Endpoints.SubmitSupport.Result> {
+        if (payload.attachments) {
+            const MAX_ATTACHMENTS = 5;
+            const MAX_BYTES = 5 * 1024 * 1024; // 5 MB per file
+            const keys = Object.keys(payload.attachments);
+            if (keys.length > MAX_ATTACHMENTS) {
+                throw new Error("Too many attachments. Maximum is 5.");
+            }
+            for (const key of keys) {
+                const raw = (payload.attachments as Record<string, string>)[key];
+                const is_base64 = /^[A-Za-z0-9+/]+=*$/.test(raw);
+                const buf = Buffer.from(raw, is_base64 ? "base64" : "utf-8");
+                if (buf.length > MAX_BYTES) {
+                    throw new Error(`Attachment "${key}" exceeds the maximum size of 5 MB.`);
+                }
+            }
+        }
+        return Utils.request({
             method: "POST",
             url: "/volt/support/submit",
-            data: data,
+            data: payload,
         });
-    },
+    }
 
-    /* 	@docs:
-     *  @nav: Frontend
-     *  @chapter: Support
-     * 	@title: Support PIN
-     *	@description: 
-     *		Get the support pin of an authenticated user.
-     *	@return:
-     *		@type: Promise
-     *		@desc: Returns a promise with a successful submit response or a request error on a failed request.
-     *		@attribute:
-     *			@name: pin
-     *			@desc: The user's support pin.
-     *			@type: string
+    /**
+     * Get the support pin of an authenticated user.
+     * @nav Frontend/Support
+     * @returns Returns a promise that resolves with an object containing `pin` (the user's support pin) on success, or a request error on failure.
+     * @docs
      */
-    get_pin() {
-        return Utils.request_v1({
+    export function get_pin(): Utils.RequestResultPromise<UsersBackend.Endpoints.GetSupportPin.Result> {
+        return Utils.request({
             method: "GET",
             url: "/volt/support/pin",
         });
     }
 }
-
-// Export.
-export { Support };
 export { Support as support }; // also export as lowercase for compatibility.

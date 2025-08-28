@@ -9,15 +9,14 @@
 import * as vlib from "@vandenberghinc/vlib";
 import * as vts from "@vandenberghinc/vlib/vts";
 import * as vhighlight from "@vandenberghinc/vhighlight";
-import utils from "./utils.js";
-import Meta from "./meta.js";
-import logger from "./logger.js";
+import { utils } from "./utils.js";
+import { Meta } from "./meta.js";
 import { Route } from './route.js';
-import Frontend from './frontend.js';
+import { Frontend } from './frontend.js';
 import { Endpoint } from "./endpoint.js";
-import Server from "./server.js";
+import { Server } from "./server.js";
+import { SplashScreen } from "./splash_screen.js";
 
-const { log, error } = logger;
 const { debug } = vlib;
 
 // ---------------------------------------------------------
@@ -109,7 +108,7 @@ export class View {
     static includes: Array<string | Record<string, any>> = [];
     static links: Array<string | Record<string, any>> = [];
     static body_style: string | null = null; // css string style.
-    static splash_screen: any = null; // SplashScreen object.
+    static splash_screen: SplashScreen | undefined = undefined; // SplashScreen object.
 
     // Private static attributes,
     private static _volt_css?: string;
@@ -126,7 +125,7 @@ export class View {
     jquery: boolean;
     lang: string;
     body_style: string | null;
-    splash_screen: any;
+    splash_screen: SplashScreen | undefined;
     tree_shaking: boolean;
     mangle: boolean;
     _src?: string;
@@ -138,8 +137,8 @@ export class View {
     payments?: string | undefined;
     // vhighlight?: string | undefined;
     min_device_width?: number;
-    _server?: Server;
-    _endpoint?: Endpoint;
+    server?: Server;
+    endpoint?: Endpoint;
 
     // Constructor.
     constructor({
@@ -152,7 +151,7 @@ export class View {
         jquery = false,
         lang = "en",
         body_style = null,
-        splash_screen = null,
+        splash_screen = undefined,
         tree_shaking = false,
         mangle = false,
         min_device_width = 600,
@@ -167,7 +166,7 @@ export class View {
         jquery?: boolean;
         lang?: string;
         body_style?: string | null;
-        splash_screen?: any;
+        splash_screen?: SplashScreen;
         tree_shaking?: boolean;
         mangle?: boolean;
         min_device_width?: number,
@@ -222,42 +221,30 @@ export class View {
     _initialize(server: Server, endpoint: Endpoint): void {
         if (server === undefined) { throw Error("Invalid usage, define parameter \"server\"."); }
         if (endpoint === undefined) { throw Error("Invalid usage, define parameter \"endpoint\"."); }
-        this._server = server;
-        this._endpoint = endpoint;
+        this.server = server;
+        this.endpoint = endpoint;
     }
 
     // Bundle the compiled typescript / javascript dynamically on demand to optimize server startup for development purposes.
     private async _dynamic_bundle(): Promise<void> {
 
         // Server & endpoint.
-        if (this._server === undefined || this._endpoint === undefined) { throw Error("View has not been initialized with \"View._initialize()\" yet."); }
+        if (this.server === undefined || this.endpoint === undefined) { throw Error("View has not been initialized with \"View._initialize()\" yet."); }
 
         // Bundle.
-        // const had_bundle = this.bundle !== undefined;
-        // if (bundle != null) {
-        //     // also accept already bundled for server.js in case multiple endpoint paths serve the same bundle.
-        //     this.bundle = bundle;
-        // } else {
-        debug(3, this._endpoint?.route?.id, `: Bundling entry path "${this.source_path?.str()}".`)
+        debug(3, this.endpoint?.route?.id, `: Bundling entry path "${this.source_path?.str()}".`)
         this._bundle = await vts.bundle({
-            entry_paths: [this.source_path?.str() ?? ""],
-            output: `/tmp/${this._endpoint.route.method}_${this.source_path!.str().replace(/\//g, "_") }.js`, // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
+            include: this.source_path ? [this.source_path?.str()] : [],
+            output: `/tmp/${this.endpoint.route.method}_${this.source_path!.str().replace(/\//g, "_")}.js`, // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
             minify: false,//this._server.production,
             platform: "browser",
-            // format: "esm",
-            format: "iife",
+            format: "esm",
+            // format: "iife", // can causes issues with node_modules imports.
             target: "es2022",
-            // target: "esnext",
-            // sourcemap: this._server.production ? false : "inline",
+            // sourcemap: this.server.production ? false : "inline",
             extract_inputs: true, // since bundle.inputs is used by server.js.
             tree_shaking: true,
         })
-        // console.log("Bundle:", this._bundle);
-        if (this._bundle.errors.length > 0) {
-            error(this._endpoint?.route?.id, `: Encountered an error while bundling "${this.source}".\n`, this._bundle.debug())
-            return;
-        }
-        // }
 
         // Set options based on inputs.
         this.payments = this._bundle.inputs.find((path: string) => path.endsWith("/modules/paddle.js"));
@@ -265,9 +252,6 @@ export class View {
 
         // Rebuild html.
         await this._build_html();
-
-        // Response.
-        // return this.bundle;
     }
 
     /** Ensure the view is bundled when required. */
@@ -277,19 +261,146 @@ export class View {
         }
     }
 
+    /** Create an error HTML file when errors are encountered during the bundle process. */
+    private async _build_bundle_err_html(): Promise<void> {
+        const bundle = await vts.inspect_bundle({
+            include: this.source_path ? [this.source_path?.str()] : [],
+            output: vlib.Path.tmp().join(`${this.endpoint?.route.method}_${this.source_path!.str().replace(/\//g, "_")}.js`), // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
+            minify: false,//this._server.production,
+            platform: "browser",
+            format: "esm",
+            // format: "iife", // can causes issues with node_modules imports.
+            target: "es2022",
+            tree_shaking: true,
+        })
+
+        // Log to server
+        this.server?.log.error(this.endpoint?.route?.id, `: Encountered an error while bundling "${this.source}".\n${bundle.debug({ limit: 25 })}`);
+
+        // HTML escape function
+        const escape_html = (str: string) => vlib.Color.to_html(
+            str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+        );
+
+        if (this.server?.production) {
+            this.html = `
+                <!DOCTYPE html>
+                <html lang='${this.lang}'>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <title>Bundling Error</title>
+                </head>
+                <body style='font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 2rem; background: #f5f5f5;'>
+                    <div style='max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
+                        <h1 style='color: #d32f2f; margin-top: 0;'>Bundling Error</h1>
+                        <p>An error occurred while processing your request. Please contact support if this issue persists.</p>
+                    </div>
+                </body>
+                </html>
+                `.dedent(false);
+        } else {
+            // Development mode - show full debug info
+            const formatted_import_chains = bundle.format_import_chains();
+            const formatted_errors = bundle.format_errors();
+            this.html = `
+                <!DOCTYPE html>
+                <html lang='${this.lang}'>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <title>Bundling Error - ${escape_html(this.source || 'Unknown')}</title>
+                    <style>
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            margin: 0;
+                            padding: 1rem;
+                            background: #1e1e1e;
+                            color: #d4d4d4;
+                        }
+                        .container {
+                            max-width: 1200px;
+                            margin: 0 auto;
+                        }
+                        h1 {
+                            color: #FFFFFF;
+                            font-size: 1.5rem;
+                            margin-bottom: 0.5rem;
+                        }
+                        .source {
+                            color: #C0C0C0;
+                            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+                            font-size: 0.875rem;
+                            margin-bottom: 1rem;
+                        }
+                        pre {
+                            background: #2d2d2d;
+                            border: 1px solid #3e3e3e;
+                            border-radius: 4px;
+                            padding: 1rem;
+                            overflow-x: auto;
+                            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+                            font-size: 0.875rem;
+                            line-height: 1.5;
+                            margin: 20px 0px 0px 0px;
+                        }
+                        .error-count {
+                            background: #f44336;
+                            color: white;
+                            padding: 0.25rem 0.5rem;
+                            border-radius: 4px;
+                            font-size: 0.875rem;
+                            display: inline-block;
+                            margin-bottom: 1rem;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>Bundle Error</h1>
+                        <div class="source">Source: ${escape_html(this.source || 'Unknown')}</div>
+                        <div class="error-count">${bundle.errors.length} error${bundle.errors.length === 1 ? '' : 's'}</div>
+                        <pre>${escape_html(bundle.debug({ limit: -1 }))}</pre>
+                        <!--<h2>Metafile</h2>
+                        <pre>${escape_html(bundle.metafile ?? "No metafile detected.")}</pre>
+                        <h2>Input files</h2>
+                        <pre>${escape_html(bundle.inputs.length ? bundle.inputs.join("\n") : "No input files detected.")}</pre>
+                        <h2>Import Chains</h2>
+                        <pre>${escape_html(formatted_import_chains.length
+                            ? formatted_import_chains.join("\n")
+                            : "No import chains detected."
+                        )}</pre>
+                        <h2>Encountered Errors</h2>
+                        <pre>${escape_html(formatted_errors.length ? formatted_errors.join("\n") : "No errors detected.")}</pre>
+                        -->
+                    </div>
+                </body>
+                </html>
+                `.dedent(false);
+        }
+    }
+
 
     // Build html.
     async _build_html(): Promise<void> {
         // Server & endpoint.
-        if (this._server == null || this._endpoint == null) { throw Error("View has not been initialized with \"View._initialize()\" yet."); }
+        if (this.server == null || this.endpoint == null) { throw Error("View has not been initialized with \"View._initialize()\" yet."); }
 
         // Bundle js files automatically.
         if (this.is_js_ts_view && !this._bundle) {
             await this._dynamic_bundle();
         }
+        if (this._bundle.errors.length > 0) {
+            return this._build_bundle_err_html();
+        }
 
         // Vars.
-        const line_break = this._server.production ? "\n" : "\n";
+        const line_break = this.server.production ? "\n" : "\n";
         const has_bundle = this._bundle != null && typeof this._bundle === "object";
 
         // Initialize html.
@@ -303,7 +414,7 @@ export class View {
         
         // Meta.
         if (this.meta) {
-            this.html += this.meta.build_html(this._server.full_domain) + line_break;
+            this.html += this.meta.build_html(this.server.full_domain) + line_break;
         }
 
         // this.html = "Hello World!";
@@ -319,7 +430,7 @@ export class View {
                 url != null &&
                 url.charAt(0) === "/"
             ) {
-                for (const endpoint of this._server!.endpoints.values()) {
+                for (const endpoint of this.server!.endpoints.values()) {
                     if (url === endpoint.route.endpoint_str) {
                         if (typeof endpoint.raw_data === "string") {
                             embed = endpoint.raw_data;
@@ -486,7 +597,7 @@ export class View {
         // Returns `false` when the endpoint is not found.
         const embed_script = (url: string): boolean => {
             let embed;
-            for (const endpoint of this._server!.endpoints.values()) {
+            for (const endpoint of this.server!.endpoints.values()) {
                 if (
                     url === endpoint.route.endpoint_str &&
                     (endpoint.raw_data != null || endpoint.data != null)
@@ -518,9 +629,9 @@ export class View {
             // Keep first since it needs to be included before volt.
             this.html += "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js'></script>" + line_break;
         }
-        if (this._server.google_tag !== undefined) {
+        if (this.server.google_tag !== undefined) {
             // this.html += `<script async src="https://www.googletagmanager.com/gtag/js?id=${this._server.google_tag}" onload='volt.google._initialize()'></script>`;
-            include_js_script += `__volt_incl_js("https://www.googletagmanager.com/gtag/js?id=${this._server.google_tag}");${line_break}`;
+            include_js_script += `__volt_incl_js("https://www.googletagmanager.com/gtag/js?id=${this.server.google_tag}");${line_break}`;
         }
 
         // Primary volt includes do not add them to cached_code since they need to be included before any other includes.
@@ -530,11 +641,11 @@ export class View {
 
         // Add volt static aspect ratios.
         // @todo volt.static
-        this.html += `<script>${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this._server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
+        this.html += `<script>${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this.server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
 
         // Embed other scripts.
-        if (this._server.payments) {
-            if (this._server.payments.type === "paddle") {
+        if (this.server.payments) {
+            if (this.server.payments.type === "paddle") {
                 // embed_script("/volt/payments/paddle.js", false); // no longer required due to auto imports.
                 if (this.payments) {
                     include_js_script += `__volt_incl_js("https://cdn.paddle.com/paddle/v2/paddle.js");${line_break}`;
@@ -626,7 +737,7 @@ export class View {
     
     // Serve a client.
     _serve(stream: any, status_code: number = 200): void {
-        debug(2, this._endpoint?.route?.id, ": Serving HTML ", this.html?.slice(0, 50), "...");
+        debug(2, this.endpoint?.route?.id, ": Serving HTML ", this.html?.slice(0, 50), "...");
         stream.send({
             status: status_code, 
             headers: { "Content-Type": "text/html" }, 

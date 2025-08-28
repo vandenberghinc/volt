@@ -56,6 +56,14 @@ class Stream {
   res_headers;
   body;
   promise;
+  /**
+   * Create a new Stream wrapper for HTTP/1.1 or HTTP/2.
+   *
+   * @param stream The HTTP/2 stream (when using HTTP/2).
+   * @param headers The request headers.
+   * @param req The HTTP/1.1 request (when using HTTP/1.1).
+   * @param res The HTTP/1.1/HTTP/2 response object.
+   */
   constructor(stream, headers, req, res) {
     this.s = stream;
     this.headers = headers ?? {};
@@ -74,8 +82,8 @@ class Stream {
     this._endpoint = void 0;
     this._query_string = void 0;
     this._cookies = void 0;
-    this._uid = null;
-    this.status_code = null;
+    this._uid = void 0;
+    this.status_code = void 0;
     this.finished = false;
     this.res_cookies = [];
     this.res_headers = this.http1 ? [] : {};
@@ -83,7 +91,11 @@ class Stream {
     this.promise = void 0;
     this._recv_body();
   }
-  // Receve the body.
+  /**
+   * Receive and buffer the request body, handling optional gzip/deflate decompression.
+   * Sets {@link body} and resolves the internal promise used by {@link join}.
+   * @private
+   */
   _recv_body() {
     this.promise = new Promise((resolve, reject) => {
       const buffs = [];
@@ -137,7 +149,11 @@ class Stream {
       }
     });
   }
-  // Parse endpoint.
+  /**
+   * Parse and cache the request endpoint and query string.
+   * Populates {@link _endpoint} and {@link _query_string}.
+   * @private
+   */
   _parse_endoint() {
     if (this._endpoint !== void 0) {
       return;
@@ -153,7 +169,10 @@ class Stream {
       this._endpoint = this._endpoint.substr(0, this._endpoint.length - 1);
     }
   }
-  // Parse the parameters.
+  /**
+   * Parse and cache request parameters from the query string or JSON body.
+   * Returns the parsed params map.
+   */
   _parse_params() {
     this._parse_endoint();
     if (this._params !== void 0) {
@@ -231,12 +250,17 @@ class Stream {
     }
     return this._params;
   }
-  // Parse cookies.
+  /**
+   * Parses & returns the cookies  cookies,
+   * while assigning it to {@link _cookies}
+   *
+   * @warning On subsequent calls cookies will be parsed again.
+  */
   _parse_cookies() {
     this._cookies = {};
     const cookie_str = this.http2 ? this.headers["cookie"] : this.req.headers.cookie;
-    if (cookie_str === void 0) {
-      return null;
+    if (cookie_str == null) {
+      return this._cookies;
     }
     let key = "";
     let value = "";
@@ -297,58 +321,65 @@ class Stream {
     }
     append_to_cookie();
     append_cookie();
+    return this._cookies;
   }
   // ---------------------------------------------------------
   // Functions.
-  // Wait till the request body is fully received.
+  /**
+   * Wait until the request body is fully received.
+   * Resolves when the internal receive promise completes.
+   */
   async join() {
     await this.promise;
   }
   // Get the requests ip.
-  /*  @docs:
-   *  @title: IP
-   *  @description: Get the request's ip.
-   *  @property: true
-   *  @usage:
-   *      ...
-   *      const ip = stream.ip;
+  /**
+   * Get the request's ip.
+   *
+   * @example
+   * ```ts
+   * const ip = stream.ip;
+   * ```
+   * @docs
    */
   get ip() {
     return this._ip;
   }
   // Get the requests port.
-  /*  @docs:
-   *  @title: Port
-   *  @description: Get the request's port.
-   *  @property: true
-   *  @usage:
-   *      ...
-   *      const port = stream.port;
+  /**
+   * Get the request's port.
+   *
+   * @example
+   * ```ts
+   * const port = stream.port;
+   * ```
+   * @docs
    */
   get port() {
     return this._port;
   }
   // Get the method.
-  /*  @docs:
-   *  @title: Method
-   *  @description: Get the request method.
-   *  @property: true
-   *  @usage:
-   *      ...
-   *      const method = stream.method;
+  /**
+   * Get the request method.
+   *
+   * @example
+   * ```ts
+   * const method = stream.method;
+   * ```
+   * @docs
    */
   get method() {
     return this._method;
   }
   // Get the endpoint.
-  /*  @docs:
-   *  @title: Endpoint
-   *  @description: Get the request's endpoint. This will not include the query string.
-   *  @property: true
-   *  @type: string
-   *  @usage:
-   *      ...
-   *      const endpoint = stream.endpoint;
+  /**
+   * Get the request's endpoint. This will not include the query string.
+   *
+   * @example
+   * ```ts
+   * const endpoint = stream.endpoint;
+   * ```
+   * @docs
    */
   get endpoint() {
     if (this._endpoint !== void 0) {
@@ -358,14 +389,14 @@ class Stream {
     return this._endpoint;
   }
   // Get the params.
-  /*  @docs:
-   *  @title: Parameters
-   *  @description: Get the request's query or body params.
-   *  property: true
-   *  @type: object
-   *  @usage:
-   *      ...
-   *      const params = stream.params;
+  /**
+   * Get the request's query or body params.
+   *
+   * @example
+   * ```ts
+   * const params = stream.params;
+   * ```
+   * @docs
    */
   get params() {
     if (this._params !== void 0) {
@@ -382,31 +413,25 @@ class Stream {
     this._params[name] = value;
   }
   // Get a param by name and optionally by type.
-  /*  @docs:
-   *  @title: Parameter
-   *  @description: Get a single query or body parameter with an optional type cast.
-   *  @warning: Throws an error when the parameter does not exist or when the type is different from the specified type(s), unless parameter `def` is defined.
-   *  @param:
-   *      @name: name
-   *      @desc: The name of the parameter.
-   *      @type: string
-   *  @param:
-   *      @name: type
-   *      @desc: The type cast of the parameters, valid types are `[null, "boolean", "number", "string", "array", "object"]`.
-   *      @type: string
-   *  @param:
-   *      @name: def
-   *      @desc:
+  /**
+   * Get a single query or body parameter with an optional type cast.
+   *
+   * @warning Throws an error when the parameter does not exist or when the type is different from the specified type(s), unless parameter `def` is defined.
+   *
+   * @param name The name of the parameter.
+   * @param type The type cast of the parameters, valid types are `[null, "boolean", "number", "string", "array", "object"]`.
+   * @param def
    *          The default value to return when the parameter does not exist.
    *
    *          If the parameter is not defined and `def` is `undefined` then this function will throw an error.
    *          When `def` is `undefined` errors will be thrown, when `def` is `null` and the parameter is undefined then `null` will be returned as the default value.
    *
    *          Errors will always be thrown when the incorrect type has been sent by the user.
-   *      @type: any
-   *  @usage:
-   *      ...
-   *      const param = stream.param("myparameter", "number", 10);
+   * @example
+   * ```ts
+   * const param = stream.param("myparameter", "number", 10);
+   * ```
+   * @docs
    */
   param(name, type = null, def = void 0) {
     this._parse_params();
@@ -518,30 +543,29 @@ class Stream {
     return value;
   }
   // Get the request cookies.
-  /*  @docs:
-   *  @title: Cookies
-   *  @description: Get the request's cookies
-   *  property: true
-   *  @type: object
-   *  @usage:
-   *      ...
-   *      const cookies = stream.cookies;
+  /**
+   * Get the request's cookies
+   *
+   * @example
+   * ```ts
+   * const cookies = stream.cookies;
+   * ```
+   * @docs
    */
   get cookies() {
-    if (this._cookies !== void 0) {
+    if (this._cookies != null)
       return this._cookies;
-    }
-    this._parse_cookies();
-    return this._cookies;
+    return this._parse_cookies();
   }
   // Check if the stream is closed
-  /*  @docs:
-   *  @title: Closed
-   *  @description: Check if the stream is closed.
-   *  @property: true
-   *  @usage:
-   *      ...
-   *      const ip = stream.closed;
+  /**
+   * Check if the stream is closed.
+   *
+   * @example
+   * ```ts
+   * const ip = stream.closed;
+   * ```
+   * @docs
    */
   get closed() {
     if (!this.http2) {
@@ -550,13 +574,14 @@ class Stream {
     return this.s.closed;
   }
   // Check if the stream is destroyed
-  /*  @docs:
-   *  @title: Destroyed
-   *  @description: Check if the stream is destroyed.
-   *  @property: true
-   *  @usage:
-   *      ...
-   *      const ip = stream.destroyed;
+  /**
+   * Check if the stream is destroyed.
+   *
+   * @example
+   * ```ts
+   * const ip = stream.destroyed;
+   * ```
+   * @docs
    */
   get destroyed() {
     if (this.http2) {
@@ -568,14 +593,14 @@ class Stream {
   // ---------------------------------------------------------
   // Functions.
   // Get the authenticated uid.
-  /*  @docs:
-   *  @title: UID
-   *  @description: Get the authenticated uid, is `null` when the request was not authenticated.
-   *  @property: true
-   *  @type: string
-   *  @usage:
-   *      ...
-   *      const uid = stream.uid;
+  /**
+   * Get the authenticated uid; `undefined` when the request was not authenticated.
+   *
+   * @example
+   * ```ts
+   * const uid = stream.uid;
+   * ```
+   * @docs
    */
   get uid() {
     return this._uid;
@@ -584,48 +609,34 @@ class Stream {
     this._uid = value;
   }
   // Send a response.
-  /*  @docs:
-   *  @title: Send
-   *  @description: Send a response
-   *  @parameter:
-   *      @name: status
-   *      @description: The response status.
-   *      @type: number
-   *  @parameter:
-   *      @name: headers
-   *      @description: The response headers.
-   *      @type: object
-   *  @parameter:
-   *      @name: body
-   *      @description: The response body.
-   *      @type: any
-   *  @parameter:
-   *      @name: data
-   *      @description: The response data.
-   *      @type: undefined, string
-   *      @deprecated: true
-   *  @parameter:
-   *      @name: compress
-   *      @description: A boolean indicating if the response data should be compressed.
-   *      @type: boolean
-   *  @usage:
-   *      ...
-   *      stream.send({status: 200, data: "Hello World!"});
+  /**
+   * Send a response.
+   *
+   * @param options The response options.
+   * @param options.status The response status.
+   * @param options.headers The response headers.
+   * @param options.body The response body.
+   * @param options.data The response data. (Deprecated.)
+   * @param options.compress Whether the response should be gzip-compressed.
+   * @example
+   * ```ts
+   * stream.send({status: 200, data: "Hello World!"});
+   * ```
+   * @docs
    */
   send({
     status = 200,
     headers = {},
-    // data,
-    // body = data,    // zero-copy pull in data
-    body,
     data,
+    body = data,
+    // zero-copy pull in data
+    // body,data,
     compress = false
   } = {}) {
-    if (data) {
-      body = data;
-    }
     this.status_code = status;
-    const has_body = body != null && body !== "";
+    if (typeof body === "boolean" || typeof body === "number") {
+      body = body.toString();
+    }
     if (this.http2) {
       const stream = this.s;
       this.res_headers[":status"] = status;
@@ -633,21 +644,32 @@ class Stream {
       if (this.res_cookies.length > 0) {
         this.res_headers["set-cookie"] = this.res_cookies;
       }
-      if (compress && has_body) {
+      if (compress && body) {
         this.res_headers["Content-Encoding"] = "gzip";
         this.res_headers["Vary"] = "Accept-Encoding";
       }
-      if (has_body && typeof body === "object" && Buffer.isBuffer(body) === false && body instanceof Uint8Array === false) {
+      if (body && typeof body === "object" && Buffer.isBuffer(body) === false && body instanceof Uint8Array === false) {
         this.res_headers["Content-Type"] = "application/json";
         body = JSON.stringify(body);
       }
-      if (compress && has_body) {
-        body = import_zlib.default.gzipSync(body, { level: import_zlib.default.constants.Z_BEST_COMPRESSION });
+      if (body && typeof body === "object" && !(body instanceof Buffer) && !(body instanceof Uint8Array)) {
+        body = JSON.stringify(body);
+      }
+      if (compress && body) {
+        if (typeof body === "string" || Buffer.isBuffer(body) || body instanceof Uint8Array) {
+          body = import_zlib.default.gzipSync(body, { level: import_zlib.default.constants.Z_BEST_COMPRESSION });
+        } else {
+          body = import_zlib.default.gzipSync(JSON.stringify(body), { level: import_zlib.default.constants.Z_BEST_COMPRESSION });
+        }
       }
       stream.respond(this.res_headers);
-      debug(3, "Sending response: ", status, " - has body: ", has_body);
-      if (has_body) {
-        stream.end(Buffer.from(body));
+      debug(3, "Sending response: ", status, " - has body: ", !!body);
+      if (body) {
+        if (Buffer.isBuffer(body) || body instanceof Uint8Array) {
+          stream.end(body);
+        } else {
+          stream.end(Buffer.from(body));
+        }
       } else {
         stream.end();
       }
@@ -659,21 +681,28 @@ class Stream {
         res.setHeader(this.res_headers[i][0], this.res_headers[i][1]);
       }
       Object.keys(headers).forEach((key) => {
-        res.setHeader(key, headers[key]);
+        const v = headers[key];
+        if (v != null) {
+          if (typeof v === "boolean") {
+            res.setHeader(key, v.toString());
+          } else {
+            res.setHeader(key, v);
+          }
+        }
       });
       if (this.cookies.length > 0) {
         res.setHeader("Set-Cookie", this.res_cookies);
       }
-      if (has_body && typeof body === "object" && Buffer.isBuffer(body) === false && body instanceof Uint8Array === false) {
+      if (body && typeof body === "object" && Buffer.isBuffer(body) === false && body instanceof Uint8Array === false) {
         res.setHeader("Content-Type", "application/json");
         body = JSON.stringify(body);
       }
-      if (compress && has_body) {
+      if (compress && body) {
         res.setHeader("Content-Encoding", "gzip");
         res.setHeader("Vary", "Accept-Encoding");
         body = import_zlib.default.gzipSync(body, { level: import_zlib.default.constants.Z_BEST_COMPRESSION });
       }
-      if (has_body) {
+      if (body) {
         res.end(body);
       } else {
         res.end();
@@ -683,70 +712,46 @@ class Stream {
     return this;
   }
   // Send a successs response.
-  /*  @docs:
-   *  @title: Send Successs
-   *  @description: Send a response
-   *  @parameter:
-   *      @name: status
-   *      @description: The response status.
-   *      @type: number
-   *  @parameter:
-   *      @name: headers
-   *      @description: The response headers.
-   *      @type: object
-   *  @parameter:
-   *      @name: body
-   *      @description: The response data.
-   *      @type: any
-   *  @parameter:
-   *      @name: data
-   *      @description: The response data.
-   *      @type: undefined, string
-   *      @deprecated: true
-   *  @parameter:
-   *      @name: compress
-   *      @description: A boolean indicating if the response data should be compressed.
-   *      @type: boolean
-   *  @usage:
-   *      ...
-   *      stream.success({data: "Hello World!"});
+  /**
+   * Send a response
+   *
+   * @param options The response options.
+   * @param options.status The response status.
+   * @param options.headers The response headers.
+   * @param options.body The response data.
+   * @param options.data The response data. (Deprecated.)
+   * @param options.compress Whether the response should be gzip-compressed.
+   * @example
+   * ```ts
+   * stream.success({data: "Hello World!"});
+   * ```
+   * @docs
    */
   success({ status = 200, headers = {}, body = void 0, data = void 0, compress = false } = {}) {
     debug(3, "Sending [success] response: ", status, " - body: ", body ?? data);
     return this.send({ status, headers, body: body ?? data, compress });
   }
   // Send an error response.
-  /*  @docs:
-   *  @title: Send Error
-   *  @description: Send an error response
-   *  @parameter:
-   *      @name: status
-   *      @description: The response status.
-   *      @type: number
-   *  @parameter:
-   *      @name: headers
-   *      @description: The response headers.
-   *      @type: object
-   *  @parameter:
-   *      @name: body
-   *      @description: The response data.
-   *      @type: any
-   *  @parameter:
-   *      @name: data
-   *      @description: The response data.
-   *      @type: undefined, string
-   *      @deprecated: true
-   *  @parameter:
-   *      @name: compress
-   *      @description: A boolean indicating if the response data should be compressed.
-   *      @type: boolean
-   *  @usage:
-   *      ...
-   *      stream.error({data: "Some error occured"});
+  /**
+   * Send an error response
+   *
+   * @param options The error response options.
+   * @param options.message The error message.
+   * @param options.type The error type.
+   * @param options.invalid_fields The invalid fields when validation fails.
+   * @param options.status The response status.
+   * @param options.headers The response headers.
+   * @param options.compress Whether the response should be gzip-compressed.
+   * @param options.data Optional data to include in the error response.
+   * @example
+   * ```ts
+   * stream.error({ message: "Some error occurred", status: 400 });
+   * ```
+   * @docs
    */
   error({ message, type = "APIError", invalid_fields = {}, status = 500, headers = {}, compress = false, data = void 0 }) {
     debug(3, "Sending [error] response: ", status, " - message: ", message);
-    return this.send({ status, headers, compress, body: {
+    const api_error = {
       error: {
         type,
         message,
@@ -754,23 +759,20 @@ class Stream {
         invalid_fields
       },
       data
-    } });
+    };
+    return this.send({ status, headers, compress, body: api_error });
   }
   // Set headers.
-  /*  @docs:
-   *  @title: Set header
-   *  @description: Add a new header to the response data.
-   *  @parameter:
-   *      @name: name
-   *      @description: The header name.
-   *      @type: string
-   *  @parameter:
-   *      @name: value
-   *      @description: The header value.
-   *      @type: string
-   *  @usage:
-   *      ...
-   *      stream.set_header("Connection", "close");
+  /**
+   * Add a new header to the response data.
+   *
+   * @param name The header name.
+   * @param value The header value.
+   * @example
+   * ```ts
+   * stream.set_header("Connection", "close");
+   * ```
+   * @docs
    */
   set_header(name, value) {
     if (this.http2) {
@@ -781,16 +783,15 @@ class Stream {
     return this;
   }
   // Set headers.
-  /*  @docs:
-   *  @title: Set headers
-   *  @description: Add new headers to the response data.
-   *  @parameter:
-   *      @name: headers
-   *      @description: The new response headers.
-   *      @type: object
-   *  @usage:
-   *      ...
-   *      stream.set_headers({"Connection": "close"});
+  /**
+   * Add new headers to the response data.
+   *
+   * @param headers The new response headers.
+   * @example
+   * ```ts
+   * stream.set_headers({"Connection": "close"});
+   * ```
+   * @docs
    */
   set_headers(headers = {}) {
     if (headers == null) {
@@ -808,17 +809,15 @@ class Stream {
     return this;
   }
   // Remove header.
-  /*  @docs:
-   *  @title: Remove headers
-   *  @description: Remove header names from the response data.
-   *  @parameter:
-   *      @name: ...names
-   *      @description: The header names to remove.
-   *      @type: ...string
-   *  @usage:
-   *      ...
-   *      stream.remove_header("Connection", "User-Agent");
-   *  @funcs: 2
+  /**
+   * Remove header names from the response data.
+   *
+   * @param names The header names to remove.
+   * @example
+   * ```ts
+   * stream.remove_header("Connection", "User-Agent");
+   * ```
+   * @docs
    */
   remove_header(...names) {
     if (this.http1) {
@@ -836,21 +835,25 @@ class Stream {
     }
     return this;
   }
+  /**
+   * Alias of {@link remove_header}.
+   *
+   * @param names The header names to remove.
+   */
   remove_headers(...names) {
     return this.remove_header(...names);
   }
   // Set a cookie.
-  /*  @docs:
-   *  @title: Set cookie.
-   *  @description: Set a cookie that will be sent with the response.
-   *  @warning: Will only be added to the response when the user uses `send()`, `success()` or `error()`.
-   *  @parameter:
-   *      @name: cookie
-   *      @description: The cookie string.
-   *      @type: string
-   *  @usage:
-   *      ...
-   *      stream.set_cookie("MyCookie=Hello World;");
+  /**
+   * Set a cookie that will be sent with the response.
+   *
+   * @warning Will only be added to the response when the user uses `send()`, `success()` or `error()`.
+   * @param cookie The cookie string.
+   * @example
+   * ```ts
+   * stream.set_cookie("MyCookie=Hello World;");
+   * ```
+   * @docs
    */
   set_cookie(cookie) {
     cookie = cookie.trim();
@@ -868,17 +871,16 @@ class Stream {
     return this;
   }
   // Set cookies.
-  /*  @docs:
-   *  @title: Set Cookies
-   *  @description: Set a cookie that will be sent with the response.
-   *  @warning: Will only be added to the response when the user uses `send()`, `success()` or `error()`.
-   *  @parameter:
-   *      @name: cookies
-   *      @description: The cookie strings.
-   *      @type: ...string
-   *  @usage:
-   *      ...
-   *      stream.set_cookies("MyCookie1=Hello World;", "MyCookie2=Hello Universe;");
+  /**
+   * Set cookies that will be sent with the response.
+   *
+   * @warning Will only be added to the response when the user uses `send()`, `success()` or `error()`.
+   * @param cookies The cookie strings.
+   * @example
+   * ```ts
+   * stream.set_cookies("MyCookie1=Hello World;", "MyCookie2=Hello Universe;");
+   * ```
+   * @docs
    */
   set_cookies(...cookies) {
     for (let i = 0; i < cookies.length; i++) {
@@ -887,6 +889,8 @@ class Stream {
     return this;
   }
 }
+;
+;
 var stdin_default = Stream;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
