@@ -5,7 +5,6 @@ import * as Mail from './plugins/mail/ui.js';
 import { Status } from "./status.js";
 import { Endpoint } from "./endpoint.js";
 import { Database } from "./database/database.js";
-import { Collection } from "./database/collection.js";
 import { Users } from "./users.js";
 import { Paddle } from "./payments/paddle.js";
 import { RateLimits, RateLimitServer, RateLimitClient } from "./rate_limit.js";
@@ -286,14 +285,14 @@ export declare class Server {
     payments?: Paddle;
     /** Daemon instance to manage a live daemon. */
     daemon?: vlib.Daemon;
-    _sys_db: Collection;
     mail_style: MailStyle;
     csp: Record<string, string>;
     statics_aspect_ratios: Map<string | RegExp, any>;
     google_tag?: string;
+    rate_limit_api_key: string | undefined;
     private favicon?;
     private statics;
-    private _keys;
+    private _user_keys_opts;
     private additional_sitemap_endpoints;
     private tls?;
     private performance;
@@ -301,8 +300,14 @@ export declare class Server {
     private http;
     private https;
     private threading;
-    /** The master hash key. */
-    private _master_hash_key;
+    /**
+     * The master hash key.
+     */
+    FIX: any;
+    private master_hmac_key;
+    private _keys_db;
+    private _sys_keys_db;
+    private _website_status_db;
     /** User defined callbacks. */
     private _on_start;
     private _on_initialize;
@@ -317,8 +322,6 @@ export declare class Server {
     generate_crypto_key(length?: number): string;
     /** Create an HMAC hash using the provided key and data. */
     hmac(key: string, data: string, algo?: string): string;
-    /** Create an HMAC hash using the server's master hash key. */
-    _hmac(data: string): string;
     /** Create a hash (no key) of the given data using the specified algorithm. */
     hash(data: string | object, algo?: string): string;
     private _init_default_headers;

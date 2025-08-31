@@ -122,11 +122,23 @@ export declare class Users {
     /** The token expiration in seconds */
     private token_expiration;
     /** Database collection for public (read:public, write:public) user documents. */
-    public: Collection;
+    public: Collection<{
+        uid: string;
+        query?: string;
+        data: Users.Endpoints.JsonValue;
+    }>;
     /** Database collection for protected (read:public, write:private) user documents. */
-    protected: Collection;
+    protected: Collection<{
+        uid: string;
+        query?: string;
+        data: Users.Endpoints.JsonValue;
+    }>;
     /** Database collection for private (read:private, write:private) user documents. */
-    private: Collection;
+    private: Collection<{
+        uid: string;
+        query?: string;
+        data: Users.Endpoints.JsonValue;
+    }>;
     /** Construct the server. */
     constructor(opts: Users.Opts & {
         _server: Server;
@@ -401,6 +413,7 @@ export declare class Users {
      * Get a user by uid. Throws if the uid does not exist.
      * @returns Returns a User object.
      * @param uid The user id.
+     * @throws {Collection.NotFoundError} If the user id does not exist.
      * @example
      * const user = await server.users.get("0");
      */
@@ -409,6 +422,7 @@ export declare class Users {
      * Get a user by username. Throws if the username does not exist.
      * @returns Returns a User object.
      * @param username The username of the user to fetch.
+     * @throws {Collection.NotFoundError} If the username does not exist.
      * @example
      * const user = await server.users.get_by_username("myusername");
      */
@@ -417,6 +431,7 @@ export declare class Users {
      * Get a user by email. Throws if the email does not exist.
      * @returns Returns a User object.
      * @param email The email of the user to fetch.
+     * @throws {Collection.NotFoundError} If the email does not exist.
      * @example
      * const user = await server.users.get_by_email("my@email.com");
      */
@@ -497,6 +512,7 @@ export declare class Users {
      * Check if a user has a generated API key.
      * @returns Returns a boolean indicating whether the user has an API key.
      * @param uid The user id.
+     * @throws {Collection.NotFoundError} If the user id does not exist.
      * @example
      * const has_api_key = await server.users.has_api_key("0");
      */
@@ -689,24 +705,47 @@ export declare namespace Users {
                 message: string;
             }
         }
+        /** JSON values for LoadUserData data field etc. */
+        type JsonValue = string | number | boolean | null | JsonArray | JsonObject;
+        type JsonArray = Array<JsonValue>;
+        type JsonObject = {
+            [key: string]: JsonValue;
+        };
+        const JsonValueSchemaType: readonly ["string", "number", "boolean", "null", "array", "object"];
         /** The load public user data endpoint. */
         namespace LoadUserData {
             /** The request params. */
             interface Params {
-                path: string | Record<string, any>;
-                default?: Record<string, any>;
+                /**
+                 * The document query.
+                 * @note The object form query may not include system
+                 *       reserved fields `_id`, `uid`, `query` and `data`.
+                 */
+                query: string | Record<string, any>;
+                /**
+                 * The default value for document field `data`,
+                 * see {@link Collection.LoadOpts.default}.
+                 */
+                default?: JsonValue;
             }
             /** The result interface for a **successful** request. */
             interface Result {
                 message: string;
+                data: JsonValue;
             }
         }
         /** The set public user data endpoint. */
         namespace SetUserData {
             /** The request params. */
             interface Params {
-                path: string | Record<string, any>;
-                data: Record<string, any>;
+                /**
+                 * The document query.
+                 * @note The object form query may not include system
+                 *       reserved fields `_id`, `uid`, `query` and `data`.
+                 */
+                query: string | Record<string, any>;
+                /** The data to save. */
+                data: JsonValue;
             }
             /** The result interface for a **successful** request. */
             interface Result {
@@ -717,7 +756,12 @@ export declare namespace Users {
         namespace DeleteUserData {
             /** The request params. */
             interface Params {
-                path: string | Record<string, any>;
+                /**
+                 * The document query.
+                 * @note The object form query may not include system
+                 *       reserved fields `_id`, `uid`, `query` and `data`.
+                 */
+                query: string | Record<string, any>;
             }
             /** The result interface for a **successful** request. */
             interface Result {
@@ -728,12 +772,19 @@ export declare namespace Users {
         namespace LoadProtectedUserData {
             /** The request params. */
             interface Params {
-                path: string | Record<string, any>;
-                default?: Record<string, any>;
+                /**
+                 * The document query.
+                 * @note The object form query may not include system
+                 *       reserved fields `_id`, `uid`, `query` and `data`.
+                 */
+                query: string | Record<string, any>;
+                /** The default value for document field `data`. */
+                default?: JsonValue;
             }
             /** The result interface for a **successful** request. */
             interface Result {
                 message: string;
+                data: JsonValue;
             }
         }
         /** The sign in endpoint. */

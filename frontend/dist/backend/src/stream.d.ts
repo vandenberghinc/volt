@@ -200,8 +200,7 @@ export declare class Stream {
      * @param options The response options.
      * @param options.status The response status.
      * @param options.headers The response headers.
-     * @param options.body The response body.
-     * @param options.data The response data. (Deprecated.)
+     * @param options.data The data of the response body to send.
      * @param options.compress Whether the response should be gzip-compressed.
      * @example
      * ```ts
@@ -209,12 +208,10 @@ export declare class Stream {
      * ```
      * @docs
      */
-    send({ status, headers, data, body, // zero-copy pull in data
-    compress, }?: {
+    send<Data extends ResponseBody = ResponseBody>({ status, headers, data, compress, }?: {
         status?: number;
         headers?: ResponseHeaders;
-        body?: ResponseBody;
-        data?: ResponseBody;
+        data?: Data;
         compress?: boolean;
     }): this;
     /**
@@ -223,8 +220,7 @@ export declare class Stream {
      * @param options The response options.
      * @param options.status The response status.
      * @param options.headers The response headers.
-     * @param options.body The response data.
-     * @param options.data The response data. (Deprecated.)
+     * @param options.data The data of the response body to send.
      * @param options.compress Whether the response should be gzip-compressed.
      * @example
      * ```ts
@@ -232,11 +228,10 @@ export declare class Stream {
      * ```
      * @docs
      */
-    success({ status, headers, body, data, compress }?: {
+    success<Data extends ResponseBody = ResponseBody>({ status, headers, data, compress }?: {
         status?: number;
         headers?: ResponseHeaders;
-        body?: ResponseBody;
-        data?: ResponseBody;
+        data?: Data;
         compress?: boolean;
     }): this;
     /**
@@ -249,21 +244,21 @@ export declare class Stream {
      * @param options.status The response status.
      * @param options.headers The response headers.
      * @param options.compress Whether the response should be gzip-compressed.
-     * @param options.data Optional data to include in the error response.
+     * @param options.data Optional data to include in the error response, nested in the JSON response under field `data`.
      * @example
      * ```ts
      * stream.error({ message: "Some error occurred", status: 400 });
      * ```
      * @docs
      */
-    error({ message, type, invalid_fields, status, headers, compress, data, }: {
+    error<ErrorData extends ResponseBody = ResponseBody>({ message, type, invalid_fields, status, headers, compress, data, }: {
         message: string;
         type?: string;
         invalid_fields?: Record<string, string>;
         status?: number;
         headers?: ResponseHeaders;
         compress?: boolean;
-        data?: ResponseBody;
+        data?: ErrorData;
     }): this;
     /**
      * Add a new header to the response data.

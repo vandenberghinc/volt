@@ -33,6 +33,7 @@ __export(stdin_exports, {
   Mail: () => Mail
 });
 module.exports = __toCommonJS(stdin_exports);
+__reExport(stdin_exports, require("./errors.js"), module.exports);
 var import_utils = require("./utils.js");
 __reExport(stdin_exports, require("./status.js"), module.exports);
 __reExport(stdin_exports, require("./meta.js"), module.exports);
@@ -53,6 +54,7 @@ __reExport(stdin_exports, require("./frontend.js"), module.exports);
   ExternalError,
   InternalError,
   Mail,
+  ...require("./errors.js"),
   ...require("./status.js"),
   ...require("./meta.js"),
   ...require("./splash_screen.js"),

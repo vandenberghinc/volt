@@ -150,15 +150,9 @@ export class RateLimitServer {
 
     // Start.
     async start(): Promise<void> {
-        // Load/generate api key.
-        const data = await this.server._sys_db.load("rate_limit", {
-            default: {
-                api_key: null,
-            }
-        });
-        if (data.api_key == null) {
-            data.api_key = vlib.String.random(32);
-            await this.server._sys_db.set("rate_limit", data);
+        // Ensure the rate limit api key is defined.
+        if (!this.server.rate_limit_api_key) {
+            throw new Error("Rate limit API key is not defined.");
         }
 
         // Initialize server.
@@ -166,7 +160,7 @@ export class RateLimitServer {
             ip: this.ip,
             port: this.port,
             https: this.https_config,
-            api_keys: [data.api_key],
+            api_keys: [this.server.rate_limit_api_key],
             rate_limit: {
                 limit: 100,
                 interval: 60,
@@ -374,20 +368,16 @@ export class RateLimitClient {
 
     // Start.
     async start(): Promise<void> {
-        // Create websocket.
-        const data = await this.server._sys_db.load("rate_limit", {
-            default: {
-                api_key: null,
-            }
-        });
-        if (data.api_key == null) {
-            throw new Error("No rate limit api key has been generated yet.");
+        
+        // Ensure the rate limit api key is defined.
+        if (!this.server.rate_limit_api_key) {
+            throw new Error("Rate limit API key is not defined.");
         }
 
         // Initialize server.
         this.ws = new vlib.websocket.Client({
             url: this.url ? this.url : `${this.https ? "wss" : "ws"}://${this.ip}:${this.port}`,
-            api_key: data.api_key,
+            api_key: this.server.rate_limit_api_key,
             reconnect: {
                 interval: 10,
                 max_interval: 30000,

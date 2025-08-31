@@ -39,6 +39,7 @@ var libcrypto = __toESM(require("crypto"));
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var import_utils = require("../utils.js");
 var import_status = require("../status.js");
+var import_collection = require("../database/collection.js");
 var LineItem;
 (function(LineItem2) {
   LineItem2.Schema = {
@@ -232,25 +233,18 @@ class Paddle {
     await this._active_sub_db.delete({ uid, prod_id });
   }
   async _check_subscription(uid, prod_id, load_data = false) {
-    const doc = await this._active_sub_db.load({ uid, prod_id });
-    let exists = false, sub_id;
-    if (doc == null) {
-      if (load_data) {
-        return { exists, sub_id };
-      } else {
-        return exists;
+    try {
+      const doc = await this._active_sub_db.load({ uid, prod_id });
+      return load_data ? { exists: true, sub_id: doc.sub_id } : true;
+    } catch (err) {
+      if (err instanceof import_collection.Collection.NotFoundError) {
+        return load_data ? { exists: false, sub_id: void 0 } : false;
       }
-    }
-    exists = true;
-    sub_id = doc.sub_id;
-    if (load_data) {
-      return { exists, sub_id };
-    } else {
-      return exists;
+      throw err;
     }
   }
   async _get_active_subscriptions(uid, detailed = false) {
-    const list = await this._active_sub_db.list_query({ uid });
+    const list = await this._active_sub_db.list({ uid });
     if (detailed) {
       return list;
     }
@@ -267,17 +261,13 @@ class Paddle {
     }, subscription);
   }
   async _load_subscription(id) {
-    const subscription = await this._sub_db.find({ id });
-    if (subscription == null) {
-      throw Error(`Unable to find subscription "${id}".`);
-    }
-    return subscription;
+    return await this._sub_db.load({ id }, { retry: 3 });
   }
   async _get_subscriptions(uid) {
     if (uid === "unauth" || uid == null) {
       return [];
     }
-    const list = await this._sub_db.list_query({ uid });
+    const list = await this._sub_db.list({ uid });
     return list;
   }
   // Save and delete payments, all failed payments should be deleted from the database.
@@ -289,21 +279,13 @@ class Paddle {
   }
   async _load_payment(id) {
     const uid = id.split("_")[1];
-    const payment = await this._pay_db.load({ uid, id });
-    if (payment == null) {
-      throw Error(`Unable to find payment "${id}".`);
-    }
-    return payment;
+    return await this._pay_db.load({ uid, id });
   }
   async _load_payment_for_public(id) {
     return Payment.anonymize(await this._load_payment(id));
   }
   async _load_payment_by_transaction(tran_id) {
-    const payment = await this._pay_db.find({ tran_id });
-    if (payment == null) {
-      throw Error(`Unable to find the payment by transaction id "${tran_id}".`);
-    }
-    return payment;
+    return await this._pay_db.load({ tran_id }, { retry: 3 });
   }
   async _load_payment_by_transaction_for_public(tran_id) {
     return Payment.anonymize(await this._load_payment_by_transaction(tran_id));
@@ -314,9 +296,9 @@ class Paddle {
   }
   // Delete all info of a user.
   async _delete_user(uid) {
-    await this._sub_db.delete_all({ uid });
-    await this._active_sub_db.delete_all({ uid });
-    await this._pay_db.delete_all({ uid });
+    await this._sub_db.delete_many({ uid });
+    await this._active_sub_db.delete_many({ uid });
+    await this._pay_db.delete_many({ uid });
   }
   // List all active subscriptions.
   async _get_all_active_subscriptions() {
@@ -718,8 +700,10 @@ class Paddle {
       }
     });
     now = this.performance.end("init-products", now);
-    const last_products = await this._last_products_db.load({ production: this.server.production, version: 1 });
-    if (last_products && vlib.Object.eq(last_products.last_products, this.products)) {
+    const last_products = await this._last_products_db.load({ production: this.server.production, version: 1 }, { throw: false });
+    if (last_products instanceof Error && !(last_products instanceof import_collection.Collection.NotFoundError))
+      throw last_products;
+    if (!(last_products instanceof import_collection.Collection.NotFoundError) && vlib.Object.eq(last_products.last_products, this.products)) {
       last_products.product_ids.iterate((item) => {
         const product = this.get_product_sync(item.id);
         if (product != null) {
@@ -1261,7 +1245,10 @@ class Paddle {
   }
   // Create and register the webhook endpoint.
   async _create_webhook() {
-    const webhook_doc = await this._webhook_conf_db.load({ production: this.server.production, version: 1 });
+    const webhook_doc = await this._webhook_conf_db.load({ production: this.server.production, version: 1 }, { throw: false });
+    if (webhook_doc instanceof Error && !(webhook_doc instanceof import_collection.Collection.NotFoundError)) {
+      throw webhook_doc;
+    }
     const webhook_settings = {
       description: "volt webhook",
       destination: `${this.server.full_domain}/volt/payments/webhook`,
@@ -1298,7 +1285,7 @@ class Paddle {
         hash: this.server.hash(webhook_settings)
       });
     };
-    if (webhook_doc != null) {
+    if (!(webhook_doc instanceof import_collection.Collection.NotFoundError)) {
       this.webhook_key = webhook_doc.key;
       if (webhook_doc.hash !== this.server.hash(webhook_settings)) {
         this.server.log(0, `Checking payments webhook.`);
@@ -1493,7 +1480,7 @@ class Paddle {
     } else if (typeof status === "string") {
       query.status = status;
     }
-    const payments = await this._pay_db.list_query(query, { limit });
+    const payments = await this._pay_db.list(query, { limit });
     payments.sort((a, b) => b.timestamp - a.timestamp);
     return for_public ? payments.map((p) => Payment.anonymize(p)) : payments;
   }

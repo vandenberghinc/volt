@@ -243,15 +243,15 @@ export class Server {
     /** Daemon instance to manage a live daemon. */
     daemon;
     // Public for internal use:
-    _sys_db;
     mail_style;
     csp;
     statics_aspect_ratios;
     google_tag;
+    rate_limit_api_key;
     // Private.
     favicon;
     statics;
-    _keys;
+    _user_keys_opts;
     additional_sitemap_endpoints;
     tls;
     performance;
@@ -259,8 +259,15 @@ export class Server {
     http;
     https;
     threading;
-    /** The master hash key. */
-    _master_hash_key = null;
+    /**
+     * The master hash key.
+     */
+    FIX; // deprecate this key and use a key that indicates for what it is.
+    master_hmac_key = null;
+    // Private ollections.
+    _keys_db;
+    _sys_keys_db;
+    _website_status_db;
     /** User defined callbacks. */
     _on_start = [];
     _on_initialize = [];
@@ -439,7 +446,7 @@ export class Server {
         this.company = company;
         this.mail_style = mail_style;
         this.offline = offline;
-        this._keys = keys;
+        this._user_keys_opts = keys;
         this.additional_sitemap_endpoints = additional_sitemap_endpoints;
         this.tls = tls;
         // this.admin = admin as AdminConfig;
@@ -609,9 +616,17 @@ export class Server {
             this.db = new Database({ ...database, _server: this });
         }
         // Database collections.
-        this._sys_db = this.db.collection({
-            name: "Volt.System",
-            indexes: ["_path"],
+        this._keys_db = this.db.collection({
+            name: "Volt.Keys",
+            indexes: ["id"],
+        });
+        this._sys_keys_db = this.db.collection({
+            name: "Volt.SystemKeys",
+            indexes: ["id"],
+        });
+        this._website_status_db = this.db.collection({
+            name: "Volt.WebsiteStatus",
+            indexes: ["id"],
         });
         // Initialize the users class.
         this.users = new Users({
@@ -661,15 +676,15 @@ export class Server {
         hmac.update(data);
         return hmac.digest("hex");
     }
-    /** Create an HMAC hash using the server's master hash key. */
-    _hmac(data) {
-        if (!this._master_hash_key) {
-            throw new Error("Hash key not initialized");
-        }
-        const hmac = crypto.createHmac("sha256", this._master_hash_key);
-        hmac.update(data);
-        return hmac.digest("hex");
-    }
+    // /** Create an HMAC hash using the server's master hash key. */
+    // hmac_with_master(data: string): string {
+    //     if (!this._master_hash_key) {
+    //         throw new Error("Hash key not initialized");
+    //     }
+    //     const hmac = crypto.createHmac("sha256", this._master_hash_key);
+    //     hmac.update(data);
+    //     return hmac.digest("hex");
+    // }
     /** Create a hash (no key) of the given data using the specified algorithm. */
     hash(data, algo = "sha256") {
         if (typeof data !== "string") {
@@ -793,9 +808,10 @@ export class Server {
                     status.https_port = this.https_port;
                 }
                 // Load data.
-                const data = await this._sys_db.load("status", {
+                const data = await this._website_status_db.load({ id: "status" }, {
                     default: {
-                        running_since: null,
+                        id: "status",
+                        running_since: undefined,
                         running_threads: 0,
                         total_threads: 0,
                     }
@@ -1226,61 +1242,99 @@ export class Server {
         if (this.db) {
             await this.db.initialize();
             /* @performance */ this.performance.end("init-db");
-            // Load keys.
-            const keys_document = await this._sys_db.load("keys");
-            const gen_user_crypto_key = (doc, key) => {
-                if (typeof key === "string") {
-                    doc[key] = this.generate_crypto_key(32);
+            // Load system keys.
+            const sys_keys = await this._sys_keys_db.load({ id: "sys_keys" }, {
+                default: {
+                    id: "sys_keys",
+                    master_hmac_key: undefined,
+                    rate_limit_api_key: undefined,
                 }
-                else {
-                    if (key.length == null) {
-                        throw Error(`Crypto key object "${JSON.stringify(key)}" does not contain a "length" attribute.`);
-                    }
-                    if (typeof key.length !== "number") {
-                        throw Error(`Crypto key object "${JSON.stringify(key)}" has an invalid type fo attribute "length", the valid type is "number".`);
-                    }
-                    if (key.name == null) {
-                        throw Error(`Crypto key object "${JSON.stringify(key)}" does not contain a "name" attribute.`);
-                    }
-                    if (typeof key.name !== "string") {
-                        throw Error(`Crypto key object "${JSON.stringify(key)}" has an invalid type fo attribute "name", the valid type is "string".`);
-                    }
-                    doc[key.name] = this.generate_crypto_key(key.length);
-                    this.keys[key.name] = doc[key.name];
-                }
-            };
-            if (keys_document == null) {
-                this._master_hash_key = this.generate_crypto_key(32);
-                const doc = {
-                    _master_sha256: this._master_hash_key,
-                };
-                this._keys.forEach((key) => {
-                    gen_user_crypto_key(doc, key);
-                });
-                await this._sys_db.set("keys", doc);
+            });
+            let perform_sys_keys_save = false;
+            // Check master hash key.
+            if (sys_keys.master_hmac_key == null) {
+                this.master_hmac_key = this.generate_crypto_key(32);
+                sys_keys.master_hmac_key = this.master_hmac_key;
+                perform_sys_keys_save = true;
             }
             else {
-                // Check hash key.
-                this._master_hash_key = keys_document._master_sha256;
-                let perform_save = false;
-                if (this._master_hash_key === undefined) {
-                    this._master_hash_key = this.generate_crypto_key(32);
-                    keys_document._master_sha256 = this._master_hash_key;
-                    perform_save = true;
+                this.master_hmac_key = sys_keys.master_hmac_key;
+            }
+            // Check rate limit api key.
+            if (sys_keys.rate_limit_api_key == null) {
+                this.rate_limit_api_key = this.generate_crypto_key(32);
+                sys_keys.rate_limit_api_key = this.rate_limit_api_key;
+                perform_sys_keys_save = true;
+            }
+            else {
+                this.rate_limit_api_key = sys_keys.rate_limit_api_key;
+            }
+            // Save.
+            if (perform_sys_keys_save) {
+                await this._sys_keys_db.set({ id: "sys_keys" }, sys_keys);
+            }
+            // Check user defined crypto keys.
+            // const gen_user_crypto_key = (key: string | { name: string, length: number }) => {
+            //     if (typeof key === "string") {
+            //         sys_keys.keys[key] = this.generate_crypto_key(32);
+            //     } else {
+            //         if (key.length == null) {
+            //             throw Error(`Crypto key object "${JSON.stringify(key)}" does not contain a "length" attribute.`);
+            //         }
+            //         if (typeof key.length !== "number") {
+            //             throw Error(`Crypto key object "${JSON.stringify(key)}" has an invalid type fo attribute "length", the valid type is "number".`);
+            //         }
+            //         if (key.name == null) {
+            //             throw Error(`Crypto key object "${JSON.stringify(key)}" does not contain a "name" attribute.`);
+            //         }
+            //         if (typeof key.name !== "string") {
+            //             throw Error(`Crypto key object "${JSON.stringify(key)}" has an invalid type fo attribute "name", the valid type is "string".`);
+            //         }
+            //         const generated_key = this.generate_crypto_key(key.length);
+            //         sys_keys.keys[key.name] = generated_key;
+            //         this.keys[key.name] = generated_key;
+            //     }
+            // }
+            const user_keys = await this._keys_db.load({ id: "user_keys" }, {
+                default: {
+                    id: "user_keys",
+                    keys: {},
                 }
-                // Check crypto keys.
-                this._keys.forEach((key) => {
-                    let name = typeof key === "string" ? key : key.name;
-                    if (keys_document[name] == null) {
-                        gen_user_crypto_key(keys_document, key);
-                        perform_save = true;
+            });
+            let perform_user_keys_save = false;
+            for (const key of this._user_keys_opts) {
+                const name = typeof key === "string" ? key : key.name;
+                if (user_keys[name]) {
+                    this.keys[name] = user_keys[name];
+                }
+                else {
+                    perform_user_keys_save = true;
+                    if (typeof key === "string") {
+                        if (!key) {
+                            throw Error(`Crypto key "${key}" is an invalid key name.`);
+                        }
+                        const generated_key = this.generate_crypto_key(32);
+                        user_keys.keys[key] = generated_key;
+                        this.keys[key] = generated_key;
                     }
-                    this.keys[name] = keys_document[name];
-                });
-                // Save.
-                if (perform_save) {
-                    await this._sys_db.set("keys", keys_document);
+                    else {
+                        if (!key.name) {
+                            throw Error(`Crypto key "${key.name}" is an invalid key name.`);
+                        }
+                        if (key.length == null) {
+                            throw Error(`Crypto key "${key.name}" does not contain a "length" attribute.`);
+                        }
+                        if (typeof key.length !== "number") {
+                            throw Error(`Crypto key "${key.name}" has an invalid type for attribute "length", the valid type is "number".`);
+                        }
+                        const generated_key = this.generate_crypto_key(key.length);
+                        user_keys.keys[key.name] = generated_key;
+                        this.keys[key.name] = generated_key;
+                    }
                 }
+            }
+            if (perform_user_keys_save) {
+                await this._keys_db.set({ id: "user_keys" }, user_keys);
             }
             /* @performance */ this.performance.end("load-keys");
         }
@@ -1648,7 +1702,7 @@ export class Server {
                 start_thread(thread_id);
             }
             // Save status.
-            await this._sys_db.set("status", {
+            await this._website_status_db.set({ id: "status" }, {
                 running_since: Date.now(),
                 total_threads: active_threads,
                 running_threads: active_threads,
@@ -1670,7 +1724,7 @@ export class Server {
                 else {
                     this.log.error(`Thread ${worker.process.pid} is being shut down due to its periodic restart limit.`);
                     --active_threads;
-                    await this._sys_db.set("status", { running_threads: active_threads });
+                    await this._website_status_db.save({ id: "status" }, { $inc: { running_threads: -1 } });
                     if (active_threads === 0) {
                         this.log.error(`All threads died, stopping server.`);
                         process.exit(0);

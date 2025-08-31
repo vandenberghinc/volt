@@ -189,13 +189,13 @@ export class Users {
     private token_expiration: number;
 
     /** Database collection for public (read:public, write:public) user documents. */
-    public public: Collection;
+    public public: Collection<{ uid: string, query?: string, data: Users.Endpoints.JsonValue }>;
 
     /** Database collection for protected (read:public, write:private) user documents. */
-    public protected: Collection;
+    public protected: Collection<{ uid: string, query?: string, data: Users.Endpoints.JsonValue }>;
 
     /** Database collection for private (read:private, write:private) user documents. */
-    public private: Collection;
+    public private: Collection<{ uid: string, query?: string, data: Users.Endpoints.JsonValue }>;
 
     // ---------------------------------------------------------
     // Constructor.
@@ -237,15 +237,15 @@ export class Users {
         // Public database collections.
         this.public = this.server.db.collection({
             name: "Volt.Server.Users.Public",
-            indexes: ["uid", "path"],
+            indexes: ["uid", "query"],
         });
         this.protected = this.server.db.collection({
             name: "Volt.Server.Users.Protected",
-            indexes: ["uid", "path"],
+            indexes: ["uid", "query"],
         });
         this.private = this.server.db.collection({
             name: "Volt.Server.Users.Private",
-            indexes: ["uid", "path"],
+            indexes: ["uid", "query"],
         });
     }
 
@@ -564,7 +564,7 @@ export class Users {
 
         // Response.
         if (opts?.send !== false) {
-            stream.send({
+            stream.send<Users.Endpoints.SignIn.Result>({
                 status: 200,
                 data: { message: "Successfully signed in." },
             });
@@ -661,14 +661,14 @@ export class Users {
                 // Get uid.
                 let uid;
                 if ((uid = await this.get_uid_by_email(params.email)) == null) {
-                    return stream.success({
+                    return stream.success<Users.Endpoints.Send2FA.Result>({
                         data: { message: "A 2FA code was sent if the specified email exists." },
                     });
                 }
 
                 // Send.
                 await this.send_2fa({ uid: uid, stream });
-                return stream.success({
+                return stream.success<Users.Endpoints.Send2FA.Result>({
                     data: { message: "A 2FA code was sent if the specified email exists." },
                 });
             }
@@ -784,8 +784,10 @@ export class Users {
                             this.avg_send_2fa_time.push(Date.now() - start_time);
 
                             // Send error.
-                            return stream.send({
+                            return stream.error({
                                 status: Status.two_factor_auth_required,
+                                message: "2FA required.",
+                                type: "2FARequired",
                                 data: { error: "2FA required." }
                             });
                         }
@@ -793,14 +795,13 @@ export class Users {
                         // Verify 2FA.
                         const err = await this.verify_2fa(uid, code);
                         if (err) {
-                            return stream.send({
+                            return stream.error({
                                 status: Status.unauthorized,
-                                data: {
-                                    error: "Invalid 2FA code.",
-                                    invalid_fields: {
-                                        "code": err,
-                                    },
-                                }
+                                message: "Invalid 2FA code.",
+                                type: "Invalid2FACode",
+                                invalid_fields: {
+                                    "code": err,
+                                },
                             });
                         }
                     }
@@ -813,14 +814,13 @@ export class Users {
                 await uniform_delay();
 
                 // Unauthorized.
-                return stream.send({
+                return stream.error({
                     status: Status.unauthorized,
-                    data: {
-                        error: "Unauthorized.",
-                        invalid_fields: {
-                            "username": "Invalid or unrecognized username",
-                            "password": "Invalid or unrecognized password",
-                        },
+                    type: "Unauthorized",
+                    message: "Unauthorized.",
+                    invalid_fields: {
+                        "username": "Invalid or unrecognized username",
+                        "password": "Invalid or unrecognized password",
                     }
                 });
             }
@@ -841,7 +841,7 @@ export class Users {
                 this._reset_cookies(stream);
 
                 // Response.
-                return stream.success({
+                return stream.success<Users.Endpoints.SignOut.Result>({
                     data: { message: "Successfully signed out." },
                 });
             }
@@ -914,23 +914,23 @@ export class Users {
                         this.avg_send_2fa_time.push(Date.now() - start_time);
 
                         // Send error.
-                        return stream.send({
+                        return stream.error({
                             status: Status.two_factor_auth_required,
-                            data: { error: "2FA required." }
+                            message: "2FA required.",
+                            type: "TwoFactorAuthRequired",
                         });
                     }
 
                     // Verify 2FA.
                     const err = await this.verify_2fa(params.email, params.code);
                     if (err) {
-                        return stream.send({
+                        return stream.error({
                             status: Status.unauthorized,
-                            data: {
-                                error: "Invalid 2FA code.",
-                                invalid_fields: {
-                                    "code": err,
-                                },
-                            }
+                            type: "Invalid2FACode",
+                            message: "Invalid 2FA code.",
+                            invalid_fields: {
+                                "code": err,
+                            },
                         });
                     }
                 }
@@ -1002,7 +1002,7 @@ export class Users {
 
                 // Response.
                 await this._create_user_cookie(stream, uid);
-                return stream.success({ data: { message: "Successfully verified the 2FA code." } });
+                return stream.success<Users.Endpoints.ActivateUser.Result>({ data: { message: "Successfully activated your account." } });
             }
         });
 
@@ -1097,7 +1097,7 @@ export class Users {
                     is_activated: user.is_activated === true,
                     has_api_key: Boolean(user.api_key),
                 }
-                return stream.success({ data: frontend });
+                return stream.success<Users.Endpoints.GetUser.Result>({ data: frontend });
             }
         });
 
@@ -1148,7 +1148,7 @@ export class Users {
                     stream.uid,
                     { send: false },
                 );
-                return stream.success({ data: { message: "Successfully updated your account." } });
+                return stream.success<Users.Endpoints.UpdateUser.Result>({ data: { message: "Successfully updated your account." } });
             }
         });
 
@@ -1190,7 +1190,7 @@ export class Users {
                 await this.set_password(stream.uid, params.password);
 
                 // Success.
-                return stream.success({
+                return stream.success<Users.Endpoints.ChangePassword.Result>({
                     status: Status.success,
                     data: { message: "Successfully updated your password." },
                 });
@@ -1212,7 +1212,7 @@ export class Users {
                 this._reset_cookies(stream);
 
                 // Success.
-                return stream.success({
+                return stream.success<Users.Endpoints.DeleteUser.Result>({
                     status: Status.success,
                     data: { message: "Successfully deleted your account." },
                 });
@@ -1227,7 +1227,7 @@ export class Users {
             authenticated: true,
             rate_limit: "global",
             callback: async (stream: AuthStream) => {
-                return stream.success({
+                return stream.success<Users.Endpoints.GenerateAPIKey.Result>({
                     data: {
                         message: "Successfully generated an API key.",
                         api_key: await this.generate_api_key(stream.uid),
@@ -1244,9 +1244,9 @@ export class Users {
             authenticated: true,
             rate_limit: "global",
             callback: async (stream: AuthStream) => {
-                return stream.success({
+                return stream.success<Users.Endpoints.HasAPIKey.Result>({
                     data: {
-                        message: "Successfully generated an API key.",
+                        message: "Successfully checked your API key.",
                         has_api_key: await this.has_api_key(stream.uid),
                     }
                 });
@@ -1262,12 +1262,68 @@ export class Users {
             rate_limit: "global",
             callback: async (stream: AuthStream) => {
                 await this.revoke_api_key(stream.uid);
-                return stream.send({
+                return stream.send<Users.Endpoints.RevokeAPIKey.Result>({
                     status: Status.success,
                     data: { message: "Successfully revoked your API key." },
                 });
             }
         });
+
+        /**
+         * Initialize a document query for the public/protected/private user data.
+         * @returns The initialzied query upon success, or `false` is an error has been sent through the stream.
+         */
+        const init_user_data_query = (
+            stream: AuthStream,
+            uid: string,
+            query: string | Record<string, any>,
+        ): false | { uid: string; [key: string]: any } => {
+            if (typeof query === "object") {
+                if ("uid" in query) {
+                    return stream.error({
+                        message: "Invalid query parameter, the 'uid' field is not allowed.",
+                        type: "invalid_query_parameter",
+                        status: Status.bad_request,
+                        invalid_fields: {
+                            query: "Invalid query parameter, the 'uid' field is not allowed.",
+                        }
+                    });
+                }
+                if ("data" in query) {
+                    return stream.error({
+                        message: "Invalid query parameter, the 'data' field is not allowed.",
+                        type: "invalid_query_parameter",
+                        status: Status.bad_request,
+                        invalid_fields: {
+                            query: "Invalid query parameter, the 'data' field is not allowed.",
+                        }
+                    });
+                }
+                if ("query" in query) {
+                    return stream.error({
+                        message: "Invalid query parameter, the 'query' field is not allowed.",
+                        type: "invalid_query_parameter",
+                        status: Status.bad_request,
+                        invalid_fields: {
+                            query: "Invalid query parameter, the 'query' field is not allowed.",
+                        }
+                    });
+                }
+                if ("_id" in query) {
+                    return stream.error({
+                        message: "Invalid query parameter, the '_id' field is not allowed.",
+                        type: "invalid_query_parameter",
+                        status: Status.bad_request,
+                        invalid_fields: {
+                            query: "Invalid query parameter, the '_id' field is not allowed.",
+                        }
+                    });
+                }
+            }
+            return typeof query === "string"
+                ? { uid, query: query }
+                : { ...query, uid: uid };
+        }
 
         // Load data.
         this.server.endpoint({
@@ -1277,21 +1333,43 @@ export class Users {
             authenticated: true,
             rate_limit: "global",
             params: {
-                path: { type: ["string", "object"], allow_empty: false },
-                default: { type: "object", required: false },
+                query: { type: ["string", "object"], allow_empty: false },
+                default: { type: Users.Endpoints.JsonValueSchemaType, required: false },
             },
             callback: async (stream, params) => {
-                const query = typeof params.path === "string"
-                    ? { uid: stream.uid, path: params.path }
-                    : { ...params.path, uid: stream.uid };
-                return stream.send({
-                    status: Status.success,
-                    data: await this.public.load(query, { default: params.default })
-                });
+                const query = init_user_data_query(stream, stream.uid, params.query);
+                if (!query) return;
+                try {
+                    const document = await this.public.load(
+                        query,
+                        {
+                            default: params.default
+                                ? { ...query, data: params.default }
+                                : undefined,
+                            retry: 3,
+                        }
+                    );
+                    return stream.send<Users.Endpoints.LoadUserData.Result>({
+                        status: Status.success,
+                        data: {
+                            message: "Successfully loaded the requested document.",
+                            data: document.data,
+                        },
+                    });
+                } catch (e: unknown) {
+                    if (e instanceof Collection.NotFoundError) {
+                        return stream.error({
+                            message: "Document not found.",
+                            type: "document_not_found",
+                            status: Status.not_found,
+                        });
+                    }
+                    throw e;
+                }
             }
         });
 
-        // Save data.
+        // Set data.
         this.server.endpoint({
             method: "POST",
             endpoint: "/volt/user/data",
@@ -1299,15 +1377,18 @@ export class Users {
             authenticated: true,
             rate_limit: "global",
             params: {
-                path: { type: ["string", "object"], allow_empty: false },
-                data: { type: "object" },
+                query: { type: ["string", "object"], allow_empty: false },
+                data: { type: Users.Endpoints.JsonValueSchemaType },
             },
             callback: async (stream, params) => {
-                const query = typeof params.path === "string"
-                    ? { uid: stream.uid, path: params.path }
-                    : { ...params.path, uid: stream.uid };
-                await this.public.set(query, params.data);
-                return stream.send({
+                const query = init_user_data_query(stream, stream.uid, params.query);
+                if (!query) return;
+                await this.public.set(
+                    query,
+                    { data: params.data },
+                    { retry: 3, flatten: true }
+                );
+                return stream.send<Users.Endpoints.SetUserData.Result>({
                     status: Status.success,
                     data: { message: "Successfully saved." },
                 });
@@ -1322,14 +1403,13 @@ export class Users {
             authenticated: true,
             rate_limit: "global",
             params: {
-                path: { type: ["string", "object"], allow_empty: false },
+                query: { type: ["string", "object"], allow_empty: false },
             },
             callback: async (stream, params) => {
-                const query = typeof params.path === "string"
-                    ? { uid: stream.uid, path: params.path }
-                    : { ...params.path, uid: stream.uid };
+                const query = init_user_data_query(stream, stream.uid, params.query);
+                if (!query) return;
                 await this.public.delete(query);
-                return stream.send({
+                return stream.send<Users.Endpoints.DeleteUserData.Result>({
                     status: Status.success,
                     data: { message: "Successfully deleted." },
                 });
@@ -1344,17 +1424,39 @@ export class Users {
             authenticated: true,
             rate_limit: "global",
             params: {
-                path: { type: ["string", "object"], allow_empty: false },
-                default: { type: "object", required: false },
+                query: { type: ["string", "object"], allow_empty: false },
+                default: { type: Users.Endpoints.JsonValueSchemaType, required: false },
             }, 
             callback: async (stream, params) => {
-                const query = typeof params.path === "string"
-                    ? { uid: stream.uid, path: params.path }
-                    : { ...params.path, uid: stream.uid };
-                return stream.send({
-                    status: Status.success,
-                    data: await this.protected.load(query, { default: params.default })
-                });
+                const query = init_user_data_query(stream, stream.uid, params.query);
+                if (!query) return;
+                try {
+                    const document = await this.protected.load(
+                        query,
+                        {
+                            default: params.default
+                                ? { ...query, data: params.default }
+                                : undefined,
+                            retry: 3,
+                        }
+                    );
+                    return stream.send<Users.Endpoints.LoadProtectedUserData.Result>({
+                        status: Status.success,
+                        data: {
+                            message: "Successfully loaded the requested document.",
+                            data: document.data,
+                        },
+                    });
+                } catch (e: unknown) {
+                    if (e instanceof Collection.NotFoundError) {
+                        return stream.error({
+                            message: "Document not found.",
+                            type: "document_not_found",
+                            status: Status.not_found,
+                        });
+                    }
+                    throw e;
+                }
             }
         });
 
@@ -1372,7 +1474,7 @@ export class Users {
             callback: async (stream: AuthStream) => {
                 // Sign in.
                 const pin = await this.get_support_pin(stream.uid);
-                return stream.success({
+                return stream.success<Users.Endpoints.GetSupportPin.Result>({
                     data: {
                         message: "Successfully retrieved your support PIN.",
                         pin: pin,
@@ -1495,7 +1597,9 @@ export class Users {
                 });
 
                 // Sign in.
-                return stream.success({ data: { message: "Successfully sent your request." } });
+                return stream.success<Users.Endpoints.SubmitSupport.Result>({
+                    data: { message: "Successfully sent your request." }
+                });
             }
         });
 
@@ -1511,7 +1615,7 @@ export class Users {
      * @returns True if a user with the given uid exists.
      */
     async uid_exists(uid: string): Promise<boolean> {
-        return (await this._users_db.find({ uid })) != null;
+        return await this._users_db.exists({ uid });
     }
 
     /**
@@ -1522,7 +1626,7 @@ export class Users {
      * const exists = await server.users.username_exists("someusername");
      */
     async username_exists(username: string): Promise<boolean> {
-        return (await this._users_db.find({ username })) != null;
+        return await this._users_db.exists({ username });
     }
 
     /**
@@ -1533,7 +1637,7 @@ export class Users {
      * const exists = await server.users.email_exists("some@email.com");
      */
     async email_exists(email: string): Promise<boolean> {
-        return (await this._users_db.find({ email })) != null;
+        return await this._users_db.exists({ email });
     }
 
     /**
@@ -1662,12 +1766,12 @@ export class Users {
      * await server.users.delete("0");
      */
     async delete(uid: string): Promise<void> {
-        await this._users_db.delete_all({ uid });
-        await this._tokens_db.delete_all({ uid });
-        await this._2fa_tokens_db.delete_all({ uid });
-        await this.public.delete_all({ uid });
-        await this.protected.delete_all({ uid });
-        await this.private.delete_all({ uid });
+        await this._users_db.delete_many({ uid });
+        await this._tokens_db.delete_many({ uid });
+        await this._2fa_tokens_db.delete_many({ uid });
+        await this.public.delete_many({ uid });
+        await this.protected.delete_many({ uid });
+        await this.private.delete_many({ uid });
         if (this.server.payments !== undefined) {
             await this.server.payments._delete_user(uid);
         }
@@ -1839,39 +1943,36 @@ export class Users {
      * Get a user by uid. Throws if the uid does not exist.
      * @returns Returns a User object.
      * @param uid The user id.
+     * @throws {Collection.NotFoundError} If the user id does not exist.
      * @example
      * const user = await server.users.get("0");
      */
     async get(uid: string): Promise<User> {
-        const data = await this._users_db.load({ uid });
-        if (data == null) { throw new Error(`Unable to find a user by uid "${uid}".`); }
-        return data;
+        return await this._users_db.load({ uid });
     }
 
     /**
      * Get a user by username. Throws if the username does not exist.
      * @returns Returns a User object.
      * @param username The username of the user to fetch.
+     * @throws {Collection.NotFoundError} If the username does not exist.
      * @example
      * const user = await server.users.get_by_username("myusername");
      */
     async get_by_username(username: string): Promise<User> {
-        const data = await this._users_db.find({ username });
-        if (data == null) { throw new Error(`Unable to find a user by username "${username}".`); }
-        return data;
+        return await this._users_db.load({ username });
     }
 
     /**
      * Get a user by email. Throws if the email does not exist.
      * @returns Returns a User object.
      * @param email The email of the user to fetch.
+     * @throws {Collection.NotFoundError} If the email does not exist.
      * @example
      * const user = await server.users.get_by_email("my@email.com");
      */
     async get_by_email(email: string): Promise<User> {
-        const data = await this._users_db.find({ email });
-        if (data == null) { throw new Error(`Unable to find a user by email "${email}".`); }
-        return data;
+        return await this._users_db.load({ email });
     }
 
     /**
@@ -2010,6 +2111,7 @@ export class Users {
      * Check if a user has a generated API key.
      * @returns Returns a boolean indicating whether the user has an API key.
      * @param uid The user id.
+     * @throws {Collection.NotFoundError} If the user id does not exist.
      * @example
      * const has_api_key = await server.users.has_api_key("0");
      */
@@ -2017,7 +2119,6 @@ export class Users {
         const data = await this._users_db.load({ uid }, {
             projection: { api_key: 1 }
         });
-        if (data == null) { throw new Error(`Unable to find a user by uid "${uid}".`); }
         return data.api_key != null && data.api_key.length > 0;
     }
 
@@ -2113,7 +2214,10 @@ export class Users {
                 await this._verify_password(token, correct_token.token)
             );
         } catch (err) {
-            return false;
+            if (err instanceof Collection.NotFoundError) {
+                return false;
+            }
+            throw err;
         }
     }
 
@@ -2128,9 +2232,6 @@ export class Users {
     async verify_2fa(uid: string, code: string): Promise<string | undefined> {
         try {
             const auth = await this._2fa_tokens_db.load({ uid });
-            if (auth == null) {
-                return "Invalid 2FA code.";
-            }
             const now = Date.now();
             if (now >= auth.expiration) {
                 await this._deactivate_2fa_token(uid);
@@ -2149,7 +2250,9 @@ export class Users {
             await this._deactivate_2fa_token(uid); // single use.
             return;
         } catch (err) {
-            this.server.log.error("Encountered an error while validating the 2FA code.");
+            if (err instanceof Collection.NotFoundError) {
+                return "Invalid 2FA code.";
+            }
             this.server.log.error(`${err}.`);
             return "Unknown error.";
         }
@@ -2353,16 +2456,41 @@ export namespace Users {
             };
         }
 
+        /** JSON values for LoadUserData data field etc. */
+        export type JsonValue = string | number | boolean | null | JsonArray | JsonObject;
+        export type JsonArray = Array<JsonValue>;
+        export type JsonObject = {
+            [key: string]: JsonValue;
+        }
+        export const JsonValueSchemaType = [
+            "string",
+            "number",
+            "boolean",
+            "null",
+            "array",
+            "object"
+        ] as const;
+
         /** The load public user data endpoint. */
         export namespace LoadUserData {
             /** The request params. */
             export interface Params {
-                path: string | Record<string, any>;
-                default?: Record<string, any>;
+                /**
+                 * The document query.
+                 * @note The object form query may not include system
+                 *       reserved fields `_id`, `uid`, `query` and `data`.
+                 */
+                query: string | Record<string, any>;
+                /**
+                 * The default value for document field `data`,
+                 * see {@link Collection.LoadOpts.default}.
+                 */
+                default?: JsonValue;
             }
             /** The result interface for a **successful** request. */
             export interface Result {
                 message: string;
+                data: JsonValue;
             };
         }
 
@@ -2370,8 +2498,14 @@ export namespace Users {
         export namespace SetUserData {
             /** The request params. */
             export interface Params {
-                path: string | Record<string, any>;
-                data: Record<string, any>;
+                /**
+                 * The document query.
+                 * @note The object form query may not include system
+                 *       reserved fields `_id`, `uid`, `query` and `data`.
+                 */
+                query: string | Record<string, any>;
+                /** The data to save. */
+                data: JsonValue;
             }
             /** The result interface for a **successful** request. */
             export interface Result {
@@ -2383,7 +2517,12 @@ export namespace Users {
         export namespace DeleteUserData {
             /** The request params. */
             export interface Params {
-                path: string | Record<string, any>;
+                /**
+                 * The document query.
+                 * @note The object form query may not include system
+                 *       reserved fields `_id`, `uid`, `query` and `data`.
+                 */
+                query: string | Record<string, any>;
             }
             /** The result interface for a **successful** request. */
             export interface Result {
@@ -2395,12 +2534,19 @@ export namespace Users {
         export namespace LoadProtectedUserData {
             /** The request params. */
             export interface Params {
-                path: string | Record<string, any>;
-                default?: Record<string, any>;
+                /**
+                 * The document query.
+                 * @note The object form query may not include system
+                 *       reserved fields `_id`, `uid`, `query` and `data`.
+                 */
+                query: string | Record<string, any>;
+                /** The default value for document field `data`. */
+                default?: JsonValue;
             }
             /** The result interface for a **successful** request. */
             export interface Result {
                 message: string;
+                data: JsonValue;
             };
         }
 

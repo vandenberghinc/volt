@@ -95,20 +95,14 @@ class RateLimitServer {
   }
   // Start.
   async start() {
-    const data = await this.server._sys_db.load("rate_limit", {
-      default: {
-        api_key: null
-      }
-    });
-    if (data.api_key == null) {
-      data.api_key = vlib.String.random(32);
-      await this.server._sys_db.set("rate_limit", data);
+    if (!this.server.rate_limit_api_key) {
+      throw new Error("Rate limit API key is not defined.");
     }
     this.ws = new vlib.websocket.Server({
       ip: this.ip,
       port: this.port,
       https: this.https_config,
-      api_keys: [data.api_key],
+      api_keys: [this.server.rate_limit_api_key],
       rate_limit: {
         limit: 100,
         interval: 60
@@ -120,21 +114,21 @@ class RateLimitServer {
     this.ws.on_event("error", (stream, e) => {
       this.server.log.error(e);
     });
-    this.ws.on("limit", async (stream, id, data2) => {
+    this.ws.on("limit", async (stream, id, data) => {
       try {
         this.ws.send({
           stream,
           id,
-          data: { response: await this.limit(data2.ip, data2.groups) }
+          data: { response: await this.limit(data.ip, data.groups) }
         });
       } catch (e) {
         this.server.log.error(e);
         this.ws.send({ stream, id, data: { error: e.message } });
       }
     });
-    this.ws.on("reset", async (stream, id, data2) => {
+    this.ws.on("reset", async (stream, id, data) => {
       try {
-        await this.reset(data2.group);
+        await this.reset(data.group);
         this.ws.send({ stream, id, data: { error: void 0 } });
       } catch (e) {
         this.server.log.error(e);
@@ -154,8 +148,8 @@ class RateLimitServer {
     this.clear_caches_interval = setInterval(() => {
       const remove_after = Date.now() + 3600 * 1e3;
       for (const [group, map] of this.limits.entries()) {
-        for (const [ip, data2] of map.entries()) {
-          if (remove_after > data2.expiration) {
+        for (const [ip, data] of map.entries()) {
+          if (remove_after > data.expiration) {
             map.delete(ip);
           }
         }
@@ -260,17 +254,12 @@ class RateLimitClient {
   }
   // Start.
   async start() {
-    const data = await this.server._sys_db.load("rate_limit", {
-      default: {
-        api_key: null
-      }
-    });
-    if (data.api_key == null) {
-      throw new Error("No rate limit api key has been generated yet.");
+    if (!this.server.rate_limit_api_key) {
+      throw new Error("Rate limit API key is not defined.");
     }
     this.ws = new vlib.websocket.Client({
       url: this.url ? this.url : `${this.https ? "wss" : "ws"}://${this.ip}:${this.port}`,
-      api_key: data.api_key,
+      api_key: this.server.rate_limit_api_key,
       reconnect: {
         interval: 10,
         max_interval: 3e4

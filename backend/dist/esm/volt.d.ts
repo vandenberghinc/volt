@@ -1,3 +1,4 @@
+export * from "./errors.js";
 export { ExternalError, InternalError } from "./utils.js";
 export * from "./status.js";
 export * from "./meta.js";

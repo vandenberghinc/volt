@@ -229,6 +229,8 @@ export namespace User {
      * @nav Frontend/User
      * @type Promise
      * @return Returns a promise with the loaded user's data or a request error on a failed request.
+     *         When the document is not found, an error response with status `404` and type `document_not_found` will be returned,
+     *         unless a `default` value is provided in the request payload. In that case, the default value will be inserted
      * @docs
      */
     export async function load_data(
@@ -277,6 +279,8 @@ export namespace User {
      * @nav Frontend/User
      * @type Promise
      * @return Returns a promise with the loaded user's data or a request error on a failed request.
+     *         When the document is not found, an error response with status `404` and type `document_not_found` will be returned,
+     *         unless a `default` value is provided in the request payload. In that case, the default value will be inserted
      * @docs
      */
     export async function load_protected_data(

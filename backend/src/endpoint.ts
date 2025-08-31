@@ -521,9 +521,10 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
         try {
             // Check IP whitelist.
             if (this.ip_whitelist && !this.ip_whitelist.includes(stream.ip)) {
-                stream.send({
+                stream.error({
                     status: Status.unauthorized,
-                    body: "Unauthorized.",
+                    type: "Unauthorized",
+                    message: "Unauthorized.",
                 });
                 return;
             }

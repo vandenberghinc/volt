@@ -1,12 +1,12 @@
-// strict-filter.ts
-import type * as mongodb from 'mongodb';
+// strict_filter.ts
+// Compile-time only helper types for a fully strict Filter<T> compatible with the mongodb driver.
+
 import type {
+    ObjectId,
     Document as MongoDocument,
     Filter as MongoFilter,
-    ObjectId,
     WithId,
-    Collection,
-} from 'mongodb';
+} from "mongodb";
 
 /* ---------------------------------- Utils --------------------------------- */
 
@@ -21,13 +21,13 @@ type KnownKeys<T> = {
 }[keyof T];
 
 type Comparable = number | bigint | Date;
-
 type Elem<T> = T extends readonly (infer U)[] ? U : never;
 type IsArray<T> = T extends readonly any[] ? true : false;
 type Defined<T> = Exclude<T, undefined>;
 
 // Depth limiter for dot-path generation.
 type Prev = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
 type Join<K, P> = K extends string | number
     ? P extends string | number
     ? `${K}.${P}`
@@ -42,14 +42,13 @@ export type DotPaths<T, D extends number = 5> = [D] extends [never]
         [K in KnownKeys<T>]: T[K] extends object
         ? IsArray<T[K]> extends true
         ? K & string
-        : K & string | Join<K & string, DotPaths<T[K], Prev[D]>>
-        : K & string
+        : (K & string) | Join<K & string, DotPaths<T[K], Prev[D]>>
+        : K & string;
     }[KnownKeys<T>]
     : never;
 
 /** Value type at a given dot-path (subset handles up to depth ~5 cleanly). */
-export type PathValue<T, P extends string> =
-    P extends `${infer K}.${infer R}`
+export type PathValue<T, P extends string> = P extends `${infer K}.${infer R}`
     ? K extends keyof T
     ? PathValue<T[K], R>
     : never
@@ -60,39 +59,43 @@ export type PathValue<T, P extends string> =
 /* ------------------------------ BSON type names --------------------------- */
 
 export type BSONTypeName =
-    | 'double'
-    | 'string'
-    | 'object'
-    | 'array'
-    | 'binData'
-    | 'undefined'
-    | 'objectId'
-    | 'bool'
-    | 'date'
-    | 'null'
-    | 'regex'
-    | 'dbPointer'
-    | 'javascript'
-    | 'symbol'
-    | 'javascriptWithScope'
-    | 'int'
-    | 'timestamp'
-    | 'long'
-    | 'decimal'
-    | 'minKey'
-    | 'maxKey';
+    | "double"
+    | "string"
+    | "object"
+    | "array"
+    | "binData"
+    | "undefined"
+    | "objectId"
+    | "bool"
+    | "date"
+    | "null"
+    | "regex"
+    | "dbPointer"
+    | "javascript"
+    | "symbol"
+    | "javascriptWithScope"
+    | "int"
+    | "timestamp"
+    | "long"
+    | "decimal"
+    | "minKey"
+    | "maxKey";
 
 export type BSONType = BSONTypeName | number;
 
 /* --------------------------- GeoJSON (lightweight) ------------------------ */
 
 export type Position = [number, number] | [number, number, number];
-export type Point = { type: 'Point'; coordinates: Position };
-export type LineString = { type: 'LineString'; coordinates: Position[] };
-export type Polygon = { type: 'Polygon'; coordinates: Position[][] };
-export type MultiPoint = { type: 'MultiPoint'; coordinates: Position[] };
-export type MultiLineString = { type: 'MultiLineString'; coordinates: Position[][] };
-export type MultiPolygon = { type: 'MultiPolygon'; coordinates: Position[][][] };
+export type Point = { type: "Point"; coordinates: Position };
+export type LineString = { type: "LineString"; coordinates: Position[] };
+export type Polygon = { type: "Polygon"; coordinates: Position[][] };
+export type MultiPoint = { type: "MultiPoint"; coordinates: Position[] };
+export type MultiLineString = {
+    type: "MultiLineString";
+    coordinates: Position[][];
+};
+export type MultiPolygon = { type: "MultiPolygon"; coordinates: Position[][][] };
+
 export type Geometry =
     | Point
     | LineString
@@ -103,13 +106,53 @@ export type Geometry =
 
 /* ------------------------------- $expr typing ----------------------------- */
 
-export type FieldRef<T extends MongoDocument> = `$${DotPaths<T>}`;
-type ExprLiteral = string | number | boolean | null | Date;
+// Generate all valid field paths including those from WithId<T>
+type AllFieldPaths<T extends MongoDocument> = DotPaths<WithId<T>> | KnownKeys<WithId<T>>;
 
-/** Strict(ish) expression tree good for `$expr` usage. */
-export type Expr<T extends MongoDocument> =
-    | ExprLiteral
+// Strict field references - must start with $ and be a valid field path
+export type FieldRef<T extends MongoDocument> = `$${AllFieldPaths<T> & string}`;
+
+// Helper to validate if a string is a field reference
+type IsFieldRef<S, T extends MongoDocument> = S extends `$${infer Path}`
+    ? Path extends AllFieldPaths<T>
+        ? true
+        : false
+    : false;
+
+// Strict validation for strings in expressions
+// If a string starts with $, it MUST be a valid field reference
+type StrictExprString<T extends MongoDocument> = 
     | FieldRef<T>
+    | (string extends infer S 
+        ? S extends `${string}`
+            ? S extends FieldRef<T> 
+                ? S 
+                : never
+            : S
+        : never);
+
+// Validate strings in expressions:
+// - If starts with $, must be a valid field reference
+// - Otherwise, it's a regular string literal
+type NonStrictExprString<T extends MongoDocument, S> =
+    S extends `$${infer Path}`
+    ? Path extends AllFieldPaths<T>
+    ? S  // Valid field reference
+    : never  // Invalid field reference
+    : S;  // Regular string (not a field ref)
+
+// Values that can appear in expressions with strict field ref validation
+type ExprValue<T extends MongoDocument> = 
+    | number 
+    | boolean 
+    | null 
+    | Date
+    | StrictExprString<T>
+    // | ValidateExprString<T, string>;
+
+/** Strict expression tree for `$expr`. */
+export type Expr<T extends MongoDocument> =
+    | ExprValue<T>
     | Expr<T>[]
     | {
         // arithmetic
@@ -118,7 +161,6 @@ export type Expr<T extends MongoDocument> =
         $multiply?: Expr<T>[];
         $divide?: [Expr<T>, Expr<T>];
         $mod?: [Expr<T>, Expr<T>];
-
         // comparison
         $eq?: [Expr<T>, Expr<T>];
         $ne?: [Expr<T>, Expr<T>];
@@ -126,17 +168,14 @@ export type Expr<T extends MongoDocument> =
         $gte?: [Expr<T>, Expr<T>];
         $lt?: [Expr<T>, Expr<T>];
         $lte?: [Expr<T>, Expr<T>];
-
         // boolean
         $and?: Expr<T>[];
         $or?: Expr<T>[];
         $not?: Expr<T>;
-
         // array/string helpers (useful subset)
         $concat?: Expr<T>[];
         $size?: Expr<T>;
-        $in?: [Expr<T>, Expr<T>]; // [needle, haystack-array]
-
+        $in?: [Expr<T> | NonStrictExprString<T, string>, Expr<T>]; // [needle, haystack/array-expr]
         // type/date coercions (subset)
         $toString?: Expr<T>;
         $toInt?: Expr<T>;
@@ -145,11 +184,11 @@ export type Expr<T extends MongoDocument> =
         $toLong?: Expr<T>;
         $toBool?: Expr<T>;
         $toDate?: Expr<T>;
-    };
+    }
 
 /* ---------------------------- Field operator maps ------------------------- */
 
-type BitwiseOps<T> = T extends number | bigint
+type BitwiseOps<T> = [T] extends [number | bigint]
     ? {
         $bitsAllClear?: number;
         $bitsAllSet?: number;
@@ -158,7 +197,7 @@ type BitwiseOps<T> = T extends number | bigint
     }
     : {};
 
-type NumericComparators<T> = T extends Comparable
+type NumericComparators<T> = [T] extends [Comparable]
     ? {
         $gt?: T;
         $gte?: T;
@@ -168,30 +207,46 @@ type NumericComparators<T> = T extends Comparable
     }
     : {};
 
-type StringOps<T> = T extends string
-    ? {
-        $regex?: RegExp | string;
-        $options?: string;
-    }
-    : {};
+/**
+ * String ops:
+ * - `$regex` optional overall, but `$options` is only legal when `$regex` is present.
+ */
+type StringRegexOps =
+    | { $regex: RegExp | string; $options?: string }
+    | { $regex?: undefined; $options?: undefined };
 
-type ArrayOps<T> = T extends readonly any[]
+type StringOps<T> = [T] extends [string] ? StringRegexOps : {};
+
+type ArrayOps<T> = [T] extends [readonly any[]]
     ? {
         $size?: number;
         $all?: Elem<T>[];
-        $elemMatch?: Elem<T> extends object ? StrictFilter<Elem<T>> | FieldOperators<Elem<T>> : FieldOperators<Elem<T>>;
+        $elemMatch?: Elem<T> extends object
+        ? StrictFilter<Elem<T>> | FieldOperators<Elem<T>>
+        : FieldOperators<Elem<T>>;
         $in?: Elem<T>[];
         $nin?: Elem<T>[];
     }
     : {};
 
-type ExistsAndType = {
-    $exists?: boolean;
-    $type?: BSONType | BSONType[];
+type ExistsOp = { $exists?: boolean };
+
+/**
+ * `$type` differs for string fields for driver-interop:
+ * - For string/regex fields, the mongodb driver narrows *`$type`* to **names only** (no numeric codes).
+ * - For other fields we allow both numeric codes and names.
+ */
+type TypeOpByField<T> = {
+    $type?: [Defined<T>] extends [string]
+    ? BSONTypeName | BSONTypeName[]
+    : BSONType | BSONType[];
 };
 
-/** For arrays, omit $in/$nin here to avoid the `string[][] & string[]` intersection. */
-type EqualityOps<T> = T extends readonly any[]
+/** 
+ * For arrays, omit $in/$nin here to avoid the `string[][] & string[]` intersection.
+ * For union types, properly handle $in and $nin to accept arrays of the union values.
+ */
+type EqualityOps<T> = [T] extends [readonly any[]]
     ? {
         $eq?: T;
         $ne?: T;
@@ -203,37 +258,61 @@ type EqualityOps<T> = T extends readonly any[]
         $nin?: T[];
     };
 
-export type FieldOperators<T> =
-    EqualityOps<Defined<T>> &
-    ExistsAndType &
+/** Geospatial operators (field-level) */
+type GeoOps = {
+    $geoWithin?:
+    | { $geometry: Geometry }
+    | { $box: [Position, Position] }
+    | { $polygon: Position[] }
+    | { $centerSphere: [Position, number] };
+    $geoIntersects?: { $geometry: Geometry };
+    /**
+     * `$near`/`$nearSphere`: accept only GeoJSON Point (+ optional distance bounds).
+     * (Unit tests expect raw coordinate arrays to be rejected.)
+     */
+    $near?: Point & { $maxDistance?: number; $minDistance?: number };
+    $nearSphere?: Point & { $maxDistance?: number; $minDistance?: number };
+};
+
+/** Operators excluding equality — used as the inner type for $not */
+type FieldOperatorsBase<T> = ExistsOp &
+    TypeOpByField<T> &
     NumericComparators<Defined<T>> &
     StringOps<Defined<T>> &
     ArrayOps<T extends undefined ? never : T> &
-    BitwiseOps<Defined<T>> & {
-        /** Field-level $not wrapping the SAME field's operators (or regex for strings). */
-        $not?: Omit<FieldOperators<Defined<T>>, '$not'> | (Defined<T> extends string ? RegExp : never);
+    BitwiseOps<Defined<T>> &
+    GeoOps;
 
-        // Geospatial (field-level)
-        $geoWithin?:
-        | { $geometry: Geometry }
-        | { $box: [Position, Position] }
-        | { $polygon: Position[] }
-        | { $centerSphere: [Position, number] };
+type NotInner<T> = Omit<FieldOperatorsBase<T>, "$not">;
 
-        $geoIntersects?: { $geometry: Geometry };
-        $near?: Position | (Point & { $maxDistance?: number; $minDistance?: number });
-        $nearSphere?: Position | (Point & { $maxDistance?: number; $minDistance?: number });
+export type FieldOperators<T> = 
+    EqualityOps<Defined<T>> &
+    FieldOperatorsBase<T> & {
+        /**
+         * Field-level $not wrapping EITHER a regex (only for string fields)
+         * OR any non-equality operators. (Equality inside $not is not allowed.)
+         *
+         * This shape also matches the driver's `FilterOperators<string | RegExp | BSONRegExp>`
+         * so `StrictFilter<T>` remains assignable to `mongodb.Filter<T>`.
+         */
+        $not?:
+            | (Defined<T> extends string ? RegExp : never)
+            | NotInner<Defined<T>>;
     };
 
 /** Value OR operators for a given field type.
  * For strings, allow bare RegExp because the driver accepts `{ name: /x/ }`.
  */
-export type FieldCondition<T> =
-    T extends string
+export type FieldCondition<T> = [T] extends [string]
     ? string | RegExp | FieldOperators<T>
     : Defined<T> | FieldOperators<T>;
 
 /* ----------------------------- Filter construction ------------------------ */
+
+// Support for _id field
+type IdField = {
+    _id?: ObjectId | FieldOperators<ObjectId>;
+};
 
 type FieldQueryMap<T extends MongoDocument> = {
     [K in KnownKeys<T>]?: FieldCondition<T[K]>;
@@ -243,6 +322,11 @@ type DotPathQueryMap<T extends MongoDocument> = {
     [P in DotPaths<T>]?: FieldCondition<PathValue<T, P>>;
 };
 
+/**
+ * Use `WithId<T>` in logicals for driver interop (driver defines logicals in terms of `Filter<WithId<T>>`).
+ * That lets `StrictFilter<T>` be assignable to `Filter<T>` and also makes arrays of `StrictFilter<T>`
+ * usable where the driver expects `Filter<WithId<T>>[]` (because `StrictFilter<T>` is a subtype).
+ */
 type LogicalOps<T extends MongoDocument> = {
     $and?: StrictFilter<WithId<T>>[];
     $or?: StrictFilter<WithId<T>>[];
@@ -252,8 +336,15 @@ type LogicalOps<T extends MongoDocument> = {
 /** Top-level evaluation-ish operators accepted by find() / $match */
 type TopEvalOps<T extends MongoDocument> = {
     $expr?: Expr<T>;
-    $jsonSchema?: unknown;
-    $where?: string | ((this: WithId<T>) => boolean);
+    $jsonSchema?: unknown; // pass-through
+    /**
+     * Accept a $where function compatible with both our tests (WithId<T>) and the driver
+     * (which spells it as WithId<WithId<T>>). The intersection makes it callable as either.
+     */
+    $where?:
+    | string
+    | (((this: WithId<T>) => boolean) &
+        ((this: WithId<WithId<T>>) => boolean));
     $text?: {
         $search: string;
         $language?: string;
@@ -268,31 +359,12 @@ type TopEvalOps<T extends MongoDocument> = {
  * - Only allows T's declared keys (plus dot paths) and legal top-level operators.
  * - Field operators strictly depend on the field type.
  * - `$expr` has a strongly-typed expression tree with field refs limited to known paths.
+ * - Includes support for _id field which is always present in MongoDB documents.
  *
  * NOTE: No string index signatures anywhere — TS excess property checks will catch typos.
  */
-export type StrictFilter<TSchema extends MongoDocument> =
+export type StrictFilter<TSchema extends MongoDocument> = IdField &
     FieldQueryMap<TSchema> &
     DotPathQueryMap<TSchema> &
     LogicalOps<TSchema> &
     TopEvalOps<TSchema>;
-// export type StrictFilter<TSchema extends MongoDocument> = any // @todo @tmp for compiling
-
-/** Helper to show compatibility with the official driver types. */
-export type IsAssignableToMongoFilter<T extends MongoDocument> =
-    StrictFilter<T> extends MongoFilter<T> ? true : false;
-
-/* ----------------------------- Example generic ---------------------------- */
-
-export class SomeClass<Data extends MongoDocument> {
-    col!: Collection<Data>;
-
-    cast(query: StrictFilter<Data>): void {
-        const q: MongoFilter<Data> = query; // assignable
-        void q;
-    }
-
-    async find(query: StrictFilter<Data>) {
-        return (await this.col.findOne(query)) ?? undefined;
-    }
-}

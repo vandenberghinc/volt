@@ -15,7 +15,7 @@ import { Collection } from "./collection.js";
 export var Document;
 (function (Document) {
     /**
-     * Document reference object. Its objectively an document without holding its data.
+     * Document reference object. Its objectively a document without holding its data.
      * Its more efficient to store that separately and use this to perform operations on it.
      * This supports a hierarchy where a class instance always holds a reference and the loaded document.
      * And a static function can be declared to load the document and initialize the class instance.
@@ -27,7 +27,7 @@ export var Document;
     class Ref {
         col;
         query;
-        def;
+        default;
         // chunked: boolean;
         record_version; // defaults to 1.
         error_type;
@@ -48,7 +48,7 @@ export var Document;
             // Assign attributes.
             this.query = query;
             this.col = opts.col;
-            this.def = opts.def;
+            this.default = opts.default;
             // this.chunked = opts.chunked || false;
             this.error_type = opts.external_errors ? ExternalError : InternalError;
             this.transform_version = opts.transform_version;
@@ -79,11 +79,16 @@ export var Document;
          *                             Defaults to `true`.
          */
         on_load(data, opts) {
+            const is_partial = (opts?.projection != null && Object.keys(opts.projection).length > 0);
             if (this.record_version != null
                 && this.transform_version != null
                 && data.__record_version !== this.record_version) {
                 try {
-                    data = this.transform_version(data.__record_version, this.record_version, data);
+                    data = this.transform_version(data, {
+                        from_version: data.__record_version,
+                        to_version: this.record_version,
+                        partial: is_partial,
+                    });
                 }
                 catch (e) {
                     throw new this.error_type({
@@ -100,8 +105,10 @@ export var Document;
             if (this.record_version != null && data.__record_version == null) {
                 data.__record_version = this.record_version;
             }
-            // Set defaults.
-            if (this.def && (opts?.insert_defaults ?? true)) {
+            // Merge defaults only on full loads. For partial (projected) loads we avoid adding fields the caller did not request.
+            if (this.default
+                && (opts?.insert_defaults ?? true)
+                && !is_partial) {
                 try {
                     Collection.insert_defaults_helper(data, this.as_default({ clone: false }), { clone: true });
                 }
@@ -116,7 +123,9 @@ export var Document;
             }
             // Call on load.
             if (this._on_load) {
-                data = this._on_load(data);
+                data = this._on_load(data, {
+                    partial: is_partial,
+                });
             }
             // Response.
             return data;
@@ -130,8 +139,9 @@ export var Document;
          *                   Defaults to `true`.
          */
         as_default(opts) {
-            if (this.def) {
-                const raw = typeof this.def === "function" ? this.def() : this.def;
+            // Dont insert `_id` here so it will never be overridden.
+            if (this.default) {
+                const raw = typeof this.default === "function" ? this.default() : this.default;
                 if (opts?.clone ?? true) {
                     const cloned = (typeof globalThis.structuredClone === "function")
                         ? structuredClone(raw)
@@ -146,51 +156,106 @@ export var Document;
                 };
             }
         }
-        /** Check if a project exists.
-         * @note this does not load the full document.
+        /** Check if a document exists.
+         * @note This does not load the full document.
          */
         async exists() {
             return await this.col.exists(this.query);
         }
         /**
-         * Load a project from the database.
+         * Load a document from the database.
+         *
          * Automatically performing the optional {@link Ref.Opts.transform_version} and {@link Ref.Opts.on_load} callbacks.
          *
-         * @param def the default value, when the default value is an object then the attributes will be checked / inserted as well.
+         * Internally performing {@link Collection.load} so more info about the loading process can be found there.
+         *
+         * Default fields are automatically upserted when missing in the loaded document and
+         * {@link Ref.Opts.default} is defined while {@link Collection.LoadOpts.projection} is not defined.
+         *
+         * @note When loading a document with a specified {@link Collection.LoadOpts.projection} the `__record_version` field will always be included.
+         *
+         * @returns See {@link Collection.LoadResult} for more info about the return type.
          */
-        async load() {
-            let data = await this.col.load(this.query);
-            if (!data) {
-                if (this.def) {
-                    data = this.as_default();
-                    data._id = new mongodb.ObjectId();
-                    return this.on_load(data, { insert_defaults: false });
+        async load(opts) {
+            const throw_errors = opts?.throw ?? true;
+            try {
+                // Check projection.
+                if (opts?.projection && Object.keys(opts.projection).length === 0) {
+                    opts.projection = undefined;
                 }
-                return;
+                if (opts?.projection) {
+                    // Insert __record_version for the transform version callback.
+                    if (Array.isArray(opts.projection) && !opts.projection.includes("__record_version")) {
+                        opts.projection = [...opts.projection, "__record_version"];
+                    }
+                    else if (typeof opts.projection === "object") {
+                        // For exclusion patterns ensure record version is not excluded, 
+                        // Inclusion and exclusion styles can not be mixed.
+                        if (Object.values(opts.projection).some(v => v === 0 || v === false)) {
+                            if (opts.projection["__record_version"] != null) {
+                                opts.projection = { ...opts.projection };
+                                delete opts.projection["__record_version"];
+                            }
+                        }
+                        else if (opts.projection["__record_version"] !== 1 && opts.projection["__record_version"] !== true) {
+                            // Ensure its included.
+                            opts.projection = {
+                                ...opts.projection,
+                                __record_version: 1,
+                            };
+                        }
+                    }
+                }
+                // Load data.
+                if (opts?.default) {
+                    // ensure default is not present at runtime.
+                    opts = { ...opts, default: undefined };
+                }
+                const data = await this.col.load(this.query, opts);
+                // Error returned by `throw:false`
+                if (data instanceof Error) {
+                    if (data instanceof Collection.NotFoundError && this.default) {
+                        // Not found & this.default is defined.
+                        const data = this.as_default();
+                        if (data._id == null) {
+                            data._id = new mongodb.ObjectId();
+                        }
+                        return this.on_load(data, { insert_defaults: false, projection: opts?.projection });
+                    }
+                    if (throw_errors)
+                        throw data;
+                    return data;
+                }
+                // Not an error.
+                const success_data = data;
+                return this.on_load(success_data, { insert_defaults: true, projection: opts?.projection });
+                // Handle thrown errors.
             }
-            return this.on_load(data);
-        }
-        /**
-         * Load partial by projection.
-         *
-         * @warning This does not execute the optional {@link Ref.Opts.transform_version} and {@link Ref.Opts.on_load} callbacks.
-         *
-         * @param fields The fields to load, nested fields should be separated by a dot (e.g. "a.b.c").
-         */
-        async load_partial(...fields) {
-            const projection = {};
-            projection._id = 1;
-            projection.__record_version = 1;
-            for (const field of fields) {
-                projection[field] = 1;
+            catch (err) {
+                // Not found when `throw:true`.
+                if (err instanceof Collection.NotFoundError) {
+                    if (this.default) {
+                        const data = this.as_default();
+                        if (!data._id) {
+                            data._id = new mongodb.ObjectId();
+                        }
+                        return this.on_load(data, { insert_defaults: false, projection: opts?.projection });
+                    }
+                    if (throw_errors)
+                        throw err;
+                    return err;
+                }
+                // Throw or return error.
+                if (throw_errors)
+                    throw err;
+                return err;
             }
-            return await this.col.load(this.query, { projection });
         }
         /**
          * Safely save the document to the database, internally executing {@link Collection.save}
          * Inserting default values upon document creation.
          *
-         * @note This retrieves the default document values opon every call.
+         * @note This retrieves the default document values upon every call.
          *       Either by executing the {@link Ref.def} method, or by passing its
          *       raw properties directly if it is passed as such.
          *
@@ -247,7 +312,7 @@ export var Document;
          * @warning Keep in mind that if you defined {@link Ref.def} as method,
          *          it will be called on every call of this function.
          *
-         * @note This retrieves the default document values opon every call.
+         * @note This retrieves the default document values upon every call.
          *       Either by executing the {@link Ref.def} method, or by passing its
          *       raw properties directly if it is passed as such.
          *

@@ -319,9 +319,10 @@ class Endpoint {
     }
     try {
       if (this.ip_whitelist && !this.ip_whitelist.includes(stream.ip)) {
-        stream.send({
+        stream.error({
           status: import_status.Status.unauthorized,
-          body: "Unauthorized."
+          type: "Unauthorized",
+          message: "Unauthorized."
         });
         return;
       }

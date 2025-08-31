@@ -11,6 +11,7 @@ import * as utils from "./utils.js";
 import * as Mail from "./plugins/mail/ui.js";
 import { Status } from "./status.js";
 const { ExternalError } = utils;
+import { Collection } from "./database/collection.js";
 // ---------------------------------------------------------
 // The users manager.
 // ---------------------------------------------------------
@@ -130,15 +131,15 @@ export class Users {
         // Public database collections.
         this.public = this.server.db.collection({
             name: "Volt.Server.Users.Public",
-            indexes: ["uid", "path"],
+            indexes: ["uid", "query"],
         });
         this.protected = this.server.db.collection({
             name: "Volt.Server.Users.Protected",
-            indexes: ["uid", "path"],
+            indexes: ["uid", "query"],
         });
         this.private = this.server.db.collection({
             name: "Volt.Server.Users.Private",
-            indexes: ["uid", "path"],
+            indexes: ["uid", "query"],
         });
     }
     // ---------------------------------------------------------
@@ -642,22 +643,23 @@ export class Users {
                             }
                             this.avg_send_2fa_time.push(Date.now() - start_time);
                             // Send error.
-                            return stream.send({
+                            return stream.error({
                                 status: Status.two_factor_auth_required,
+                                message: "2FA required.",
+                                type: "2FARequired",
                                 data: { error: "2FA required." }
                             });
                         }
                         // Verify 2FA.
                         const err = await this.verify_2fa(uid, code);
                         if (err) {
-                            return stream.send({
+                            return stream.error({
                                 status: Status.unauthorized,
-                                data: {
-                                    error: "Invalid 2FA code.",
-                                    invalid_fields: {
-                                        "code": err,
-                                    },
-                                }
+                                message: "Invalid 2FA code.",
+                                type: "Invalid2FACode",
+                                invalid_fields: {
+                                    "code": err,
+                                },
                             });
                         }
                     }
@@ -667,14 +669,13 @@ export class Users {
                 // Wait for the same time as it would time on avg to send a mail.
                 await uniform_delay();
                 // Unauthorized.
-                return stream.send({
+                return stream.error({
                     status: Status.unauthorized,
-                    data: {
-                        error: "Unauthorized.",
-                        invalid_fields: {
-                            "username": "Invalid or unrecognized username",
-                            "password": "Invalid or unrecognized password",
-                        },
+                    type: "Unauthorized",
+                    message: "Unauthorized.",
+                    invalid_fields: {
+                        "username": "Invalid or unrecognized username",
+                        "password": "Invalid or unrecognized password",
                     }
                 });
             }
@@ -759,22 +760,22 @@ export class Users {
                         }
                         this.avg_send_2fa_time.push(Date.now() - start_time);
                         // Send error.
-                        return stream.send({
+                        return stream.error({
                             status: Status.two_factor_auth_required,
-                            data: { error: "2FA required." }
+                            message: "2FA required.",
+                            type: "TwoFactorAuthRequired",
                         });
                     }
                     // Verify 2FA.
                     const err = await this.verify_2fa(params.email, params.code);
                     if (err) {
-                        return stream.send({
+                        return stream.error({
                             status: Status.unauthorized,
-                            data: {
-                                error: "Invalid 2FA code.",
-                                invalid_fields: {
-                                    "code": err,
-                                },
-                            }
+                            type: "Invalid2FACode",
+                            message: "Invalid 2FA code.",
+                            invalid_fields: {
+                                "code": err,
+                            },
                         });
                     }
                 }
@@ -839,7 +840,7 @@ export class Users {
                 await this.set_activated(uid, true);
                 // Response.
                 await this._create_user_cookie(stream, uid);
-                return stream.success({ data: { message: "Successfully verified the 2FA code." } });
+                return stream.success({ data: { message: "Successfully activated your account." } });
             }
         });
         // Forgot password.
@@ -1063,7 +1064,7 @@ export class Users {
             callback: async (stream) => {
                 return stream.success({
                     data: {
-                        message: "Successfully generated an API key.",
+                        message: "Successfully checked your API key.",
                         has_api_key: await this.has_api_key(stream.uid),
                     }
                 });
@@ -1084,6 +1085,57 @@ export class Users {
                 });
             }
         });
+        /**
+         * Initialize a document query for the public/protected/private user data.
+         * @returns The initialzied query upon success, or `false` is an error has been sent through the stream.
+         */
+        const init_user_data_query = (stream, uid, query) => {
+            if (typeof query === "object") {
+                if ("uid" in query) {
+                    return stream.error({
+                        message: "Invalid query parameter, the 'uid' field is not allowed.",
+                        type: "invalid_query_parameter",
+                        status: Status.bad_request,
+                        invalid_fields: {
+                            query: "Invalid query parameter, the 'uid' field is not allowed.",
+                        }
+                    });
+                }
+                if ("data" in query) {
+                    return stream.error({
+                        message: "Invalid query parameter, the 'data' field is not allowed.",
+                        type: "invalid_query_parameter",
+                        status: Status.bad_request,
+                        invalid_fields: {
+                            query: "Invalid query parameter, the 'data' field is not allowed.",
+                        }
+                    });
+                }
+                if ("query" in query) {
+                    return stream.error({
+                        message: "Invalid query parameter, the 'query' field is not allowed.",
+                        type: "invalid_query_parameter",
+                        status: Status.bad_request,
+                        invalid_fields: {
+                            query: "Invalid query parameter, the 'query' field is not allowed.",
+                        }
+                    });
+                }
+                if ("_id" in query) {
+                    return stream.error({
+                        message: "Invalid query parameter, the '_id' field is not allowed.",
+                        type: "invalid_query_parameter",
+                        status: Status.bad_request,
+                        invalid_fields: {
+                            query: "Invalid query parameter, the '_id' field is not allowed.",
+                        }
+                    });
+                }
+            }
+            return typeof query === "string"
+                ? { uid, query: query }
+                : { ...query, uid: uid };
+        };
         // Load data.
         this.server.endpoint({
             method: "GET",
@@ -1092,20 +1144,41 @@ export class Users {
             authenticated: true,
             rate_limit: "global",
             params: {
-                path: { type: ["string", "object"], allow_empty: false },
-                default: { type: "object", required: false },
+                query: { type: ["string", "object"], allow_empty: false },
+                default: { type: Users.Endpoints.JsonValueSchemaType, required: false },
             },
             callback: async (stream, params) => {
-                const query = typeof params.path === "string"
-                    ? { uid: stream.uid, path: params.path }
-                    : { ...params.path, uid: stream.uid };
-                return stream.send({
-                    status: Status.success,
-                    data: await this.public.load(query, { default: params.default })
-                });
+                const query = init_user_data_query(stream, stream.uid, params.query);
+                if (!query)
+                    return;
+                try {
+                    const document = await this.public.load(query, {
+                        default: params.default
+                            ? { ...query, data: params.default }
+                            : undefined,
+                        retry: 3,
+                    });
+                    return stream.send({
+                        status: Status.success,
+                        data: {
+                            message: "Successfully loaded the requested document.",
+                            data: document.data,
+                        },
+                    });
+                }
+                catch (e) {
+                    if (e instanceof Collection.NotFoundError) {
+                        return stream.error({
+                            message: "Document not found.",
+                            type: "document_not_found",
+                            status: Status.not_found,
+                        });
+                    }
+                    throw e;
+                }
             }
         });
-        // Save data.
+        // Set data.
         this.server.endpoint({
             method: "POST",
             endpoint: "/volt/user/data",
@@ -1113,14 +1186,14 @@ export class Users {
             authenticated: true,
             rate_limit: "global",
             params: {
-                path: { type: ["string", "object"], allow_empty: false },
-                data: { type: "object" },
+                query: { type: ["string", "object"], allow_empty: false },
+                data: { type: Users.Endpoints.JsonValueSchemaType },
             },
             callback: async (stream, params) => {
-                const query = typeof params.path === "string"
-                    ? { uid: stream.uid, path: params.path }
-                    : { ...params.path, uid: stream.uid };
-                await this.public.set(query, params.data);
+                const query = init_user_data_query(stream, stream.uid, params.query);
+                if (!query)
+                    return;
+                await this.public.set(query, { data: params.data }, { retry: 3, flatten: true });
                 return stream.send({
                     status: Status.success,
                     data: { message: "Successfully saved." },
@@ -1135,12 +1208,12 @@ export class Users {
             authenticated: true,
             rate_limit: "global",
             params: {
-                path: { type: ["string", "object"], allow_empty: false },
+                query: { type: ["string", "object"], allow_empty: false },
             },
             callback: async (stream, params) => {
-                const query = typeof params.path === "string"
-                    ? { uid: stream.uid, path: params.path }
-                    : { ...params.path, uid: stream.uid };
+                const query = init_user_data_query(stream, stream.uid, params.query);
+                if (!query)
+                    return;
                 await this.public.delete(query);
                 return stream.send({
                     status: Status.success,
@@ -1156,17 +1229,38 @@ export class Users {
             authenticated: true,
             rate_limit: "global",
             params: {
-                path: { type: ["string", "object"], allow_empty: false },
-                default: { type: "object", required: false },
+                query: { type: ["string", "object"], allow_empty: false },
+                default: { type: Users.Endpoints.JsonValueSchemaType, required: false },
             },
             callback: async (stream, params) => {
-                const query = typeof params.path === "string"
-                    ? { uid: stream.uid, path: params.path }
-                    : { ...params.path, uid: stream.uid };
-                return stream.send({
-                    status: Status.success,
-                    data: await this.protected.load(query, { default: params.default })
-                });
+                const query = init_user_data_query(stream, stream.uid, params.query);
+                if (!query)
+                    return;
+                try {
+                    const document = await this.protected.load(query, {
+                        default: params.default
+                            ? { ...query, data: params.default }
+                            : undefined,
+                        retry: 3,
+                    });
+                    return stream.send({
+                        status: Status.success,
+                        data: {
+                            message: "Successfully loaded the requested document.",
+                            data: document.data,
+                        },
+                    });
+                }
+                catch (e) {
+                    if (e instanceof Collection.NotFoundError) {
+                        return stream.error({
+                            message: "Document not found.",
+                            type: "document_not_found",
+                            status: Status.not_found,
+                        });
+                    }
+                    throw e;
+                }
             }
         });
         // ---------------------------------------------------------
@@ -1300,7 +1394,9 @@ export class Users {
                     attachments: attachments,
                 });
                 // Sign in.
-                return stream.success({ data: { message: "Successfully sent your request." } });
+                return stream.success({
+                    data: { message: "Successfully sent your request." }
+                });
             }
         });
     }
@@ -1313,7 +1409,7 @@ export class Users {
      * @returns True if a user with the given uid exists.
      */
     async uid_exists(uid) {
-        return (await this._users_db.find({ uid })) != null;
+        return await this._users_db.exists({ uid });
     }
     /**
      * Check if a username exists.
@@ -1323,7 +1419,7 @@ export class Users {
      * const exists = await server.users.username_exists("someusername");
      */
     async username_exists(username) {
-        return (await this._users_db.find({ username })) != null;
+        return await this._users_db.exists({ username });
     }
     /**
      * Check if an email exists.
@@ -1333,7 +1429,7 @@ export class Users {
      * const exists = await server.users.email_exists("some@email.com");
      */
     async email_exists(email) {
-        return (await this._users_db.find({ email })) != null;
+        return await this._users_db.exists({ email });
     }
     /**
      * Check if a user account is activated.
@@ -1436,12 +1532,12 @@ export class Users {
      * await server.users.delete("0");
      */
     async delete(uid) {
-        await this._users_db.delete_all({ uid });
-        await this._tokens_db.delete_all({ uid });
-        await this._2fa_tokens_db.delete_all({ uid });
-        await this.public.delete_all({ uid });
-        await this.protected.delete_all({ uid });
-        await this.private.delete_all({ uid });
+        await this._users_db.delete_many({ uid });
+        await this._tokens_db.delete_many({ uid });
+        await this._2fa_tokens_db.delete_many({ uid });
+        await this.public.delete_many({ uid });
+        await this.protected.delete_many({ uid });
+        await this.private.delete_many({ uid });
         if (this.server.payments !== undefined) {
             await this.server.payments._delete_user(uid);
         }
@@ -1597,43 +1693,34 @@ export class Users {
      * Get a user by uid. Throws if the uid does not exist.
      * @returns Returns a User object.
      * @param uid The user id.
+     * @throws {Collection.NotFoundError} If the user id does not exist.
      * @example
      * const user = await server.users.get("0");
      */
     async get(uid) {
-        const data = await this._users_db.load({ uid });
-        if (data == null) {
-            throw new Error(`Unable to find a user by uid "${uid}".`);
-        }
-        return data;
+        return await this._users_db.load({ uid });
     }
     /**
      * Get a user by username. Throws if the username does not exist.
      * @returns Returns a User object.
      * @param username The username of the user to fetch.
+     * @throws {Collection.NotFoundError} If the username does not exist.
      * @example
      * const user = await server.users.get_by_username("myusername");
      */
     async get_by_username(username) {
-        const data = await this._users_db.find({ username });
-        if (data == null) {
-            throw new Error(`Unable to find a user by username "${username}".`);
-        }
-        return data;
+        return await this._users_db.load({ username });
     }
     /**
      * Get a user by email. Throws if the email does not exist.
      * @returns Returns a User object.
      * @param email The email of the user to fetch.
+     * @throws {Collection.NotFoundError} If the email does not exist.
      * @example
      * const user = await server.users.get_by_email("my@email.com");
      */
     async get_by_email(email) {
-        const data = await this._users_db.find({ email });
-        if (data == null) {
-            throw new Error(`Unable to find a user by email "${email}".`);
-        }
-        return data;
+        return await this._users_db.load({ email });
     }
     /**
      * Get a user by API key. Throws if invalid.
@@ -1767,6 +1854,7 @@ export class Users {
      * Check if a user has a generated API key.
      * @returns Returns a boolean indicating whether the user has an API key.
      * @param uid The user id.
+     * @throws {Collection.NotFoundError} If the user id does not exist.
      * @example
      * const has_api_key = await server.users.has_api_key("0");
      */
@@ -1774,9 +1862,6 @@ export class Users {
         const data = await this._users_db.load({ uid }, {
             projection: { api_key: 1 }
         });
-        if (data == null) {
-            throw new Error(`Unable to find a user by uid "${uid}".`);
-        }
         return data.api_key != null && data.api_key.length > 0;
     }
     /**
@@ -1865,7 +1950,10 @@ export class Users {
                 await this._verify_password(token, correct_token.token));
         }
         catch (err) {
-            return false;
+            if (err instanceof Collection.NotFoundError) {
+                return false;
+            }
+            throw err;
         }
     }
     /**
@@ -1879,9 +1967,6 @@ export class Users {
     async verify_2fa(uid, code) {
         try {
             const auth = await this._2fa_tokens_db.load({ uid });
-            if (auth == null) {
-                return "Invalid 2FA code.";
-            }
             const now = Date.now();
             if (now >= auth.expiration) {
                 await this._deactivate_2fa_token(uid);
@@ -1899,7 +1984,9 @@ export class Users {
             return;
         }
         catch (err) {
-            this.server.log.error("Encountered an error while validating the 2FA code.");
+            if (err instanceof Collection.NotFoundError) {
+                return "Invalid 2FA code.";
+            }
             this.server.log.error(`${err}.`);
             return "Unknown error.";
         }
@@ -2004,6 +2091,14 @@ export class Users {
         (function (RevokeAPIKey) {
             ;
         })(RevokeAPIKey = Endpoints.RevokeAPIKey || (Endpoints.RevokeAPIKey = {}));
+        Endpoints.JsonValueSchemaType = [
+            "string",
+            "number",
+            "boolean",
+            "null",
+            "array",
+            "object"
+        ];
         /** The load public user data endpoint. */
         let LoadUserData;
         (function (LoadUserData) {

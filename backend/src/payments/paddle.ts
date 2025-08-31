@@ -447,27 +447,20 @@ export class Paddle {
     private async _check_subscription(uid: string, prod_id: string, load_data?: true): Promise<{exists: boolean, sub_id?: string}>;
     private async _check_subscription(uid: string, prod_id: string, load_data?: false): Promise<boolean>;
     private async _check_subscription(uid: string, prod_id: string, load_data: true | false = false): Promise<{exists: boolean, sub_id?: string} | boolean> {
-        const doc = await this._active_sub_db.load({uid, prod_id});
-        let exists = false, sub_id;
-        if (doc == null) {
-            if (load_data) {
-                return {exists, sub_id};
-            } else {
-                return exists;
+        try {
+            const doc = await this._active_sub_db.load({uid, prod_id});
+            return load_data ? { exists: true, sub_id: doc.sub_id } : true;
+        } catch (err) {
+            if (err instanceof Collection.NotFoundError) {
+                return load_data ? { exists: false, sub_id: undefined } : false;
             }
-        }
-        exists = true;
-        sub_id = doc.sub_id;
-        if (load_data) {
-            return {exists, sub_id};
-        } else {
-            return exists;
+            throw err;
         }
     }
     private async _get_active_subscriptions(uid: string, detailed: true): Promise<ActiveSubscription[]>;
     private async _get_active_subscriptions(uid: string, detailed?: false): Promise<string[]>;
     private async _get_active_subscriptions(uid: string, detailed: boolean = false): Promise<ActiveSubscription[] | string[]> {
-        const list = await this._active_sub_db.list_query({uid: uid});
+        const list = await this._active_sub_db.list({uid: uid});
         if (detailed) { return list; }
         const products: string[] = [];
         list.iterate((doc) => {
@@ -482,15 +475,11 @@ export class Paddle {
         }, subscription);
     }
     private async _load_subscription(id: string): Promise<Subscription> {
-        const subscription = await this._sub_db.find({ id: id });
-        if (subscription == null) {
-            throw Error(`Unable to find subscription "${id}".`);
-        }
-        return subscription;
+        return await this._sub_db.load({ id: id }, { retry: 3 });
     }
     private async _get_subscriptions(uid: string): Promise<Subscription[]> {
         if (uid === "unauth" || uid == null) { return []; }
-        const list = await this._sub_db.list_query({ uid: uid });
+        const list = await this._sub_db.list({ uid: uid });
         return list;
     }
 
@@ -503,21 +492,13 @@ export class Paddle {
     }
     private async _load_payment(id: string): Promise<Payment> {
         const uid = id.split("_")[1];
-        const payment = await this._pay_db.load({ uid, id });
-        if (payment == null) {
-            throw Error(`Unable to find payment "${id}".`);
-        }
-        return payment;
+        return await this._pay_db.load({ uid, id });
     }
     private async _load_payment_for_public(id: string): Promise<vlib.Types.Optional<Payment, "billing_details">> {
         return Payment.anonymize(await this._load_payment(id));
     }
     private async _load_payment_by_transaction(tran_id: string): Promise<Payment> {
-        const payment = await this._pay_db.find({ tran_id: tran_id });
-        if (payment == null) {
-            throw Error(`Unable to find the payment by transaction id "${tran_id}".`);
-        }
-        return payment;
+        return await this._pay_db.load({ tran_id: tran_id }, { retry: 3 });
     }
     private async _load_payment_by_transaction_for_public(tran_id: string): Promise<vlib.Types.Optional<Payment, "billing_details">> {
         return Payment.anonymize(await this._load_payment_by_transaction(tran_id));
@@ -529,9 +510,9 @@ export class Paddle {
 
     // Delete all info of a user.
     async _delete_user(uid: string): Promise<void> {
-        await this._sub_db.delete_all({ uid });
-        await this._active_sub_db.delete_all({ uid });
-        await this._pay_db.delete_all({ uid });
+        await this._sub_db.delete_many({ uid });
+        await this._active_sub_db.delete_many({ uid });
+        await this._pay_db.delete_many({ uid });
         // await this._inv_db.delete_all({ uid });
     }
 
@@ -1043,8 +1024,9 @@ export class Paddle {
         /* @performance */ now = this.performance.end("init-products", now);
 
         // Check registered products.
-        const last_products = await this._last_products_db.load({ production: this.server.production, version: 1 });
-        if (last_products && vlib.Object.eq(last_products.last_products, this.products)) {
+        const last_products = await this._last_products_db.load({ production: this.server.production, version: 1 }, { throw: false });
+        if (last_products instanceof Error && !(last_products instanceof Collection.NotFoundError)) throw last_products;
+        if (!(last_products instanceof Collection.NotFoundError) && vlib.Object.eq(last_products.last_products, this.products)) {
             last_products.product_ids.iterate((item) => {
                 const product = this.get_product_sync(item.id);
                 if (product != null) {
@@ -1790,7 +1772,10 @@ export class Paddle {
     private async _create_webhook(): Promise<Endpoint.Opts> {
 
         // Register the webhook.
-        const webhook_doc = await this._webhook_conf_db.load({ production: this.server.production, version: 1 });
+        const webhook_doc = await this._webhook_conf_db.load({ production: this.server.production, version: 1 }, { throw: false });
+        if (webhook_doc instanceof Error && !(webhook_doc instanceof Collection.NotFoundError)) {
+            throw webhook_doc;
+        }
         const webhook_settings = {
             description: "volt webhook",
             destination: `${this.server.full_domain}/volt/payments/webhook`,
@@ -1831,7 +1816,7 @@ export class Paddle {
         }
 
         // Webhook registered.
-        if (webhook_doc != null) {
+        if (!(webhook_doc instanceof Collection.NotFoundError)) {
             this.webhook_key = webhook_doc.key;
 
             // Check update required.
@@ -2111,7 +2096,7 @@ export class Paddle {
         } else if (typeof status === "string") {
             query.status = status;
         }
-        const payments: Payment[] = await this._pay_db.list_query(query, { limit });
+        const payments: Payment[] = await this._pay_db.list(query, { limit });
 
         // Sort.
         payments.sort((a, b) => b.timestamp - a.timestamp);

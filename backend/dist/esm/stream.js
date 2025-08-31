@@ -671,8 +671,7 @@ export class Stream {
      * @param options The response options.
      * @param options.status The response status.
      * @param options.headers The response headers.
-     * @param options.body The response body.
-     * @param options.data The response data. (Deprecated.)
+     * @param options.data The data of the response body to send.
      * @param options.compress Whether the response should be gzip-compressed.
      * @example
      * ```ts
@@ -680,16 +679,11 @@ export class Stream {
      * ```
      * @docs
      */
-    send({ status = 200, headers = {}, data, body = data, // zero-copy pull in data
-    // body,data,
-    compress = false, } = {}) {
-        // if (data) {
-        //     body = data;
-        // }
-        /** @warning @todo  */
-        // compress = false; // @todo @tmp
+    send({ status = 200, headers = {}, data, compress = false, } = {}) {
         // Assign sent status code.
         this.status_code = status;
+        // The body to send as non `ResponseBody` type.
+        let body = data;
         // Convert body primitivies to string.
         if (typeof body === 'boolean' || typeof body === 'number') {
             body = body.toString();
@@ -804,8 +798,7 @@ export class Stream {
      * @param options The response options.
      * @param options.status The response status.
      * @param options.headers The response headers.
-     * @param options.body The response data.
-     * @param options.data The response data. (Deprecated.)
+     * @param options.data The data of the response body to send.
      * @param options.compress Whether the response should be gzip-compressed.
      * @example
      * ```ts
@@ -813,9 +806,9 @@ export class Stream {
      * ```
      * @docs
      */
-    success({ status = 200, headers = {}, body = undefined, data = undefined, compress = false } = {}) {
-        debug(3, "Sending [success] response: ", status, " - body: ", body ?? data);
-        return this.send({ status: status, headers: headers, body: body ?? data, compress: compress });
+    success({ status = 200, headers = {}, data, compress = false } = {}) {
+        debug(3, "Sending [success] response: ", status, " - body: ", data);
+        return this.send({ status, headers, data, compress });
     }
     // Send an error response.
     /**
@@ -828,14 +821,14 @@ export class Stream {
      * @param options.status The response status.
      * @param options.headers The response headers.
      * @param options.compress Whether the response should be gzip-compressed.
-     * @param options.data Optional data to include in the error response.
+     * @param options.data Optional data to include in the error response, nested in the JSON response under field `data`.
      * @example
      * ```ts
      * stream.error({ message: "Some error occurred", status: 400 });
      * ```
      * @docs
      */
-    error({ message, type = "APIError", invalid_fields = {}, status = 500, headers = {}, compress = false, data = undefined, }) {
+    error({ message, type = "APIError", invalid_fields = {}, status = 500, headers = {}, compress = false, data, }) {
         debug(3, "Sending [error] response: ", status, " - message: ", message);
         const api_error = {
             error: {
@@ -844,9 +837,9 @@ export class Stream {
                 status,
                 invalid_fields,
             },
-            data: data,
+            data,
         };
-        return this.send({ status: status, headers: headers, compress: compress, body: api_error });
+        return this.send({ status, headers, compress, data: api_error });
     }
     // Set headers.
     /**
