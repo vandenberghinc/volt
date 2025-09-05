@@ -12,7 +12,7 @@ import * as vlib from "@vandenberghinc/vlib";
 import type { Database } from "./database.js";
 import { StrictFilter, StrictUpdateFilter } from "./filters/filters.js";
 import { FlattenToDotNotation, flatten } from "./flatten.js";
-import { InvalidUsageError } from '../errors.js';
+import { InvalidUsageError } from '../errors/index.js';
 
 // ---------------------------------------------------------
 // The collection class.
@@ -65,8 +65,11 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
     /** Enable sliding ttl (refreshes ttl on update), or static ttl (sets ttl on insert) */
     readonly sliding_ttl: boolean;
 
-    /** The temporary indexes passed to the constructor for the init method. */
-    protected readonly _init_indexes?: (string | Collection.IndexOpts)[];
+    /**
+     * The temporary indexes passed to the constructor for the init method.
+     * @note This is not private so it can be updated by {@link QuotaManager}.
+     */
+    _init_indexes?: (string | Collection.IndexOpts)[];
 
     /** The MongoDB client session for transaction support. */
     protected _session?: mongodb.ClientSession;
@@ -1750,10 +1753,10 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
      */
     async set<
-        Bulk extends boolean | undefined = undefined,
-        Return extends boolean | undefined = undefined,
-        Throw extends boolean | undefined = undefined,
-        Upsert extends boolean | undefined = undefined,
+        Bulk extends Collection.SetOpts.Bulk = undefined,
+        Return extends Collection.SetOpts.Return = undefined,
+        Throw extends Collection.SetOpts.Throw = undefined,
+        Upsert extends Collection.SetOpts.Upsert = undefined,
     >(
         query: Collection.Query<Data>,
         content: Partial<Data> | Partial<FlattenToDotNotation<Data>>,
@@ -1797,10 +1800,10 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
      */
     async save<
-        Bulk extends boolean | undefined = undefined,
-        Return extends boolean | undefined = undefined,
-        Throw extends boolean | undefined = undefined,
-        Upsert extends boolean | undefined = undefined,
+        Bulk extends Collection.SaveOpts.Bulk = undefined,
+        Return extends Collection.SaveOpts.Return = undefined,
+        Throw extends Collection.SaveOpts.Throw = undefined,
+        Upsert extends Collection.SaveOpts.Upsert = undefined,
     >(
         query: Collection.Query<Data>,
         operation: StrictUpdateFilter<Data> | mongodb.Document[], // @todo add strict pipeline type.
@@ -3874,7 +3877,7 @@ export namespace Collection {
      * @template PossibleErrors The errors that are returned if `Throw` is `false`.
      * @template NoThrowType The type when `Throw` is `false`.
      */
-    type WithThrow<
+    export type WithThrow<
         Throw extends boolean | undefined,
         PossibleErrors extends Error,
         NoThrowType,
@@ -4220,10 +4223,10 @@ export namespace Collection {
      *                     Defaults to `true`.
      */
     export type SaveOpts<
-        Bulk extends boolean | undefined = undefined,
-        Return extends boolean | undefined = undefined,
-        Throw extends boolean | undefined = undefined,
-        Upsert extends boolean | undefined = undefined
+        Bulk extends SaveOpts.Bulk = undefined,
+        Return extends SaveOpts.Return = undefined,
+        Throw extends SaveOpts.Throw = undefined,
+        Upsert extends SaveOpts.Upsert = undefined
     > = Bulk extends true // false by default.
         ? { bulk: Bulk; return?: never; throw?: never; upsert?: Upsert; retry?: never; timeout?: never; apply_ttl?: never }
         : Return extends true // false by default.
@@ -4232,15 +4235,29 @@ export namespace Collection {
                 : { bulk?: false; return: Return; throw?: Throw; upsert?: Upsert; retry?: number | Retry.Opts; timeout?: number; apply_ttl?: boolean }
             : { bulk?: false; return?: false; throw?: Throw; upsert?: Upsert; retry?: number | Retry.Opts; timeout?: number; apply_ttl?: boolean };    
     
+    /** Nested types for the {@link LoadOpts} interface. */
+    export namespace SaveOpts {
+        /** The default value for the `Data` template of {@link SaveOpts} */
+        export type Data = mongodb.Document;
+        /** The default value for the `Bulk` template of {@link SaveOpts} */
+        export type Bulk = boolean | undefined;
+        /** The default value for the `Return` template of {@link SaveOpts} */
+        export type Return = boolean | undefined;
+        /** The default value for the `Throw` template of {@link SaveOpts} */
+        export type Throw = boolean | undefined;
+        /** The default value for the `Upsert` template of {@link SaveOpts} */
+        export type Upsert = boolean | undefined;
+    }
+    
     /**
      * The return type of {@link Collection.save}.
      * @note `Error` is also a returned type since some other errors might be thrown as well.
      */
     export type SaveResult<
-        Data extends mongodb.Document = mongodb.Document,
-        Bulk extends boolean | undefined = undefined,
-        Return extends boolean | undefined = undefined,
-        Throw extends boolean | undefined = undefined,
+        Data extends SaveOpts.Data = SaveOpts.Data,
+        Bulk extends SaveOpts.Bulk = undefined,
+        Return extends SaveOpts.Return = undefined,
+        Throw extends SaveOpts.Throw = undefined,
     > = Bulk extends true // false by default.
         ? mongodb.AnyBulkWriteOperation<Data>
         : Return extends true // false by default.
@@ -4253,21 +4270,35 @@ export namespace Collection {
     
     /** The options (third arg) for {@link Collection.set} */
     export type SetOpts<
-        Bulk extends boolean | undefined = undefined,
-        Return extends boolean | undefined = undefined,
-        Throw extends boolean | undefined = undefined,
-        Upsert extends boolean | undefined = undefined
+        Bulk extends SetOpts.Bulk = undefined,
+        Return extends SetOpts.Return = undefined,
+        Throw extends SetOpts.Throw = undefined,
+        Upsert extends SetOpts.Upsert = undefined
     > = SaveOpts<Bulk, Return, Throw, Upsert> & {
         /** If true, the operation will flatten the input data to a dot nested notation. */
         flatten?: boolean;
     }
 
+    /** Nested types for the {@link SetOpts} interface. */
+    export namespace SetOpts {
+        /** The default value for the `Data` template of {@link SetOpts} */
+        export type Data = mongodb.Document;
+        /** The default value for the `Bulk` template of {@link SetOpts} */
+        export type Bulk = boolean | undefined;
+        /** The default value for the `Return` template of {@link SetOpts} */
+        export type Return = boolean | undefined;
+        /** The default value for the `Throw` template of {@link SetOpts} */
+        export type Throw = boolean | undefined;
+        /** The default value for the `Upsert` template of {@link SetOpts} */
+        export type Upsert = boolean | undefined;
+    }
+
     /** The return type of {@link Collection.set}. */
     export type SetResult<
         Data extends mongodb.Document = mongodb.Document,
-        Bulk extends boolean | undefined = undefined,
-        Return extends boolean | undefined = undefined,
-        Throw extends boolean | undefined = undefined,
+        Bulk extends SetOpts.Bulk = undefined,
+        Return extends SetOpts.Return = undefined,
+        Throw extends SetOpts.Throw = undefined,
     > = SaveResult<Data, Bulk, Return, Throw>;
 
     // -------------------------------------------------------------------

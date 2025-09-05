@@ -565,3 +565,30 @@ function genericSaveRepro<Data extends mongodb.Document>(
 //     };
 //     void x;
 // }
+
+// --------------------------------------
+// Errors encountered in Quota
+
+export interface Query<Type extends string> {
+    uid: string;
+    type: Type;
+    name: string;
+}
+type Quota = {
+    max: number;
+    interval: number;
+    start: number;
+    usage: number;
+}
+type QuotaDocument<Type extends string> = Query<Type> & Quota;
+
+const ok_query: StrictUpdateFilter<QuotaDocument<'my-project'>> = {
+    $set: {
+        max: 0,
+        interval: 0,
+    },
+    $setOnInsert: {
+        usage: 0,
+        start: 0,
+    },
+};

@@ -392,15 +392,14 @@ function genericSaveRepro(filter, op) {
         $currentDate: { "name": true },
     };
 }
+const ok_query = {
+    $set: {
+        max: 0,
+        interval: 0,
+    },
+    $setOnInsert: {
+        usage: 0,
+        start: 0,
+    },
+};
 export {};
-// DOES NOT PASS THE FOLLOWING BECAUSE OF TEMPLATE.
-// function forcesRealCheck<Data extends mongodb.Document>(
-//     filter: mongodb.Filter<Data>,
-//     op: StrictUpdateFilter<Data>
-// ) {
-//     // 🔴 This mirrors collection.ts exactly
-//     const x: mongodb.AnyBulkWriteOperation<Data> = {
-//         updateOne: { filter, update: op, upsert: true },
-//     };
-//     void x;
-// }

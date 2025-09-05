@@ -7,7 +7,7 @@
 // Exports.
 
 // Create volt lib.
-export * from "./errors.js"
+export * from "./errors/index.js"
 export { ExternalError, InternalError } from "./utils.js"
 export * from "./status.js"
 export * from "./meta.js"
@@ -19,6 +19,8 @@ export * from "./server.js"
 export * from "./database/database.js"
 export * from "./database/document.js"
 export * from "./database/collection.js"
+export * from "./database/quota/quota.js"
+export * from "./database/quota/safe_int.js"
 export * from "./rate_limit.js"
 export * from "./logger.js"
 // export * from "./file_watcher.js"

@@ -5,7 +5,7 @@
 import * as mongodb from 'mongodb';
 import * as vlib from "@vandenberghinc/vlib";
 import { flatten } from "./flatten.js";
-import { InvalidUsageError } from '../errors.js';
+import { InvalidUsageError } from '../errors/index.js';
 // ---------------------------------------------------------
 // The collection class.
 // ---------------------------------------------------------
@@ -48,7 +48,10 @@ export class Collection {
     ttl_enabled;
     /** Enable sliding ttl (refreshes ttl on update), or static ttl (sets ttl on insert) */
     sliding_ttl;
-    /** The temporary indexes passed to the constructor for the init method. */
+    /**
+     * The temporary indexes passed to the constructor for the init method.
+     * @note This is not private so it can be updated by {@link QuotaManager}.
+     */
     _init_indexes;
     /** The MongoDB client session for transaction support. */
     _session;

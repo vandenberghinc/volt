@@ -34,7 +34,7 @@ module.exports = __toCommonJS(stdin_exports);
 var mongodb = __toESM(require("mongodb"));
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var import_flatten = require("./flatten.js");
-var import_errors = require("../errors.js");
+var import_errors = require("../errors/index.js");
 class Collection {
   /** Collection name */
   name;
@@ -57,7 +57,10 @@ class Collection {
   ttl_enabled;
   /** Enable sliding ttl (refreshes ttl on update), or static ttl (sets ttl on insert) */
   sliding_ttl;
-  /** The temporary indexes passed to the constructor for the init method. */
+  /**
+   * The temporary indexes passed to the constructor for the init method.
+   * @note This is not private so it can be updated by {@link QuotaManager}.
+   */
   _init_indexes;
   /** The MongoDB client session for transaction support. */
   _session;

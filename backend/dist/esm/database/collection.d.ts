@@ -46,8 +46,11 @@ export declare class Collection<Data extends mongodb.Document = mongodb.Document
     readonly ttl_enabled: boolean;
     /** Enable sliding ttl (refreshes ttl on update), or static ttl (sets ttl on insert) */
     readonly sliding_ttl: boolean;
-    /** The temporary indexes passed to the constructor for the init method. */
-    protected readonly _init_indexes?: (string | Collection.IndexOpts)[];
+    /**
+     * The temporary indexes passed to the constructor for the init method.
+     * @note This is not private so it can be updated by {@link QuotaManager}.
+     */
+    _init_indexes?: (string | Collection.IndexOpts)[];
     /** The MongoDB client session for transaction support. */
     protected _session?: mongodb.ClientSession;
     /**
@@ -405,7 +408,7 @@ export declare class Collection<Data extends mongodb.Document = mongodb.Document
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
      */
-    set<Bulk extends boolean | undefined = undefined, Return extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined, Upsert extends boolean | undefined = undefined>(query: Collection.Query<Data>, content: Partial<Data> | Partial<FlattenToDotNotation<Data>>, opts?: Collection.SetOpts<Bulk, Return, Throw, Upsert>): Promise<Collection.SetResult<Data, Bulk, Return, Throw>>;
+    set<Bulk extends Collection.SetOpts.Bulk = undefined, Return extends Collection.SetOpts.Return = undefined, Throw extends Collection.SetOpts.Throw = undefined, Upsert extends Collection.SetOpts.Upsert = undefined>(query: Collection.Query<Data>, content: Partial<Data> | Partial<FlattenToDotNotation<Data>>, opts?: Collection.SetOpts<Bulk, Return, Throw, Upsert>): Promise<Collection.SetResult<Data, Bulk, Return, Throw>>;
     /**
      * Save a single document without performing any default `$set` or `$inc` like operations.
      * When a document does not exist it will automatically be created unless `opts.upsert === false`.
@@ -428,7 +431,7 @@ export declare class Collection<Data extends mongodb.Document = mongodb.Document
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
      */
-    save<Bulk extends boolean | undefined = undefined, Return extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined, Upsert extends boolean | undefined = undefined>(query: Collection.Query<Data>, operation: StrictUpdateFilter<Data> | mongodb.Document[], // @todo add strict pipeline type.
+    save<Bulk extends Collection.SaveOpts.Bulk = undefined, Return extends Collection.SaveOpts.Return = undefined, Throw extends Collection.SaveOpts.Throw = undefined, Upsert extends Collection.SaveOpts.Upsert = undefined>(query: Collection.Query<Data>, operation: StrictUpdateFilter<Data> | mongodb.Document[], // @todo add strict pipeline type.
     opts?: Collection.SaveOpts<Bulk, Return, Throw, Upsert>): Promise<Collection.SaveResult<Data, Bulk, Return, Throw>>;
     /**
      * Save multiple documents without performing any default `$set` or `$inc` operations.
@@ -669,7 +672,7 @@ export declare class Collection<Data extends mongodb.Document = mongodb.Document
 /** Nested types for the {@link Collection} class. */
 export declare namespace Collection {
     /** The constructor options for {@link Collection}. */
-    export interface Opts<Data extends mongodb.Document = mongodb.Document> {
+    interface Opts<Data extends mongodb.Document = mongodb.Document> {
         /** The name of the collection. */
         name: string;
         /** The MongoDB collection instance. */
@@ -744,19 +747,19 @@ export declare namespace Collection {
      * The type for the {@link Opts.on_transform_version} and {@link Collection.on_transform_version} callback.
      * @note The input `data` may be an older document shape that does not match {@link Data}.
      */
-    export type OnTransformVersion<Data extends mongodb.Document> = <Projection extends Collection.LoadOpts.Projection>(data: Record<string, any>, opts: {
+    type OnTransformVersion<Data extends mongodb.Document> = <Projection extends Collection.LoadOpts.Projection>(data: Record<string, any>, opts: {
         from_version: undefined | number;
         to_version: number;
         projection: Projection;
         is_partial: Projection extends undefined ? false : true;
     }) => WithProjection<Projection, Data> | Promise<WithProjection<Projection, Data>>;
     /** The type for the {@link Opts.on_load} and {@link Collection.on_load_cb} callback */
-    export type OnLoad<Data extends mongodb.Document> = <Projection extends Collection.LoadOpts.Projection>(data: WithProjection<Projection, Data>, opts: {
+    type OnLoad<Data extends mongodb.Document> = <Projection extends Collection.LoadOpts.Projection>(data: WithProjection<Projection, Data>, opts: {
         projection: Projection;
         is_partial: Projection extends undefined ? false : true;
     }) => WithProjection<Projection, Data> | Promise<WithProjection<Projection, Data>>;
     /** Index options for {@link Collection.create_index}. */
-    export type IndexOpts = {
+    type IndexOpts = {
         /**
          * Creates a unique index.
          * @warning An error will be thrown both when `unique` and `options.unique` are booleans with different values.
@@ -785,9 +788,9 @@ export declare namespace Collection {
      * @note Keep this as a simple alias for now in case we want to build in a
      *       `QueryByStrict<Data, Strict extends boolean>` like type to support strict and non strict.
      */
-    export type Query<Data extends mongodb.Document> = StrictFilter<Data>;
+    type Query<Data extends mongodb.Document> = StrictFilter<Data>;
     /** Mini module for managing retry attempts. */
-    export namespace Retry {
+    namespace Retry {
         /**
          * Retry options for database operations such as {@link Collection.save}.
          *
@@ -864,7 +867,7 @@ export declare namespace Collection {
     /**
      * Options for {@link Collection.count} and {@link Collection.count_estimated}.
      */
-    export interface CountOpts<Throw extends CountOpts.Throw = undefined> {
+    interface CountOpts<Throw extends CountOpts.Throw = undefined> {
         /**
          * When false, the operation will **not throw** on count-related failures.
          * Instead, it will return a {@link Collection.CountError}.
@@ -881,7 +884,7 @@ export declare namespace Collection {
         timeout?: number;
     }
     /** The nested types for {@link CountOpts}. */
-    export namespace CountOpts {
+    namespace CountOpts {
         /** The default value for the `Throw` template of {@link CountOpts}. */
         type Throw = boolean | undefined;
     }
@@ -889,9 +892,9 @@ export declare namespace Collection {
      * The return type of {@link Collection.count} and {@link Collection.count_estimated}.
      * @note `Error` is also a returned type since other errors might be thrown as well.
      */
-    export type CountResult<Throw extends CountOpts.Throw = undefined> = WithThrow<Throw, Collection.CountError | Error, number>;
+    type CountResult<Throw extends CountOpts.Throw = undefined> = WithThrow<Throw, Collection.CountError | Error, number>;
     /** The options for {@link Collection.list} and alike */
-    export interface ListOpts<Data extends ListOpts.Data = ListOpts.Data, Projection extends ListOpts.Projection = undefined, Throw extends ListOpts.Throw = undefined, Cursor extends ListOpts.Cursor = undefined, Callback extends Collection.ListOpts.Callback<Data, Projection> = undefined, PageInfo extends ListOpts.PageInfo = undefined> {
+    interface ListOpts<Data extends ListOpts.Data = ListOpts.Data, Projection extends ListOpts.Projection = undefined, Throw extends ListOpts.Throw = undefined, Cursor extends ListOpts.Cursor = undefined, Callback extends Collection.ListOpts.Callback<Data, Projection> = undefined, PageInfo extends ListOpts.PageInfo = undefined> {
         /**
          * The attributes to include (1) or exclude (0) from the document.
          * Mixing inclusion and exclusion patterns is not allowed, following mongodb rules.
@@ -957,14 +960,14 @@ export declare namespace Collection {
         page_info?: Cursor extends false | undefined ? Callback extends undefined ? PageInfo : never : never;
     }
     /** A per-document streaming callback for {@link Collection.list}. */
-    export type ListCallback<Data extends ListOpts.Data = ListOpts.Data, Projection extends ListOpts.Projection = undefined> = (
+    type ListCallback<Data extends ListOpts.Data = ListOpts.Data, Projection extends ListOpts.Projection = undefined> = (
     /**
      * A single document from the result set.
      * Type: {@link WithProjection} of the collection's {@link Data} with {@link WithId}.
      */
     doc: WithProjection<Projection, WithId<Data>>) => void | Promise<void>;
     /** Nested types for the {@link ListOpts} */
-    export namespace ListOpts {
+    namespace ListOpts {
         /** The default value for the `Data` template of {@link ListOpts} */
         type Data = mongodb.Document;
         /** The default value for the `Projection` template of {@link ListOpts} */
@@ -979,7 +982,7 @@ export declare namespace Collection {
         type PageInfo = boolean | undefined;
     }
     /** The returned page information. */
-    export interface ListedPage<T> {
+    interface ListedPage<T> {
         /** The returned documents. */
         items: T[];
         /** Still has more documents. */
@@ -989,9 +992,9 @@ export declare namespace Collection {
      * The return type of {@link Collection.list} and alike
      * @note `Error` is also a returned type since some other errors might be thrown as well.
      */
-    export type ListResult<Data extends ListOpts.Data = ListOpts.Data, Projection extends ListOpts.Projection = undefined, Throw extends ListOpts.Throw = undefined, Cursor extends ListOpts.Cursor = undefined, Callback extends ListOpts.Callback<Data, Projection> = undefined, PageInfo extends ListOpts.PageInfo = undefined> = WithThrow<Throw, Collection.ListError | Error, (Cursor extends true ? mongodb.FindCursor<WithProjection<Projection, WithId<Data>>> : Callback extends ListCallback<Data, Projection> ? undefined : PageInfo extends true ? ListedPage<WithProjection<Projection, WithId<Data>>> : WithProjection<Projection, WithId<Data>>[])>;
+    type ListResult<Data extends ListOpts.Data = ListOpts.Data, Projection extends ListOpts.Projection = undefined, Throw extends ListOpts.Throw = undefined, Cursor extends ListOpts.Cursor = undefined, Callback extends ListOpts.Callback<Data, Projection> = undefined, PageInfo extends ListOpts.PageInfo = undefined> = WithThrow<Throw, Collection.ListError | Error, (Cursor extends true ? mongodb.FindCursor<WithProjection<Projection, WithId<Data>>> : Callback extends ListCallback<Data, Projection> ? undefined : PageInfo extends true ? ListedPage<WithProjection<Projection, WithId<Data>>> : WithProjection<Projection, WithId<Data>>[])>;
     /** The options for {@link Collection.exist} */
-    export interface ExistsOpts<Throw extends ExistsOpts.Throw = undefined> {
+    interface ExistsOpts<Throw extends ExistsOpts.Throw = undefined> {
         /**
          * When false, the operation will **not throw** on exist-related failures.
          * Instead, it will return a {@link Collection.ExistsError}.
@@ -1008,7 +1011,7 @@ export declare namespace Collection {
         timeout?: number;
     }
     /** Nested types for the {@link ExistsOpts} */
-    export namespace ExistsOpts {
+    namespace ExistsOpts {
         /** The default value for the `Throw` template of {@link ExistsOpts} */
         type Throw = boolean | undefined;
     }
@@ -1016,9 +1019,9 @@ export declare namespace Collection {
      * The return type of {@link Collection.exists} and alike
      * @note `Error` is also a returned type since some other errors might be thrown as well.
      */
-    export type ExistsResult<Throw extends ExistsOpts.Throw = undefined> = WithThrow<Throw, ExistsError | Error, boolean>;
+    type ExistsResult<Throw extends ExistsOpts.Throw = undefined> = WithThrow<Throw, ExistsError | Error, boolean>;
     /** The options for {@link Collection.load} */
-    export interface LoadOpts<Data extends LoadOpts.Data = LoadOpts.Data, Default extends LoadOpts.Default<Data> = undefined, Projection extends LoadOpts.Projection = undefined, Throw extends LoadOpts.Throw = undefined> {
+    interface LoadOpts<Data extends LoadOpts.Data = LoadOpts.Data, Default extends LoadOpts.Default<Data> = undefined, Projection extends LoadOpts.Projection = undefined, Throw extends LoadOpts.Throw = undefined> {
         /**
          * The default data to be returned when the data does not exist.
          *
@@ -1052,7 +1055,7 @@ export declare namespace Collection {
         timeout?: number;
     }
     /** Nested types for the {@link LoadOpts} interface. */
-    export namespace LoadOpts {
+    namespace LoadOpts {
         /** The default value for the `Data` template of {@link LoadOpts} */
         type Data = mongodb.Document;
         /** The default value for the `Default` template of {@link LoadOpts} */
@@ -1063,12 +1066,12 @@ export declare namespace Collection {
         type Throw = boolean | undefined;
     }
     /** Helper type to return type unpack the default value type. */
-    export type UnpackedDefault<Data extends LoadOpts.Data, Default extends LoadOpts.Default<Data>> = Default extends () => infer R ? R : Default;
+    type UnpackedDefault<Data extends LoadOpts.Data, Default extends LoadOpts.Default<Data>> = Default extends () => infer R ? R : Default;
     /**
      * The return type of {@link Collection.load}
      * @note `Error` is also a returned type since some other errors might be thrown as well.
      */
-    export type LoadResult<Data extends LoadOpts.Data = LoadOpts.Data, Default extends LoadOpts.Default<Data> = undefined, Projection extends LoadOpts.Projection = undefined, Throw extends LoadOpts.Throw = undefined> = Default extends undefined ? WithThrow<Throw, Collection.NotFoundError | Collection.LoadError | Error, WithProjection<Projection, WithId<Data>>> : WithThrow<Throw, Collection.LoadError | Error, WithProjection<Projection, WithId<Data>> | WithId<UnpackedDefault<Data, Default>>>;
+    type LoadResult<Data extends LoadOpts.Data = LoadOpts.Data, Default extends LoadOpts.Default<Data> = undefined, Projection extends LoadOpts.Projection = undefined, Throw extends LoadOpts.Throw = undefined> = Default extends undefined ? WithThrow<Throw, Collection.NotFoundError | Collection.LoadError | Error, WithProjection<Projection, WithId<Data>>> : WithThrow<Throw, Collection.LoadError | Error, WithProjection<Projection, WithId<Data>> | WithId<UnpackedDefault<Data, Default>>>;
     /**
      * Options for the save operation.
      *
@@ -1087,7 +1090,7 @@ export declare namespace Collection {
      *                     This behaviour only takes effect if the collection has TTL settings enabled.
      *                     Defaults to `true`.
      */
-    export type SaveOpts<Bulk extends boolean | undefined = undefined, Return extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined, Upsert extends boolean | undefined = undefined> = Bulk extends true ? {
+    type SaveOpts<Bulk extends SaveOpts.Bulk = undefined, Return extends SaveOpts.Return = undefined, Throw extends SaveOpts.Throw = undefined, Upsert extends SaveOpts.Upsert = undefined> = Bulk extends true ? {
         bulk: Bulk;
         return?: never;
         throw?: never;
@@ -1120,24 +1123,50 @@ export declare namespace Collection {
         timeout?: number;
         apply_ttl?: boolean;
     };
+    /** Nested types for the {@link LoadOpts} interface. */
+    namespace SaveOpts {
+        /** The default value for the `Data` template of {@link SaveOpts} */
+        type Data = mongodb.Document;
+        /** The default value for the `Bulk` template of {@link SaveOpts} */
+        type Bulk = boolean | undefined;
+        /** The default value for the `Return` template of {@link SaveOpts} */
+        type Return = boolean | undefined;
+        /** The default value for the `Throw` template of {@link SaveOpts} */
+        type Throw = boolean | undefined;
+        /** The default value for the `Upsert` template of {@link SaveOpts} */
+        type Upsert = boolean | undefined;
+    }
     /**
      * The return type of {@link Collection.save}.
      * @note `Error` is also a returned type since some other errors might be thrown as well.
      */
-    export type SaveResult<Data extends mongodb.Document = mongodb.Document, Bulk extends boolean | undefined = undefined, Return extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined> = Bulk extends true ? mongodb.AnyBulkWriteOperation<Data> : Return extends true ? WithThrow<Throw, Collection.SaveError | Error, WithId<Data>> : WithThrow<Throw, Collection.SaveError | Error, mongodb.UpdateResult<Data>>;
+    type SaveResult<Data extends SaveOpts.Data = SaveOpts.Data, Bulk extends SaveOpts.Bulk = undefined, Return extends SaveOpts.Return = undefined, Throw extends SaveOpts.Throw = undefined> = Bulk extends true ? mongodb.AnyBulkWriteOperation<Data> : Return extends true ? WithThrow<Throw, Collection.SaveError | Error, WithId<Data>> : WithThrow<Throw, Collection.SaveError | Error, mongodb.UpdateResult<Data>>;
     /** The options (third arg) for {@link Collection.set} */
-    export type SetOpts<Bulk extends boolean | undefined = undefined, Return extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined, Upsert extends boolean | undefined = undefined> = SaveOpts<Bulk, Return, Throw, Upsert> & {
+    type SetOpts<Bulk extends SetOpts.Bulk = undefined, Return extends SetOpts.Return = undefined, Throw extends SetOpts.Throw = undefined, Upsert extends SetOpts.Upsert = undefined> = SaveOpts<Bulk, Return, Throw, Upsert> & {
         /** If true, the operation will flatten the input data to a dot nested notation. */
         flatten?: boolean;
     };
+    /** Nested types for the {@link SetOpts} interface. */
+    namespace SetOpts {
+        /** The default value for the `Data` template of {@link SetOpts} */
+        type Data = mongodb.Document;
+        /** The default value for the `Bulk` template of {@link SetOpts} */
+        type Bulk = boolean | undefined;
+        /** The default value for the `Return` template of {@link SetOpts} */
+        type Return = boolean | undefined;
+        /** The default value for the `Throw` template of {@link SetOpts} */
+        type Throw = boolean | undefined;
+        /** The default value for the `Upsert` template of {@link SetOpts} */
+        type Upsert = boolean | undefined;
+    }
     /** The return type of {@link Collection.set}. */
-    export type SetResult<Data extends mongodb.Document = mongodb.Document, Bulk extends boolean | undefined = undefined, Return extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined> = SaveResult<Data, Bulk, Return, Throw>;
+    type SetResult<Data extends mongodb.Document = mongodb.Document, Bulk extends SetOpts.Bulk = undefined, Return extends SetOpts.Return = undefined, Throw extends SetOpts.Throw = undefined> = SaveResult<Data, Bulk, Return, Throw>;
     /** The additional return options for {@link SaveManyOpts.return} */
-    export type SaveManyReturnOpts = Omit<ListOpts, "throw" | "retry" | "timeout" | "cursor" | "page_info" | "callback">;
+    type SaveManyReturnOpts = Omit<ListOpts, "throw" | "retry" | "timeout" | "cursor" | "page_info" | "callback">;
     /**
      * Options for the {@link Collection.save_many} operation.
      */
-    export interface SaveManyOpts<Bulk extends boolean | undefined = undefined, Return extends boolean | undefined | SaveManyReturnOpts = undefined, Throw extends boolean | undefined = undefined, Upsert extends boolean | undefined = undefined> {
+    interface SaveManyOpts<Bulk extends boolean | undefined = undefined, Return extends boolean | undefined | SaveManyReturnOpts = undefined, Throw extends boolean | undefined = undefined, Upsert extends boolean | undefined = undefined> {
         /** If true, returns an unexecuted bulk operation object (`{ updateMany: ... }`). */
         bulk?: Bulk extends true ? Bulk : never;
         /**
@@ -1175,17 +1204,17 @@ export declare namespace Collection {
     /**
      * The return type of {@link Collection.save_many}.
      */
-    export type SaveManyResult<Data extends mongodb.Document = mongodb.Document, Bulk extends boolean | undefined = undefined, Return extends boolean | SaveManyReturnOpts | undefined = undefined, Throw extends boolean | undefined = undefined> = Bulk extends true ? mongodb.AnyBulkWriteOperation<Data> : (Return extends false | undefined ? WithThrow<Throw, Collection.SaveError | Error, mongodb.UpdateResult<Data>> : WithThrow<Throw, Collection.SaveError | Collection.ListError | Error, WithProjection<ExtractProjection<Return>, WithId<Data>>[]>);
+    type SaveManyResult<Data extends mongodb.Document = mongodb.Document, Bulk extends boolean | undefined = undefined, Return extends boolean | SaveManyReturnOpts | undefined = undefined, Throw extends boolean | undefined = undefined> = Bulk extends true ? mongodb.AnyBulkWriteOperation<Data> : (Return extends false | undefined ? WithThrow<Throw, Collection.SaveError | Error, mongodb.UpdateResult<Data>> : WithThrow<Throw, Collection.SaveError | Collection.ListError | Error, WithProjection<ExtractProjection<Return>, WithId<Data>>[]>);
     /** The options (third arg) for {@link Collection.replace} */
-    export type ReplaceOpts<Bulk extends boolean | undefined = undefined, Return extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined, Upsert extends boolean | undefined = undefined> = SaveOpts<Bulk, Return, Throw, Upsert>;
+    type ReplaceOpts<Bulk extends boolean | undefined = undefined, Return extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined, Upsert extends boolean | undefined = undefined> = SaveOpts<Bulk, Return, Throw, Upsert>;
     /** The return type of {@link Collection.replace}. */
-    export type ReplaceResult<Data extends mongodb.Document = mongodb.Document, Bulk extends boolean | undefined = undefined, Return extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined> = SaveResult<Data, Bulk, Return, Throw>;
+    type ReplaceResult<Data extends mongodb.Document = mongodb.Document, Bulk extends boolean | undefined = undefined, Return extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined> = SaveResult<Data, Bulk, Return, Throw>;
     /** The options for {@link Collection.replace_many} */
-    export type ReplaceManyOpts<Bulk extends boolean | undefined = undefined, Return extends boolean | undefined | SaveManyReturnOpts = undefined, Throw extends boolean | undefined = undefined, Upsert extends boolean | undefined = undefined> = SaveManyOpts<Bulk, Return, Throw, Upsert>;
+    type ReplaceManyOpts<Bulk extends boolean | undefined = undefined, Return extends boolean | undefined | SaveManyReturnOpts = undefined, Throw extends boolean | undefined = undefined, Upsert extends boolean | undefined = undefined> = SaveManyOpts<Bulk, Return, Throw, Upsert>;
     /** The return type of {@link Collection.replace_many} */
-    export type ReplaceManyResult<Data extends mongodb.Document = mongodb.Document, Bulk extends boolean | undefined = undefined, Return extends boolean | SaveManyReturnOpts | undefined = undefined, Throw extends boolean | undefined = undefined> = SaveManyResult<Data, Bulk, Return, Throw>;
+    type ReplaceManyResult<Data extends mongodb.Document = mongodb.Document, Bulk extends boolean | undefined = undefined, Return extends boolean | SaveManyReturnOpts | undefined = undefined, Throw extends boolean | undefined = undefined> = SaveManyResult<Data, Bulk, Return, Throw>;
     /** The options for {@link Collection.delete} */
-    export interface DeleteOpts<Bulk extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined> {
+    interface DeleteOpts<Bulk extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined> {
         /** If true, the operation will return a non executed bulk operation object. */
         bulk?: Bulk;
         /**
@@ -1204,13 +1233,13 @@ export declare namespace Collection {
         timeout?: number;
     }
     /** The return type of {@link Collection.delete} */
-    export type DeleteResult<Data extends mongodb.Document = mongodb.Document, Bulk extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined> = Bulk extends true ? mongodb.AnyBulkWriteOperation<Data> : WithThrow<Throw, DeleteError | Error, mongodb.DeleteResult>;
+    type DeleteResult<Data extends mongodb.Document = mongodb.Document, Bulk extends boolean | undefined = undefined, Throw extends boolean | undefined = undefined> = Bulk extends true ? mongodb.AnyBulkWriteOperation<Data> : WithThrow<Throw, DeleteError | Error, mongodb.DeleteResult>;
     /** The options for {@link Collection.delete_collection} */
-    export type DeleteCollectionOpts<Throw extends boolean | undefined = undefined> = Pick<DeleteOpts<false, Throw>, "retry" | "throw" | "timeout">;
+    type DeleteCollectionOpts<Throw extends boolean | undefined = undefined> = Pick<DeleteOpts<false, Throw>, "retry" | "throw" | "timeout">;
     /** The return type of {@link Collection.delete_collection} */
-    export type DeleteCollectionResult<Throw extends boolean | undefined = undefined> = WithThrow<Throw, DeleteError | Error, undefined>;
+    type DeleteCollectionResult<Throw extends boolean | undefined = undefined> = WithThrow<Throw, DeleteError | Error, undefined>;
     /** The options for {@link Collection.bulk_operations} */
-    export interface BulkOpts<Throw extends boolean | undefined = undefined> {
+    interface BulkOpts<Throw extends boolean | undefined = undefined> {
         /**
          * Optional bounded retry attempts for retryable errors (e.g., transient/network).
          * Retries use exponential backoff. Defaults to `1` (no retry).
@@ -1227,9 +1256,9 @@ export declare namespace Collection {
         timeout?: number;
     }
     /** The return type of {@link Collection.bulk_operations} */
-    export type BulkResult<Throw extends boolean | undefined = undefined> = WithThrow<Throw, BulkError | Error, mongodb.BulkWriteResult>;
+    type BulkResult<Throw extends boolean | undefined = undefined> = WithThrow<Throw, BulkError | Error, mongodb.BulkWriteResult>;
     /** The options for {@link Collection.aggregate} */
-    export interface AggregateOpts<Throw extends boolean | undefined = undefined, Cursor extends boolean | undefined = undefined> {
+    interface AggregateOpts<Throw extends boolean | undefined = undefined, Cursor extends boolean | undefined = undefined> {
         /**
          * Optional bounded retry attempts for retryable errors (e.g., transient/network).
          * Retries use exponential backoff. Defaults to `1` (no retry).
@@ -1253,9 +1282,9 @@ export declare namespace Collection {
         timeout?: number;
     }
     /** The return type of {@link Collection.aggregate} */
-    export type AggregateResult<Data extends mongodb.Document = mongodb.Document, Throw extends boolean | undefined = undefined, Cursor extends boolean | undefined = undefined> = WithThrow<Throw, AggregateError | Error, (Cursor extends true ? mongodb.AggregationCursor<Data> : Data[])>;
+    type AggregateResult<Data extends mongodb.Document = mongodb.Document, Throw extends boolean | undefined = undefined, Cursor extends boolean | undefined = undefined> = WithThrow<Throw, AggregateError | Error, (Cursor extends true ? mongodb.AggregationCursor<Data> : Data[])>;
     /** The base error for {@link NotFoundError}, {@link DeleteError} etc. */
-    export class OperationError extends Error implements OperationError.Opts {
+    class OperationError extends Error implements OperationError.Opts {
         /** The error message. */
         message: string;
         query: Record<string, any> | Record<string, any>[];
@@ -1266,7 +1295,7 @@ export declare namespace Collection {
         constructor(opts: OperationError.Opts);
     }
     /** The nested types for {@link BaseError} */
-    export namespace OperationError {
+    namespace OperationError {
         /** The constructor options for {@link BaseError} */
         interface Opts {
             /** The new error message. */
@@ -1292,7 +1321,7 @@ export declare namespace Collection {
      * Error thrown when a document is not found.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class NotFoundError extends OperationError {
+    class NotFoundError extends OperationError {
         /**
          * Constructor method.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1303,7 +1332,7 @@ export declare namespace Collection {
      * Error thrown when a {@link Collection.Opts.on_transform_version} callback fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class OnTransformError extends OperationError {
+    class OnTransformError extends OperationError {
         /**
          * Constructor method.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1314,7 +1343,7 @@ export declare namespace Collection {
      * Error thrown when a {@link Collection.Opts.on_load} callback fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class OnLoadError extends OperationError {
+    class OnLoadError extends OperationError {
         /**
          * Constructor method.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1325,7 +1354,7 @@ export declare namespace Collection {
      * Error thrown when a count operation fails.
      * This error extends {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class CountError extends OperationError {
+    class CountError extends OperationError {
         /**
          * Construct a {@link CountError}.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1336,7 +1365,7 @@ export declare namespace Collection {
      * Error thrown when a list operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class ListError extends OperationError {
+    class ListError extends OperationError {
         /**
          * Constructor method.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1347,7 +1376,7 @@ export declare namespace Collection {
      * Error thrown when a load operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class ExistsError extends OperationError {
+    class ExistsError extends OperationError {
         /**
          * Constructor method.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1358,7 +1387,7 @@ export declare namespace Collection {
      * Error thrown when a load operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class LoadError extends OperationError {
+    class LoadError extends OperationError {
         /**
          * Constructor method.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1369,7 +1398,7 @@ export declare namespace Collection {
      * Error thrown when a save operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class SaveError extends OperationError {
+    class SaveError extends OperationError {
         /**
          * Constructor method.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1380,7 +1409,7 @@ export declare namespace Collection {
      * Error thrown when a delete operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class DeleteError extends OperationError {
+    class DeleteError extends OperationError {
         /**
          * Constructor method.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1391,7 +1420,7 @@ export declare namespace Collection {
      * Error thrown when a bulk operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class BulkError extends OperationError {
+    class BulkError extends OperationError {
         /**
          * Constructor method.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1402,7 +1431,7 @@ export declare namespace Collection {
      * Error thrown when an aggregate operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
      */
-    export class AggregateError extends OperationError {
+    class AggregateError extends OperationError {
         /**
          * Constructor method.
          * @param opts The error options, see {@link OperationError.Opts}.
@@ -1413,9 +1442,9 @@ export declare namespace Collection {
      * The attributes to include (1) or exclude (0) from the loaded document in a database query.
      * Mixing inclusion and exclusion patterns is not allowed, following mongodb rules.
      */
-    export type Projection = readonly string[] | Record<string, number | boolean>;
+    type Projection = readonly string[] | Record<string, number | boolean>;
     /** The nested types for the {@link Projection} type. */
-    export namespace Projection {
+    namespace Projection {
         /**
          * Convert a projection query into a MongoDB-compatible format.
          * @throws An error if both inclusion (1) and exclusion (0) patterns are found,
@@ -1447,7 +1476,7 @@ export declare namespace Collection {
      * The projected fields are included as is, and the non included fields
      * are included as optional, since {@link LoadOpts.default} may add them.
      */
-    export type Projected<Projection extends Collection.Projection, Data extends mongodb.Document> = Projection extends readonly [] ? WithId<Data> : [
+    type Projected<Projection extends Collection.Projection, Data extends mongodb.Document> = Projection extends readonly [] ? WithId<Data> : [
         keyof Projection
     ] extends [never] ? WithId<Data> : Partial<Omit<WithId<Data>, Projection.IncludedKeysFor<Data, Projection>>> & Pick<WithId<Data>, Extract<Projection.IncludedKeysFor<Data, Projection>, keyof WithId<Data>>>;
     /**
@@ -1461,12 +1490,11 @@ export declare namespace Collection {
      * @template Projection The throw generic, defaults to `undefined`.
      * @template Data The document data type.
      */
-    export type WithProjection<Projection extends Collection.Projection | undefined, Data extends mongodb.Document> = Projection extends Collection.Projection ? Projected<Projection, Data> : Data;
+    type WithProjection<Projection extends Collection.Projection | undefined, Data extends mongodb.Document> = Projection extends Collection.Projection ? Projected<Projection, Data> : Data;
     /** Extract the projection field from a type. */
-    export type ExtractProjection<R> = R extends {
+    type ExtractProjection<R> = R extends {
         projection?: infer P extends undefined | Collection.Projection;
     } ? P : undefined;
-    export {};
 }
 /**
  * TransactionCollection extends Collection with transaction-specific methods.

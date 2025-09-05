@@ -33,7 +33,7 @@ __export(stdin_exports, {
   Mail: () => Mail
 });
 module.exports = __toCommonJS(stdin_exports);
-__reExport(stdin_exports, require("./errors.js"), module.exports);
+__reExport(stdin_exports, require("./errors/index.js"), module.exports);
 var import_utils = require("./utils.js");
 __reExport(stdin_exports, require("./status.js"), module.exports);
 __reExport(stdin_exports, require("./meta.js"), module.exports);
@@ -45,6 +45,8 @@ __reExport(stdin_exports, require("./server.js"), module.exports);
 __reExport(stdin_exports, require("./database/database.js"), module.exports);
 __reExport(stdin_exports, require("./database/document.js"), module.exports);
 __reExport(stdin_exports, require("./database/collection.js"), module.exports);
+__reExport(stdin_exports, require("./database/quota/quota.js"), module.exports);
+__reExport(stdin_exports, require("./database/quota/safe_int.js"), module.exports);
 __reExport(stdin_exports, require("./rate_limit.js"), module.exports);
 __reExport(stdin_exports, require("./logger.js"), module.exports);
 var Mail = __toESM(require("./plugins/mail/ui.js"));
@@ -54,7 +56,7 @@ __reExport(stdin_exports, require("./frontend.js"), module.exports);
   ExternalError,
   InternalError,
   Mail,
-  ...require("./errors.js"),
+  ...require("./errors/index.js"),
   ...require("./status.js"),
   ...require("./meta.js"),
   ...require("./splash_screen.js"),
@@ -65,6 +67,8 @@ __reExport(stdin_exports, require("./frontend.js"), module.exports);
   ...require("./database/database.js"),
   ...require("./database/document.js"),
   ...require("./database/collection.js"),
+  ...require("./database/quota/quota.js"),
+  ...require("./database/quota/safe_int.js"),
   ...require("./rate_limit.js"),
   ...require("./logger.js"),
   ...require("./frontend.js")
