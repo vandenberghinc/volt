@@ -110,9 +110,10 @@ export module Protocol {
 - from 'live' to 'root': attributes which apply to nodes in live regions
 - from 'autocomplete' to 'valuetext': attributes which apply to widgets
 - from 'checked' to 'selected': states which apply to widgets
-- from 'activedescendant' to 'owns' - relationships between elements other than parent/child/sibling.
+- from 'activedescendant' to 'owns': relationships between elements other than parent/child/sibling
+- from 'activeFullscreenElement' to 'uninteresting': reasons why this noode is hidden
      */
-    export type AXPropertyName = "actions"|"busy"|"disabled"|"editable"|"focusable"|"focused"|"hidden"|"hiddenRoot"|"invalid"|"keyshortcuts"|"settable"|"roledescription"|"live"|"atomic"|"relevant"|"root"|"autocomplete"|"hasPopup"|"level"|"multiselectable"|"orientation"|"multiline"|"readonly"|"required"|"valuemin"|"valuemax"|"valuetext"|"checked"|"expanded"|"modal"|"pressed"|"selected"|"activedescendant"|"controls"|"describedby"|"details"|"errormessage"|"flowto"|"labelledby"|"owns"|"url";
+    export type AXPropertyName = "actions"|"busy"|"disabled"|"editable"|"focusable"|"focused"|"hidden"|"hiddenRoot"|"invalid"|"keyshortcuts"|"settable"|"roledescription"|"live"|"atomic"|"relevant"|"root"|"autocomplete"|"hasPopup"|"level"|"multiselectable"|"orientation"|"multiline"|"readonly"|"required"|"valuemin"|"valuemax"|"valuetext"|"checked"|"expanded"|"modal"|"pressed"|"selected"|"activedescendant"|"controls"|"describedby"|"details"|"errormessage"|"flowto"|"labelledby"|"owns"|"url"|"activeFullscreenElement"|"activeModalDialog"|"activeAriaModalDialog"|"ariaHiddenElement"|"ariaHiddenSubtree"|"emptyAlt"|"emptyText"|"inertElement"|"inertSubtree"|"labelContainer"|"labelFor"|"notRendered"|"notVisible"|"presentationalRole"|"probablyPresentational"|"inactiveCarouselTabContent"|"uninteresting";
     /**
      * A node in the accessibility tree.
      */
@@ -859,8 +860,9 @@ CORS RFC1918 enforcement.
       clientSecurityState?: Network.ClientSecurityState;
     }
     export type AttributionReportingIssueType = "PermissionPolicyDisabled"|"UntrustworthyReportingOrigin"|"InsecureContext"|"InvalidHeader"|"InvalidRegisterTriggerHeader"|"SourceAndTriggerHeaders"|"SourceIgnored"|"TriggerIgnored"|"OsSourceIgnored"|"OsTriggerIgnored"|"InvalidRegisterOsSourceHeader"|"InvalidRegisterOsTriggerHeader"|"WebAndOsHeaders"|"NoWebOrOsSupport"|"NavigationRegistrationWithoutTransientUserActivation"|"InvalidInfoHeader"|"NoRegisterSourceHeader"|"NoRegisterTriggerHeader"|"NoRegisterOsSourceHeader"|"NoRegisterOsTriggerHeader"|"NavigationRegistrationUniqueScopeAlreadySet";
-    export type SharedDictionaryError = "UseErrorCrossOriginNoCorsRequest"|"UseErrorDictionaryLoadFailure"|"UseErrorMatchingDictionaryNotUsed"|"UseErrorUnexpectedContentDictionaryHeader"|"WriteErrorCossOriginNoCorsRequest"|"WriteErrorDisallowedBySettings"|"WriteErrorExpiredResponse"|"WriteErrorFeatureDisabled"|"WriteErrorInsufficientResources"|"WriteErrorInvalidMatchField"|"WriteErrorInvalidStructuredHeader"|"WriteErrorNavigationRequest"|"WriteErrorNoMatchField"|"WriteErrorNonListMatchDestField"|"WriteErrorNonSecureContext"|"WriteErrorNonStringIdField"|"WriteErrorNonStringInMatchDestList"|"WriteErrorNonStringMatchField"|"WriteErrorNonTokenTypeField"|"WriteErrorRequestAborted"|"WriteErrorShuttingDown"|"WriteErrorTooLongIdField"|"WriteErrorUnsupportedType";
+    export type SharedDictionaryError = "UseErrorCrossOriginNoCorsRequest"|"UseErrorDictionaryLoadFailure"|"UseErrorMatchingDictionaryNotUsed"|"UseErrorUnexpectedContentDictionaryHeader"|"WriteErrorCossOriginNoCorsRequest"|"WriteErrorDisallowedBySettings"|"WriteErrorExpiredResponse"|"WriteErrorFeatureDisabled"|"WriteErrorInsufficientResources"|"WriteErrorInvalidMatchField"|"WriteErrorInvalidStructuredHeader"|"WriteErrorInvalidTTLField"|"WriteErrorNavigationRequest"|"WriteErrorNoMatchField"|"WriteErrorNonIntegerTTLField"|"WriteErrorNonListMatchDestField"|"WriteErrorNonSecureContext"|"WriteErrorNonStringIdField"|"WriteErrorNonStringInMatchDestList"|"WriteErrorNonStringMatchField"|"WriteErrorNonTokenTypeField"|"WriteErrorRequestAborted"|"WriteErrorShuttingDown"|"WriteErrorTooLongIdField"|"WriteErrorUnsupportedType";
     export type SRIMessageSignatureError = "MissingSignatureHeader"|"MissingSignatureInputHeader"|"InvalidSignatureHeader"|"InvalidSignatureInputHeader"|"SignatureHeaderValueIsNotByteSequence"|"SignatureHeaderValueIsParameterized"|"SignatureHeaderValueIsIncorrectLength"|"SignatureInputHeaderMissingLabel"|"SignatureInputHeaderValueNotInnerList"|"SignatureInputHeaderValueMissingComponents"|"SignatureInputHeaderInvalidComponentType"|"SignatureInputHeaderInvalidComponentName"|"SignatureInputHeaderInvalidHeaderComponentParameter"|"SignatureInputHeaderInvalidDerivedComponentParameter"|"SignatureInputHeaderKeyIdLength"|"SignatureInputHeaderInvalidParameter"|"SignatureInputHeaderMissingRequiredParameters"|"ValidationFailedSignatureExpired"|"ValidationFailedInvalidLength"|"ValidationFailedSignatureMismatch"|"ValidationFailedIntegrityMismatch";
+    export type UnencodedDigestError = "MalformedDictionary"|"UnknownAlgorithm"|"IncorrectDigestType"|"IncorrectDigestLength";
     /**
      * Details for issues around "Attribution Reporting API" usage.
 Explainer: https://github.com/WICG/attribution-reporting-api
@@ -898,6 +900,10 @@ instead of "limited-quirks".
       error: SRIMessageSignatureError;
       signatureBase: string;
       integrityAssertions: string[];
+      request: AffectedRequest;
+    }
+    export interface UnencodedDigestIssueDetails {
+      error: UnencodedDigestError;
       request: AffectedRequest;
     }
     export type GenericIssueErrorType = "FormLabelForNameError"|"FormDuplicateIdForInputError"|"FormInputWithNoLabelError"|"FormAutocompleteAttributeEmptyError"|"FormEmptyIdAndNameAttributesForInputError"|"FormAriaLabelledByToNonExistingId"|"FormInputAssignedAutocompleteValueToIdOrNameAttributeError"|"FormLabelHasNeitherForNorNestedInput"|"FormLabelForMatchesNonExistingIdError"|"FormInputHasWrongButWellIntendedAutocompleteValueError"|"ResponseWasBlockedByORB";
@@ -999,13 +1005,13 @@ features, encourage the use of new ones, and provide general guidance.
        */
       partitioningBlobURLInfo: PartitioningBlobURLInfo;
     }
-    export type SelectElementAccessibilityIssueReason = "DisallowedSelectChild"|"DisallowedOptGroupChild"|"NonPhrasingContentOptionChild"|"InteractiveContentOptionChild"|"InteractiveContentLegendChild";
+    export type ElementAccessibilityIssueReason = "DisallowedSelectChild"|"DisallowedOptGroupChild"|"NonPhrasingContentOptionChild"|"InteractiveContentOptionChild"|"InteractiveContentLegendChild"|"InteractiveContentSummaryDescendant";
     /**
-     * This issue warns about errors in the select element content model.
+     * This issue warns about errors in the select or summary element content model.
      */
-    export interface SelectElementAccessibilityIssueDetails {
+    export interface ElementAccessibilityIssueDetails {
       nodeId: DOM.BackendNodeId;
-      selectElementAccessibilityIssueReason: SelectElementAccessibilityIssueReason;
+      elementAccessibilityIssueReason: ElementAccessibilityIssueReason;
       hasDisallowedAttributes: boolean;
     }
     export type StyleSheetLoadingIssueReason = "LateImportRule"|"RequestFailed";
@@ -1045,12 +1051,28 @@ registrations being ignored.
        */
       propertyValue?: string;
     }
+    export type UserReidentificationIssueType = "BlockedFrameNavigation"|"BlockedSubresource"|"NoisedCanvasReadback";
+    /**
+     * This issue warns about uses of APIs that may be considered misuse to
+re-identify users.
+     */
+    export interface UserReidentificationIssueDetails {
+      type: UserReidentificationIssueType;
+      /**
+       * Applies to BlockedFrameNavigation and BlockedSubresource issue types.
+       */
+      request?: AffectedRequest;
+      /**
+       * Applies to NoisedCanvasReadback issue type.
+       */
+      sourceCodeLocation?: SourceCodeLocation;
+    }
     /**
      * A unique identifier for the type of issue. Each type may use one of the
 optional fields in InspectorIssueDetails to convey more specific
 information about the kind of issue.
      */
-    export type InspectorIssueCode = "CookieIssue"|"MixedContentIssue"|"BlockedByResponseIssue"|"HeavyAdIssue"|"ContentSecurityPolicyIssue"|"SharedArrayBufferIssue"|"LowTextContrastIssue"|"CorsIssue"|"AttributionReportingIssue"|"QuirksModeIssue"|"PartitioningBlobURLIssue"|"NavigatorUserAgentIssue"|"GenericIssue"|"DeprecationIssue"|"ClientHintIssue"|"FederatedAuthRequestIssue"|"BounceTrackingIssue"|"CookieDeprecationMetadataIssue"|"StylesheetLoadingIssue"|"FederatedAuthUserInfoRequestIssue"|"PropertyRuleIssue"|"SharedDictionaryIssue"|"SelectElementAccessibilityIssue"|"SRIMessageSignatureIssue";
+    export type InspectorIssueCode = "CookieIssue"|"MixedContentIssue"|"BlockedByResponseIssue"|"HeavyAdIssue"|"ContentSecurityPolicyIssue"|"SharedArrayBufferIssue"|"LowTextContrastIssue"|"CorsIssue"|"AttributionReportingIssue"|"QuirksModeIssue"|"PartitioningBlobURLIssue"|"NavigatorUserAgentIssue"|"GenericIssue"|"DeprecationIssue"|"ClientHintIssue"|"FederatedAuthRequestIssue"|"BounceTrackingIssue"|"CookieDeprecationMetadataIssue"|"StylesheetLoadingIssue"|"FederatedAuthUserInfoRequestIssue"|"PropertyRuleIssue"|"SharedDictionaryIssue"|"ElementAccessibilityIssue"|"SRIMessageSignatureIssue"|"UnencodedDigestIssue"|"UserReidentificationIssue";
     /**
      * This struct holds a list of optional fields with additional information
 specific to the kind of issue. When adding a new issue code, please also
@@ -1079,8 +1101,10 @@ add a new optional field to this type.
       propertyRuleIssueDetails?: PropertyRuleIssueDetails;
       federatedAuthUserInfoRequestIssueDetails?: FederatedAuthUserInfoRequestIssueDetails;
       sharedDictionaryIssueDetails?: SharedDictionaryIssueDetails;
-      selectElementAccessibilityIssueDetails?: SelectElementAccessibilityIssueDetails;
+      elementAccessibilityIssueDetails?: ElementAccessibilityIssueDetails;
       sriMessageSignatureIssueDetails?: SRIMessageSignatureIssueDetails;
+      unencodedDigestIssueDetails?: UnencodedDigestIssueDetails;
+      userReidentificationIssueDetails?: UserReidentificationIssueDetails;
     }
     /**
      * A unique id for a DevTools inspector issue. Allows other entities (e.g.
@@ -1179,125 +1203,6 @@ using Audits.issueAdded event.
   }
   
   /**
-   * Defines commands and events for browser extensions.
-   */
-  export module Extensions {
-    /**
-     * Storage areas.
-     */
-    export type StorageArea = "session"|"local"|"sync"|"managed";
-    
-    
-    /**
-     * Installs an unpacked extension from the filesystem similar to
---load-extension CLI flags. Returns extension ID once the extension
-has been installed. Available if the client is connected using the
---remote-debugging-pipe flag and the --enable-unsafe-extension-debugging
-flag is set.
-     */
-    export type loadUnpackedParameters = {
-      /**
-       * Absolute file path.
-       */
-      path: string;
-    }
-    export type loadUnpackedReturnValue = {
-      /**
-       * Extension id.
-       */
-      id: string;
-    }
-    /**
-     * Uninstalls an unpacked extension (others not supported) from the profile.
-Available if the client is connected using the --remote-debugging-pipe flag
-and the --enable-unsafe-extension-debugging.
-     */
-    export type uninstallParameters = {
-      /**
-       * Extension id.
-       */
-      id: string;
-    }
-    export type uninstallReturnValue = {
-    }
-    /**
-     * Gets data from extension storage in the given `storageArea`. If `keys` is
-specified, these are used to filter the result.
-     */
-    export type getStorageItemsParameters = {
-      /**
-       * ID of extension.
-       */
-      id: string;
-      /**
-       * StorageArea to retrieve data from.
-       */
-      storageArea: StorageArea;
-      /**
-       * Keys to retrieve.
-       */
-      keys?: string[];
-    }
-    export type getStorageItemsReturnValue = {
-      data: { [key: string]: string };
-    }
-    /**
-     * Removes `keys` from extension storage in the given `storageArea`.
-     */
-    export type removeStorageItemsParameters = {
-      /**
-       * ID of extension.
-       */
-      id: string;
-      /**
-       * StorageArea to remove data from.
-       */
-      storageArea: StorageArea;
-      /**
-       * Keys to remove.
-       */
-      keys: string[];
-    }
-    export type removeStorageItemsReturnValue = {
-    }
-    /**
-     * Clears extension storage in the given `storageArea`.
-     */
-    export type clearStorageItemsParameters = {
-      /**
-       * ID of extension.
-       */
-      id: string;
-      /**
-       * StorageArea to remove data from.
-       */
-      storageArea: StorageArea;
-    }
-    export type clearStorageItemsReturnValue = {
-    }
-    /**
-     * Sets `values` in extension storage in the given `storageArea`. The provided `values`
-will be merged with existing values in the storage area.
-     */
-    export type setStorageItemsParameters = {
-      /**
-       * ID of extension.
-       */
-      id: string;
-      /**
-       * StorageArea to set data in.
-       */
-      storageArea: StorageArea;
-      /**
-       * Values to set.
-       */
-      values: { [key: string]: string };
-    }
-    export type setStorageItemsReturnValue = {
-    }
-  }
-  
-  /**
    * Defines commands and events for Autofill.
    */
   export module Autofill {
@@ -1326,6 +1231,8 @@ will be merged with existing values in the storage area.
     export interface AddressField {
       /**
        * address field name, for example GIVEN_NAME.
+The full list of supported field names:
+https://source.chromium.org/chromium/chromium/src/+/main:components/autofill/core/browser/field_types.cc;l=38
        */
       name: string;
       /**
@@ -1428,9 +1335,13 @@ If the field and related form cannot be autofilled, returns an error.
        */
       frameId?: Page.FrameId;
       /**
-       * Credit card information to fill out the form. Credit card data is not saved.
+       * Credit card information to fill out the form. Credit card data is not saved.  Mutually exclusive with `address`.
        */
-      card: CreditCard;
+      card?: CreditCard;
+      /**
+       * Address to fill out the form. Address data is not saved. Mutually exclusive with `card`.
+       */
+      address?: Address;
     }
     export type triggerReturnValue = {
     }
@@ -1561,6 +1472,292 @@ events afterwards if enabled and recording.
   }
   
   /**
+   * This domain allows configuring virtual Bluetooth devices to test
+the web-bluetooth API.
+   */
+  export module BluetoothEmulation {
+    /**
+     * Indicates the various states of Central.
+     */
+    export type CentralState = "absent"|"powered-off"|"powered-on";
+    /**
+     * Indicates the various types of GATT event.
+     */
+    export type GATTOperationType = "connection"|"discovery";
+    /**
+     * Indicates the various types of characteristic write.
+     */
+    export type CharacteristicWriteType = "write-default-deprecated"|"write-with-response"|"write-without-response";
+    /**
+     * Indicates the various types of characteristic operation.
+     */
+    export type CharacteristicOperationType = "read"|"write"|"subscribe-to-notifications"|"unsubscribe-from-notifications";
+    /**
+     * Indicates the various types of descriptor operation.
+     */
+    export type DescriptorOperationType = "read"|"write";
+    /**
+     * Stores the manufacturer data
+     */
+    export interface ManufacturerData {
+      /**
+       * Company identifier
+https://bitbucket.org/bluetooth-SIG/public/src/main/assigned_numbers/company_identifiers/company_identifiers.yaml
+https://usb.org/developers
+       */
+      key: number;
+      /**
+       * Manufacturer-specific data
+       */
+      data: binary;
+    }
+    /**
+     * Stores the byte data of the advertisement packet sent by a Bluetooth device.
+     */
+    export interface ScanRecord {
+      name?: string;
+      uuids?: string[];
+      /**
+       * Stores the external appearance description of the device.
+       */
+      appearance?: number;
+      /**
+       * Stores the transmission power of a broadcasting device.
+       */
+      txPower?: number;
+      /**
+       * Key is the company identifier and the value is an array of bytes of
+manufacturer specific data.
+       */
+      manufacturerData?: ManufacturerData[];
+    }
+    /**
+     * Stores the advertisement packet information that is sent by a Bluetooth device.
+     */
+    export interface ScanEntry {
+      deviceAddress: string;
+      rssi: number;
+      scanRecord: ScanRecord;
+    }
+    /**
+     * Describes the properties of a characteristic. This follows Bluetooth Core
+Specification BT 4.2 Vol 3 Part G 3.3.1. Characteristic Properties.
+     */
+    export interface CharacteristicProperties {
+      broadcast?: boolean;
+      read?: boolean;
+      writeWithoutResponse?: boolean;
+      write?: boolean;
+      notify?: boolean;
+      indicate?: boolean;
+      authenticatedSignedWrites?: boolean;
+      extendedProperties?: boolean;
+    }
+    
+    /**
+     * Event for when a GATT operation of |type| to the peripheral with |address|
+happened.
+     */
+    export type gattOperationReceivedPayload = {
+      address: string;
+      type: GATTOperationType;
+    }
+    /**
+     * Event for when a characteristic operation of |type| to the characteristic
+respresented by |characteristicId| happened. |data| and |writeType| is
+expected to exist when |type| is write.
+     */
+    export type characteristicOperationReceivedPayload = {
+      characteristicId: string;
+      type: CharacteristicOperationType;
+      data?: binary;
+      writeType?: CharacteristicWriteType;
+    }
+    /**
+     * Event for when a descriptor operation of |type| to the descriptor
+respresented by |descriptorId| happened. |data| is expected to exist when
+|type| is write.
+     */
+    export type descriptorOperationReceivedPayload = {
+      descriptorId: string;
+      type: DescriptorOperationType;
+      data?: binary;
+    }
+    
+    /**
+     * Enable the BluetoothEmulation domain.
+     */
+    export type enableParameters = {
+      /**
+       * State of the simulated central.
+       */
+      state: CentralState;
+      /**
+       * If the simulated central supports low-energy.
+       */
+      leSupported: boolean;
+    }
+    export type enableReturnValue = {
+    }
+    /**
+     * Set the state of the simulated central.
+     */
+    export type setSimulatedCentralStateParameters = {
+      /**
+       * State of the simulated central.
+       */
+      state: CentralState;
+    }
+    export type setSimulatedCentralStateReturnValue = {
+    }
+    /**
+     * Disable the BluetoothEmulation domain.
+     */
+    export type disableParameters = {
+    }
+    export type disableReturnValue = {
+    }
+    /**
+     * Simulates a peripheral with |address|, |name| and |knownServiceUuids|
+that has already been connected to the system.
+     */
+    export type simulatePreconnectedPeripheralParameters = {
+      address: string;
+      name: string;
+      manufacturerData: ManufacturerData[];
+      knownServiceUuids: string[];
+    }
+    export type simulatePreconnectedPeripheralReturnValue = {
+    }
+    /**
+     * Simulates an advertisement packet described in |entry| being received by
+the central.
+     */
+    export type simulateAdvertisementParameters = {
+      entry: ScanEntry;
+    }
+    export type simulateAdvertisementReturnValue = {
+    }
+    /**
+     * Simulates the response code from the peripheral with |address| for a
+GATT operation of |type|. The |code| value follows the HCI Error Codes from
+Bluetooth Core Specification Vol 2 Part D 1.3 List Of Error Codes.
+     */
+    export type simulateGATTOperationResponseParameters = {
+      address: string;
+      type: GATTOperationType;
+      code: number;
+    }
+    export type simulateGATTOperationResponseReturnValue = {
+    }
+    /**
+     * Simulates the response from the characteristic with |characteristicId| for a
+characteristic operation of |type|. The |code| value follows the Error
+Codes from Bluetooth Core Specification Vol 3 Part F 3.4.1.1 Error Response.
+The |data| is expected to exist when simulating a successful read operation
+response.
+     */
+    export type simulateCharacteristicOperationResponseParameters = {
+      characteristicId: string;
+      type: CharacteristicOperationType;
+      code: number;
+      data?: binary;
+    }
+    export type simulateCharacteristicOperationResponseReturnValue = {
+    }
+    /**
+     * Simulates the response from the descriptor with |descriptorId| for a
+descriptor operation of |type|. The |code| value follows the Error
+Codes from Bluetooth Core Specification Vol 3 Part F 3.4.1.1 Error Response.
+The |data| is expected to exist when simulating a successful read operation
+response.
+     */
+    export type simulateDescriptorOperationResponseParameters = {
+      descriptorId: string;
+      type: DescriptorOperationType;
+      code: number;
+      data?: binary;
+    }
+    export type simulateDescriptorOperationResponseReturnValue = {
+    }
+    /**
+     * Adds a service with |serviceUuid| to the peripheral with |address|.
+     */
+    export type addServiceParameters = {
+      address: string;
+      serviceUuid: string;
+    }
+    export type addServiceReturnValue = {
+      /**
+       * An identifier that uniquely represents this service.
+       */
+      serviceId: string;
+    }
+    /**
+     * Removes the service respresented by |serviceId| from the simulated central.
+     */
+    export type removeServiceParameters = {
+      serviceId: string;
+    }
+    export type removeServiceReturnValue = {
+    }
+    /**
+     * Adds a characteristic with |characteristicUuid| and |properties| to the
+service represented by |serviceId|.
+     */
+    export type addCharacteristicParameters = {
+      serviceId: string;
+      characteristicUuid: string;
+      properties: CharacteristicProperties;
+    }
+    export type addCharacteristicReturnValue = {
+      /**
+       * An identifier that uniquely represents this characteristic.
+       */
+      characteristicId: string;
+    }
+    /**
+     * Removes the characteristic respresented by |characteristicId| from the
+simulated central.
+     */
+    export type removeCharacteristicParameters = {
+      characteristicId: string;
+    }
+    export type removeCharacteristicReturnValue = {
+    }
+    /**
+     * Adds a descriptor with |descriptorUuid| to the characteristic respresented
+by |characteristicId|.
+     */
+    export type addDescriptorParameters = {
+      characteristicId: string;
+      descriptorUuid: string;
+    }
+    export type addDescriptorReturnValue = {
+      /**
+       * An identifier that uniquely represents this descriptor.
+       */
+      descriptorId: string;
+    }
+    /**
+     * Removes the descriptor with |descriptorId| from the simulated central.
+     */
+    export type removeDescriptorParameters = {
+      descriptorId: string;
+    }
+    export type removeDescriptorReturnValue = {
+    }
+    /**
+     * Simulates a GATT disconnection from the peripheral with |address|.
+     */
+    export type simulateGATTDisconnectionParameters = {
+      address: string;
+    }
+    export type simulateGATTDisconnectionReturnValue = {
+    }
+  }
+  
+  /**
    * The Browser domain defines methods and events for browser managing.
    */
   export module Browser {
@@ -1632,7 +1829,7 @@ Note that userVisibleOnly = true is the only currently supported type.
     /**
      * Browser command ids used by executeBrowserCommand.
      */
-    export type BrowserCommandId = "openTabSearch"|"closeTabSearch";
+    export type BrowserCommandId = "openTabSearch"|"closeTabSearch"|"openGlic";
     /**
      * Chrome histogram bucket.
      */
@@ -1714,10 +1911,16 @@ Note that userVisibleOnly = true is the only currently supported type.
        * Download status.
        */
       state: "inProgress"|"completed"|"canceled";
+      /**
+       * If download is "completed", provides the path of the downloaded file.
+Depending on the platform, it is not guaranteed to be set, nor the file
+is guaranteed to exist.
+       */
+      filePath?: string;
     }
     
     /**
-     * Set permission settings for given origin.
+     * Set permission settings for given embedding and embedded origins.
      */
     export type setPermissionParameters = {
       /**
@@ -1729,9 +1932,15 @@ Note that userVisibleOnly = true is the only currently supported type.
        */
       setting: PermissionSetting;
       /**
-       * Origin the permission applies to, all origins if not specified.
+       * Embedding origin the permission applies to, all origins if not specified.
        */
       origin?: string;
+      /**
+       * Embedded origin the permission applies to. It is ignored unless the embedding origin is
+present and valid. If the embedding origin is provided but the embedded origin isn't, the
+embedding origin is used as the embedded origin.
+       */
+      embeddedOrigin?: string;
       /**
        * Context to override. When omitted, default browser context is used.
        */
@@ -1740,7 +1949,8 @@ Note that userVisibleOnly = true is the only currently supported type.
     export type setPermissionReturnValue = {
     }
     /**
-     * Grant specific permissions to the given origin and reject all others.
+     * Grant specific permissions to the given origin and reject all others. Deprecated. Use
+setPermission instead.
      */
     export type grantPermissionsParameters = {
       permissions: PermissionType[];
@@ -1958,6 +2168,27 @@ with 'left', 'top', 'width' or 'height'. Leaves unspecified fields unchanged.
       bounds: Bounds;
     }
     export type setWindowBoundsReturnValue = {
+    }
+    /**
+     * Set size of the browser contents resizing browser window as necessary.
+     */
+    export type setContentsSizeParameters = {
+      /**
+       * Browser window id.
+       */
+      windowId: WindowID;
+      /**
+       * The window contents width in DIP. Assumes current width if omitted.
+Must be specified if 'height' is omitted.
+       */
+      width?: number;
+      /**
+       * The window contents height in DIP. Assumes current height if omitted.
+Must be specified if 'width' is omitted.
+       */
+      height?: number;
+    }
+    export type setContentsSizeReturnValue = {
     }
     /**
      * Set dock tile details, platform-specific.
@@ -2261,6 +2492,10 @@ stylesheet rules) this rule came from.
        */
       style: CSSStyle;
       /**
+       * The BackendNodeId of the DOM node that constitutes the origin tree scope of this rule.
+       */
+      originTreeScopeNodeId?: DOM.BackendNodeId;
+      /**
        * Media list array (for rules involving media queries). The array enumerates media queries
 starting with the innermost one, going outwards.
        */
@@ -2366,6 +2601,14 @@ stylesheet rules) this rule came from.
        * Computed style property value.
        */
       value: string;
+    }
+    export interface ComputedStyleExtraFields {
+      /**
+       * Returns whether or not this node is being rendered with base appearance,
+which happens when it has its appearance property set to base/base-select
+or it is in the subtree of an element being rendered with base appearance.
+       */
+      isAppearanceBase: boolean;
     }
     /**
      * CSS style representation.
@@ -2539,6 +2782,10 @@ available).
        * true if the query contains scroll-state() queries.
        */
       queriesScrollState?: boolean;
+      /**
+       * true if the query contains anchored() queries.
+       */
+      queriesAnchored?: boolean;
     }
     /**
      * CSS Supports at-rule descriptor.
@@ -3138,17 +3385,26 @@ be ignored (as if the image had failed to load).
        * Computed style for the specified DOM node.
        */
       computedStyle: CSSComputedStyleProperty[];
+      /**
+       * A list of non-standard "extra fields" which blink stores alongside each
+computed style.
+       */
+      extraFields: ComputedStyleExtraFields;
     }
     /**
      * Resolve the specified values in the context of the provided element.
 For example, a value of '1em' is evaluated according to the computed
 'font-size' of the element and a value 'calc(1px + 2px)' will be
 resolved to '3px'.
+If the `propertyName` was specified the `values` are resolved as if
+they were property's declaration. If a value cannot be parsed according
+to the provided property syntax, the value is parsed using combined
+syntax as if null `propertyName` was provided. If the value cannot be
+resolved even then, return the provided value without any changes.
      */
     export type resolveValuesParameters = {
       /**
-       * Substitution functions (var()/env()/attr()) and cascade-dependent
-keywords (revert/revert-layer) do not work.
+       * Cascade-dependent keywords (revert/revert-layer) do not work.
        */
       values: string[];
       /**
@@ -3282,6 +3538,14 @@ will not be set if there is no active position-try fallback.
        * A list of CSS at-function rules referenced by styles of this node.
        */
       cssFunctionRules?: CSSFunctionRule[];
+    }
+    /**
+     * Returns the values of the default UA-defined environment variables used in env()
+     */
+    export type getEnvironmentVariablesParameters = {
+    }
+    export type getEnvironmentVariablesReturnValue = {
+      environmentVariables: { [key: string]: string };
     }
     /**
      * Returns all media queries parsed by the rendering engine.
@@ -3874,7 +4138,7 @@ front-end.
     /**
      * Pseudo element type.
      */
-    export type PseudoType = "first-line"|"first-letter"|"checkmark"|"before"|"after"|"picker-icon"|"marker"|"backdrop"|"column"|"selection"|"search-text"|"target-text"|"spelling-error"|"grammar-error"|"highlight"|"first-line-inherited"|"scroll-marker"|"scroll-marker-group"|"scroll-button"|"scrollbar"|"scrollbar-thumb"|"scrollbar-button"|"scrollbar-track"|"scrollbar-track-piece"|"scrollbar-corner"|"resizer"|"input-list-button"|"view-transition"|"view-transition-group"|"view-transition-image-pair"|"view-transition-old"|"view-transition-new"|"placeholder"|"file-selector-button"|"details-content"|"picker";
+    export type PseudoType = "first-line"|"first-letter"|"checkmark"|"before"|"after"|"picker-icon"|"interest-hint"|"marker"|"backdrop"|"column"|"selection"|"search-text"|"target-text"|"spelling-error"|"grammar-error"|"highlight"|"first-line-inherited"|"scroll-marker"|"scroll-marker-group"|"scroll-button"|"scrollbar"|"scrollbar-thumb"|"scrollbar-button"|"scrollbar-track"|"scrollbar-track-piece"|"scrollbar-corner"|"resizer"|"input-list-button"|"view-transition"|"view-transition-group"|"view-transition-image-pair"|"view-transition-group-children"|"view-transition-old"|"view-transition-new"|"placeholder"|"file-selector-button"|"details-content"|"picker"|"permission-icon";
     /**
      * Shadow root type.
      */
@@ -4024,6 +4288,7 @@ The property is always undefined now.
       compatibilityMode?: CompatibilityMode;
       assignedSlot?: BackendNode;
       isScrollable?: boolean;
+      affectedByStartingStyles?: boolean;
     }
     /**
      * A structure to hold the top-level node of a detached tree and an array of its retained descendants.
@@ -4280,6 +4545,19 @@ The property is always undefined now.
        * If the node is scrollable.
        */
       isScrollable: boolean;
+    }
+    /**
+     * Fired when a node's starting styles changes.
+     */
+    export type affectedByStartingStylesFlagUpdatedPayload = {
+      /**
+       * The id of the node.
+       */
+      nodeId: DOM.NodeId;
+      /**
+       * If the node has starting styles.
+       */
+      affectedByStartingStyles: boolean;
     }
     /**
      * Called when a pseudo element is removed from an element.
@@ -4667,6 +4945,10 @@ either returned or not.
        * JavaScript object id of the node wrapper.
        */
       objectId?: Runtime.RemoteObjectId;
+      /**
+       * Include all shadow roots. Equals to false if not specified.
+       */
+      includeShadowDOM?: boolean;
     }
     export type getOuterHTMLReturnValue = {
       /**
@@ -4882,7 +5164,7 @@ appear on top of all other content.
       /**
        * Type of relation to get.
        */
-      relation: "PopoverTarget"|"InterestTarget";
+      relation: "PopoverTarget"|"InterestTarget"|"CommandFor";
     }
     export type getElementByRelationReturnValue = {
       /**
@@ -5190,9 +5472,9 @@ $x functions).
     /**
      * Returns the query container of the given node based on container query
 conditions: containerName, physical and logical axes, and whether it queries
-scroll-state. If no axes are provided and queriesScrollState is false, the
-style container is returned, which is the direct parent or the closest
-element with a matching container-name.
+scroll-state or anchored elements. If no axes are provided and
+queriesScrollState is false, the style container is returned, which is the
+direct parent or the closest element with a matching container-name.
      */
     export type getContainerForNodeParameters = {
       nodeId: NodeId;
@@ -5200,6 +5482,7 @@ element with a matching container-name.
       physicalAxes?: PhysicalAxes;
       logicalAxes?: LogicalAxes;
       queriesScrollState?: boolean;
+      queriesAnchored?: boolean;
     }
     export type getContainerForNodeReturnValue = {
       /**
@@ -5245,6 +5528,27 @@ the given positioned element.
        * The anchor element of the given anchor query.
        */
       nodeId: NodeId;
+    }
+    /**
+     * When enabling, this API force-opens the popover identified by nodeId
+and keeps it open until disabled.
+     */
+    export type forceShowPopoverParameters = {
+      /**
+       * Id of the popover HTMLElement
+       */
+      nodeId: NodeId;
+      /**
+       * If true, opens the popover and keeps it open. If false, closes the
+popover if it was previously force-opened.
+       */
+      enable: boolean;
+    }
+    export type forceShowPopoverReturnValue = {
+      /**
+       * List of popovers that were closed in order to respect popover stacking order.
+       */
+      nodeIds: NodeId[];
     }
   }
   
@@ -5448,45 +5752,6 @@ EventTarget.
       url: string;
     }
     export type setXHRBreakpointReturnValue = {
-    }
-  }
-  
-  /**
-   * EventBreakpoints permits setting JavaScript breakpoints on operations and events
-occurring in native code invoked from JavaScript. Once breakpoint is hit, it is
-reported through Debugger domain, similarly to regular breakpoints being hit.
-   */
-  export module EventBreakpoints {
-    
-    
-    /**
-     * Sets breakpoint on particular native event.
-     */
-    export type setInstrumentationBreakpointParameters = {
-      /**
-       * Instrumentation name to stop on.
-       */
-      eventName: string;
-    }
-    export type setInstrumentationBreakpointReturnValue = {
-    }
-    /**
-     * Removes breakpoint on particular native event.
-     */
-    export type removeInstrumentationBreakpointParameters = {
-      /**
-       * Instrumentation name to stop on.
-       */
-      eventName: string;
-    }
-    export type removeInstrumentationBreakpointReturnValue = {
-    }
-    /**
-     * Removes all breakpoints
-     */
-    export type disableParameters = {
-    }
-    export type disableReturnValue = {
     }
   }
   
@@ -6114,6 +6379,68 @@ The final text color opacity is computed based on the opacity of all overlapping
     }
   }
   
+  export module DeviceAccess {
+    /**
+     * Device request id.
+     */
+    export type RequestId = string;
+    /**
+     * A device id.
+     */
+    export type DeviceId = string;
+    /**
+     * Device information displayed in a user prompt to select a device.
+     */
+    export interface PromptDevice {
+      id: DeviceId;
+      /**
+       * Display name as it appears in a device request user prompt.
+       */
+      name: string;
+    }
+    
+    /**
+     * A device request opened a user prompt to select a device. Respond with the
+selectPrompt or cancelPrompt command.
+     */
+    export type deviceRequestPromptedPayload = {
+      id: RequestId;
+      devices: PromptDevice[];
+    }
+    
+    /**
+     * Enable events in this domain.
+     */
+    export type enableParameters = {
+    }
+    export type enableReturnValue = {
+    }
+    /**
+     * Disable events in this domain.
+     */
+    export type disableParameters = {
+    }
+    export type disableReturnValue = {
+    }
+    /**
+     * Select a device in response to a DeviceAccess.deviceRequestPrompted event.
+     */
+    export type selectPromptParameters = {
+      id: RequestId;
+      deviceId: DeviceId;
+    }
+    export type selectPromptReturnValue = {
+    }
+    /**
+     * Cancel a prompt in response to a DeviceAccess.deviceRequestPrompted event.
+     */
+    export type cancelPromptParameters = {
+      id: RequestId;
+    }
+    export type cancelPromptReturnValue = {
+    }
+  }
+  
   export module DeviceOrientation {
     
     
@@ -6258,6 +6585,11 @@ Missing optional values will be filled in by the target with what it would norma
       mobile: boolean;
       bitness?: string;
       wow64?: boolean;
+      /**
+       * Used to specify User Agent form-factor values.
+See https://wicg.github.io/ua-client-hints/#sec-ch-ua-form-factors
+       */
+      formFactors?: string[];
     }
     /**
      * Used to specify sensor types to emulate.
@@ -6292,6 +6624,95 @@ See https://w3c.github.io/sensors/#automation for more information.
     export type PressureState = "nominal"|"fair"|"serious"|"critical";
     export interface PressureMetadata {
       available?: boolean;
+    }
+    export interface WorkAreaInsets {
+      /**
+       * Work area top inset in pixels. Default is 0;
+       */
+      top?: number;
+      /**
+       * Work area left inset in pixels. Default is 0;
+       */
+      left?: number;
+      /**
+       * Work area bottom inset in pixels. Default is 0;
+       */
+      bottom?: number;
+      /**
+       * Work area right inset in pixels. Default is 0;
+       */
+      right?: number;
+    }
+    export type ScreenId = string;
+    /**
+     * Screen information similar to the one returned by window.getScreenDetails() method,
+see https://w3c.github.io/window-management/#screendetailed.
+     */
+    export interface ScreenInfo {
+      /**
+       * Offset of the left edge of the screen.
+       */
+      left: number;
+      /**
+       * Offset of the top edge of the screen.
+       */
+      top: number;
+      /**
+       * Width of the screen.
+       */
+      width: number;
+      /**
+       * Height of the screen.
+       */
+      height: number;
+      /**
+       * Offset of the left edge of the available screen area.
+       */
+      availLeft: number;
+      /**
+       * Offset of the top edge of the available screen area.
+       */
+      availTop: number;
+      /**
+       * Width of the available screen area.
+       */
+      availWidth: number;
+      /**
+       * Height of the available screen area.
+       */
+      availHeight: number;
+      /**
+       * Specifies the screen's device pixel ratio.
+       */
+      devicePixelRatio: number;
+      /**
+       * Specifies the screen's orientation.
+       */
+      orientation: ScreenOrientation;
+      /**
+       * Specifies the screen's color depth in bits.
+       */
+      colorDepth: number;
+      /**
+       * Indicates whether the device has multiple screens.
+       */
+      isExtended: boolean;
+      /**
+       * Indicates whether the screen is internal to the device or external, attached to the device.
+       */
+      isInternal: boolean;
+      /**
+       * Indicates whether the screen is set as the the operating system primary screen.
+       */
+      isPrimary: boolean;
+      /**
+       * Specifies the descriptive label for the screen.
+       */
+      label: string;
+      /**
+       * Specifies the unique identifier of the screen.
+       */
+      id: ScreenId;
     }
     /**
      * Enum of image types that can be disabled.
@@ -6556,8 +6977,16 @@ physiologically accurate emulations for medically recognized color vision defici
     export type setEmulatedVisionDeficiencyReturnValue = {
     }
     /**
-     * Overrides the Geolocation Position or Error. Omitting any of the parameters emulates position
-unavailable.
+     * Emulates the given OS text scale.
+     */
+    export type setEmulatedOSTextScaleParameters = {
+      scale?: number;
+    }
+    export type setEmulatedOSTextScaleReturnValue = {
+    }
+    /**
+     * Overrides the Geolocation Position or Error. Omitting latitude, longitude or
+accuracy emulates position unavailable.
      */
     export type setGeolocationOverrideParameters = {
       /**
@@ -6572,6 +7001,22 @@ unavailable.
        * Mock accuracy
        */
       accuracy?: number;
+      /**
+       * Mock altitude
+       */
+      altitude?: number;
+      /**
+       * Mock altitudeAccuracy
+       */
+      altitudeAccuracy?: number;
+      /**
+       * Mock heading
+       */
+      heading?: number;
+      /**
+       * Mock speed
+       */
+      speed?: number;
     }
     export type setGeolocationOverrideReturnValue = {
     }
@@ -6619,7 +7064,8 @@ platform-provided telemetry data.
     export type setPressureSourceOverrideEnabledReturnValue = {
     }
     /**
-     * Provides a given pressure state that will be processed and eventually be
+     * TODO: OBSOLETE: To remove when setPressureDataOverride is merged.
+Provides a given pressure state that will be processed and eventually be
 delivered to PressureObserver users. |source| must have been previously
 overridden by setPressureSourceOverrideEnabled.
      */
@@ -6628,6 +7074,18 @@ overridden by setPressureSourceOverrideEnabled.
       state: PressureState;
     }
     export type setPressureStateOverrideReturnValue = {
+    }
+    /**
+     * Provides a given pressure data set that will be processed and eventually be
+delivered to PressureObserver users. |source| must have been previously
+overridden by setPressureSourceOverrideEnabled.
+     */
+    export type setPressureDataOverrideParameters = {
+      source: PressureSource;
+      state: PressureState;
+      ownContributionEstimate?: number;
+    }
+    export type setPressureDataOverrideReturnValue = {
     }
     /**
      * Overrides the Idle state.
@@ -6776,6 +7234,17 @@ on Android.
     }
     export type setDisabledImageTypesReturnValue = {
     }
+    /**
+     * Override the value of navigator.connection.saveData
+     */
+    export type setDataSaverOverrideParameters = {
+      /**
+       * Override value. Omitting the parameter disables the override.
+       */
+      dataSaverEnabled?: boolean;
+    }
+    export type setDataSaverOverrideReturnValue = {
+    }
     export type setHardwareConcurrencyOverrideParameters = {
       /**
        * Hardware concurrency to report
@@ -6818,6 +7287,771 @@ on Android.
       enabled: boolean;
     }
     export type setAutomationOverrideReturnValue = {
+    }
+    /**
+     * Allows overriding the difference between the small and large viewport sizes, which determine the
+value of the `svh` and `lvh` unit, respectively. Only supported for top-level frames.
+     */
+    export type setSmallViewportHeightDifferenceOverrideParameters = {
+      /**
+       * This will cause an element of size 100svh to be `difference` pixels smaller than an element
+of size 100lvh.
+       */
+      difference: number;
+    }
+    export type setSmallViewportHeightDifferenceOverrideReturnValue = {
+    }
+    /**
+     * Returns device's screen configuration.
+     */
+    export type getScreenInfosParameters = {
+    }
+    export type getScreenInfosReturnValue = {
+      screenInfos: ScreenInfo[];
+    }
+    /**
+     * Add a new screen to the device. Only supported in headless mode.
+     */
+    export type addScreenParameters = {
+      /**
+       * Offset of the left edge of the screen in pixels.
+       */
+      left: number;
+      /**
+       * Offset of the top edge of the screen in pixels.
+       */
+      top: number;
+      /**
+       * The width of the screen in pixels.
+       */
+      width: number;
+      /**
+       * The height of the screen in pixels.
+       */
+      height: number;
+      /**
+       * Specifies the screen's work area. Default is entire screen.
+       */
+      workAreaInsets?: WorkAreaInsets;
+      /**
+       * Specifies the screen's device pixel ratio. Default is 1.
+       */
+      devicePixelRatio?: number;
+      /**
+       * Specifies the screen's rotation angle. Available values are 0, 90, 180 and 270. Default is 0.
+       */
+      rotation?: number;
+      /**
+       * Specifies the screen's color depth in bits. Default is 24.
+       */
+      colorDepth?: number;
+      /**
+       * Specifies the descriptive label for the screen. Default is none.
+       */
+      label?: string;
+      /**
+       * Indicates whether the screen is internal to the device or external, attached to the device. Default is false.
+       */
+      isInternal?: boolean;
+    }
+    export type addScreenReturnValue = {
+      screenInfo: ScreenInfo;
+    }
+    /**
+     * Remove screen from the device. Only supported in headless mode.
+     */
+    export type removeScreenParameters = {
+      screenId: ScreenId;
+    }
+    export type removeScreenReturnValue = {
+    }
+  }
+  
+  /**
+   * EventBreakpoints permits setting JavaScript breakpoints on operations and events
+occurring in native code invoked from JavaScript. Once breakpoint is hit, it is
+reported through Debugger domain, similarly to regular breakpoints being hit.
+   */
+  export module EventBreakpoints {
+    
+    
+    /**
+     * Sets breakpoint on particular native event.
+     */
+    export type setInstrumentationBreakpointParameters = {
+      /**
+       * Instrumentation name to stop on.
+       */
+      eventName: string;
+    }
+    export type setInstrumentationBreakpointReturnValue = {
+    }
+    /**
+     * Removes breakpoint on particular native event.
+     */
+    export type removeInstrumentationBreakpointParameters = {
+      /**
+       * Instrumentation name to stop on.
+       */
+      eventName: string;
+    }
+    export type removeInstrumentationBreakpointReturnValue = {
+    }
+    /**
+     * Removes all breakpoints
+     */
+    export type disableParameters = {
+    }
+    export type disableReturnValue = {
+    }
+  }
+  
+  /**
+   * Defines commands and events for browser extensions.
+   */
+  export module Extensions {
+    /**
+     * Storage areas.
+     */
+    export type StorageArea = "session"|"local"|"sync"|"managed";
+    
+    
+    /**
+     * Installs an unpacked extension from the filesystem similar to
+--load-extension CLI flags. Returns extension ID once the extension
+has been installed. Available if the client is connected using the
+--remote-debugging-pipe flag and the --enable-unsafe-extension-debugging
+flag is set.
+     */
+    export type loadUnpackedParameters = {
+      /**
+       * Absolute file path.
+       */
+      path: string;
+    }
+    export type loadUnpackedReturnValue = {
+      /**
+       * Extension id.
+       */
+      id: string;
+    }
+    /**
+     * Uninstalls an unpacked extension (others not supported) from the profile.
+Available if the client is connected using the --remote-debugging-pipe flag
+and the --enable-unsafe-extension-debugging.
+     */
+    export type uninstallParameters = {
+      /**
+       * Extension id.
+       */
+      id: string;
+    }
+    export type uninstallReturnValue = {
+    }
+    /**
+     * Gets data from extension storage in the given `storageArea`. If `keys` is
+specified, these are used to filter the result.
+     */
+    export type getStorageItemsParameters = {
+      /**
+       * ID of extension.
+       */
+      id: string;
+      /**
+       * StorageArea to retrieve data from.
+       */
+      storageArea: StorageArea;
+      /**
+       * Keys to retrieve.
+       */
+      keys?: string[];
+    }
+    export type getStorageItemsReturnValue = {
+      data: { [key: string]: string };
+    }
+    /**
+     * Removes `keys` from extension storage in the given `storageArea`.
+     */
+    export type removeStorageItemsParameters = {
+      /**
+       * ID of extension.
+       */
+      id: string;
+      /**
+       * StorageArea to remove data from.
+       */
+      storageArea: StorageArea;
+      /**
+       * Keys to remove.
+       */
+      keys: string[];
+    }
+    export type removeStorageItemsReturnValue = {
+    }
+    /**
+     * Clears extension storage in the given `storageArea`.
+     */
+    export type clearStorageItemsParameters = {
+      /**
+       * ID of extension.
+       */
+      id: string;
+      /**
+       * StorageArea to remove data from.
+       */
+      storageArea: StorageArea;
+    }
+    export type clearStorageItemsReturnValue = {
+    }
+    /**
+     * Sets `values` in extension storage in the given `storageArea`. The provided `values`
+will be merged with existing values in the storage area.
+     */
+    export type setStorageItemsParameters = {
+      /**
+       * ID of extension.
+       */
+      id: string;
+      /**
+       * StorageArea to set data in.
+       */
+      storageArea: StorageArea;
+      /**
+       * Values to set.
+       */
+      values: { [key: string]: string };
+    }
+    export type setStorageItemsReturnValue = {
+    }
+  }
+  
+  /**
+   * This domain allows interacting with the FedCM dialog.
+   */
+  export module FedCm {
+    /**
+     * Whether this is a sign-up or sign-in action for this account, i.e.
+whether this account has ever been used to sign in to this RP before.
+     */
+    export type LoginState = "SignIn"|"SignUp";
+    /**
+     * The types of FedCM dialogs.
+     */
+    export type DialogType = "AccountChooser"|"AutoReauthn"|"ConfirmIdpLogin"|"Error";
+    /**
+     * The buttons on the FedCM dialog.
+     */
+    export type DialogButton = "ConfirmIdpLoginContinue"|"ErrorGotIt"|"ErrorMoreDetails";
+    /**
+     * The URLs that each account has
+     */
+    export type AccountUrlType = "TermsOfService"|"PrivacyPolicy";
+    /**
+     * Corresponds to IdentityRequestAccount
+     */
+    export interface Account {
+      accountId: string;
+      email: string;
+      name: string;
+      givenName: string;
+      pictureUrl: string;
+      idpConfigUrl: string;
+      idpLoginUrl: string;
+      loginState: LoginState;
+      /**
+       * These two are only set if the loginState is signUp
+       */
+      termsOfServiceUrl?: string;
+      privacyPolicyUrl?: string;
+    }
+    
+    export type dialogShownPayload = {
+      dialogId: string;
+      dialogType: DialogType;
+      accounts: Account[];
+      /**
+       * These exist primarily so that the caller can verify the
+RP context was used appropriately.
+       */
+      title: string;
+      subtitle?: string;
+    }
+    /**
+     * Triggered when a dialog is closed, either by user action, JS abort,
+or a command below.
+     */
+    export type dialogClosedPayload = {
+      dialogId: string;
+    }
+    
+    export type enableParameters = {
+      /**
+       * Allows callers to disable the promise rejection delay that would
+normally happen, if this is unimportant to what's being tested.
+(step 4 of https://fedidcg.github.io/FedCM/#browser-api-rp-sign-in)
+       */
+      disableRejectionDelay?: boolean;
+    }
+    export type enableReturnValue = {
+    }
+    export type disableParameters = {
+    }
+    export type disableReturnValue = {
+    }
+    export type selectAccountParameters = {
+      dialogId: string;
+      accountIndex: number;
+    }
+    export type selectAccountReturnValue = {
+    }
+    export type clickDialogButtonParameters = {
+      dialogId: string;
+      dialogButton: DialogButton;
+    }
+    export type clickDialogButtonReturnValue = {
+    }
+    export type openUrlParameters = {
+      dialogId: string;
+      accountIndex: number;
+      accountUrlType: AccountUrlType;
+    }
+    export type openUrlReturnValue = {
+    }
+    export type dismissDialogParameters = {
+      dialogId: string;
+      triggerCooldown?: boolean;
+    }
+    export type dismissDialogReturnValue = {
+    }
+    /**
+     * Resets the cooldown time, if any, to allow the next FedCM call to show
+a dialog even if one was recently dismissed by the user.
+     */
+    export type resetCooldownParameters = {
+    }
+    export type resetCooldownReturnValue = {
+    }
+  }
+  
+  /**
+   * A domain for letting clients substitute browser's network layer with client code.
+   */
+  export module Fetch {
+    /**
+     * Unique request identifier.
+Note that this does not identify individual HTTP requests that are part of
+a network request.
+     */
+    export type RequestId = string;
+    /**
+     * Stages of the request to handle. Request will intercept before the request is
+sent. Response will intercept after the response is received (but before response
+body is received).
+     */
+    export type RequestStage = "Request"|"Response";
+    export interface RequestPattern {
+      /**
+       * Wildcards (`'*'` -> zero or more, `'?'` -> exactly one) are allowed. Escape character is
+backslash. Omitting is equivalent to `"*"`.
+       */
+      urlPattern?: string;
+      /**
+       * If set, only requests for matching resource types will be intercepted.
+       */
+      resourceType?: Network.ResourceType;
+      /**
+       * Stage at which to begin intercepting requests. Default is Request.
+       */
+      requestStage?: RequestStage;
+    }
+    /**
+     * Response HTTP header entry
+     */
+    export interface HeaderEntry {
+      name: string;
+      value: string;
+    }
+    /**
+     * Authorization challenge for HTTP status code 401 or 407.
+     */
+    export interface AuthChallenge {
+      /**
+       * Source of the authentication challenge.
+       */
+      source?: "Server"|"Proxy";
+      /**
+       * Origin of the challenger.
+       */
+      origin: string;
+      /**
+       * The authentication scheme used, such as basic or digest
+       */
+      scheme: string;
+      /**
+       * The realm of the challenge. May be empty.
+       */
+      realm: string;
+    }
+    /**
+     * Response to an AuthChallenge.
+     */
+    export interface AuthChallengeResponse {
+      /**
+       * The decision on what to do in response to the authorization challenge.  Default means
+deferring to the default behavior of the net stack, which will likely either the Cancel
+authentication or display a popup dialog box.
+       */
+      response: "Default"|"CancelAuth"|"ProvideCredentials";
+      /**
+       * The username to provide, possibly empty. Should only be set if response is
+ProvideCredentials.
+       */
+      username?: string;
+      /**
+       * The password to provide, possibly empty. Should only be set if response is
+ProvideCredentials.
+       */
+      password?: string;
+    }
+    
+    /**
+     * Issued when the domain is enabled and the request URL matches the
+specified filter. The request is paused until the client responds
+with one of continueRequest, failRequest or fulfillRequest.
+The stage of the request can be determined by presence of responseErrorReason
+and responseStatusCode -- the request is at the response stage if either
+of these fields is present and in the request stage otherwise.
+Redirect responses and subsequent requests are reported similarly to regular
+responses and requests. Redirect responses may be distinguished by the value
+of `responseStatusCode` (which is one of 301, 302, 303, 307, 308) along with
+presence of the `location` header. Requests resulting from a redirect will
+have `redirectedRequestId` field set.
+     */
+    export type requestPausedPayload = {
+      /**
+       * Each request the page makes will have a unique id.
+       */
+      requestId: RequestId;
+      /**
+       * The details of the request.
+       */
+      request: Network.Request;
+      /**
+       * The id of the frame that initiated the request.
+       */
+      frameId: Page.FrameId;
+      /**
+       * How the requested resource will be used.
+       */
+      resourceType: Network.ResourceType;
+      /**
+       * Response error if intercepted at response stage.
+       */
+      responseErrorReason?: Network.ErrorReason;
+      /**
+       * Response code if intercepted at response stage.
+       */
+      responseStatusCode?: number;
+      /**
+       * Response status text if intercepted at response stage.
+       */
+      responseStatusText?: string;
+      /**
+       * Response headers if intercepted at the response stage.
+       */
+      responseHeaders?: HeaderEntry[];
+      /**
+       * If the intercepted request had a corresponding Network.requestWillBeSent event fired for it,
+then this networkId will be the same as the requestId present in the requestWillBeSent event.
+       */
+      networkId?: Network.RequestId;
+      /**
+       * If the request is due to a redirect response from the server, the id of the request that
+has caused the redirect.
+       */
+      redirectedRequestId?: RequestId;
+    }
+    /**
+     * Issued when the domain is enabled with handleAuthRequests set to true.
+The request is paused until client responds with continueWithAuth.
+     */
+    export type authRequiredPayload = {
+      /**
+       * Each request the page makes will have a unique id.
+       */
+      requestId: RequestId;
+      /**
+       * The details of the request.
+       */
+      request: Network.Request;
+      /**
+       * The id of the frame that initiated the request.
+       */
+      frameId: Page.FrameId;
+      /**
+       * How the requested resource will be used.
+       */
+      resourceType: Network.ResourceType;
+      /**
+       * Details of the Authorization Challenge encountered.
+If this is set, client should respond with continueRequest that
+contains AuthChallengeResponse.
+       */
+      authChallenge: AuthChallenge;
+    }
+    
+    /**
+     * Disables the fetch domain.
+     */
+    export type disableParameters = {
+    }
+    export type disableReturnValue = {
+    }
+    /**
+     * Enables issuing of requestPaused events. A request will be paused until client
+calls one of failRequest, fulfillRequest or continueRequest/continueWithAuth.
+     */
+    export type enableParameters = {
+      /**
+       * If specified, only requests matching any of these patterns will produce
+fetchRequested event and will be paused until clients response. If not set,
+all requests will be affected.
+       */
+      patterns?: RequestPattern[];
+      /**
+       * If true, authRequired events will be issued and requests will be paused
+expecting a call to continueWithAuth.
+       */
+      handleAuthRequests?: boolean;
+    }
+    export type enableReturnValue = {
+    }
+    /**
+     * Causes the request to fail with specified reason.
+     */
+    export type failRequestParameters = {
+      /**
+       * An id the client received in requestPaused event.
+       */
+      requestId: RequestId;
+      /**
+       * Causes the request to fail with the given reason.
+       */
+      errorReason: Network.ErrorReason;
+    }
+    export type failRequestReturnValue = {
+    }
+    /**
+     * Provides response to the request.
+     */
+    export type fulfillRequestParameters = {
+      /**
+       * An id the client received in requestPaused event.
+       */
+      requestId: RequestId;
+      /**
+       * An HTTP response code.
+       */
+      responseCode: number;
+      /**
+       * Response headers.
+       */
+      responseHeaders?: HeaderEntry[];
+      /**
+       * Alternative way of specifying response headers as a \0-separated
+series of name: value pairs. Prefer the above method unless you
+need to represent some non-UTF8 values that can't be transmitted
+over the protocol as text.
+       */
+      binaryResponseHeaders?: binary;
+      /**
+       * A response body. If absent, original response body will be used if
+the request is intercepted at the response stage and empty body
+will be used if the request is intercepted at the request stage.
+       */
+      body?: binary;
+      /**
+       * A textual representation of responseCode.
+If absent, a standard phrase matching responseCode is used.
+       */
+      responsePhrase?: string;
+    }
+    export type fulfillRequestReturnValue = {
+    }
+    /**
+     * Continues the request, optionally modifying some of its parameters.
+     */
+    export type continueRequestParameters = {
+      /**
+       * An id the client received in requestPaused event.
+       */
+      requestId: RequestId;
+      /**
+       * If set, the request url will be modified in a way that's not observable by page.
+       */
+      url?: string;
+      /**
+       * If set, the request method is overridden.
+       */
+      method?: string;
+      /**
+       * If set, overrides the post data in the request.
+       */
+      postData?: binary;
+      /**
+       * If set, overrides the request headers. Note that the overrides do not
+extend to subsequent redirect hops, if a redirect happens. Another override
+may be applied to a different request produced by a redirect.
+       */
+      headers?: HeaderEntry[];
+      /**
+       * If set, overrides response interception behavior for this request.
+       */
+      interceptResponse?: boolean;
+    }
+    export type continueRequestReturnValue = {
+    }
+    /**
+     * Continues a request supplying authChallengeResponse following authRequired event.
+     */
+    export type continueWithAuthParameters = {
+      /**
+       * An id the client received in authRequired event.
+       */
+      requestId: RequestId;
+      /**
+       * Response to  with an authChallenge.
+       */
+      authChallengeResponse: AuthChallengeResponse;
+    }
+    export type continueWithAuthReturnValue = {
+    }
+    /**
+     * Continues loading of the paused response, optionally modifying the
+response headers. If either responseCode or headers are modified, all of them
+must be present.
+     */
+    export type continueResponseParameters = {
+      /**
+       * An id the client received in requestPaused event.
+       */
+      requestId: RequestId;
+      /**
+       * An HTTP response code. If absent, original response code will be used.
+       */
+      responseCode?: number;
+      /**
+       * A textual representation of responseCode.
+If absent, a standard phrase matching responseCode is used.
+       */
+      responsePhrase?: string;
+      /**
+       * Response headers. If absent, original response headers will be used.
+       */
+      responseHeaders?: HeaderEntry[];
+      /**
+       * Alternative way of specifying response headers as a \0-separated
+series of name: value pairs. Prefer the above method unless you
+need to represent some non-UTF8 values that can't be transmitted
+over the protocol as text.
+       */
+      binaryResponseHeaders?: binary;
+    }
+    export type continueResponseReturnValue = {
+    }
+    /**
+     * Causes the body of the response to be received from the server and
+returned as a single string. May only be issued for a request that
+is paused in the Response stage and is mutually exclusive with
+takeResponseBodyForInterceptionAsStream. Calling other methods that
+affect the request or disabling fetch domain before body is received
+results in an undefined behavior.
+Note that the response body is not available for redirects. Requests
+paused in the _redirect received_ state may be differentiated by
+`responseCode` and presence of `location` response header, see
+comments to `requestPaused` for details.
+     */
+    export type getResponseBodyParameters = {
+      /**
+       * Identifier for the intercepted request to get body for.
+       */
+      requestId: RequestId;
+    }
+    export type getResponseBodyReturnValue = {
+      /**
+       * Response body.
+       */
+      body: string;
+      /**
+       * True, if content was sent as base64.
+       */
+      base64Encoded: boolean;
+    }
+    /**
+     * Returns a handle to the stream representing the response body.
+The request must be paused in the HeadersReceived stage.
+Note that after this command the request can't be continued
+as is -- client either needs to cancel it or to provide the
+response body.
+The stream only supports sequential read, IO.read will fail if the position
+is specified.
+This method is mutually exclusive with getResponseBody.
+Calling other methods that affect the request or disabling fetch
+domain before body is received results in an undefined behavior.
+     */
+    export type takeResponseBodyAsStreamParameters = {
+      requestId: RequestId;
+    }
+    export type takeResponseBodyAsStreamReturnValue = {
+      stream: IO.StreamHandle;
+    }
+  }
+  
+  export module FileSystem {
+    export interface File {
+      name: string;
+      /**
+       * Timestamp
+       */
+      lastModified: Network.TimeSinceEpoch;
+      /**
+       * Size in bytes
+       */
+      size: number;
+      type: string;
+    }
+    export interface Directory {
+      name: string;
+      nestedDirectories: string[];
+      /**
+       * Files that are directly nested under this directory.
+       */
+      nestedFiles: File[];
+    }
+    export interface BucketFileSystemLocator {
+      /**
+       * Storage key
+       */
+      storageKey: Storage.SerializedStorageKey;
+      /**
+       * Bucket name. Not passing a `bucketName` will retrieve the default Bucket. (https://developer.mozilla.org/en-US/docs/Web/API/Storage_API#storage_buckets)
+       */
+      bucketName?: string;
+      /**
+       * Path to the directory using each path component as an array item.
+       */
+      pathComponents: string[];
+    }
+    
+    
+    export type getDirectoryParameters = {
+      bucketFileSystemLocator: BucketFileSystemLocator;
+    }
+    export type getDirectoryReturnValue = {
+      /**
+       * Returns the directory object at the path.
+       */
+      directory: Directory;
     }
   }
   
@@ -6969,54 +8203,6 @@ following the last read). Some types of streams may only support sequential read
        * UUID of the specified Blob.
        */
       uuid: string;
-    }
-  }
-  
-  export module FileSystem {
-    export interface File {
-      name: string;
-      /**
-       * Timestamp
-       */
-      lastModified: Network.TimeSinceEpoch;
-      /**
-       * Size in bytes
-       */
-      size: number;
-      type: string;
-    }
-    export interface Directory {
-      name: string;
-      nestedDirectories: string[];
-      /**
-       * Files that are directly nested under this directory.
-       */
-      nestedFiles: File[];
-    }
-    export interface BucketFileSystemLocator {
-      /**
-       * Storage key
-       */
-      storageKey: Storage.SerializedStorageKey;
-      /**
-       * Bucket name. Not passing a `bucketName` will retrieve the default Bucket. (https://developer.mozilla.org/en-US/docs/Web/API/Storage_API#storage_buckets)
-       */
-      bucketName?: string;
-      /**
-       * Path to the directory using each path component as an array item.
-       */
-      pathComponents: string[];
-    }
-    
-    
-    export type getDirectoryParameters = {
-      bucketFileSystemLocator: BucketFileSystemLocator;
-    }
-    export type getDirectoryReturnValue = {
-      /**
-       * Returns the directory object at the path.
-       */
-      directory: Directory;
     }
   }
   
@@ -7281,9 +8467,9 @@ Security origin.
        */
       objectStoreName: string;
       /**
-       * Index name, empty string for object store data requests.
+       * Index name. If not specified, it performs an object store data request.
        */
-      indexName: string;
+      indexName?: string;
       /**
        * Number of records to skip.
        */
@@ -7941,6 +9127,10 @@ for the preferred input type).
      * Fired when debugging target has reloaded after crash
      */
     export type targetReloadedAfterCrashPayload = void;
+    /**
+     * Fired on worker targets when main worker script and any imported scripts have been evaluated.
+     */
+    export type workerScriptLoadedPayload = void;
     
     /**
      * Disables inspector domain notifications.
@@ -8368,6 +9558,140 @@ transform/scrolling purposes only.
     }
   }
   
+  /**
+   * This domain allows detailed inspection of media elements.
+   */
+  export module Media {
+    /**
+     * Players will get an ID that is unique within the agent context.
+     */
+    export type PlayerId = string;
+    export type Timestamp = number;
+    /**
+     * Have one type per entry in MediaLogRecord::Type
+Corresponds to kMessage
+     */
+    export interface PlayerMessage {
+      /**
+       * Keep in sync with MediaLogMessageLevel
+We are currently keeping the message level 'error' separate from the
+PlayerError type because right now they represent different things,
+this one being a DVLOG(ERROR) style log message that gets printed
+based on what log level is selected in the UI, and the other is a
+representation of a media::PipelineStatus object. Soon however we're
+going to be moving away from using PipelineStatus for errors and
+introducing a new error type which should hopefully let us integrate
+the error log level into the PlayerError type.
+       */
+      level: "error"|"warning"|"info"|"debug";
+      message: string;
+    }
+    /**
+     * Corresponds to kMediaPropertyChange
+     */
+    export interface PlayerProperty {
+      name: string;
+      value: string;
+    }
+    /**
+     * Corresponds to kMediaEventTriggered
+     */
+    export interface PlayerEvent {
+      timestamp: Timestamp;
+      value: string;
+    }
+    /**
+     * Represents logged source line numbers reported in an error.
+NOTE: file and line are from chromium c++ implementation code, not js.
+     */
+    export interface PlayerErrorSourceLocation {
+      file: string;
+      line: number;
+    }
+    /**
+     * Corresponds to kMediaError
+     */
+    export interface PlayerError {
+      errorType: string;
+      /**
+       * Code is the numeric enum entry for a specific set of error codes, such
+as PipelineStatusCodes in media/base/pipeline_status.h
+       */
+      code: number;
+      /**
+       * A trace of where this error was caused / where it passed through.
+       */
+      stack: PlayerErrorSourceLocation[];
+      /**
+       * Errors potentially have a root cause error, ie, a DecoderError might be
+caused by an WindowsError
+       */
+      cause: PlayerError[];
+      /**
+       * Extra data attached to an error, such as an HRESULT, Video Codec, etc.
+       */
+      data: { [key: string]: string };
+    }
+    export interface Player {
+      playerId: PlayerId;
+      domNodeId?: DOM.BackendNodeId;
+    }
+    
+    /**
+     * This can be called multiple times, and can be used to set / override /
+remove player properties. A null propValue indicates removal.
+     */
+    export type playerPropertiesChangedPayload = {
+      playerId: PlayerId;
+      properties: PlayerProperty[];
+    }
+    /**
+     * Send events as a list, allowing them to be batched on the browser for less
+congestion. If batched, events must ALWAYS be in chronological order.
+     */
+    export type playerEventsAddedPayload = {
+      playerId: PlayerId;
+      events: PlayerEvent[];
+    }
+    /**
+     * Send a list of any messages that need to be delivered.
+     */
+    export type playerMessagesLoggedPayload = {
+      playerId: PlayerId;
+      messages: PlayerMessage[];
+    }
+    /**
+     * Send a list of any errors that need to be delivered.
+     */
+    export type playerErrorsRaisedPayload = {
+      playerId: PlayerId;
+      errors: PlayerError[];
+    }
+    /**
+     * Called whenever a player is created, or when a new agent joins and receives
+a list of active players. If an agent is restored, it will receive one
+event for each active player.
+     */
+    export type playerCreatedPayload = {
+      player: Player;
+    }
+    
+    /**
+     * Enables the Media domain
+     */
+    export type enableParameters = {
+    }
+    export type enableReturnValue = {
+    }
+    /**
+     * Disables the Media domain.
+     */
+    export type disableParameters = {
+    }
+    export type disableReturnValue = {
+    }
+  }
+  
   export module Memory {
     /**
      * Memory pressure level.
@@ -8552,7 +9876,7 @@ file, data and other requests and responses, their headers, bodies, timing, etc.
     /**
      * Resource type as it was perceived by the rendering engine.
      */
-    export type ResourceType = "Document"|"Stylesheet"|"Image"|"Media"|"Font"|"Script"|"TextTrack"|"XHR"|"Fetch"|"Prefetch"|"EventSource"|"WebSocket"|"Manifest"|"SignedExchange"|"Ping"|"CSPViolationReport"|"Preflight"|"Other";
+    export type ResourceType = "Document"|"Stylesheet"|"Image"|"Media"|"Font"|"Script"|"TextTrack"|"XHR"|"Fetch"|"Prefetch"|"EventSource"|"WebSocket"|"Manifest"|"SignedExchange"|"Ping"|"CSPViolationReport"|"Preflight"|"FedCM"|"Other";
     /**
      * Unique loader identifier.
      */
@@ -8762,6 +10086,10 @@ passed by the developer (e.g. via "fetch") as understood by the backend.
 request corresponding to the main frame.
        */
       isSameSite?: boolean;
+      /**
+       * True when the resource request is ad-related.
+       */
+      isAdRelated?: boolean;
     }
     /**
      * Details of a signed certificate timestamp (SCT).
@@ -8875,7 +10203,12 @@ applicable or not known.
     /**
      * The reason why request was blocked.
      */
-    export type BlockedReason = "other"|"csp"|"mixed-content"|"origin"|"inspector"|"subresource-filter"|"content-type"|"coep-frame-resource-needs-coep-header"|"coop-sandboxed-iframe-cannot-navigate-to-coop-page"|"corp-not-same-origin"|"corp-not-same-origin-after-defaulted-to-same-origin-by-coep"|"corp-not-same-origin-after-defaulted-to-same-origin-by-dip"|"corp-not-same-origin-after-defaulted-to-same-origin-by-coep-and-dip"|"corp-not-same-site"|"sri-message-signature-mismatch";
+    export type BlockedReason = "other"|"csp"|"mixed-content"|"origin"|"inspector"|"integrity"|"subresource-filter"|"content-type"|"coep-frame-resource-needs-coep-header"|"coop-sandboxed-iframe-cannot-navigate-to-coop-page"|"corp-not-same-origin"|"corp-not-same-origin-after-defaulted-to-same-origin-by-coep"|"corp-not-same-origin-after-defaulted-to-same-origin-by-dip"|"corp-not-same-origin-after-defaulted-to-same-origin-by-coep-and-dip"|"corp-not-same-site"|"sri-message-signature-mismatch";
+    /**
+     * Sets Controls for IP Proxy of requests.
+Page reload is required before the new behavior will be observed.
+     */
+    export type IpProxyStatus = "Available"|"FeatureNotEnabled"|"MaskedDomainListNotEnabled"|"MaskedDomainListNotPopulated"|"AuthTokensUnavailable"|"Unavailable"|"BypassedByDevTools";
     /**
      * The reason why request was blocked.
      */
@@ -8914,7 +10247,7 @@ records.
     /**
      * Source of service worker router.
      */
-    export type ServiceWorkerRouterSource = "network"|"cache"|"fetch-event"|"race-network-and-fetch-handler";
+    export type ServiceWorkerRouterSource = "network"|"cache"|"fetch-event"|"race-network-and-fetch-handler"|"race-network-and-cache";
     export interface ServiceWorkerRouterInfo {
       /**
        * ID of the rule matched. If there is a matched rule, this field will
@@ -9046,6 +10379,11 @@ Otherwise, the API is not used.
        * Security details for the request.
        */
       securityDetails?: SecurityDetails;
+      /**
+       * Indicates whether the request was sent through IP Protection proxies. If
+set to true, the request used the IP Protection privacy feature.
+       */
+      isIpProtectionUsed?: boolean;
     }
     /**
      * WebSocket request data.
@@ -9132,7 +10470,7 @@ If the opcode isn't 1, then payloadData is a base64 encoded string representing 
       /**
        * Type of this initiator.
        */
-      type: "parser"|"script"|"preload"|"SignedExchange"|"preflight"|"other";
+      type: "parser"|"script"|"preload"|"SignedExchange"|"preflight"|"FedCM"|"other";
       /**
        * Initiator JavaScript stack trace, set for Script only.
 Requires the Debugger domain to be enabled.
@@ -9194,6 +10532,9 @@ of the request to the endpoint that set the cookie.
       path: string;
       /**
        * Cookie expiration date as the number of seconds since the UNIX epoch.
+The value is set to -1 if the expiry date is not set.
+The value can be null for values that cannot be represented in
+JSON (±Inf).
        */
       expires: number;
       /**
@@ -9539,6 +10880,11 @@ https://wicg.github.io/webpackage/draft-yasskin-httpbis-origin-signed-exchanges-
        */
       outerResponse: Response;
       /**
+       * Whether network response for the signed exchange was accompanied by
+extra headers.
+       */
+      hasExtraInfo: boolean;
+      /**
        * Information about the signed exchange header.
        */
       header?: SignedExchangeHeader;
@@ -9555,6 +10901,54 @@ https://wicg.github.io/webpackage/draft-yasskin-httpbis-origin-signed-exchanges-
      * List of content encodings supported by the backend.
      */
     export type ContentEncoding = "deflate"|"gzip"|"br"|"zstd";
+    export interface NetworkConditions {
+      /**
+       * Only matching requests will be affected by these conditions. Patterns use the URLPattern constructor string
+syntax (https://urlpattern.spec.whatwg.org/) and must be absolute. If the pattern is empty, all requests are
+matched (including p2p connections).
+       */
+      urlPattern: string;
+      /**
+       * Minimum latency from request sent to response headers received (ms).
+       */
+      latency: number;
+      /**
+       * Maximal aggregated download throughput (bytes/sec). -1 disables download throttling.
+       */
+      downloadThroughput: number;
+      /**
+       * Maximal aggregated upload throughput (bytes/sec).  -1 disables upload throttling.
+       */
+      uploadThroughput: number;
+      /**
+       * Connection type if known.
+       */
+      connectionType?: ConnectionType;
+      /**
+       * WebRTC packet loss (percent, 0-100). 0 disables packet loss emulation, 100 drops all the packets.
+       */
+      packetLoss?: number;
+      /**
+       * WebRTC packet queue length (packet). 0 removes any queue length limitations.
+       */
+      packetQueueLength?: number;
+      /**
+       * WebRTC packetReordering feature.
+       */
+      packetReordering?: boolean;
+    }
+    export interface BlockPattern {
+      /**
+       * URL pattern to match. Patterns use the URLPattern constructor string syntax
+(https://urlpattern.spec.whatwg.org/) and must be absolute. Example: `<example>`.
+       */
+      urlPattern: string;
+      /**
+       * Whether or not to block the pattern. If false, a matching request will not be blocked even if it matches a later
+`BlockPattern`.
+       */
+      block: boolean;
+    }
     export type DirectSocketDnsQueryType = "ipv4"|"ipv6";
     export interface DirectTCPSocketOptions {
       /**
@@ -9575,8 +10969,41 @@ https://wicg.github.io/webpackage/draft-yasskin-httpbis-origin-signed-exchanges-
       receiveBufferSize?: number;
       dnsQueryType?: DirectSocketDnsQueryType;
     }
+    export interface DirectUDPSocketOptions {
+      remoteAddr?: string;
+      /**
+       * Unsigned int 16.
+       */
+      remotePort?: number;
+      localAddr?: string;
+      /**
+       * Unsigned int 16.
+       */
+      localPort?: number;
+      dnsQueryType?: DirectSocketDnsQueryType;
+      /**
+       * Expected to be unsigned integer.
+       */
+      sendBufferSize?: number;
+      /**
+       * Expected to be unsigned integer.
+       */
+      receiveBufferSize?: number;
+    }
+    export interface DirectUDPMessage {
+      data: binary;
+      /**
+       * Null for connected mode.
+       */
+      remoteAddr?: string;
+      /**
+       * Null for connected mode.
+Expected to be unsigned integer.
+       */
+      remotePort?: number;
+    }
     export type PrivateNetworkRequestPolicy = "Allow"|"BlockFromInsecureToMorePrivate"|"WarnFromInsecureToMorePrivate"|"PreflightBlock"|"PreflightWarn"|"PermissionBlock"|"PermissionWarn";
-    export type IPAddressSpace = "Local"|"Private"|"Public"|"Unknown";
+    export type IPAddressSpace = "Loopback"|"Local"|"Public"|"Unknown";
     export interface ConnectTiming {
       /**
        * Timing's requestTime is a baseline in seconds, while the other numbers are ticks in
@@ -10192,6 +11619,79 @@ or were emitted for this request.
       timestamp: MonotonicTime;
     }
     /**
+     * Fired when data is sent to tcp direct socket stream.
+     */
+    export type directTCPSocketChunkSentPayload = {
+      identifier: RequestId;
+      data: binary;
+      timestamp: MonotonicTime;
+    }
+    /**
+     * Fired when data is received from tcp direct socket stream.
+     */
+    export type directTCPSocketChunkReceivedPayload = {
+      identifier: RequestId;
+      data: binary;
+      timestamp: MonotonicTime;
+    }
+    /**
+     * Fired upon direct_socket.UDPSocket creation.
+     */
+    export type directUDPSocketCreatedPayload = {
+      identifier: RequestId;
+      options: DirectUDPSocketOptions;
+      timestamp: MonotonicTime;
+      initiator?: Initiator;
+    }
+    /**
+     * Fired when direct_socket.UDPSocket connection is opened.
+     */
+    export type directUDPSocketOpenedPayload = {
+      identifier: RequestId;
+      localAddr: string;
+      /**
+       * Expected to be unsigned integer.
+       */
+      localPort: number;
+      timestamp: MonotonicTime;
+      remoteAddr?: string;
+      /**
+       * Expected to be unsigned integer.
+       */
+      remotePort?: number;
+    }
+    /**
+     * Fired when direct_socket.UDPSocket is aborted.
+     */
+    export type directUDPSocketAbortedPayload = {
+      identifier: RequestId;
+      errorMessage: string;
+      timestamp: MonotonicTime;
+    }
+    /**
+     * Fired when direct_socket.UDPSocket is closed.
+     */
+    export type directUDPSocketClosedPayload = {
+      identifier: RequestId;
+      timestamp: MonotonicTime;
+    }
+    /**
+     * Fired when message is sent to udp direct socket stream.
+     */
+    export type directUDPSocketChunkSentPayload = {
+      identifier: RequestId;
+      message: DirectUDPMessage;
+      timestamp: MonotonicTime;
+    }
+    /**
+     * Fired when message is received from udp direct socket stream.
+     */
+    export type directUDPSocketChunkReceivedPayload = {
+      identifier: RequestId;
+      message: DirectUDPMessage;
+      timestamp: MonotonicTime;
+    }
+    /**
      * Fired when additional information about a requestWillBeSent event is available from the
 network stack. Not every requestWillBeSent event will have an additional
 requestWillBeSentExtraInfo fired for it, and there is no guarantee whether requestWillBeSent
@@ -10223,6 +11723,11 @@ the request and the ones not sent; the latter are distinguished by having blocke
        * Whether the site has partitioned cookies stored in a partition different than the current one.
        */
       siteHasCookieInOtherPartition?: boolean;
+      /**
+       * The network conditions id if this request was affected by network conditions configured via
+emulateNetworkConditionsByRule.
+       */
+      appliedNetworkConditionsId?: string;
     }
     /**
      * Fired when additional information about a responseReceived event is available from the network
@@ -10330,76 +11835,6 @@ preemptively (e.g. a cache hit).
      */
     export type policyUpdatedPayload = void;
     /**
-     * Fired once when parsing the .wbn file has succeeded.
-The event contains the information about the web bundle contents.
-     */
-    export type subresourceWebBundleMetadataReceivedPayload = {
-      /**
-       * Request identifier. Used to match this information to another event.
-       */
-      requestId: RequestId;
-      /**
-       * A list of URLs of resources in the subresource Web Bundle.
-       */
-      urls: string[];
-    }
-    /**
-     * Fired once when parsing the .wbn file has failed.
-     */
-    export type subresourceWebBundleMetadataErrorPayload = {
-      /**
-       * Request identifier. Used to match this information to another event.
-       */
-      requestId: RequestId;
-      /**
-       * Error message
-       */
-      errorMessage: string;
-    }
-    /**
-     * Fired when handling requests for resources within a .wbn file.
-Note: this will only be fired for resources that are requested by the webpage.
-     */
-    export type subresourceWebBundleInnerResponseParsedPayload = {
-      /**
-       * Request identifier of the subresource request
-       */
-      innerRequestId: RequestId;
-      /**
-       * URL of the subresource resource.
-       */
-      innerRequestURL: string;
-      /**
-       * Bundle request identifier. Used to match this information to another event.
-This made be absent in case when the instrumentation was enabled only
-after webbundle was parsed.
-       */
-      bundleRequestId?: RequestId;
-    }
-    /**
-     * Fired when request for resources within a .wbn file failed.
-     */
-    export type subresourceWebBundleInnerResponseErrorPayload = {
-      /**
-       * Request identifier of the subresource request
-       */
-      innerRequestId: RequestId;
-      /**
-       * URL of the subresource resource.
-       */
-      innerRequestURL: string;
-      /**
-       * Error message
-       */
-      errorMessage: string;
-      /**
-       * Bundle request identifier. Used to match this information to another event.
-This made be absent in case when the instrumentation was enabled only
-after webbundle was parsed.
-       */
-      bundleRequestId?: RequestId;
-    }
-    /**
      * Is sent whenever a new report is added.
 And after 'enableReportingApi' for all existing reports.
      */
@@ -10417,6 +11852,29 @@ And after 'enableReportingApi' for all existing reports.
       endpoints: ReportingApiEndpoint[];
     }
     
+    /**
+     * Returns enum representing if IP Proxy of requests is available
+or reason it is not active.
+     */
+    export type getIPProtectionProxyStatusParameters = {
+    }
+    export type getIPProtectionProxyStatusReturnValue = {
+      /**
+       * Whether IP proxy is available
+       */
+      status: IpProxyStatus;
+    }
+    /**
+     * Sets bypass IP Protection Proxy boolean.
+     */
+    export type setIPProtectionProxyBypassEnabledParameters = {
+      /**
+       * Whether IP Proxy is being bypassed by devtools; false by default.
+       */
+      enabled: boolean;
+    }
+    export type setIPProtectionProxyBypassEnabledReturnValue = {
+    }
     /**
      * Sets a list of content encodings that will be accepted. Empty list means no encoding is accepted.
      */
@@ -10565,7 +12023,8 @@ all partition key attributes match the cookie partition key attribute.
     export type disableReturnValue = {
     }
     /**
-     * Activates emulation of network conditions.
+     * Activates emulation of network conditions. This command is deprecated in favor of the emulateNetworkConditionsByRule
+and overrideNetworkState commands, which can be used together to the same effect.
      */
     export type emulateNetworkConditionsParameters = {
       /**
@@ -10604,6 +12063,57 @@ all partition key attributes match the cookie partition key attribute.
     export type emulateNetworkConditionsReturnValue = {
     }
     /**
+     * Activates emulation of network conditions for individual requests using URL match patterns. Unlike the deprecated
+Network.emulateNetworkConditions this method does not affect `navigator` state. Use Network.overrideNetworkState to
+explicitly modify `navigator` behavior.
+     */
+    export type emulateNetworkConditionsByRuleParameters = {
+      /**
+       * True to emulate internet disconnection.
+       */
+      offline: boolean;
+      /**
+       * Configure conditions for matching requests. If multiple entries match a request, the first entry wins.  Global
+conditions can be configured by leaving the urlPattern for the conditions empty. These global conditions are
+also applied for throttling of p2p connections.
+       */
+      matchedNetworkConditions: NetworkConditions[];
+    }
+    export type emulateNetworkConditionsByRuleReturnValue = {
+      /**
+       * An id for each entry in matchedNetworkConditions. The id will be included in the requestWillBeSentExtraInfo for
+requests affected by a rule.
+       */
+      ruleIds: string[];
+    }
+    /**
+     * Override the state of navigator.onLine and navigator.connection.
+     */
+    export type overrideNetworkStateParameters = {
+      /**
+       * True to emulate internet disconnection.
+       */
+      offline: boolean;
+      /**
+       * Minimum latency from request sent to response headers received (ms).
+       */
+      latency: number;
+      /**
+       * Maximal aggregated download throughput (bytes/sec). -1 disables download throttling.
+       */
+      downloadThroughput: number;
+      /**
+       * Maximal aggregated upload throughput (bytes/sec).  -1 disables upload throttling.
+       */
+      uploadThroughput: number;
+      /**
+       * Connection type if known.
+       */
+      connectionType?: ConnectionType;
+    }
+    export type overrideNetworkStateReturnValue = {
+    }
+    /**
      * Enables network tracking, network events will now be delivered to the client.
      */
     export type enableParameters = {
@@ -10619,6 +12129,16 @@ all partition key attributes match the cookie partition key attribute.
        * Longest post body size (in bytes) that would be included in requestWillBeSent notification
        */
       maxPostDataSize?: number;
+      /**
+       * Whether DirectSocket chunk send/receive events should be reported.
+       */
+      reportDirectSocketTraffic?: boolean;
+      /**
+       * Enable storing response bodies outside of renderer, so that these survive
+a cross-process navigation. Requires maxTotalBufferSize to be set.
+Currently defaults to false.
+       */
+      enableDurableMessages?: boolean;
     }
     export type enableReturnValue = {
     }
@@ -10775,9 +12295,14 @@ attribute, user, password.
      */
     export type setBlockedURLsParameters = {
       /**
+       * Patterns to match in the order in which they are given. These patterns
+also take precedence over any wildcard patterns defined in `urls`.
+       */
+      urlPatterns?: BlockPattern[];
+      /**
        * URL patterns to block. Wildcards ('*') are allowed.
        */
-      urls: string[];
+      urls?: string[];
     }
     export type setBlockedURLsReturnValue = {
     }
@@ -11005,7 +12530,7 @@ should be omitted for worker targets.
     }
     /**
      * Sets Controls for third-party cookie access
-Page reload is required before the new cookie bahavior will be observed
+Page reload is required before the new cookie behavior will be observed
      */
     export type setCookieControlsParameters = {
       /**
@@ -11419,7 +12944,7 @@ Page reload is required before the new cookie bahavior will be observed
        */
       maskColor?: DOM.RGBA;
     }
-    export type InspectMode = "searchForNode"|"searchForUAShadowDOM"|"captureAreaScreenshot"|"showDistances"|"none";
+    export type InspectMode = "searchForNode"|"searchForUAShadowDOM"|"captureAreaScreenshot"|"none";
     
     /**
      * Fired when the node should be inspected. This happens after call to `setInspectMode` or when
@@ -11604,6 +13129,9 @@ objectId must be specified.
     }
     /**
      * Highlights given rectangle. Coordinates are absolute with respect to the main frame viewport.
+Issue: the method does not handle device pixel ratio (DPR) correctly.
+The coordinates currently have to be adjusted by the client
+if DPR is not 1 (see crbug.com/437807128).
      */
     export type highlightRectParameters = {
       /**
@@ -11849,6 +13377,177 @@ Backend then generates 'inspectNodeRequested' event upon element selection.
   }
   
   /**
+   * This domain allows interacting with the browser to control PWAs.
+   */
+  export module PWA {
+    /**
+     * The following types are the replica of
+https://crsrc.org/c/chrome/browser/web_applications/proto/web_app_os_integration_state.proto;drc=9910d3be894c8f142c977ba1023f30a656bc13fc;l=67
+     */
+    export interface FileHandlerAccept {
+      /**
+       * New name of the mimetype according to
+https://www.iana.org/assignments/media-types/media-types.xhtml
+       */
+      mediaType: string;
+      fileExtensions: string[];
+    }
+    export interface FileHandler {
+      action: string;
+      accepts: FileHandlerAccept[];
+      displayName: string;
+    }
+    /**
+     * If user prefers opening the app in browser or an app window.
+     */
+    export type DisplayMode = "standalone"|"browser";
+    
+    
+    /**
+     * Returns the following OS state for the given manifest id.
+     */
+    export type getOsAppStateParameters = {
+      /**
+       * The id from the webapp's manifest file, commonly it's the url of the
+site installing the webapp. See
+https://web.dev/learn/pwa/web-app-manifest.
+       */
+      manifestId: string;
+    }
+    export type getOsAppStateReturnValue = {
+      badgeCount: number;
+      fileHandlers: FileHandler[];
+    }
+    /**
+     * Installs the given manifest identity, optionally using the given installUrlOrBundleUrl
+
+IWA-specific install description:
+manifestId corresponds to isolated-app:// + web_package::SignedWebBundleId
+
+File installation mode:
+The installUrlOrBundleUrl can be either file:// or http(s):// pointing
+to a signed web bundle (.swbn). In this case SignedWebBundleId must correspond to
+The .swbn file's signing key.
+
+Dev proxy installation mode:
+installUrlOrBundleUrl must be http(s):// that serves dev mode IWA.
+web_package::SignedWebBundleId must be of type dev proxy.
+
+The advantage of dev proxy mode is that all changes to IWA
+automatically will be reflected in the running app without
+reinstallation.
+
+To generate bundle id for proxy mode:
+1. Generate 32 random bytes.
+2. Add a specific suffix at the end following the documentation
+   https://github.com/WICG/isolated-web-apps/blob/main/Scheme.md#suffix
+3. Encode the entire sequence using Base32 without padding.
+
+If Chrome is not in IWA dev
+mode, the installation will fail, regardless of the state of the allowlist.
+     */
+    export type installParameters = {
+      manifestId: string;
+      /**
+       * The location of the app or bundle overriding the one derived from the
+manifestId.
+       */
+      installUrlOrBundleUrl?: string;
+    }
+    export type installReturnValue = {
+    }
+    /**
+     * Uninstalls the given manifest_id and closes any opened app windows.
+     */
+    export type uninstallParameters = {
+      manifestId: string;
+    }
+    export type uninstallReturnValue = {
+    }
+    /**
+     * Launches the installed web app, or an url in the same web app instead of the
+default start url if it is provided. Returns a page Target.TargetID which
+can be used to attach to via Target.attachToTarget or similar APIs.
+     */
+    export type launchParameters = {
+      manifestId: string;
+      url?: string;
+    }
+    export type launchReturnValue = {
+      /**
+       * ID of the tab target created as a result.
+       */
+      targetId: Target.TargetID;
+    }
+    /**
+     * Opens one or more local files from an installed web app identified by its
+manifestId. The web app needs to have file handlers registered to process
+the files. The API returns one or more page Target.TargetIDs which can be
+used to attach to via Target.attachToTarget or similar APIs.
+If some files in the parameters cannot be handled by the web app, they will
+be ignored. If none of the files can be handled, this API returns an error.
+If no files are provided as the parameter, this API also returns an error.
+
+According to the definition of the file handlers in the manifest file, one
+Target.TargetID may represent a page handling one or more files. The order
+of the returned Target.TargetIDs is not guaranteed.
+
+TODO(crbug.com/339454034): Check the existences of the input files.
+     */
+    export type launchFilesInAppParameters = {
+      manifestId: string;
+      files: string[];
+    }
+    export type launchFilesInAppReturnValue = {
+      /**
+       * IDs of the tab targets created as the result.
+       */
+      targetIds: Target.TargetID[];
+    }
+    /**
+     * Opens the current page in its web app identified by the manifest id, needs
+to be called on a page target. This function returns immediately without
+waiting for the app to finish loading.
+     */
+    export type openCurrentPageInAppParameters = {
+      manifestId: string;
+    }
+    export type openCurrentPageInAppReturnValue = {
+    }
+    /**
+     * Changes user settings of the web app identified by its manifestId. If the
+app was not installed, this command returns an error. Unset parameters will
+be ignored; unrecognized values will cause an error.
+
+Unlike the ones defined in the manifest files of the web apps, these
+settings are provided by the browser and controlled by the users, they
+impact the way the browser handling the web apps.
+
+See the comment of each parameter.
+     */
+    export type changeAppUserSettingsParameters = {
+      manifestId: string;
+      /**
+       * If user allows the links clicked on by the user in the app's scope, or
+extended scope if the manifest has scope extensions and the flags
+`DesktopPWAsLinkCapturingWithScopeExtensions` and
+`WebAppEnableScopeExtensions` are enabled.
+
+Note, the API does not support resetting the linkCapturing to the
+initial value, uninstalling and installing the web app again will reset
+it.
+
+TODO(crbug.com/339453269): Setting this value on ChromeOS is not
+supported yet.
+       */
+      linkCapturing?: boolean;
+      displayMode?: DisplayMode;
+    }
+    export type changeAppUserSettingsReturnValue = {
+    }
+  }
+  
+  /**
    * Actions and events related to the inspected page belong to the page domain.
    */
   export module Page {
@@ -11869,19 +13568,39 @@ Backend then generates 'inspectNodeRequested' event upon element selection.
       explanations?: AdFrameExplanation[];
     }
     /**
-     * Identifies the bottom-most script which caused the frame to be labelled
-as an ad.
+     * Identifies the script which caused a script or frame to be labelled as an
+ad.
      */
     export interface AdScriptId {
       /**
-       * Script Id of the bottom-most script which caused the frame to be labelled
-as an ad.
+       * Script Id of the script which caused a script or frame to be labelled as
+an ad.
        */
       scriptId: Runtime.ScriptId;
       /**
-       * Id of adScriptId's debugger.
+       * Id of scriptId's debugger.
        */
       debuggerId: Runtime.UniqueDebuggerId;
+    }
+    /**
+     * Encapsulates the script ancestry and the root script filterlist rule that
+caused the frame to be labelled as an ad. Only created when `ancestryChain`
+is not empty.
+     */
+    export interface AdScriptAncestry {
+      /**
+       * A chain of `AdScriptId`s representing the ancestry of an ad script that
+led to the creation of a frame. The chain is ordered from the script
+itself (lower level) up to its root ancestor that was flagged by
+filterlist.
+       */
+      ancestryChain: AdScriptId[];
+      /**
+       * The filterlist rule that caused the root (last) script in
+`ancestryChain` to be ad-tagged. Only populated if the rule is
+available.
+       */
+      rootScriptFilterlistRule?: string;
     }
     /**
      * Indicates whether the frame is a secure context and why it is the case.
@@ -11895,8 +13614,9 @@ as an ad.
     /**
      * All Permissions Policy features. This enum should match the one defined
 in services/network/public/cpp/permissions_policy/permissions_policy_features.json5.
+LINT.IfChange(PermissionsPolicyFeature)
      */
-    export type PermissionsPolicyFeature = "accelerometer"|"all-screens-capture"|"ambient-light-sensor"|"attribution-reporting"|"autoplay"|"bluetooth"|"browsing-topics"|"camera"|"captured-surface-control"|"ch-dpr"|"ch-device-memory"|"ch-downlink"|"ch-ect"|"ch-prefers-color-scheme"|"ch-prefers-reduced-motion"|"ch-prefers-reduced-transparency"|"ch-rtt"|"ch-save-data"|"ch-ua"|"ch-ua-arch"|"ch-ua-bitness"|"ch-ua-high-entropy-values"|"ch-ua-platform"|"ch-ua-model"|"ch-ua-mobile"|"ch-ua-form-factors"|"ch-ua-full-version"|"ch-ua-full-version-list"|"ch-ua-platform-version"|"ch-ua-wow64"|"ch-viewport-height"|"ch-viewport-width"|"ch-width"|"clipboard-read"|"clipboard-write"|"compute-pressure"|"controlled-frame"|"cross-origin-isolated"|"deferred-fetch"|"deferred-fetch-minimal"|"digital-credentials-get"|"direct-sockets"|"direct-sockets-private"|"display-capture"|"document-domain"|"encrypted-media"|"execution-while-out-of-viewport"|"execution-while-not-rendered"|"fenced-unpartitioned-storage-read"|"focus-without-user-activation"|"fullscreen"|"frobulate"|"gamepad"|"geolocation"|"gyroscope"|"hid"|"identity-credentials-get"|"idle-detection"|"interest-cohort"|"join-ad-interest-group"|"keyboard-map"|"language-detector"|"local-fonts"|"magnetometer"|"media-playback-while-not-visible"|"microphone"|"midi"|"otp-credentials"|"payment"|"picture-in-picture"|"popins"|"private-aggregation"|"private-state-token-issuance"|"private-state-token-redemption"|"publickey-credentials-create"|"publickey-credentials-get"|"rewriter"|"run-ad-auction"|"screen-wake-lock"|"serial"|"shared-autofill"|"shared-storage"|"shared-storage-select-url"|"smart-card"|"speaker-selection"|"storage-access"|"sub-apps"|"summarizer"|"sync-xhr"|"translator"|"unload"|"usb"|"usb-unrestricted"|"vertical-scroll"|"web-app-installation"|"web-printing"|"web-share"|"window-management"|"writer"|"xr-spatial-tracking";
+    export type PermissionsPolicyFeature = "accelerometer"|"all-screens-capture"|"ambient-light-sensor"|"aria-notify"|"attribution-reporting"|"autoplay"|"bluetooth"|"browsing-topics"|"camera"|"captured-surface-control"|"ch-dpr"|"ch-device-memory"|"ch-downlink"|"ch-ect"|"ch-prefers-color-scheme"|"ch-prefers-reduced-motion"|"ch-prefers-reduced-transparency"|"ch-rtt"|"ch-save-data"|"ch-ua"|"ch-ua-arch"|"ch-ua-bitness"|"ch-ua-high-entropy-values"|"ch-ua-platform"|"ch-ua-model"|"ch-ua-mobile"|"ch-ua-form-factors"|"ch-ua-full-version"|"ch-ua-full-version-list"|"ch-ua-platform-version"|"ch-ua-wow64"|"ch-viewport-height"|"ch-viewport-width"|"ch-width"|"clipboard-read"|"clipboard-write"|"compute-pressure"|"controlled-frame"|"cross-origin-isolated"|"deferred-fetch"|"deferred-fetch-minimal"|"device-attributes"|"digital-credentials-create"|"digital-credentials-get"|"direct-sockets"|"direct-sockets-multicast"|"direct-sockets-private"|"display-capture"|"document-domain"|"encrypted-media"|"execution-while-out-of-viewport"|"execution-while-not-rendered"|"fenced-unpartitioned-storage-read"|"focus-without-user-activation"|"fullscreen"|"frobulate"|"gamepad"|"geolocation"|"gyroscope"|"hid"|"identity-credentials-get"|"idle-detection"|"interest-cohort"|"join-ad-interest-group"|"keyboard-map"|"language-detector"|"language-model"|"local-fonts"|"local-network-access"|"magnetometer"|"media-playback-while-not-visible"|"microphone"|"midi"|"on-device-speech-recognition"|"otp-credentials"|"payment"|"picture-in-picture"|"popins"|"private-aggregation"|"private-state-token-issuance"|"private-state-token-redemption"|"publickey-credentials-create"|"publickey-credentials-get"|"record-ad-auction-events"|"rewriter"|"run-ad-auction"|"screen-wake-lock"|"serial"|"shared-autofill"|"shared-storage"|"shared-storage-select-url"|"smart-card"|"speaker-selection"|"storage-access"|"sub-apps"|"summarizer"|"sync-xhr"|"translator"|"unload"|"usb"|"usb-unrestricted"|"vertical-scroll"|"web-app-installation"|"web-printing"|"web-share"|"window-management"|"writer"|"xr-spatial-tracking";
     /**
      * Reason for a permissions policy feature to be disabled.
      */
@@ -12489,17 +14209,13 @@ https://github.com/WICG/manifest-incubations/blob/gh-pages/scope_extensions-expl
       themeColor?: string;
     }
     /**
-     * Enum of possible auto-response for permission / prompt dialogs.
-     */
-    export type AutoResponseMode = "none"|"autoAccept"|"autoReject"|"autoOptOut";
-    /**
      * The type of a frameNavigated event.
      */
     export type NavigationType = "Navigation"|"BackForwardCacheRestore";
     /**
      * List of not restored reasons for back-forward cache.
      */
-    export type BackForwardCacheNotRestoredReason = "NotPrimaryMainFrame"|"BackForwardCacheDisabled"|"RelatedActiveContentsExist"|"HTTPStatusNotOK"|"SchemeNotHTTPOrHTTPS"|"Loading"|"WasGrantedMediaAccess"|"DisableForRenderFrameHostCalled"|"DomainNotAllowed"|"HTTPMethodNotGET"|"SubframeIsNavigating"|"Timeout"|"CacheLimit"|"JavaScriptExecution"|"RendererProcessKilled"|"RendererProcessCrashed"|"SchedulerTrackedFeatureUsed"|"ConflictingBrowsingInstance"|"CacheFlushed"|"ServiceWorkerVersionActivation"|"SessionRestored"|"ServiceWorkerPostMessage"|"EnteredBackForwardCacheBeforeServiceWorkerHostAdded"|"RenderFrameHostReused_SameSite"|"RenderFrameHostReused_CrossSite"|"ServiceWorkerClaim"|"IgnoreEventAndEvict"|"HaveInnerContents"|"TimeoutPuttingInCache"|"BackForwardCacheDisabledByLowMemory"|"BackForwardCacheDisabledByCommandLine"|"NetworkRequestDatapipeDrainedAsBytesConsumer"|"NetworkRequestRedirected"|"NetworkRequestTimeout"|"NetworkExceedsBufferLimit"|"NavigationCancelledWhileRestoring"|"NotMostRecentNavigationEntry"|"BackForwardCacheDisabledForPrerender"|"UserAgentOverrideDiffers"|"ForegroundCacheLimit"|"BrowsingInstanceNotSwapped"|"BackForwardCacheDisabledForDelegate"|"UnloadHandlerExistsInMainFrame"|"UnloadHandlerExistsInSubFrame"|"ServiceWorkerUnregistration"|"CacheControlNoStore"|"CacheControlNoStoreCookieModified"|"CacheControlNoStoreHTTPOnlyCookieModified"|"NoResponseHead"|"Unknown"|"ActivationNavigationsDisallowedForBug1234857"|"ErrorDocument"|"FencedFramesEmbedder"|"CookieDisabled"|"HTTPAuthRequired"|"CookieFlushed"|"BroadcastChannelOnMessage"|"WebViewSettingsChanged"|"WebViewJavaScriptObjectChanged"|"WebViewMessageListenerInjected"|"WebViewSafeBrowsingAllowlistChanged"|"WebViewDocumentStartJavascriptChanged"|"WebSocket"|"WebTransport"|"WebRTC"|"MainResourceHasCacheControlNoStore"|"MainResourceHasCacheControlNoCache"|"SubresourceHasCacheControlNoStore"|"SubresourceHasCacheControlNoCache"|"ContainsPlugins"|"DocumentLoaded"|"OutstandingNetworkRequestOthers"|"RequestedMIDIPermission"|"RequestedAudioCapturePermission"|"RequestedVideoCapturePermission"|"RequestedBackForwardCacheBlockedSensors"|"RequestedBackgroundWorkPermission"|"BroadcastChannel"|"WebXR"|"SharedWorker"|"WebLocks"|"WebHID"|"WebShare"|"RequestedStorageAccessGrant"|"WebNfc"|"OutstandingNetworkRequestFetch"|"OutstandingNetworkRequestXHR"|"AppBanner"|"Printing"|"WebDatabase"|"PictureInPicture"|"SpeechRecognizer"|"IdleManager"|"PaymentManager"|"SpeechSynthesis"|"KeyboardLock"|"WebOTPService"|"OutstandingNetworkRequestDirectSocket"|"InjectedJavascript"|"InjectedStyleSheet"|"KeepaliveRequest"|"IndexedDBEvent"|"Dummy"|"JsNetworkRequestReceivedCacheControlNoStoreResource"|"WebRTCSticky"|"WebTransportSticky"|"WebSocketSticky"|"SmartCard"|"LiveMediaStreamTrack"|"UnloadHandler"|"ParserAborted"|"ContentSecurityHandler"|"ContentWebAuthenticationAPI"|"ContentFileChooser"|"ContentSerial"|"ContentFileSystemAccess"|"ContentMediaDevicesDispatcherHost"|"ContentWebBluetooth"|"ContentWebUSB"|"ContentMediaSessionService"|"ContentScreenReader"|"ContentDiscarded"|"EmbedderPopupBlockerTabHelper"|"EmbedderSafeBrowsingTriggeredPopupBlocker"|"EmbedderSafeBrowsingThreatDetails"|"EmbedderAppBannerManager"|"EmbedderDomDistillerViewerSource"|"EmbedderDomDistillerSelfDeletingRequestDelegate"|"EmbedderOomInterventionTabHelper"|"EmbedderOfflinePage"|"EmbedderChromePasswordManagerClientBindCredentialManager"|"EmbedderPermissionRequestManager"|"EmbedderModalDialog"|"EmbedderExtensions"|"EmbedderExtensionMessaging"|"EmbedderExtensionMessagingForOpenPort"|"EmbedderExtensionSentMessageToCachedFrame"|"RequestedByWebViewClient"|"PostMessageByWebViewClient"|"CacheControlNoStoreDeviceBoundSessionTerminated"|"CacheLimitPruned";
+    export type BackForwardCacheNotRestoredReason = "NotPrimaryMainFrame"|"BackForwardCacheDisabled"|"RelatedActiveContentsExist"|"HTTPStatusNotOK"|"SchemeNotHTTPOrHTTPS"|"Loading"|"WasGrantedMediaAccess"|"DisableForRenderFrameHostCalled"|"DomainNotAllowed"|"HTTPMethodNotGET"|"SubframeIsNavigating"|"Timeout"|"CacheLimit"|"JavaScriptExecution"|"RendererProcessKilled"|"RendererProcessCrashed"|"SchedulerTrackedFeatureUsed"|"ConflictingBrowsingInstance"|"CacheFlushed"|"ServiceWorkerVersionActivation"|"SessionRestored"|"ServiceWorkerPostMessage"|"EnteredBackForwardCacheBeforeServiceWorkerHostAdded"|"RenderFrameHostReused_SameSite"|"RenderFrameHostReused_CrossSite"|"ServiceWorkerClaim"|"IgnoreEventAndEvict"|"HaveInnerContents"|"TimeoutPuttingInCache"|"BackForwardCacheDisabledByLowMemory"|"BackForwardCacheDisabledByCommandLine"|"NetworkRequestDatapipeDrainedAsBytesConsumer"|"NetworkRequestRedirected"|"NetworkRequestTimeout"|"NetworkExceedsBufferLimit"|"NavigationCancelledWhileRestoring"|"NotMostRecentNavigationEntry"|"BackForwardCacheDisabledForPrerender"|"UserAgentOverrideDiffers"|"ForegroundCacheLimit"|"BrowsingInstanceNotSwapped"|"BackForwardCacheDisabledForDelegate"|"UnloadHandlerExistsInMainFrame"|"UnloadHandlerExistsInSubFrame"|"ServiceWorkerUnregistration"|"CacheControlNoStore"|"CacheControlNoStoreCookieModified"|"CacheControlNoStoreHTTPOnlyCookieModified"|"NoResponseHead"|"Unknown"|"ActivationNavigationsDisallowedForBug1234857"|"ErrorDocument"|"FencedFramesEmbedder"|"CookieDisabled"|"HTTPAuthRequired"|"CookieFlushed"|"BroadcastChannelOnMessage"|"WebViewSettingsChanged"|"WebViewJavaScriptObjectChanged"|"WebViewMessageListenerInjected"|"WebViewSafeBrowsingAllowlistChanged"|"WebViewDocumentStartJavascriptChanged"|"WebSocket"|"WebTransport"|"WebRTC"|"MainResourceHasCacheControlNoStore"|"MainResourceHasCacheControlNoCache"|"SubresourceHasCacheControlNoStore"|"SubresourceHasCacheControlNoCache"|"ContainsPlugins"|"DocumentLoaded"|"OutstandingNetworkRequestOthers"|"RequestedMIDIPermission"|"RequestedAudioCapturePermission"|"RequestedVideoCapturePermission"|"RequestedBackForwardCacheBlockedSensors"|"RequestedBackgroundWorkPermission"|"BroadcastChannel"|"WebXR"|"SharedWorker"|"SharedWorkerMessage"|"SharedWorkerWithNoActiveClient"|"WebLocks"|"WebHID"|"WebBluetooth"|"WebShare"|"RequestedStorageAccessGrant"|"WebNfc"|"OutstandingNetworkRequestFetch"|"OutstandingNetworkRequestXHR"|"AppBanner"|"Printing"|"WebDatabase"|"PictureInPicture"|"SpeechRecognizer"|"IdleManager"|"PaymentManager"|"SpeechSynthesis"|"KeyboardLock"|"WebOTPService"|"OutstandingNetworkRequestDirectSocket"|"InjectedJavascript"|"InjectedStyleSheet"|"KeepaliveRequest"|"IndexedDBEvent"|"Dummy"|"JsNetworkRequestReceivedCacheControlNoStoreResource"|"WebRTCUsedWithCCNS"|"WebTransportUsedWithCCNS"|"WebSocketUsedWithCCNS"|"SmartCard"|"LiveMediaStreamTrack"|"UnloadHandler"|"ParserAborted"|"ContentSecurityHandler"|"ContentWebAuthenticationAPI"|"ContentFileChooser"|"ContentSerial"|"ContentFileSystemAccess"|"ContentMediaDevicesDispatcherHost"|"ContentWebBluetooth"|"ContentWebUSB"|"ContentMediaSessionService"|"ContentScreenReader"|"ContentDiscarded"|"EmbedderPopupBlockerTabHelper"|"EmbedderSafeBrowsingTriggeredPopupBlocker"|"EmbedderSafeBrowsingThreatDetails"|"EmbedderAppBannerManager"|"EmbedderDomDistillerViewerSource"|"EmbedderDomDistillerSelfDeletingRequestDelegate"|"EmbedderOomInterventionTabHelper"|"EmbedderOfflinePage"|"EmbedderChromePasswordManagerClientBindCredentialManager"|"EmbedderPermissionRequestManager"|"EmbedderModalDialog"|"EmbedderExtensions"|"EmbedderExtensionMessaging"|"EmbedderExtensionMessagingForOpenPort"|"EmbedderExtensionSentMessageToCachedFrame"|"RequestedByWebViewClient"|"PostMessageByWebViewClient"|"CacheControlNoStoreDeviceBoundSessionTerminated"|"CacheLimitPrunedOnModerateMemoryPressure"|"CacheLimitPrunedOnCriticalMemoryPressure";
     /**
      * Types of not restored reasons for back-forward cache.
      */
@@ -12787,6 +14503,10 @@ closed.
      */
     export type javascriptDialogClosedPayload = {
       /**
+       * Frame id.
+       */
+      frameId: FrameId;
+      /**
        * Whether dialog was confirmed.
        */
       result: boolean;
@@ -12804,6 +14524,10 @@ open.
        * Frame url.
        */
       url: string;
+      /**
+       * Frame id.
+       */
+      frameId: FrameId;
       /**
        * Message that will be displayed by the dialog.
        */
@@ -12932,8 +14656,7 @@ etc.
       userGesture: boolean;
     }
     /**
-     * Issued for every compilation cache generated. Is only available
-if Page.setGenerateCompilationCache is enabled.
+     * Issued for every compilation cache generated.
      */
     export type compilationCacheProducedPayload = {
       url: string;
@@ -13175,15 +14898,18 @@ Only returns values if the feature flag 'WebAppEnableManifestId' is enabled
        */
       recommendedId?: string;
     }
-    export type getAdScriptIdParameters = {
+    export type getAdScriptAncestryParameters = {
       frameId: FrameId;
     }
-    export type getAdScriptIdReturnValue = {
+    export type getAdScriptAncestryReturnValue = {
       /**
-       * Identifies the bottom-most script which caused the frame to be labelled
-as an ad. Only sent if frame is labelled as an ad and id is available.
+       * The ancestry chain of ad script identifiers leading to this frame's
+creation, along with the root script's filterlist rule. The ancestry
+chain is ordered from the most immediate script (in the frame creation
+stack) to more distant ancestors (that created the immediately preceding
+script). Only sent if frame is labelled as an ad and ids are available.
        */
-      adScriptId?: AdScriptId;
+      adScriptAncestry?: AdScriptAncestry;
     }
     /**
      * Returns present frame tree structure.
@@ -13338,6 +15064,10 @@ as the previously committed loaderId would not change.
        * User friendly error message, present if and only if navigation has failed.
        */
       errorText?: string;
+      /**
+       * Whether the navigation resulted in a download.
+       */
+      isDownload?: boolean;
     }
     /**
      * Navigates current page to the given history entry.
@@ -13855,7 +15585,7 @@ cross-process navigation.
 https://w3c.github.io/secure-payment-confirmation/#sctn-automation-set-spc-transaction-mode
      */
     export type setSPCTransactionModeParameters = {
-      mode: AutoResponseMode;
+      mode: "none"|"autoAccept"|"autoChooseToAuthAnotherWay"|"autoReject"|"autoOptOut";
     }
     export type setSPCTransactionModeReturnValue = {
     }
@@ -13864,7 +15594,7 @@ https://w3c.github.io/secure-payment-confirmation/#sctn-automation-set-spc-trans
 https://html.spec.whatwg.org/multipage/system-state.html#rph-automation
      */
     export type setRPHRegistrationModeParameters = {
-      mode: AutoResponseMode;
+      mode: "none"|"autoAccept"|"autoReject";
     }
     export type setRPHRegistrationModeReturnValue = {
     }
@@ -14088,9 +15818,198 @@ Note that not all types exposed to the web platform are currently supported.
     }
   }
   
-  /**
-   * Security
-   */
+  export module Preload {
+    /**
+     * Unique id
+     */
+    export type RuleSetId = string;
+    /**
+     * Corresponds to SpeculationRuleSet
+     */
+    export interface RuleSet {
+      id: RuleSetId;
+      /**
+       * Identifies a document which the rule set is associated with.
+       */
+      loaderId: Network.LoaderId;
+      /**
+       * Source text of JSON representing the rule set. If it comes from
+`<script>` tag, it is the textContent of the node. Note that it is
+a JSON for valid case.
+
+See also:
+- https://wicg.github.io/nav-speculation/speculation-rules.html
+- https://github.com/WICG/nav-speculation/blob/main/triggers.md
+       */
+      sourceText: string;
+      /**
+       * A speculation rule set is either added through an inline
+`<script>` tag or through an external resource via the
+'Speculation-Rules' HTTP header. For the first case, we include
+the BackendNodeId of the relevant `<script>` tag. For the second
+case, we include the external URL where the rule set was loaded
+from, and also RequestId if Network domain is enabled.
+
+See also:
+- https://wicg.github.io/nav-speculation/speculation-rules.html#speculation-rules-script
+- https://wicg.github.io/nav-speculation/speculation-rules.html#speculation-rules-header
+       */
+      backendNodeId?: DOM.BackendNodeId;
+      url?: string;
+      requestId?: Network.RequestId;
+      /**
+       * Error information
+`errorMessage` is null iff `errorType` is null.
+       */
+      errorType?: RuleSetErrorType;
+      /**
+       * TODO(https://crbug.com/1425354): Replace this property with structured error.
+       */
+      errorMessage?: string;
+      /**
+       * For more details, see:
+https://github.com/WICG/nav-speculation/blob/main/speculation-rules-tags.md
+       */
+      tag?: string;
+    }
+    export type RuleSetErrorType = "SourceIsNotJsonObject"|"InvalidRulesSkipped"|"InvalidRulesetLevelTag";
+    /**
+     * The type of preloading attempted. It corresponds to
+mojom::SpeculationAction (although PrefetchWithSubresources is omitted as it
+isn't being used by clients).
+     */
+    export type SpeculationAction = "Prefetch"|"Prerender"|"PrerenderUntilScript";
+    /**
+     * Corresponds to mojom::SpeculationTargetHint.
+See https://github.com/WICG/nav-speculation/blob/main/triggers.md#window-name-targeting-hints
+     */
+    export type SpeculationTargetHint = "Blank"|"Self";
+    /**
+     * A key that identifies a preloading attempt.
+
+The url used is the url specified by the trigger (i.e. the initial URL), and
+not the final url that is navigated to. For example, prerendering allows
+same-origin main frame navigations during the attempt, but the attempt is
+still keyed with the initial URL.
+     */
+    export interface PreloadingAttemptKey {
+      loaderId: Network.LoaderId;
+      action: SpeculationAction;
+      url: string;
+      targetHint?: SpeculationTargetHint;
+    }
+    /**
+     * Lists sources for a preloading attempt, specifically the ids of rule sets
+that had a speculation rule that triggered the attempt, and the
+BackendNodeIds of <a href> or <area href> elements that triggered the
+attempt (in the case of attempts triggered by a document rule). It is
+possible for multiple rule sets and links to trigger a single attempt.
+     */
+    export interface PreloadingAttemptSource {
+      key: PreloadingAttemptKey;
+      ruleSetIds: RuleSetId[];
+      nodeIds: DOM.BackendNodeId[];
+    }
+    /**
+     * Chrome manages different types of preloads together using a
+concept of preloading pipeline. For example, if a site uses a
+SpeculationRules for prerender, Chrome first starts a prefetch and
+then upgrades it to prerender.
+
+CDP events for them are emitted separately but they share
+`PreloadPipelineId`.
+     */
+    export type PreloadPipelineId = string;
+    /**
+     * List of FinalStatus reasons for Prerender2.
+     */
+    export type PrerenderFinalStatus = "Activated"|"Destroyed"|"LowEndDevice"|"InvalidSchemeRedirect"|"InvalidSchemeNavigation"|"NavigationRequestBlockedByCsp"|"MojoBinderPolicy"|"RendererProcessCrashed"|"RendererProcessKilled"|"Download"|"TriggerDestroyed"|"NavigationNotCommitted"|"NavigationBadHttpStatus"|"ClientCertRequested"|"NavigationRequestNetworkError"|"CancelAllHostsForTesting"|"DidFailLoad"|"Stop"|"SslCertificateError"|"LoginAuthRequested"|"UaChangeRequiresReload"|"BlockedByClient"|"AudioOutputDeviceRequested"|"MixedContent"|"TriggerBackgrounded"|"MemoryLimitExceeded"|"DataSaverEnabled"|"TriggerUrlHasEffectiveUrl"|"ActivatedBeforeStarted"|"InactivePageRestriction"|"StartFailed"|"TimeoutBackgrounded"|"CrossSiteRedirectInInitialNavigation"|"CrossSiteNavigationInInitialNavigation"|"SameSiteCrossOriginRedirectNotOptInInInitialNavigation"|"SameSiteCrossOriginNavigationNotOptInInInitialNavigation"|"ActivationNavigationParameterMismatch"|"ActivatedInBackground"|"EmbedderHostDisallowed"|"ActivationNavigationDestroyedBeforeSuccess"|"TabClosedByUserGesture"|"TabClosedWithoutUserGesture"|"PrimaryMainFrameRendererProcessCrashed"|"PrimaryMainFrameRendererProcessKilled"|"ActivationFramePolicyNotCompatible"|"PreloadingDisabled"|"BatterySaverEnabled"|"ActivatedDuringMainFrameNavigation"|"PreloadingUnsupportedByWebContents"|"CrossSiteRedirectInMainFrameNavigation"|"CrossSiteNavigationInMainFrameNavigation"|"SameSiteCrossOriginRedirectNotOptInInMainFrameNavigation"|"SameSiteCrossOriginNavigationNotOptInInMainFrameNavigation"|"MemoryPressureOnTrigger"|"MemoryPressureAfterTriggered"|"PrerenderingDisabledByDevTools"|"SpeculationRuleRemoved"|"ActivatedWithAuxiliaryBrowsingContexts"|"MaxNumOfRunningEagerPrerendersExceeded"|"MaxNumOfRunningNonEagerPrerendersExceeded"|"MaxNumOfRunningEmbedderPrerendersExceeded"|"PrerenderingUrlHasEffectiveUrl"|"RedirectedPrerenderingUrlHasEffectiveUrl"|"ActivationUrlHasEffectiveUrl"|"JavaScriptInterfaceAdded"|"JavaScriptInterfaceRemoved"|"AllPrerenderingCanceled"|"WindowClosed"|"SlowNetwork"|"OtherPrerenderedPageActivated"|"V8OptimizerDisabled"|"PrerenderFailedDuringPrefetch"|"BrowsingDataRemoved"|"PrerenderHostReused";
+    /**
+     * Preloading status values, see also PreloadingTriggeringOutcome. This
+status is shared by prefetchStatusUpdated and prerenderStatusUpdated.
+     */
+    export type PreloadingStatus = "Pending"|"Running"|"Ready"|"Success"|"Failure"|"NotSupported";
+    /**
+     * TODO(https://crbug.com/1384419): revisit the list of PrefetchStatus and
+filter out the ones that aren't necessary to the developers.
+     */
+    export type PrefetchStatus = "PrefetchAllowed"|"PrefetchFailedIneligibleRedirect"|"PrefetchFailedInvalidRedirect"|"PrefetchFailedMIMENotSupported"|"PrefetchFailedNetError"|"PrefetchFailedNon2XX"|"PrefetchEvictedAfterBrowsingDataRemoved"|"PrefetchEvictedAfterCandidateRemoved"|"PrefetchEvictedForNewerPrefetch"|"PrefetchHeldback"|"PrefetchIneligibleRetryAfter"|"PrefetchIsPrivacyDecoy"|"PrefetchIsStale"|"PrefetchNotEligibleBrowserContextOffTheRecord"|"PrefetchNotEligibleDataSaverEnabled"|"PrefetchNotEligibleExistingProxy"|"PrefetchNotEligibleHostIsNonUnique"|"PrefetchNotEligibleNonDefaultStoragePartition"|"PrefetchNotEligibleSameSiteCrossOriginPrefetchRequiredProxy"|"PrefetchNotEligibleSchemeIsNotHttps"|"PrefetchNotEligibleUserHasCookies"|"PrefetchNotEligibleUserHasServiceWorker"|"PrefetchNotEligibleUserHasServiceWorkerNoFetchHandler"|"PrefetchNotEligibleRedirectFromServiceWorker"|"PrefetchNotEligibleRedirectToServiceWorker"|"PrefetchNotEligibleBatterySaverEnabled"|"PrefetchNotEligiblePreloadingDisabled"|"PrefetchNotFinishedInTime"|"PrefetchNotStarted"|"PrefetchNotUsedCookiesChanged"|"PrefetchProxyNotAvailable"|"PrefetchResponseUsed"|"PrefetchSuccessfulButNotUsed"|"PrefetchNotUsedProbeFailed";
+    /**
+     * Information of headers to be displayed when the header mismatch occurred.
+     */
+    export interface PrerenderMismatchedHeaders {
+      headerName: string;
+      initialValue?: string;
+      activationValue?: string;
+    }
+    
+    /**
+     * Upsert. Currently, it is only emitted when a rule set added.
+     */
+    export type ruleSetUpdatedPayload = {
+      ruleSet: RuleSet;
+    }
+    export type ruleSetRemovedPayload = {
+      id: RuleSetId;
+    }
+    /**
+     * Fired when a preload enabled state is updated.
+     */
+    export type preloadEnabledStateUpdatedPayload = {
+      disabledByPreference: boolean;
+      disabledByDataSaver: boolean;
+      disabledByBatterySaver: boolean;
+      disabledByHoldbackPrefetchSpeculationRules: boolean;
+      disabledByHoldbackPrerenderSpeculationRules: boolean;
+    }
+    /**
+     * Fired when a prefetch attempt is updated.
+     */
+    export type prefetchStatusUpdatedPayload = {
+      key: PreloadingAttemptKey;
+      pipelineId: PreloadPipelineId;
+      /**
+       * The frame id of the frame initiating prefetch.
+       */
+      initiatingFrameId: Page.FrameId;
+      prefetchUrl: string;
+      status: PreloadingStatus;
+      prefetchStatus: PrefetchStatus;
+      requestId: Network.RequestId;
+    }
+    /**
+     * Fired when a prerender attempt is updated.
+     */
+    export type prerenderStatusUpdatedPayload = {
+      key: PreloadingAttemptKey;
+      pipelineId: PreloadPipelineId;
+      status: PreloadingStatus;
+      prerenderStatus?: PrerenderFinalStatus;
+      /**
+       * This is used to give users more information about the name of Mojo interface
+that is incompatible with prerender and has caused the cancellation of the attempt.
+       */
+      disallowedMojoInterface?: string;
+      mismatchedHeaders?: PrerenderMismatchedHeaders[];
+    }
+    /**
+     * Send a list of sources for all preloading attempts in a document.
+     */
+    export type preloadingAttemptSourcesUpdatedPayload = {
+      loaderId: Network.LoaderId;
+      preloadingAttemptSources: PreloadingAttemptSource[];
+    }
+    
+    export type enableParameters = {
+    }
+    export type enableReturnValue = {
+    }
+    export type disableParameters = {
+    }
+    export type disableReturnValue = {
+    }
+  }
+  
   export module Security {
     /**
      * An internal certificate ID value.
@@ -14482,11 +16401,6 @@ For cached script it is the last time the cache entry was validated.
     }
     export type enableReturnValue = {
     }
-    export type inspectWorkerParameters = {
-      versionId: string;
-    }
-    export type inspectWorkerReturnValue = {
-    }
     export type setForceUpdateOnPageLoadParameters = {
       forceUpdateOnPageLoad: boolean;
     }
@@ -14604,6 +16518,28 @@ storage.
       bytesUsed: number;
     }
     /**
+     * Represents a dictionary object passed in as privateAggregationConfig to
+run or selectURL.
+     */
+    export interface SharedStoragePrivateAggregationConfig {
+      /**
+       * The chosen aggregation service deployment.
+       */
+      aggregationCoordinatorOrigin?: string;
+      /**
+       * The context ID provided.
+       */
+      contextId?: string;
+      /**
+       * Configures the maximum size allowed for filtering IDs.
+       */
+      filteringIdMaxBytes: number;
+      /**
+       * The limit on the number of contributions in the final report.
+       */
+      maxContributions?: number;
+    }
+    /**
      * Pair of reporting metadata details for a candidate URL for `selectURL()`.
      */
     export interface SharedStorageReportingMetadata {
@@ -14630,57 +16566,102 @@ presence/absence can vary according to SharedStorageAccessType.
     export interface SharedStorageAccessParams {
       /**
        * Spec of the module script URL.
-Present only for SharedStorageAccessType.documentAddModule.
+Present only for SharedStorageAccessMethods: addModule and
+createWorklet.
        */
       scriptSourceUrl?: string;
       /**
+       * String denoting "context-origin", "script-origin", or a custom
+origin to be used as the worklet's data origin.
+Present only for SharedStorageAccessMethod: createWorklet.
+       */
+      dataOrigin?: string;
+      /**
        * Name of the registered operation to be run.
-Present only for SharedStorageAccessType.documentRun and
-SharedStorageAccessType.documentSelectURL.
+Present only for SharedStorageAccessMethods: run and selectURL.
        */
       operationName?: string;
       /**
+       * ID of the operation call.
+Present only for SharedStorageAccessMethods: run and selectURL.
+       */
+      operationId?: string;
+      /**
+       * Whether or not to keep the worket alive for future run or selectURL
+calls.
+Present only for SharedStorageAccessMethods: run and selectURL.
+       */
+      keepAlive?: boolean;
+      /**
+       * Configures the private aggregation options.
+Present only for SharedStorageAccessMethods: run and selectURL.
+       */
+      privateAggregationConfig?: SharedStoragePrivateAggregationConfig;
+      /**
        * The operation's serialized data in bytes (converted to a string).
-Present only for SharedStorageAccessType.documentRun and
-SharedStorageAccessType.documentSelectURL.
+Present only for SharedStorageAccessMethods: run and selectURL.
+TODO(crbug.com/401011862): Consider updating this parameter to binary.
        */
       serializedData?: string;
       /**
        * Array of candidate URLs' specs, along with any associated metadata.
-Present only for SharedStorageAccessType.documentSelectURL.
+Present only for SharedStorageAccessMethod: selectURL.
        */
       urlsWithMetadata?: SharedStorageUrlWithMetadata[];
       /**
+       * Spec of the URN:UUID generated for a selectURL call.
+Present only for SharedStorageAccessMethod: selectURL.
+       */
+      urnUuid?: string;
+      /**
        * Key for a specific entry in an origin's shared storage.
-Present only for SharedStorageAccessType.documentSet,
-SharedStorageAccessType.documentAppend,
-SharedStorageAccessType.documentDelete,
-SharedStorageAccessType.workletSet,
-SharedStorageAccessType.workletAppend,
-SharedStorageAccessType.workletDelete,
-SharedStorageAccessType.workletGet,
-SharedStorageAccessType.headerSet,
-SharedStorageAccessType.headerAppend, and
-SharedStorageAccessType.headerDelete.
+Present only for SharedStorageAccessMethods: set, append, delete, and
+get.
        */
       key?: string;
       /**
        * Value for a specific entry in an origin's shared storage.
-Present only for SharedStorageAccessType.documentSet,
-SharedStorageAccessType.documentAppend,
-SharedStorageAccessType.workletSet,
-SharedStorageAccessType.workletAppend,
-SharedStorageAccessType.headerSet, and
-SharedStorageAccessType.headerAppend.
+Present only for SharedStorageAccessMethods: set and append.
        */
       value?: string;
       /**
        * Whether or not to set an entry for a key if that key is already present.
-Present only for SharedStorageAccessType.documentSet,
-SharedStorageAccessType.workletSet, and
-SharedStorageAccessType.headerSet.
+Present only for SharedStorageAccessMethod: set.
        */
       ignoreIfPresent?: boolean;
+      /**
+       * A number denoting the (0-based) order of the worklet's
+creation relative to all other shared storage worklets created by
+documents using the current storage partition.
+Present only for SharedStorageAccessMethods: addModule, createWorklet.
+       */
+      workletOrdinal?: number;
+      /**
+       * Hex representation of the DevTools token used as the TargetID for the
+associated shared storage worklet.
+Present only for SharedStorageAccessMethods: addModule, createWorklet,
+run, selectURL, and any other SharedStorageAccessMethod when the
+SharedStorageAccessScope is sharedStorageWorklet.
+       */
+      workletTargetId?: Target.TargetID;
+      /**
+       * Name of the lock to be acquired, if present.
+Optionally present only for SharedStorageAccessMethods: batchUpdate,
+set, append, delete, and clear.
+       */
+      withLock?: string;
+      /**
+       * If the method has been called as part of a batchUpdate, then this
+number identifies the batch to which it belongs.
+Optionally present only for SharedStorageAccessMethods:
+batchUpdate (required), set, append, delete, and clear.
+       */
+      batchUpdateId?: string;
+      /**
+       * Number of modifier methods sent in batch.
+Present only for SharedStorageAccessMethod: batchUpdate.
+       */
+      batchSize?: number;
     }
     export type StorageBucketsDurability = "relaxed"|"strict";
     export interface StorageBucket {
@@ -14734,14 +16715,6 @@ SharedStorageAccessType.headerSet.
        */
       ends: number[];
     }
-    export interface AttributionReportingTriggerSpec {
-      /**
-       * number instead of integer because not all uint32 can be represented by
-int
-       */
-      triggerData: number[];
-      eventReportWindows: AttributionReportingEventReportWindows;
-    }
     export type AttributionReportingTriggerDataMatching = "exact"|"modulus";
     export interface AttributionReportingAggregatableDebugReportingData {
       keyPiece: UnsignedInt128AsBase16;
@@ -14771,13 +16744,22 @@ int
       limit: number;
       maxEventStates: number;
     }
+    export interface AttributionReportingNamedBudgetDef {
+      name: string;
+      budget: number;
+    }
     export interface AttributionReportingSourceRegistration {
       time: Network.TimeSinceEpoch;
       /**
        * duration in seconds
        */
       expiry: number;
-      triggerSpecs: AttributionReportingTriggerSpec[];
+      /**
+       * number instead of integer because not all uint32 can be represented by
+int
+       */
+      triggerData: number[];
+      eventReportWindows: AttributionReportingEventReportWindows;
       /**
        * duration in seconds
        */
@@ -14796,6 +16778,9 @@ int
       aggregatableDebugReportingConfig: AttributionReportingAggregatableDebugReportingConfig;
       scopesData?: AttributionScopesData;
       maxEventLevelReports: number;
+      namedBudgets: AttributionReportingNamedBudgetDef[];
+      debugReporting: boolean;
+      eventLevelEpsilon: number;
     }
     export type AttributionReportingSourceRegistrationResult = "success"|"internalError"|"insufficientSourceCapacity"|"insufficientUniqueDestinationCapacity"|"excessiveReportingOrigins"|"prohibitedByBrowserPolicy"|"successNoised"|"destinationReportingLimitReached"|"destinationGlobalLimitReached"|"destinationBothLimitsReached"|"reportingOriginsPerSiteLimitReached"|"exceedsMaxChannelCapacity"|"exceedsMaxScopesChannelCapacity"|"exceedsMaxTriggerStateCardinality"|"exceedsMaxEventStatesLimit"|"destinationPerDayReportingLimitReached";
     export type AttributionReportingSourceRegistrationTimeConfig = "include"|"exclude";
@@ -14827,6 +16812,10 @@ int
       dedupKey?: UnsignedInt64AsBase10;
       filters: AttributionReportingFilterPair;
     }
+    export interface AttributionReportingNamedBudgetCandidate {
+      name?: string;
+      filters: AttributionReportingFilterPair;
+    }
     export interface AttributionReportingTriggerRegistration {
       filters: AttributionReportingFilterPair;
       debugKey?: UnsignedInt64AsBase10;
@@ -14841,9 +16830,11 @@ int
       triggerContextId?: string;
       aggregatableDebugReportingConfig: AttributionReportingAggregatableDebugReportingConfig;
       scopes: string[];
+      namedBudgets: AttributionReportingNamedBudgetCandidate[];
     }
     export type AttributionReportingEventLevelResult = "success"|"successDroppedLowerPriority"|"internalError"|"noCapacityForAttributionDestination"|"noMatchingSources"|"deduplicated"|"excessiveAttributions"|"priorityTooLow"|"neverAttributedSource"|"excessiveReportingOrigins"|"noMatchingSourceFilterData"|"prohibitedByBrowserPolicy"|"noMatchingConfigurations"|"excessiveReports"|"falselyAttributedSource"|"reportWindowPassed"|"notRegistered"|"reportWindowNotStarted"|"noMatchingTriggerData";
     export type AttributionReportingAggregatableResult = "success"|"internalError"|"noCapacityForAttributionDestination"|"noMatchingSources"|"excessiveAttributions"|"excessiveReportingOrigins"|"noHistograms"|"insufficientBudget"|"insufficientNamedBudget"|"noMatchingSourceFilterData"|"notRegistered"|"prohibitedByBrowserPolicy"|"deduplicated"|"reportWindowPassed"|"excessiveReports";
+    export type AttributionReportingReportResult = "sent"|"prohibited"|"failedToAssemble"|"expired";
     /**
      * A single Related Website Set object.
      */
@@ -15034,6 +17025,42 @@ presence/absence depends on `type`.
        */
       params: SharedStorageAccessParams;
     }
+    /**
+     * A shared storage run or selectURL operation finished its execution.
+The following parameters are included in all events.
+     */
+    export type sharedStorageWorkletOperationExecutionFinishedPayload = {
+      /**
+       * Time that the operation finished.
+       */
+      finishedTime: Network.TimeSinceEpoch;
+      /**
+       * Time, in microseconds, from start of shared storage JS API call until
+end of operation execution in the worklet.
+       */
+      executionTime: number;
+      /**
+       * Enum value indicating the Shared Storage API method invoked.
+       */
+      method: SharedStorageAccessMethod;
+      /**
+       * ID of the operation call.
+       */
+      operationId: string;
+      /**
+       * Hex representation of the DevTools token used as the TargetID for the
+associated shared storage worklet.
+       */
+      workletTargetId: Target.TargetID;
+      /**
+       * DevTools Frame Token for the primary frame tree's root.
+       */
+      mainFrameId: Page.FrameId;
+      /**
+       * Serialization of the origin owning the Shared Storage data.
+       */
+      ownerOrigin: string;
+    }
     export type storageBucketCreatedOrUpdatedPayload = {
       bucketInfo: StorageBucketInfo;
     }
@@ -15049,14 +17076,43 @@ presence/absence depends on `type`.
       eventLevel: AttributionReportingEventLevelResult;
       aggregatable: AttributionReportingAggregatableResult;
     }
+    export type attributionReportingReportSentPayload = {
+      url: string;
+      body: { [key: string]: string };
+      result: AttributionReportingReportResult;
+      /**
+       * If result is `sent`, populated with net/HTTP status.
+       */
+      netError?: number;
+      netErrorName?: string;
+      httpStatusCode?: number;
+    }
+    export type attributionReportingVerboseDebugReportSentPayload = {
+      url: string;
+      body?: { [key: string]: string }[];
+      netError?: number;
+      netErrorName?: string;
+      httpStatusCode?: number;
+    }
     
     /**
      * Returns a storage key given a frame id.
+Deprecated. Please use Storage.getStorageKey instead.
      */
     export type getStorageKeyForFrameParameters = {
       frameId: Page.FrameId;
     }
     export type getStorageKeyForFrameReturnValue = {
+      storageKey: SerializedStorageKey;
+    }
+    /**
+     * Returns storage key for the given frame. If no frame ID is provided,
+the storage key of the target executing this command is returned.
+     */
+    export type getStorageKeyParameters = {
+      frameId?: Page.FrameId;
+    }
+    export type getStorageKeyReturnValue = {
       storageKey: SerializedStorageKey;
     }
     /**
@@ -15474,6 +17530,13 @@ party URL, only the first-party URL is returned in the array.
        */
       matchedUrls: string[];
     }
+    export type setProtectedAudienceKAnonymityParameters = {
+      owner: string;
+      name: string;
+      hashes: binary[];
+    }
+    export type setProtectedAudienceKAnonymityReturnValue = {
+    }
   }
   
   /**
@@ -15733,6 +17796,10 @@ supported.
        * Frame id of originating window (is only set if target has an opener).
        */
       openerFrameId?: Page.FrameId;
+      /**
+       * Id of the parent frame, only present for the "iframe" targets.
+       */
+      parentFrameId?: Page.FrameId;
       browserContextId?: Browser.BrowserContextID;
       /**
        * Provides additional details for specific target types. For example, for
@@ -16008,6 +18075,12 @@ by headless shell).
        * Whether to create the target of type "tab".
        */
       forTab?: boolean;
+      /**
+       * Whether to create a hidden target. The hidden target is observable via protocol, but not
+present in the tab UI strip. Cannot be created with `forTab: true`, `newWindow: true` or
+`background: false`. The life-time of the tab is limited to the life-time of the session.
+       */
+      hidden?: boolean;
     }
     export type createTargetReturnValue = {
       /**
@@ -16084,11 +18157,14 @@ and crbug.com/991325.
     export type sendMessageToTargetReturnValue = {
     }
     /**
-     * Controls whether to automatically attach to new targets which are considered to be related to
-this one. When turned on, attaches to all existing related targets as well. When turned off,
+     * Controls whether to automatically attach to new targets which are considered
+to be directly related to this one (for example, iframes or workers).
+When turned on, attaches to all existing related targets as well. When turned off,
 automatically detaches from all currently attached targets.
 This also clears all targets added by `autoAttachRelated` from the list of targets to watch
 for creation of related targets.
+You might want to call this recursively for auto-attached targets to attach
+to all available targets.
      */
     export type setAutoAttachParameters = {
       /**
@@ -16163,6 +18239,21 @@ to run paused targets.
     }
     export type setRemoteLocationsReturnValue = {
     }
+    /**
+     * Opens a DevTools window for the target.
+     */
+    export type openDevToolsParameters = {
+      /**
+       * This can be the page or tab target ID.
+       */
+      targetId: TargetID;
+    }
+    export type openDevToolsReturnValue = {
+      /**
+       * The targetId of DevTools page target.
+       */
+      targetId: TargetID;
+    }
   }
   
   /**
@@ -16215,7 +18306,7 @@ to run paused targets.
     export type MemoryDumpConfig = { [key: string]: string };
     export interface TraceConfig {
       /**
-       * Controls how the trace buffer stores data.
+       * Controls how the trace buffer stores data. The default is `recordUntilFull`.
        */
       recordMode?: "recordUntilFull"|"recordContinuously"|"recordAsMuchAsPossible"|"echoToConsole";
       /**
@@ -16419,380 +18510,6 @@ are ignored.
       tracingBackend?: TracingBackend;
     }
     export type startReturnValue = {
-    }
-  }
-  
-  /**
-   * A domain for letting clients substitute browser's network layer with client code.
-   */
-  export module Fetch {
-    /**
-     * Unique request identifier.
-Note that this does not identify individual HTTP requests that are part of
-a network request.
-     */
-    export type RequestId = string;
-    /**
-     * Stages of the request to handle. Request will intercept before the request is
-sent. Response will intercept after the response is received (but before response
-body is received).
-     */
-    export type RequestStage = "Request"|"Response";
-    export interface RequestPattern {
-      /**
-       * Wildcards (`'*'` -> zero or more, `'?'` -> exactly one) are allowed. Escape character is
-backslash. Omitting is equivalent to `"*"`.
-       */
-      urlPattern?: string;
-      /**
-       * If set, only requests for matching resource types will be intercepted.
-       */
-      resourceType?: Network.ResourceType;
-      /**
-       * Stage at which to begin intercepting requests. Default is Request.
-       */
-      requestStage?: RequestStage;
-    }
-    /**
-     * Response HTTP header entry
-     */
-    export interface HeaderEntry {
-      name: string;
-      value: string;
-    }
-    /**
-     * Authorization challenge for HTTP status code 401 or 407.
-     */
-    export interface AuthChallenge {
-      /**
-       * Source of the authentication challenge.
-       */
-      source?: "Server"|"Proxy";
-      /**
-       * Origin of the challenger.
-       */
-      origin: string;
-      /**
-       * The authentication scheme used, such as basic or digest
-       */
-      scheme: string;
-      /**
-       * The realm of the challenge. May be empty.
-       */
-      realm: string;
-    }
-    /**
-     * Response to an AuthChallenge.
-     */
-    export interface AuthChallengeResponse {
-      /**
-       * The decision on what to do in response to the authorization challenge.  Default means
-deferring to the default behavior of the net stack, which will likely either the Cancel
-authentication or display a popup dialog box.
-       */
-      response: "Default"|"CancelAuth"|"ProvideCredentials";
-      /**
-       * The username to provide, possibly empty. Should only be set if response is
-ProvideCredentials.
-       */
-      username?: string;
-      /**
-       * The password to provide, possibly empty. Should only be set if response is
-ProvideCredentials.
-       */
-      password?: string;
-    }
-    
-    /**
-     * Issued when the domain is enabled and the request URL matches the
-specified filter. The request is paused until the client responds
-with one of continueRequest, failRequest or fulfillRequest.
-The stage of the request can be determined by presence of responseErrorReason
-and responseStatusCode -- the request is at the response stage if either
-of these fields is present and in the request stage otherwise.
-Redirect responses and subsequent requests are reported similarly to regular
-responses and requests. Redirect responses may be distinguished by the value
-of `responseStatusCode` (which is one of 301, 302, 303, 307, 308) along with
-presence of the `location` header. Requests resulting from a redirect will
-have `redirectedRequestId` field set.
-     */
-    export type requestPausedPayload = {
-      /**
-       * Each request the page makes will have a unique id.
-       */
-      requestId: RequestId;
-      /**
-       * The details of the request.
-       */
-      request: Network.Request;
-      /**
-       * The id of the frame that initiated the request.
-       */
-      frameId: Page.FrameId;
-      /**
-       * How the requested resource will be used.
-       */
-      resourceType: Network.ResourceType;
-      /**
-       * Response error if intercepted at response stage.
-       */
-      responseErrorReason?: Network.ErrorReason;
-      /**
-       * Response code if intercepted at response stage.
-       */
-      responseStatusCode?: number;
-      /**
-       * Response status text if intercepted at response stage.
-       */
-      responseStatusText?: string;
-      /**
-       * Response headers if intercepted at the response stage.
-       */
-      responseHeaders?: HeaderEntry[];
-      /**
-       * If the intercepted request had a corresponding Network.requestWillBeSent event fired for it,
-then this networkId will be the same as the requestId present in the requestWillBeSent event.
-       */
-      networkId?: Network.RequestId;
-      /**
-       * If the request is due to a redirect response from the server, the id of the request that
-has caused the redirect.
-       */
-      redirectedRequestId?: RequestId;
-    }
-    /**
-     * Issued when the domain is enabled with handleAuthRequests set to true.
-The request is paused until client responds with continueWithAuth.
-     */
-    export type authRequiredPayload = {
-      /**
-       * Each request the page makes will have a unique id.
-       */
-      requestId: RequestId;
-      /**
-       * The details of the request.
-       */
-      request: Network.Request;
-      /**
-       * The id of the frame that initiated the request.
-       */
-      frameId: Page.FrameId;
-      /**
-       * How the requested resource will be used.
-       */
-      resourceType: Network.ResourceType;
-      /**
-       * Details of the Authorization Challenge encountered.
-If this is set, client should respond with continueRequest that
-contains AuthChallengeResponse.
-       */
-      authChallenge: AuthChallenge;
-    }
-    
-    /**
-     * Disables the fetch domain.
-     */
-    export type disableParameters = {
-    }
-    export type disableReturnValue = {
-    }
-    /**
-     * Enables issuing of requestPaused events. A request will be paused until client
-calls one of failRequest, fulfillRequest or continueRequest/continueWithAuth.
-     */
-    export type enableParameters = {
-      /**
-       * If specified, only requests matching any of these patterns will produce
-fetchRequested event and will be paused until clients response. If not set,
-all requests will be affected.
-       */
-      patterns?: RequestPattern[];
-      /**
-       * If true, authRequired events will be issued and requests will be paused
-expecting a call to continueWithAuth.
-       */
-      handleAuthRequests?: boolean;
-    }
-    export type enableReturnValue = {
-    }
-    /**
-     * Causes the request to fail with specified reason.
-     */
-    export type failRequestParameters = {
-      /**
-       * An id the client received in requestPaused event.
-       */
-      requestId: RequestId;
-      /**
-       * Causes the request to fail with the given reason.
-       */
-      errorReason: Network.ErrorReason;
-    }
-    export type failRequestReturnValue = {
-    }
-    /**
-     * Provides response to the request.
-     */
-    export type fulfillRequestParameters = {
-      /**
-       * An id the client received in requestPaused event.
-       */
-      requestId: RequestId;
-      /**
-       * An HTTP response code.
-       */
-      responseCode: number;
-      /**
-       * Response headers.
-       */
-      responseHeaders?: HeaderEntry[];
-      /**
-       * Alternative way of specifying response headers as a \0-separated
-series of name: value pairs. Prefer the above method unless you
-need to represent some non-UTF8 values that can't be transmitted
-over the protocol as text.
-       */
-      binaryResponseHeaders?: binary;
-      /**
-       * A response body. If absent, original response body will be used if
-the request is intercepted at the response stage and empty body
-will be used if the request is intercepted at the request stage.
-       */
-      body?: binary;
-      /**
-       * A textual representation of responseCode.
-If absent, a standard phrase matching responseCode is used.
-       */
-      responsePhrase?: string;
-    }
-    export type fulfillRequestReturnValue = {
-    }
-    /**
-     * Continues the request, optionally modifying some of its parameters.
-     */
-    export type continueRequestParameters = {
-      /**
-       * An id the client received in requestPaused event.
-       */
-      requestId: RequestId;
-      /**
-       * If set, the request url will be modified in a way that's not observable by page.
-       */
-      url?: string;
-      /**
-       * If set, the request method is overridden.
-       */
-      method?: string;
-      /**
-       * If set, overrides the post data in the request.
-       */
-      postData?: binary;
-      /**
-       * If set, overrides the request headers. Note that the overrides do not
-extend to subsequent redirect hops, if a redirect happens. Another override
-may be applied to a different request produced by a redirect.
-       */
-      headers?: HeaderEntry[];
-      /**
-       * If set, overrides response interception behavior for this request.
-       */
-      interceptResponse?: boolean;
-    }
-    export type continueRequestReturnValue = {
-    }
-    /**
-     * Continues a request supplying authChallengeResponse following authRequired event.
-     */
-    export type continueWithAuthParameters = {
-      /**
-       * An id the client received in authRequired event.
-       */
-      requestId: RequestId;
-      /**
-       * Response to  with an authChallenge.
-       */
-      authChallengeResponse: AuthChallengeResponse;
-    }
-    export type continueWithAuthReturnValue = {
-    }
-    /**
-     * Continues loading of the paused response, optionally modifying the
-response headers. If either responseCode or headers are modified, all of them
-must be present.
-     */
-    export type continueResponseParameters = {
-      /**
-       * An id the client received in requestPaused event.
-       */
-      requestId: RequestId;
-      /**
-       * An HTTP response code. If absent, original response code will be used.
-       */
-      responseCode?: number;
-      /**
-       * A textual representation of responseCode.
-If absent, a standard phrase matching responseCode is used.
-       */
-      responsePhrase?: string;
-      /**
-       * Response headers. If absent, original response headers will be used.
-       */
-      responseHeaders?: HeaderEntry[];
-      /**
-       * Alternative way of specifying response headers as a \0-separated
-series of name: value pairs. Prefer the above method unless you
-need to represent some non-UTF8 values that can't be transmitted
-over the protocol as text.
-       */
-      binaryResponseHeaders?: binary;
-    }
-    export type continueResponseReturnValue = {
-    }
-    /**
-     * Causes the body of the response to be received from the server and
-returned as a single string. May only be issued for a request that
-is paused in the Response stage and is mutually exclusive with
-takeResponseBodyForInterceptionAsStream. Calling other methods that
-affect the request or disabling fetch domain before body is received
-results in an undefined behavior.
-Note that the response body is not available for redirects. Requests
-paused in the _redirect received_ state may be differentiated by
-`responseCode` and presence of `location` response header, see
-comments to `requestPaused` for details.
-     */
-    export type getResponseBodyParameters = {
-      /**
-       * Identifier for the intercepted request to get body for.
-       */
-      requestId: RequestId;
-    }
-    export type getResponseBodyReturnValue = {
-      /**
-       * Response body.
-       */
-      body: string;
-      /**
-       * True, if content was sent as base64.
-       */
-      base64Encoded: boolean;
-    }
-    /**
-     * Returns a handle to the stream representing the response body.
-The request must be paused in the HeadersReceived stage.
-Note that after this command the request can't be continued
-as is -- client either needs to cancel it or to provide the
-response body.
-The stream only supports sequential read, IO.read will fail if the position
-is specified.
-This method is mutually exclusive with getResponseBody.
-Calling other methods that affect the request or disabling fetch
-domain before body is received results in an undefined behavior.
-     */
-    export type takeResponseBodyAsStreamParameters = {
-      requestId: RequestId;
-    }
-    export type takeResponseBodyAsStreamReturnValue = {
-      stream: IO.StreamHandle;
     }
   }
   
@@ -17332,846 +19049,6 @@ https://w3c.github.io/webauthn/#sctn-automation-set-credential-properties
   }
   
   /**
-   * This domain allows detailed inspection of media elements
-   */
-  export module Media {
-    /**
-     * Players will get an ID that is unique within the agent context.
-     */
-    export type PlayerId = string;
-    export type Timestamp = number;
-    /**
-     * Have one type per entry in MediaLogRecord::Type
-Corresponds to kMessage
-     */
-    export interface PlayerMessage {
-      /**
-       * Keep in sync with MediaLogMessageLevel
-We are currently keeping the message level 'error' separate from the
-PlayerError type because right now they represent different things,
-this one being a DVLOG(ERROR) style log message that gets printed
-based on what log level is selected in the UI, and the other is a
-representation of a media::PipelineStatus object. Soon however we're
-going to be moving away from using PipelineStatus for errors and
-introducing a new error type which should hopefully let us integrate
-the error log level into the PlayerError type.
-       */
-      level: "error"|"warning"|"info"|"debug";
-      message: string;
-    }
-    /**
-     * Corresponds to kMediaPropertyChange
-     */
-    export interface PlayerProperty {
-      name: string;
-      value: string;
-    }
-    /**
-     * Corresponds to kMediaEventTriggered
-     */
-    export interface PlayerEvent {
-      timestamp: Timestamp;
-      value: string;
-    }
-    /**
-     * Represents logged source line numbers reported in an error.
-NOTE: file and line are from chromium c++ implementation code, not js.
-     */
-    export interface PlayerErrorSourceLocation {
-      file: string;
-      line: number;
-    }
-    /**
-     * Corresponds to kMediaError
-     */
-    export interface PlayerError {
-      errorType: string;
-      /**
-       * Code is the numeric enum entry for a specific set of error codes, such
-as PipelineStatusCodes in media/base/pipeline_status.h
-       */
-      code: number;
-      /**
-       * A trace of where this error was caused / where it passed through.
-       */
-      stack: PlayerErrorSourceLocation[];
-      /**
-       * Errors potentially have a root cause error, ie, a DecoderError might be
-caused by an WindowsError
-       */
-      cause: PlayerError[];
-      /**
-       * Extra data attached to an error, such as an HRESULT, Video Codec, etc.
-       */
-      data: { [key: string]: string };
-    }
-    
-    /**
-     * This can be called multiple times, and can be used to set / override /
-remove player properties. A null propValue indicates removal.
-     */
-    export type playerPropertiesChangedPayload = {
-      playerId: PlayerId;
-      properties: PlayerProperty[];
-    }
-    /**
-     * Send events as a list, allowing them to be batched on the browser for less
-congestion. If batched, events must ALWAYS be in chronological order.
-     */
-    export type playerEventsAddedPayload = {
-      playerId: PlayerId;
-      events: PlayerEvent[];
-    }
-    /**
-     * Send a list of any messages that need to be delivered.
-     */
-    export type playerMessagesLoggedPayload = {
-      playerId: PlayerId;
-      messages: PlayerMessage[];
-    }
-    /**
-     * Send a list of any errors that need to be delivered.
-     */
-    export type playerErrorsRaisedPayload = {
-      playerId: PlayerId;
-      errors: PlayerError[];
-    }
-    /**
-     * Called whenever a player is created, or when a new agent joins and receives
-a list of active players. If an agent is restored, it will receive the full
-list of player ids and all events again.
-     */
-    export type playersCreatedPayload = {
-      players: PlayerId[];
-    }
-    
-    /**
-     * Enables the Media domain
-     */
-    export type enableParameters = {
-    }
-    export type enableReturnValue = {
-    }
-    /**
-     * Disables the Media domain.
-     */
-    export type disableParameters = {
-    }
-    export type disableReturnValue = {
-    }
-  }
-  
-  export module DeviceAccess {
-    /**
-     * Device request id.
-     */
-    export type RequestId = string;
-    /**
-     * A device id.
-     */
-    export type DeviceId = string;
-    /**
-     * Device information displayed in a user prompt to select a device.
-     */
-    export interface PromptDevice {
-      id: DeviceId;
-      /**
-       * Display name as it appears in a device request user prompt.
-       */
-      name: string;
-    }
-    
-    /**
-     * A device request opened a user prompt to select a device. Respond with the
-selectPrompt or cancelPrompt command.
-     */
-    export type deviceRequestPromptedPayload = {
-      id: RequestId;
-      devices: PromptDevice[];
-    }
-    
-    /**
-     * Enable events in this domain.
-     */
-    export type enableParameters = {
-    }
-    export type enableReturnValue = {
-    }
-    /**
-     * Disable events in this domain.
-     */
-    export type disableParameters = {
-    }
-    export type disableReturnValue = {
-    }
-    /**
-     * Select a device in response to a DeviceAccess.deviceRequestPrompted event.
-     */
-    export type selectPromptParameters = {
-      id: RequestId;
-      deviceId: DeviceId;
-    }
-    export type selectPromptReturnValue = {
-    }
-    /**
-     * Cancel a prompt in response to a DeviceAccess.deviceRequestPrompted event.
-     */
-    export type cancelPromptParameters = {
-      id: RequestId;
-    }
-    export type cancelPromptReturnValue = {
-    }
-  }
-  
-  export module Preload {
-    /**
-     * Unique id
-     */
-    export type RuleSetId = string;
-    /**
-     * Corresponds to SpeculationRuleSet
-     */
-    export interface RuleSet {
-      id: RuleSetId;
-      /**
-       * Identifies a document which the rule set is associated with.
-       */
-      loaderId: Network.LoaderId;
-      /**
-       * Source text of JSON representing the rule set. If it comes from
-`<script>` tag, it is the textContent of the node. Note that it is
-a JSON for valid case.
-
-See also:
-- https://wicg.github.io/nav-speculation/speculation-rules.html
-- https://github.com/WICG/nav-speculation/blob/main/triggers.md
-       */
-      sourceText: string;
-      /**
-       * A speculation rule set is either added through an inline
-`<script>` tag or through an external resource via the
-'Speculation-Rules' HTTP header. For the first case, we include
-the BackendNodeId of the relevant `<script>` tag. For the second
-case, we include the external URL where the rule set was loaded
-from, and also RequestId if Network domain is enabled.
-
-See also:
-- https://wicg.github.io/nav-speculation/speculation-rules.html#speculation-rules-script
-- https://wicg.github.io/nav-speculation/speculation-rules.html#speculation-rules-header
-       */
-      backendNodeId?: DOM.BackendNodeId;
-      url?: string;
-      requestId?: Network.RequestId;
-      /**
-       * Error information
-`errorMessage` is null iff `errorType` is null.
-       */
-      errorType?: RuleSetErrorType;
-      /**
-       * TODO(https://crbug.com/1425354): Replace this property with structured error.
-       */
-      errorMessage?: string;
-    }
-    export type RuleSetErrorType = "SourceIsNotJsonObject"|"InvalidRulesSkipped";
-    /**
-     * The type of preloading attempted. It corresponds to
-mojom::SpeculationAction (although PrefetchWithSubresources is omitted as it
-isn't being used by clients).
-     */
-    export type SpeculationAction = "Prefetch"|"Prerender";
-    /**
-     * Corresponds to mojom::SpeculationTargetHint.
-See https://github.com/WICG/nav-speculation/blob/main/triggers.md#window-name-targeting-hints
-     */
-    export type SpeculationTargetHint = "Blank"|"Self";
-    /**
-     * A key that identifies a preloading attempt.
-
-The url used is the url specified by the trigger (i.e. the initial URL), and
-not the final url that is navigated to. For example, prerendering allows
-same-origin main frame navigations during the attempt, but the attempt is
-still keyed with the initial URL.
-     */
-    export interface PreloadingAttemptKey {
-      loaderId: Network.LoaderId;
-      action: SpeculationAction;
-      url: string;
-      targetHint?: SpeculationTargetHint;
-    }
-    /**
-     * Lists sources for a preloading attempt, specifically the ids of rule sets
-that had a speculation rule that triggered the attempt, and the
-BackendNodeIds of <a href> or <area href> elements that triggered the
-attempt (in the case of attempts triggered by a document rule). It is
-possible for multiple rule sets and links to trigger a single attempt.
-     */
-    export interface PreloadingAttemptSource {
-      key: PreloadingAttemptKey;
-      ruleSetIds: RuleSetId[];
-      nodeIds: DOM.BackendNodeId[];
-    }
-    /**
-     * Chrome manages different types of preloads together using a
-concept of preloading pipeline. For example, if a site uses a
-SpeculationRules for prerender, Chrome first starts a prefetch and
-then upgrades it to prerender.
-
-CDP events for them are emitted separately but they share
-`PreloadPipelineId`.
-     */
-    export type PreloadPipelineId = string;
-    /**
-     * List of FinalStatus reasons for Prerender2.
-     */
-    export type PrerenderFinalStatus = "Activated"|"Destroyed"|"LowEndDevice"|"InvalidSchemeRedirect"|"InvalidSchemeNavigation"|"NavigationRequestBlockedByCsp"|"MainFrameNavigation"|"MojoBinderPolicy"|"RendererProcessCrashed"|"RendererProcessKilled"|"Download"|"TriggerDestroyed"|"NavigationNotCommitted"|"NavigationBadHttpStatus"|"ClientCertRequested"|"NavigationRequestNetworkError"|"CancelAllHostsForTesting"|"DidFailLoad"|"Stop"|"SslCertificateError"|"LoginAuthRequested"|"UaChangeRequiresReload"|"BlockedByClient"|"AudioOutputDeviceRequested"|"MixedContent"|"TriggerBackgrounded"|"MemoryLimitExceeded"|"DataSaverEnabled"|"TriggerUrlHasEffectiveUrl"|"ActivatedBeforeStarted"|"InactivePageRestriction"|"StartFailed"|"TimeoutBackgrounded"|"CrossSiteRedirectInInitialNavigation"|"CrossSiteNavigationInInitialNavigation"|"SameSiteCrossOriginRedirectNotOptInInInitialNavigation"|"SameSiteCrossOriginNavigationNotOptInInInitialNavigation"|"ActivationNavigationParameterMismatch"|"ActivatedInBackground"|"EmbedderHostDisallowed"|"ActivationNavigationDestroyedBeforeSuccess"|"TabClosedByUserGesture"|"TabClosedWithoutUserGesture"|"PrimaryMainFrameRendererProcessCrashed"|"PrimaryMainFrameRendererProcessKilled"|"ActivationFramePolicyNotCompatible"|"PreloadingDisabled"|"BatterySaverEnabled"|"ActivatedDuringMainFrameNavigation"|"PreloadingUnsupportedByWebContents"|"CrossSiteRedirectInMainFrameNavigation"|"CrossSiteNavigationInMainFrameNavigation"|"SameSiteCrossOriginRedirectNotOptInInMainFrameNavigation"|"SameSiteCrossOriginNavigationNotOptInInMainFrameNavigation"|"MemoryPressureOnTrigger"|"MemoryPressureAfterTriggered"|"PrerenderingDisabledByDevTools"|"SpeculationRuleRemoved"|"ActivatedWithAuxiliaryBrowsingContexts"|"MaxNumOfRunningEagerPrerendersExceeded"|"MaxNumOfRunningNonEagerPrerendersExceeded"|"MaxNumOfRunningEmbedderPrerendersExceeded"|"PrerenderingUrlHasEffectiveUrl"|"RedirectedPrerenderingUrlHasEffectiveUrl"|"ActivationUrlHasEffectiveUrl"|"JavaScriptInterfaceAdded"|"JavaScriptInterfaceRemoved"|"AllPrerenderingCanceled"|"WindowClosed"|"SlowNetwork"|"OtherPrerenderedPageActivated"|"V8OptimizerDisabled"|"PrerenderFailedDuringPrefetch"|"BrowsingDataRemoved";
-    /**
-     * Preloading status values, see also PreloadingTriggeringOutcome. This
-status is shared by prefetchStatusUpdated and prerenderStatusUpdated.
-     */
-    export type PreloadingStatus = "Pending"|"Running"|"Ready"|"Success"|"Failure"|"NotSupported";
-    /**
-     * TODO(https://crbug.com/1384419): revisit the list of PrefetchStatus and
-filter out the ones that aren't necessary to the developers.
-     */
-    export type PrefetchStatus = "PrefetchAllowed"|"PrefetchFailedIneligibleRedirect"|"PrefetchFailedInvalidRedirect"|"PrefetchFailedMIMENotSupported"|"PrefetchFailedNetError"|"PrefetchFailedNon2XX"|"PrefetchEvictedAfterBrowsingDataRemoved"|"PrefetchEvictedAfterCandidateRemoved"|"PrefetchEvictedForNewerPrefetch"|"PrefetchHeldback"|"PrefetchIneligibleRetryAfter"|"PrefetchIsPrivacyDecoy"|"PrefetchIsStale"|"PrefetchNotEligibleBrowserContextOffTheRecord"|"PrefetchNotEligibleDataSaverEnabled"|"PrefetchNotEligibleExistingProxy"|"PrefetchNotEligibleHostIsNonUnique"|"PrefetchNotEligibleNonDefaultStoragePartition"|"PrefetchNotEligibleSameSiteCrossOriginPrefetchRequiredProxy"|"PrefetchNotEligibleSchemeIsNotHttps"|"PrefetchNotEligibleUserHasCookies"|"PrefetchNotEligibleUserHasServiceWorker"|"PrefetchNotEligibleUserHasServiceWorkerNoFetchHandler"|"PrefetchNotEligibleRedirectFromServiceWorker"|"PrefetchNotEligibleRedirectToServiceWorker"|"PrefetchNotEligibleBatterySaverEnabled"|"PrefetchNotEligiblePreloadingDisabled"|"PrefetchNotFinishedInTime"|"PrefetchNotStarted"|"PrefetchNotUsedCookiesChanged"|"PrefetchProxyNotAvailable"|"PrefetchResponseUsed"|"PrefetchSuccessfulButNotUsed"|"PrefetchNotUsedProbeFailed";
-    /**
-     * Information of headers to be displayed when the header mismatch occurred.
-     */
-    export interface PrerenderMismatchedHeaders {
-      headerName: string;
-      initialValue?: string;
-      activationValue?: string;
-    }
-    
-    /**
-     * Upsert. Currently, it is only emitted when a rule set added.
-     */
-    export type ruleSetUpdatedPayload = {
-      ruleSet: RuleSet;
-    }
-    export type ruleSetRemovedPayload = {
-      id: RuleSetId;
-    }
-    /**
-     * Fired when a preload enabled state is updated.
-     */
-    export type preloadEnabledStateUpdatedPayload = {
-      disabledByPreference: boolean;
-      disabledByDataSaver: boolean;
-      disabledByBatterySaver: boolean;
-      disabledByHoldbackPrefetchSpeculationRules: boolean;
-      disabledByHoldbackPrerenderSpeculationRules: boolean;
-    }
-    /**
-     * Fired when a prefetch attempt is updated.
-     */
-    export type prefetchStatusUpdatedPayload = {
-      key: PreloadingAttemptKey;
-      pipelineId: PreloadPipelineId;
-      /**
-       * The frame id of the frame initiating prefetch.
-       */
-      initiatingFrameId: Page.FrameId;
-      prefetchUrl: string;
-      status: PreloadingStatus;
-      prefetchStatus: PrefetchStatus;
-      requestId: Network.RequestId;
-    }
-    /**
-     * Fired when a prerender attempt is updated.
-     */
-    export type prerenderStatusUpdatedPayload = {
-      key: PreloadingAttemptKey;
-      pipelineId: PreloadPipelineId;
-      status: PreloadingStatus;
-      prerenderStatus?: PrerenderFinalStatus;
-      /**
-       * This is used to give users more information about the name of Mojo interface
-that is incompatible with prerender and has caused the cancellation of the attempt.
-       */
-      disallowedMojoInterface?: string;
-      mismatchedHeaders?: PrerenderMismatchedHeaders[];
-    }
-    /**
-     * Send a list of sources for all preloading attempts in a document.
-     */
-    export type preloadingAttemptSourcesUpdatedPayload = {
-      loaderId: Network.LoaderId;
-      preloadingAttemptSources: PreloadingAttemptSource[];
-    }
-    
-    export type enableParameters = {
-    }
-    export type enableReturnValue = {
-    }
-    export type disableParameters = {
-    }
-    export type disableReturnValue = {
-    }
-  }
-  
-  /**
-   * This domain allows interacting with the FedCM dialog.
-   */
-  export module FedCm {
-    /**
-     * Whether this is a sign-up or sign-in action for this account, i.e.
-whether this account has ever been used to sign in to this RP before.
-     */
-    export type LoginState = "SignIn"|"SignUp";
-    /**
-     * The types of FedCM dialogs.
-     */
-    export type DialogType = "AccountChooser"|"AutoReauthn"|"ConfirmIdpLogin"|"Error";
-    /**
-     * The buttons on the FedCM dialog.
-     */
-    export type DialogButton = "ConfirmIdpLoginContinue"|"ErrorGotIt"|"ErrorMoreDetails";
-    /**
-     * The URLs that each account has
-     */
-    export type AccountUrlType = "TermsOfService"|"PrivacyPolicy";
-    /**
-     * Corresponds to IdentityRequestAccount
-     */
-    export interface Account {
-      accountId: string;
-      email: string;
-      name: string;
-      givenName: string;
-      pictureUrl: string;
-      idpConfigUrl: string;
-      idpLoginUrl: string;
-      loginState: LoginState;
-      /**
-       * These two are only set if the loginState is signUp
-       */
-      termsOfServiceUrl?: string;
-      privacyPolicyUrl?: string;
-    }
-    
-    export type dialogShownPayload = {
-      dialogId: string;
-      dialogType: DialogType;
-      accounts: Account[];
-      /**
-       * These exist primarily so that the caller can verify the
-RP context was used appropriately.
-       */
-      title: string;
-      subtitle?: string;
-    }
-    /**
-     * Triggered when a dialog is closed, either by user action, JS abort,
-or a command below.
-     */
-    export type dialogClosedPayload = {
-      dialogId: string;
-    }
-    
-    export type enableParameters = {
-      /**
-       * Allows callers to disable the promise rejection delay that would
-normally happen, if this is unimportant to what's being tested.
-(step 4 of https://fedidcg.github.io/FedCM/#browser-api-rp-sign-in)
-       */
-      disableRejectionDelay?: boolean;
-    }
-    export type enableReturnValue = {
-    }
-    export type disableParameters = {
-    }
-    export type disableReturnValue = {
-    }
-    export type selectAccountParameters = {
-      dialogId: string;
-      accountIndex: number;
-    }
-    export type selectAccountReturnValue = {
-    }
-    export type clickDialogButtonParameters = {
-      dialogId: string;
-      dialogButton: DialogButton;
-    }
-    export type clickDialogButtonReturnValue = {
-    }
-    export type openUrlParameters = {
-      dialogId: string;
-      accountIndex: number;
-      accountUrlType: AccountUrlType;
-    }
-    export type openUrlReturnValue = {
-    }
-    export type dismissDialogParameters = {
-      dialogId: string;
-      triggerCooldown?: boolean;
-    }
-    export type dismissDialogReturnValue = {
-    }
-    /**
-     * Resets the cooldown time, if any, to allow the next FedCM call to show
-a dialog even if one was recently dismissed by the user.
-     */
-    export type resetCooldownParameters = {
-    }
-    export type resetCooldownReturnValue = {
-    }
-  }
-  
-  /**
-   * This domain allows interacting with the browser to control PWAs.
-   */
-  export module PWA {
-    /**
-     * The following types are the replica of
-https://crsrc.org/c/chrome/browser/web_applications/proto/web_app_os_integration_state.proto;drc=9910d3be894c8f142c977ba1023f30a656bc13fc;l=67
-     */
-    export interface FileHandlerAccept {
-      /**
-       * New name of the mimetype according to
-https://www.iana.org/assignments/media-types/media-types.xhtml
-       */
-      mediaType: string;
-      fileExtensions: string[];
-    }
-    export interface FileHandler {
-      action: string;
-      accepts: FileHandlerAccept[];
-      displayName: string;
-    }
-    /**
-     * If user prefers opening the app in browser or an app window.
-     */
-    export type DisplayMode = "standalone"|"browser";
-    
-    
-    /**
-     * Returns the following OS state for the given manifest id.
-     */
-    export type getOsAppStateParameters = {
-      /**
-       * The id from the webapp's manifest file, commonly it's the url of the
-site installing the webapp. See
-https://web.dev/learn/pwa/web-app-manifest.
-       */
-      manifestId: string;
-    }
-    export type getOsAppStateReturnValue = {
-      badgeCount: number;
-      fileHandlers: FileHandler[];
-    }
-    /**
-     * Installs the given manifest identity, optionally using the given install_url
-or IWA bundle location.
-
-TODO(crbug.com/337872319) Support IWA to meet the following specific
-requirement.
-IWA-specific install description: If the manifest_id is isolated-app://,
-install_url_or_bundle_url is required, and can be either an http(s) URL or
-file:// URL pointing to a signed web bundle (.swbn). The .swbn file's
-signing key must correspond to manifest_id. If Chrome is not in IWA dev
-mode, the installation will fail, regardless of the state of the allowlist.
-     */
-    export type installParameters = {
-      manifestId: string;
-      /**
-       * The location of the app or bundle overriding the one derived from the
-manifestId.
-       */
-      installUrlOrBundleUrl?: string;
-    }
-    export type installReturnValue = {
-    }
-    /**
-     * Uninstalls the given manifest_id and closes any opened app windows.
-     */
-    export type uninstallParameters = {
-      manifestId: string;
-    }
-    export type uninstallReturnValue = {
-    }
-    /**
-     * Launches the installed web app, or an url in the same web app instead of the
-default start url if it is provided. Returns a page Target.TargetID which
-can be used to attach to via Target.attachToTarget or similar APIs.
-     */
-    export type launchParameters = {
-      manifestId: string;
-      url?: string;
-    }
-    export type launchReturnValue = {
-      /**
-       * ID of the tab target created as a result.
-       */
-      targetId: Target.TargetID;
-    }
-    /**
-     * Opens one or more local files from an installed web app identified by its
-manifestId. The web app needs to have file handlers registered to process
-the files. The API returns one or more page Target.TargetIDs which can be
-used to attach to via Target.attachToTarget or similar APIs.
-If some files in the parameters cannot be handled by the web app, they will
-be ignored. If none of the files can be handled, this API returns an error.
-If no files are provided as the parameter, this API also returns an error.
-
-According to the definition of the file handlers in the manifest file, one
-Target.TargetID may represent a page handling one or more files. The order
-of the returned Target.TargetIDs is not guaranteed.
-
-TODO(crbug.com/339454034): Check the existences of the input files.
-     */
-    export type launchFilesInAppParameters = {
-      manifestId: string;
-      files: string[];
-    }
-    export type launchFilesInAppReturnValue = {
-      /**
-       * IDs of the tab targets created as the result.
-       */
-      targetIds: Target.TargetID[];
-    }
-    /**
-     * Opens the current page in its web app identified by the manifest id, needs
-to be called on a page target. This function returns immediately without
-waiting for the app to finish loading.
-     */
-    export type openCurrentPageInAppParameters = {
-      manifestId: string;
-    }
-    export type openCurrentPageInAppReturnValue = {
-    }
-    /**
-     * Changes user settings of the web app identified by its manifestId. If the
-app was not installed, this command returns an error. Unset parameters will
-be ignored; unrecognized values will cause an error.
-
-Unlike the ones defined in the manifest files of the web apps, these
-settings are provided by the browser and controlled by the users, they
-impact the way the browser handling the web apps.
-
-See the comment of each parameter.
-     */
-    export type changeAppUserSettingsParameters = {
-      manifestId: string;
-      /**
-       * If user allows the links clicked on by the user in the app's scope, or
-extended scope if the manifest has scope extensions and the flags
-`DesktopPWAsLinkCapturingWithScopeExtensions` and
-`WebAppEnableScopeExtensions` are enabled.
-
-Note, the API does not support resetting the linkCapturing to the
-initial value, uninstalling and installing the web app again will reset
-it.
-
-TODO(crbug.com/339453269): Setting this value on ChromeOS is not
-supported yet.
-       */
-      linkCapturing?: boolean;
-      displayMode?: DisplayMode;
-    }
-    export type changeAppUserSettingsReturnValue = {
-    }
-  }
-  
-  /**
-   * This domain allows configuring virtual Bluetooth devices to test
-the web-bluetooth API.
-   */
-  export module BluetoothEmulation {
-    /**
-     * Indicates the various states of Central.
-     */
-    export type CentralState = "absent"|"powered-off"|"powered-on";
-    /**
-     * Indicates the various types of GATT event.
-     */
-    export type GATTOperationType = "connection"|"discovery";
-    /**
-     * Stores the manufacturer data
-     */
-    export interface ManufacturerData {
-      /**
-       * Company identifier
-https://bitbucket.org/bluetooth-SIG/public/src/main/assigned_numbers/company_identifiers/company_identifiers.yaml
-https://usb.org/developers
-       */
-      key: number;
-      /**
-       * Manufacturer-specific data
-       */
-      data: binary;
-    }
-    /**
-     * Stores the byte data of the advertisement packet sent by a Bluetooth device.
-     */
-    export interface ScanRecord {
-      name?: string;
-      uuids?: string[];
-      /**
-       * Stores the external appearance description of the device.
-       */
-      appearance?: number;
-      /**
-       * Stores the transmission power of a broadcasting device.
-       */
-      txPower?: number;
-      /**
-       * Key is the company identifier and the value is an array of bytes of
-manufacturer specific data.
-       */
-      manufacturerData?: ManufacturerData[];
-    }
-    /**
-     * Stores the advertisement packet information that is sent by a Bluetooth device.
-     */
-    export interface ScanEntry {
-      deviceAddress: string;
-      rssi: number;
-      scanRecord: ScanRecord;
-    }
-    /**
-     * Describes the properties of a characteristic. This follows Bluetooth Core
-Specification BT 4.2 Vol 3 Part G 3.3.1. Characteristic Properties.
-     */
-    export interface CharacteristicProperties {
-      broadcast?: boolean;
-      read?: boolean;
-      writeWithoutResponse?: boolean;
-      write?: boolean;
-      notify?: boolean;
-      indicate?: boolean;
-      authenticatedSignedWrites?: boolean;
-      extendedProperties?: boolean;
-    }
-    
-    /**
-     * Event for when a GATT operation of |type| to the peripheral with |address|
-happened.
-     */
-    export type gattOperationReceivedPayload = {
-      address: string;
-      type: GATTOperationType;
-    }
-    
-    /**
-     * Enable the BluetoothEmulation domain.
-     */
-    export type enableParameters = {
-      /**
-       * State of the simulated central.
-       */
-      state: CentralState;
-      /**
-       * If the simulated central supports low-energy.
-       */
-      leSupported: boolean;
-    }
-    export type enableReturnValue = {
-    }
-    /**
-     * Set the state of the simulated central.
-     */
-    export type setSimulatedCentralStateParameters = {
-      /**
-       * State of the simulated central.
-       */
-      state: CentralState;
-    }
-    export type setSimulatedCentralStateReturnValue = {
-    }
-    /**
-     * Disable the BluetoothEmulation domain.
-     */
-    export type disableParameters = {
-    }
-    export type disableReturnValue = {
-    }
-    /**
-     * Simulates a peripheral with |address|, |name| and |knownServiceUuids|
-that has already been connected to the system.
-     */
-    export type simulatePreconnectedPeripheralParameters = {
-      address: string;
-      name: string;
-      manufacturerData: ManufacturerData[];
-      knownServiceUuids: string[];
-    }
-    export type simulatePreconnectedPeripheralReturnValue = {
-    }
-    /**
-     * Simulates an advertisement packet described in |entry| being received by
-the central.
-     */
-    export type simulateAdvertisementParameters = {
-      entry: ScanEntry;
-    }
-    export type simulateAdvertisementReturnValue = {
-    }
-    /**
-     * Simulates the response code from the peripheral with |address| for a
-GATT operation of |type|. The |code| value follows the HCI Error Codes from
-Bluetooth Core Specification Vol 2 Part D 1.3 List Of Error Codes.
-     */
-    export type simulateGATTOperationResponseParameters = {
-      address: string;
-      type: GATTOperationType;
-      code: number;
-    }
-    export type simulateGATTOperationResponseReturnValue = {
-    }
-    /**
-     * Adds a service with |serviceUuid| to the peripheral with |address|.
-     */
-    export type addServiceParameters = {
-      address: string;
-      serviceUuid: string;
-    }
-    export type addServiceReturnValue = {
-      /**
-       * An identifier that uniquely represents this service.
-       */
-      serviceId: string;
-    }
-    /**
-     * Removes the service respresented by |serviceId| from the peripheral with
-|address|.
-     */
-    export type removeServiceParameters = {
-      address: string;
-      serviceId: string;
-    }
-    export type removeServiceReturnValue = {
-    }
-    /**
-     * Adds a characteristic with |characteristicUuid| and |properties| to the
-service represented by |serviceId| in the peripheral with |address|.
-     */
-    export type addCharacteristicParameters = {
-      address: string;
-      serviceId: string;
-      characteristicUuid: string;
-      properties: CharacteristicProperties;
-    }
-    export type addCharacteristicReturnValue = {
-      /**
-       * An identifier that uniquely represents this characteristic.
-       */
-      characteristicId: string;
-    }
-    /**
-     * Removes the characteristic respresented by |characteristicId| from the
-service respresented by |serviceId| in the peripheral with |address|.
-     */
-    export type removeCharacteristicParameters = {
-      address: string;
-      serviceId: string;
-      characteristicId: string;
-    }
-    export type removeCharacteristicReturnValue = {
-    }
-  }
-  
-  /**
    * This domain is deprecated - use Runtime or Log instead.
    */
   export module Console {
@@ -18508,7 +19385,7 @@ Deprecated in favor of `resolvedBreakpoints` in the `scriptParsed` event.
        */
       hash: string;
       /**
-       * For Wasm modules, the content of the `build_id` custom section.
+       * For Wasm modules, the content of the `build_id` custom section. For JavaScript the `debugId` magic comment.
        */
       buildId: string;
       /**
@@ -18586,7 +19463,7 @@ scripts upon enabling debugger.
        */
       hash: string;
       /**
-       * For Wasm modules, the content of the `build_id` custom section.
+       * For Wasm modules, the content of the `build_id` custom section. For JavaScript the `debugId` magic comment.
        */
       buildId: string;
       /**
@@ -19416,6 +20293,10 @@ default value is 32768 bytes.
        */
       samplingInterval?: number;
       /**
+       * Maximum stack depth. The default value is 128.
+       */
+      stackDepth?: number;
+      /**
        * By default, the sampling heap profiler reports only objects which are
 still alive when the profile is returned via getSamplingProfile or
 stopSampling, which is useful for determining what functions contribute
@@ -19822,7 +20703,7 @@ per value in the scope of one CDP call.
 NOTE: If you change anything here, make sure to also update
 `subtype` in `ObjectPreview` and `PropertyPreview` below.
        */
-      subtype?: "array"|"null"|"node"|"regexp"|"date"|"map"|"set"|"weakmap"|"weakset"|"iterator"|"generator"|"error"|"proxy"|"promise"|"typedarray"|"arraybuffer"|"dataview"|"webassemblymemory"|"wasmvalue";
+      subtype?: "array"|"null"|"node"|"regexp"|"date"|"map"|"set"|"weakmap"|"weakset"|"iterator"|"generator"|"error"|"proxy"|"promise"|"typedarray"|"arraybuffer"|"dataview"|"webassemblymemory"|"wasmvalue"|"trustedtype";
       /**
        * Object class (constructor) name. Specified for `object` type values only.
        */
@@ -19878,7 +20759,7 @@ The result value is json ML array.
       /**
        * Object subtype hint. Specified for `object` type values only.
        */
-      subtype?: "array"|"null"|"node"|"regexp"|"date"|"map"|"set"|"weakmap"|"weakset"|"iterator"|"generator"|"error"|"proxy"|"promise"|"typedarray"|"arraybuffer"|"dataview"|"webassemblymemory"|"wasmvalue";
+      subtype?: "array"|"null"|"node"|"regexp"|"date"|"map"|"set"|"weakmap"|"weakset"|"iterator"|"generator"|"error"|"proxy"|"promise"|"typedarray"|"arraybuffer"|"dataview"|"webassemblymemory"|"wasmvalue"|"trustedtype";
       /**
        * String representation of the object.
        */
@@ -19916,7 +20797,7 @@ The result value is json ML array.
       /**
        * Object subtype hint. Specified for `object` type values only.
        */
-      subtype?: "array"|"null"|"node"|"regexp"|"date"|"map"|"set"|"weakmap"|"weakset"|"iterator"|"generator"|"error"|"proxy"|"promise"|"typedarray"|"arraybuffer"|"dataview"|"webassemblymemory"|"wasmvalue";
+      subtype?: "array"|"null"|"node"|"regexp"|"date"|"map"|"set"|"weakmap"|"weakset"|"iterator"|"generator"|"error"|"proxy"|"promise"|"typedarray"|"arraybuffer"|"dataview"|"webassemblymemory"|"wasmvalue"|"trustedtype";
     }
     export interface EntryPreview {
       /**
@@ -20864,6 +21745,9 @@ Error was thrown.
     "Autofill.addressFormFilled": Autofill.addressFormFilledPayload;
     "BackgroundService.recordingStateChanged": BackgroundService.recordingStateChangedPayload;
     "BackgroundService.backgroundServiceEventReceived": BackgroundService.backgroundServiceEventReceivedPayload;
+    "BluetoothEmulation.gattOperationReceived": BluetoothEmulation.gattOperationReceivedPayload;
+    "BluetoothEmulation.characteristicOperationReceived": BluetoothEmulation.characteristicOperationReceivedPayload;
+    "BluetoothEmulation.descriptorOperationReceived": BluetoothEmulation.descriptorOperationReceivedPayload;
     "Browser.downloadWillBegin": Browser.downloadWillBeginPayload;
     "Browser.downloadProgress": Browser.downloadProgressPayload;
     "CSS.fontsUpdated": CSS.fontsUpdatedPayload;
@@ -20886,6 +21770,7 @@ Error was thrown.
     "DOM.pseudoElementAdded": DOM.pseudoElementAddedPayload;
     "DOM.topLayerElementsUpdated": DOM.topLayerElementsUpdatedPayload;
     "DOM.scrollableFlagUpdated": DOM.scrollableFlagUpdatedPayload;
+    "DOM.affectedByStartingStylesFlagUpdated": DOM.affectedByStartingStylesFlagUpdatedPayload;
     "DOM.pseudoElementRemoved": DOM.pseudoElementRemovedPayload;
     "DOM.setChildNodes": DOM.setChildNodesPayload;
     "DOM.shadowRootPopped": DOM.shadowRootPoppedPayload;
@@ -20894,14 +21779,25 @@ Error was thrown.
     "DOMStorage.domStorageItemRemoved": DOMStorage.domStorageItemRemovedPayload;
     "DOMStorage.domStorageItemUpdated": DOMStorage.domStorageItemUpdatedPayload;
     "DOMStorage.domStorageItemsCleared": DOMStorage.domStorageItemsClearedPayload;
+    "DeviceAccess.deviceRequestPrompted": DeviceAccess.deviceRequestPromptedPayload;
     "Emulation.virtualTimeBudgetExpired": Emulation.virtualTimeBudgetExpiredPayload;
+    "FedCm.dialogShown": FedCm.dialogShownPayload;
+    "FedCm.dialogClosed": FedCm.dialogClosedPayload;
+    "Fetch.requestPaused": Fetch.requestPausedPayload;
+    "Fetch.authRequired": Fetch.authRequiredPayload;
     "Input.dragIntercepted": Input.dragInterceptedPayload;
     "Inspector.detached": Inspector.detachedPayload;
     "Inspector.targetCrashed": Inspector.targetCrashedPayload;
     "Inspector.targetReloadedAfterCrash": Inspector.targetReloadedAfterCrashPayload;
+    "Inspector.workerScriptLoaded": Inspector.workerScriptLoadedPayload;
     "LayerTree.layerPainted": LayerTree.layerPaintedPayload;
     "LayerTree.layerTreeDidChange": LayerTree.layerTreeDidChangePayload;
     "Log.entryAdded": Log.entryAddedPayload;
+    "Media.playerPropertiesChanged": Media.playerPropertiesChangedPayload;
+    "Media.playerEventsAdded": Media.playerEventsAddedPayload;
+    "Media.playerMessagesLogged": Media.playerMessagesLoggedPayload;
+    "Media.playerErrorsRaised": Media.playerErrorsRaisedPayload;
+    "Media.playerCreated": Media.playerCreatedPayload;
     "Network.dataReceived": Network.dataReceivedPayload;
     "Network.eventSourceMessageReceived": Network.eventSourceMessageReceivedPayload;
     "Network.loadingFailed": Network.loadingFailedPayload;
@@ -20926,15 +21822,19 @@ Error was thrown.
     "Network.directTCPSocketOpened": Network.directTCPSocketOpenedPayload;
     "Network.directTCPSocketAborted": Network.directTCPSocketAbortedPayload;
     "Network.directTCPSocketClosed": Network.directTCPSocketClosedPayload;
+    "Network.directTCPSocketChunkSent": Network.directTCPSocketChunkSentPayload;
+    "Network.directTCPSocketChunkReceived": Network.directTCPSocketChunkReceivedPayload;
+    "Network.directUDPSocketCreated": Network.directUDPSocketCreatedPayload;
+    "Network.directUDPSocketOpened": Network.directUDPSocketOpenedPayload;
+    "Network.directUDPSocketAborted": Network.directUDPSocketAbortedPayload;
+    "Network.directUDPSocketClosed": Network.directUDPSocketClosedPayload;
+    "Network.directUDPSocketChunkSent": Network.directUDPSocketChunkSentPayload;
+    "Network.directUDPSocketChunkReceived": Network.directUDPSocketChunkReceivedPayload;
     "Network.requestWillBeSentExtraInfo": Network.requestWillBeSentExtraInfoPayload;
     "Network.responseReceivedExtraInfo": Network.responseReceivedExtraInfoPayload;
     "Network.responseReceivedEarlyHints": Network.responseReceivedEarlyHintsPayload;
     "Network.trustTokenOperationDone": Network.trustTokenOperationDonePayload;
     "Network.policyUpdated": Network.policyUpdatedPayload;
-    "Network.subresourceWebBundleMetadataReceived": Network.subresourceWebBundleMetadataReceivedPayload;
-    "Network.subresourceWebBundleMetadataError": Network.subresourceWebBundleMetadataErrorPayload;
-    "Network.subresourceWebBundleInnerResponseParsed": Network.subresourceWebBundleInnerResponseParsedPayload;
-    "Network.subresourceWebBundleInnerResponseError": Network.subresourceWebBundleInnerResponseErrorPayload;
     "Network.reportingApiReportAdded": Network.reportingApiReportAddedPayload;
     "Network.reportingApiReportUpdated": Network.reportingApiReportUpdatedPayload;
     "Network.reportingApiEndpointsChangedForOrigin": Network.reportingApiEndpointsChangedForOriginPayload;
@@ -20972,6 +21872,12 @@ Error was thrown.
     "Page.compilationCacheProduced": Page.compilationCacheProducedPayload;
     "Performance.metrics": Performance.metricsPayload;
     "PerformanceTimeline.timelineEventAdded": PerformanceTimeline.timelineEventAddedPayload;
+    "Preload.ruleSetUpdated": Preload.ruleSetUpdatedPayload;
+    "Preload.ruleSetRemoved": Preload.ruleSetRemovedPayload;
+    "Preload.preloadEnabledStateUpdated": Preload.preloadEnabledStateUpdatedPayload;
+    "Preload.prefetchStatusUpdated": Preload.prefetchStatusUpdatedPayload;
+    "Preload.prerenderStatusUpdated": Preload.prerenderStatusUpdatedPayload;
+    "Preload.preloadingAttemptSourcesUpdated": Preload.preloadingAttemptSourcesUpdatedPayload;
     "Security.certificateError": Security.certificateErrorPayload;
     "Security.visibleSecurityStateChanged": Security.visibleSecurityStateChangedPayload;
     "Security.securityStateChanged": Security.securityStateChangedPayload;
@@ -20986,10 +21892,13 @@ Error was thrown.
     "Storage.interestGroupAuctionEventOccurred": Storage.interestGroupAuctionEventOccurredPayload;
     "Storage.interestGroupAuctionNetworkRequestCreated": Storage.interestGroupAuctionNetworkRequestCreatedPayload;
     "Storage.sharedStorageAccessed": Storage.sharedStorageAccessedPayload;
+    "Storage.sharedStorageWorkletOperationExecutionFinished": Storage.sharedStorageWorkletOperationExecutionFinishedPayload;
     "Storage.storageBucketCreatedOrUpdated": Storage.storageBucketCreatedOrUpdatedPayload;
     "Storage.storageBucketDeleted": Storage.storageBucketDeletedPayload;
     "Storage.attributionReportingSourceRegistered": Storage.attributionReportingSourceRegisteredPayload;
     "Storage.attributionReportingTriggerRegistered": Storage.attributionReportingTriggerRegisteredPayload;
+    "Storage.attributionReportingReportSent": Storage.attributionReportingReportSentPayload;
+    "Storage.attributionReportingVerboseDebugReportSent": Storage.attributionReportingVerboseDebugReportSentPayload;
     "Target.attachedToTarget": Target.attachedToTargetPayload;
     "Target.detachedFromTarget": Target.detachedFromTargetPayload;
     "Target.receivedMessageFromTarget": Target.receivedMessageFromTargetPayload;
@@ -21001,8 +21910,6 @@ Error was thrown.
     "Tracing.bufferUsage": Tracing.bufferUsagePayload;
     "Tracing.dataCollected": Tracing.dataCollectedPayload;
     "Tracing.tracingComplete": Tracing.tracingCompletePayload;
-    "Fetch.requestPaused": Fetch.requestPausedPayload;
-    "Fetch.authRequired": Fetch.authRequiredPayload;
     "WebAudio.contextCreated": WebAudio.contextCreatedPayload;
     "WebAudio.contextWillBeDestroyed": WebAudio.contextWillBeDestroyedPayload;
     "WebAudio.contextChanged": WebAudio.contextChangedPayload;
@@ -21020,21 +21927,6 @@ Error was thrown.
     "WebAuthn.credentialDeleted": WebAuthn.credentialDeletedPayload;
     "WebAuthn.credentialUpdated": WebAuthn.credentialUpdatedPayload;
     "WebAuthn.credentialAsserted": WebAuthn.credentialAssertedPayload;
-    "Media.playerPropertiesChanged": Media.playerPropertiesChangedPayload;
-    "Media.playerEventsAdded": Media.playerEventsAddedPayload;
-    "Media.playerMessagesLogged": Media.playerMessagesLoggedPayload;
-    "Media.playerErrorsRaised": Media.playerErrorsRaisedPayload;
-    "Media.playersCreated": Media.playersCreatedPayload;
-    "DeviceAccess.deviceRequestPrompted": DeviceAccess.deviceRequestPromptedPayload;
-    "Preload.ruleSetUpdated": Preload.ruleSetUpdatedPayload;
-    "Preload.ruleSetRemoved": Preload.ruleSetRemovedPayload;
-    "Preload.preloadEnabledStateUpdated": Preload.preloadEnabledStateUpdatedPayload;
-    "Preload.prefetchStatusUpdated": Preload.prefetchStatusUpdatedPayload;
-    "Preload.prerenderStatusUpdated": Preload.prerenderStatusUpdatedPayload;
-    "Preload.preloadingAttemptSourcesUpdated": Preload.preloadingAttemptSourcesUpdatedPayload;
-    "FedCm.dialogShown": FedCm.dialogShownPayload;
-    "FedCm.dialogClosed": FedCm.dialogClosedPayload;
-    "BluetoothEmulation.gattOperationReceived": BluetoothEmulation.gattOperationReceivedPayload;
     "Console.messageAdded": Console.messageAddedPayload;
     "Debugger.breakpointResolved": Debugger.breakpointResolvedPayload;
     "Debugger.paused": Debugger.pausedPayload;
@@ -21082,12 +21974,6 @@ Error was thrown.
     "Audits.enable": Audits.enableParameters;
     "Audits.checkContrast": Audits.checkContrastParameters;
     "Audits.checkFormsIssues": Audits.checkFormsIssuesParameters;
-    "Extensions.loadUnpacked": Extensions.loadUnpackedParameters;
-    "Extensions.uninstall": Extensions.uninstallParameters;
-    "Extensions.getStorageItems": Extensions.getStorageItemsParameters;
-    "Extensions.removeStorageItems": Extensions.removeStorageItemsParameters;
-    "Extensions.clearStorageItems": Extensions.clearStorageItemsParameters;
-    "Extensions.setStorageItems": Extensions.setStorageItemsParameters;
     "Autofill.trigger": Autofill.triggerParameters;
     "Autofill.setAddresses": Autofill.setAddressesParameters;
     "Autofill.disable": Autofill.disableParameters;
@@ -21096,6 +21982,21 @@ Error was thrown.
     "BackgroundService.stopObserving": BackgroundService.stopObservingParameters;
     "BackgroundService.setRecording": BackgroundService.setRecordingParameters;
     "BackgroundService.clearEvents": BackgroundService.clearEventsParameters;
+    "BluetoothEmulation.enable": BluetoothEmulation.enableParameters;
+    "BluetoothEmulation.setSimulatedCentralState": BluetoothEmulation.setSimulatedCentralStateParameters;
+    "BluetoothEmulation.disable": BluetoothEmulation.disableParameters;
+    "BluetoothEmulation.simulatePreconnectedPeripheral": BluetoothEmulation.simulatePreconnectedPeripheralParameters;
+    "BluetoothEmulation.simulateAdvertisement": BluetoothEmulation.simulateAdvertisementParameters;
+    "BluetoothEmulation.simulateGATTOperationResponse": BluetoothEmulation.simulateGATTOperationResponseParameters;
+    "BluetoothEmulation.simulateCharacteristicOperationResponse": BluetoothEmulation.simulateCharacteristicOperationResponseParameters;
+    "BluetoothEmulation.simulateDescriptorOperationResponse": BluetoothEmulation.simulateDescriptorOperationResponseParameters;
+    "BluetoothEmulation.addService": BluetoothEmulation.addServiceParameters;
+    "BluetoothEmulation.removeService": BluetoothEmulation.removeServiceParameters;
+    "BluetoothEmulation.addCharacteristic": BluetoothEmulation.addCharacteristicParameters;
+    "BluetoothEmulation.removeCharacteristic": BluetoothEmulation.removeCharacteristicParameters;
+    "BluetoothEmulation.addDescriptor": BluetoothEmulation.addDescriptorParameters;
+    "BluetoothEmulation.removeDescriptor": BluetoothEmulation.removeDescriptorParameters;
+    "BluetoothEmulation.simulateGATTDisconnection": BluetoothEmulation.simulateGATTDisconnectionParameters;
     "Browser.setPermission": Browser.setPermissionParameters;
     "Browser.grantPermissions": Browser.grantPermissionsParameters;
     "Browser.resetPermissions": Browser.resetPermissionsParameters;
@@ -21111,6 +22012,7 @@ Error was thrown.
     "Browser.getWindowBounds": Browser.getWindowBoundsParameters;
     "Browser.getWindowForTarget": Browser.getWindowForTargetParameters;
     "Browser.setWindowBounds": Browser.setWindowBoundsParameters;
+    "Browser.setContentsSize": Browser.setContentsSizeParameters;
     "Browser.setDockTile": Browser.setDockTileParameters;
     "Browser.executeBrowserCommand": Browser.executeBrowserCommandParameters;
     "Browser.addPrivacySandboxEnrollmentOverride": Browser.addPrivacySandboxEnrollmentOverrideParameters;
@@ -21129,6 +22031,7 @@ Error was thrown.
     "CSS.getInlineStylesForNode": CSS.getInlineStylesForNodeParameters;
     "CSS.getAnimatedStylesForNode": CSS.getAnimatedStylesForNodeParameters;
     "CSS.getMatchedStylesForNode": CSS.getMatchedStylesForNodeParameters;
+    "CSS.getEnvironmentVariables": CSS.getEnvironmentVariablesParameters;
     "CSS.getMediaQueries": CSS.getMediaQueriesParameters;
     "CSS.getPlatformFontsForNode": CSS.getPlatformFontsForNodeParameters;
     "CSS.getStyleSheetText": CSS.getStyleSheetTextParameters;
@@ -21214,6 +22117,7 @@ Error was thrown.
     "DOM.getContainerForNode": DOM.getContainerForNodeParameters;
     "DOM.getQueryingDescendantsForContainer": DOM.getQueryingDescendantsForContainerParameters;
     "DOM.getAnchorElement": DOM.getAnchorElementParameters;
+    "DOM.forceShowPopover": DOM.forceShowPopoverParameters;
     "DOMDebugger.getEventListeners": DOMDebugger.getEventListenersParameters;
     "DOMDebugger.removeDOMBreakpoint": DOMDebugger.removeDOMBreakpointParameters;
     "DOMDebugger.removeEventListenerBreakpoint": DOMDebugger.removeEventListenerBreakpointParameters;
@@ -21224,9 +22128,6 @@ Error was thrown.
     "DOMDebugger.setEventListenerBreakpoint": DOMDebugger.setEventListenerBreakpointParameters;
     "DOMDebugger.setInstrumentationBreakpoint": DOMDebugger.setInstrumentationBreakpointParameters;
     "DOMDebugger.setXHRBreakpoint": DOMDebugger.setXHRBreakpointParameters;
-    "EventBreakpoints.setInstrumentationBreakpoint": EventBreakpoints.setInstrumentationBreakpointParameters;
-    "EventBreakpoints.removeInstrumentationBreakpoint": EventBreakpoints.removeInstrumentationBreakpointParameters;
-    "EventBreakpoints.disable": EventBreakpoints.disableParameters;
     "DOMSnapshot.disable": DOMSnapshot.disableParameters;
     "DOMSnapshot.enable": DOMSnapshot.enableParameters;
     "DOMSnapshot.getSnapshot": DOMSnapshot.getSnapshotParameters;
@@ -21237,6 +22138,10 @@ Error was thrown.
     "DOMStorage.getDOMStorageItems": DOMStorage.getDOMStorageItemsParameters;
     "DOMStorage.removeDOMStorageItem": DOMStorage.removeDOMStorageItemParameters;
     "DOMStorage.setDOMStorageItem": DOMStorage.setDOMStorageItemParameters;
+    "DeviceAccess.enable": DeviceAccess.enableParameters;
+    "DeviceAccess.disable": DeviceAccess.disableParameters;
+    "DeviceAccess.selectPrompt": DeviceAccess.selectPromptParameters;
+    "DeviceAccess.cancelPrompt": DeviceAccess.cancelPromptParameters;
     "DeviceOrientation.clearDeviceOrientationOverride": DeviceOrientation.clearDeviceOrientationOverrideParameters;
     "DeviceOrientation.setDeviceOrientationOverride": DeviceOrientation.setDeviceOrientationOverrideParameters;
     "Emulation.canEmulate": Emulation.canEmulateParameters;
@@ -21258,12 +22163,14 @@ Error was thrown.
     "Emulation.setEmitTouchEventsForMouse": Emulation.setEmitTouchEventsForMouseParameters;
     "Emulation.setEmulatedMedia": Emulation.setEmulatedMediaParameters;
     "Emulation.setEmulatedVisionDeficiency": Emulation.setEmulatedVisionDeficiencyParameters;
+    "Emulation.setEmulatedOSTextScale": Emulation.setEmulatedOSTextScaleParameters;
     "Emulation.setGeolocationOverride": Emulation.setGeolocationOverrideParameters;
     "Emulation.getOverriddenSensorInformation": Emulation.getOverriddenSensorInformationParameters;
     "Emulation.setSensorOverrideEnabled": Emulation.setSensorOverrideEnabledParameters;
     "Emulation.setSensorOverrideReadings": Emulation.setSensorOverrideReadingsParameters;
     "Emulation.setPressureSourceOverrideEnabled": Emulation.setPressureSourceOverrideEnabledParameters;
     "Emulation.setPressureStateOverride": Emulation.setPressureStateOverrideParameters;
+    "Emulation.setPressureDataOverride": Emulation.setPressureDataOverrideParameters;
     "Emulation.setIdleOverride": Emulation.setIdleOverrideParameters;
     "Emulation.clearIdleOverride": Emulation.clearIdleOverrideParameters;
     "Emulation.setNavigatorOverrides": Emulation.setNavigatorOverridesParameters;
@@ -21275,16 +22182,46 @@ Error was thrown.
     "Emulation.setTimezoneOverride": Emulation.setTimezoneOverrideParameters;
     "Emulation.setVisibleSize": Emulation.setVisibleSizeParameters;
     "Emulation.setDisabledImageTypes": Emulation.setDisabledImageTypesParameters;
+    "Emulation.setDataSaverOverride": Emulation.setDataSaverOverrideParameters;
     "Emulation.setHardwareConcurrencyOverride": Emulation.setHardwareConcurrencyOverrideParameters;
     "Emulation.setUserAgentOverride": Emulation.setUserAgentOverrideParameters;
     "Emulation.setAutomationOverride": Emulation.setAutomationOverrideParameters;
+    "Emulation.setSmallViewportHeightDifferenceOverride": Emulation.setSmallViewportHeightDifferenceOverrideParameters;
+    "Emulation.getScreenInfos": Emulation.getScreenInfosParameters;
+    "Emulation.addScreen": Emulation.addScreenParameters;
+    "Emulation.removeScreen": Emulation.removeScreenParameters;
+    "EventBreakpoints.setInstrumentationBreakpoint": EventBreakpoints.setInstrumentationBreakpointParameters;
+    "EventBreakpoints.removeInstrumentationBreakpoint": EventBreakpoints.removeInstrumentationBreakpointParameters;
+    "EventBreakpoints.disable": EventBreakpoints.disableParameters;
+    "Extensions.loadUnpacked": Extensions.loadUnpackedParameters;
+    "Extensions.uninstall": Extensions.uninstallParameters;
+    "Extensions.getStorageItems": Extensions.getStorageItemsParameters;
+    "Extensions.removeStorageItems": Extensions.removeStorageItemsParameters;
+    "Extensions.clearStorageItems": Extensions.clearStorageItemsParameters;
+    "Extensions.setStorageItems": Extensions.setStorageItemsParameters;
+    "FedCm.enable": FedCm.enableParameters;
+    "FedCm.disable": FedCm.disableParameters;
+    "FedCm.selectAccount": FedCm.selectAccountParameters;
+    "FedCm.clickDialogButton": FedCm.clickDialogButtonParameters;
+    "FedCm.openUrl": FedCm.openUrlParameters;
+    "FedCm.dismissDialog": FedCm.dismissDialogParameters;
+    "FedCm.resetCooldown": FedCm.resetCooldownParameters;
+    "Fetch.disable": Fetch.disableParameters;
+    "Fetch.enable": Fetch.enableParameters;
+    "Fetch.failRequest": Fetch.failRequestParameters;
+    "Fetch.fulfillRequest": Fetch.fulfillRequestParameters;
+    "Fetch.continueRequest": Fetch.continueRequestParameters;
+    "Fetch.continueWithAuth": Fetch.continueWithAuthParameters;
+    "Fetch.continueResponse": Fetch.continueResponseParameters;
+    "Fetch.getResponseBody": Fetch.getResponseBodyParameters;
+    "Fetch.takeResponseBodyAsStream": Fetch.takeResponseBodyAsStreamParameters;
+    "FileSystem.getDirectory": FileSystem.getDirectoryParameters;
     "HeadlessExperimental.beginFrame": HeadlessExperimental.beginFrameParameters;
     "HeadlessExperimental.disable": HeadlessExperimental.disableParameters;
     "HeadlessExperimental.enable": HeadlessExperimental.enableParameters;
     "IO.close": IO.closeParameters;
     "IO.read": IO.readParameters;
     "IO.resolveBlob": IO.resolveBlobParameters;
-    "FileSystem.getDirectory": FileSystem.getDirectoryParameters;
     "IndexedDB.clearObjectStore": IndexedDB.clearObjectStoreParameters;
     "IndexedDB.deleteDatabase": IndexedDB.deleteDatabaseParameters;
     "IndexedDB.deleteObjectStoreEntries": IndexedDB.deleteObjectStoreEntriesParameters;
@@ -21323,6 +22260,8 @@ Error was thrown.
     "Log.enable": Log.enableParameters;
     "Log.startViolationsReport": Log.startViolationsReportParameters;
     "Log.stopViolationsReport": Log.stopViolationsReportParameters;
+    "Media.enable": Media.enableParameters;
+    "Media.disable": Media.disableParameters;
     "Memory.getDOMCounters": Memory.getDOMCountersParameters;
     "Memory.getDOMCountersForLeakDetection": Memory.getDOMCountersForLeakDetectionParameters;
     "Memory.prepareForLeakDetection": Memory.prepareForLeakDetectionParameters;
@@ -21334,6 +22273,8 @@ Error was thrown.
     "Memory.getAllTimeSamplingProfile": Memory.getAllTimeSamplingProfileParameters;
     "Memory.getBrowserSamplingProfile": Memory.getBrowserSamplingProfileParameters;
     "Memory.getSamplingProfile": Memory.getSamplingProfileParameters;
+    "Network.getIPProtectionProxyStatus": Network.getIPProtectionProxyStatusParameters;
+    "Network.setIPProtectionProxyBypassEnabled": Network.setIPProtectionProxyBypassEnabledParameters;
     "Network.setAcceptedEncodings": Network.setAcceptedEncodingsParameters;
     "Network.clearAcceptedEncodingsOverride": Network.clearAcceptedEncodingsOverrideParameters;
     "Network.canClearBrowserCache": Network.canClearBrowserCacheParameters;
@@ -21345,6 +22286,8 @@ Error was thrown.
     "Network.deleteCookies": Network.deleteCookiesParameters;
     "Network.disable": Network.disableParameters;
     "Network.emulateNetworkConditions": Network.emulateNetworkConditionsParameters;
+    "Network.emulateNetworkConditionsByRule": Network.emulateNetworkConditionsByRuleParameters;
+    "Network.overrideNetworkState": Network.overrideNetworkStateParameters;
     "Network.enable": Network.enableParameters;
     "Network.getAllCookies": Network.getAllCookiesParameters;
     "Network.getCertificate": Network.getCertificateParameters;
@@ -21398,6 +22341,13 @@ Error was thrown.
     "Overlay.setShowHinge": Overlay.setShowHingeParameters;
     "Overlay.setShowIsolatedElements": Overlay.setShowIsolatedElementsParameters;
     "Overlay.setShowWindowControlsOverlay": Overlay.setShowWindowControlsOverlayParameters;
+    "PWA.getOsAppState": PWA.getOsAppStateParameters;
+    "PWA.install": PWA.installParameters;
+    "PWA.uninstall": PWA.uninstallParameters;
+    "PWA.launch": PWA.launchParameters;
+    "PWA.launchFilesInApp": PWA.launchFilesInAppParameters;
+    "PWA.openCurrentPageInApp": PWA.openCurrentPageInAppParameters;
+    "PWA.changeAppUserSettings": PWA.changeAppUserSettingsParameters;
     "Page.addScriptToEvaluateOnLoad": Page.addScriptToEvaluateOnLoadParameters;
     "Page.addScriptToEvaluateOnNewDocument": Page.addScriptToEvaluateOnNewDocumentParameters;
     "Page.bringToFront": Page.bringToFrontParameters;
@@ -21414,7 +22364,7 @@ Error was thrown.
     "Page.getInstallabilityErrors": Page.getInstallabilityErrorsParameters;
     "Page.getManifestIcons": Page.getManifestIconsParameters;
     "Page.getAppId": Page.getAppIdParameters;
-    "Page.getAdScriptId": Page.getAdScriptIdParameters;
+    "Page.getAdScriptAncestry": Page.getAdScriptAncestryParameters;
     "Page.getFrameTree": Page.getFrameTreeParameters;
     "Page.getLayoutMetrics": Page.getLayoutMetricsParameters;
     "Page.getNavigationHistory": Page.getNavigationHistoryParameters;
@@ -21463,6 +22413,8 @@ Error was thrown.
     "Performance.setTimeDomain": Performance.setTimeDomainParameters;
     "Performance.getMetrics": Performance.getMetricsParameters;
     "PerformanceTimeline.enable": PerformanceTimeline.enableParameters;
+    "Preload.enable": Preload.enableParameters;
+    "Preload.disable": Preload.disableParameters;
     "Security.disable": Security.disableParameters;
     "Security.enable": Security.enableParameters;
     "Security.setIgnoreCertificateErrors": Security.setIgnoreCertificateErrorsParameters;
@@ -21473,7 +22425,6 @@ Error was thrown.
     "ServiceWorker.dispatchSyncEvent": ServiceWorker.dispatchSyncEventParameters;
     "ServiceWorker.dispatchPeriodicSyncEvent": ServiceWorker.dispatchPeriodicSyncEventParameters;
     "ServiceWorker.enable": ServiceWorker.enableParameters;
-    "ServiceWorker.inspectWorker": ServiceWorker.inspectWorkerParameters;
     "ServiceWorker.setForceUpdateOnPageLoad": ServiceWorker.setForceUpdateOnPageLoadParameters;
     "ServiceWorker.skipWaiting": ServiceWorker.skipWaitingParameters;
     "ServiceWorker.startWorker": ServiceWorker.startWorkerParameters;
@@ -21482,6 +22433,7 @@ Error was thrown.
     "ServiceWorker.unregister": ServiceWorker.unregisterParameters;
     "ServiceWorker.updateRegistration": ServiceWorker.updateRegistrationParameters;
     "Storage.getStorageKeyForFrame": Storage.getStorageKeyForFrameParameters;
+    "Storage.getStorageKey": Storage.getStorageKeyParameters;
     "Storage.clearDataForOrigin": Storage.clearDataForOriginParameters;
     "Storage.clearDataForStorageKey": Storage.clearDataForStorageKeyParameters;
     "Storage.getCookies": Storage.getCookiesParameters;
@@ -21517,6 +22469,7 @@ Error was thrown.
     "Storage.sendPendingAttributionReports": Storage.sendPendingAttributionReportsParameters;
     "Storage.getRelatedWebsiteSets": Storage.getRelatedWebsiteSetsParameters;
     "Storage.getAffectedUrlsForThirdPartyCookieMetadata": Storage.getAffectedUrlsForThirdPartyCookieMetadataParameters;
+    "Storage.setProtectedAudienceKAnonymity": Storage.setProtectedAudienceKAnonymityParameters;
     "SystemInfo.getInfo": SystemInfo.getInfoParameters;
     "SystemInfo.getFeatureState": SystemInfo.getFeatureStateParameters;
     "SystemInfo.getProcessInfo": SystemInfo.getProcessInfoParameters;
@@ -21537,6 +22490,7 @@ Error was thrown.
     "Target.autoAttachRelated": Target.autoAttachRelatedParameters;
     "Target.setDiscoverTargets": Target.setDiscoverTargetsParameters;
     "Target.setRemoteLocations": Target.setRemoteLocationsParameters;
+    "Target.openDevTools": Target.openDevToolsParameters;
     "Tethering.bind": Tethering.bindParameters;
     "Tethering.unbind": Tethering.unbindParameters;
     "Tracing.end": Tracing.endParameters;
@@ -21544,15 +22498,6 @@ Error was thrown.
     "Tracing.recordClockSyncMarker": Tracing.recordClockSyncMarkerParameters;
     "Tracing.requestMemoryDump": Tracing.requestMemoryDumpParameters;
     "Tracing.start": Tracing.startParameters;
-    "Fetch.disable": Fetch.disableParameters;
-    "Fetch.enable": Fetch.enableParameters;
-    "Fetch.failRequest": Fetch.failRequestParameters;
-    "Fetch.fulfillRequest": Fetch.fulfillRequestParameters;
-    "Fetch.continueRequest": Fetch.continueRequestParameters;
-    "Fetch.continueWithAuth": Fetch.continueWithAuthParameters;
-    "Fetch.continueResponse": Fetch.continueResponseParameters;
-    "Fetch.getResponseBody": Fetch.getResponseBodyParameters;
-    "Fetch.takeResponseBodyAsStream": Fetch.takeResponseBodyAsStreamParameters;
     "WebAudio.enable": WebAudio.enableParameters;
     "WebAudio.disable": WebAudio.disableParameters;
     "WebAudio.getRealtimeData": WebAudio.getRealtimeDataParameters;
@@ -21569,38 +22514,6 @@ Error was thrown.
     "WebAuthn.setUserVerified": WebAuthn.setUserVerifiedParameters;
     "WebAuthn.setAutomaticPresenceSimulation": WebAuthn.setAutomaticPresenceSimulationParameters;
     "WebAuthn.setCredentialProperties": WebAuthn.setCredentialPropertiesParameters;
-    "Media.enable": Media.enableParameters;
-    "Media.disable": Media.disableParameters;
-    "DeviceAccess.enable": DeviceAccess.enableParameters;
-    "DeviceAccess.disable": DeviceAccess.disableParameters;
-    "DeviceAccess.selectPrompt": DeviceAccess.selectPromptParameters;
-    "DeviceAccess.cancelPrompt": DeviceAccess.cancelPromptParameters;
-    "Preload.enable": Preload.enableParameters;
-    "Preload.disable": Preload.disableParameters;
-    "FedCm.enable": FedCm.enableParameters;
-    "FedCm.disable": FedCm.disableParameters;
-    "FedCm.selectAccount": FedCm.selectAccountParameters;
-    "FedCm.clickDialogButton": FedCm.clickDialogButtonParameters;
-    "FedCm.openUrl": FedCm.openUrlParameters;
-    "FedCm.dismissDialog": FedCm.dismissDialogParameters;
-    "FedCm.resetCooldown": FedCm.resetCooldownParameters;
-    "PWA.getOsAppState": PWA.getOsAppStateParameters;
-    "PWA.install": PWA.installParameters;
-    "PWA.uninstall": PWA.uninstallParameters;
-    "PWA.launch": PWA.launchParameters;
-    "PWA.launchFilesInApp": PWA.launchFilesInAppParameters;
-    "PWA.openCurrentPageInApp": PWA.openCurrentPageInAppParameters;
-    "PWA.changeAppUserSettings": PWA.changeAppUserSettingsParameters;
-    "BluetoothEmulation.enable": BluetoothEmulation.enableParameters;
-    "BluetoothEmulation.setSimulatedCentralState": BluetoothEmulation.setSimulatedCentralStateParameters;
-    "BluetoothEmulation.disable": BluetoothEmulation.disableParameters;
-    "BluetoothEmulation.simulatePreconnectedPeripheral": BluetoothEmulation.simulatePreconnectedPeripheralParameters;
-    "BluetoothEmulation.simulateAdvertisement": BluetoothEmulation.simulateAdvertisementParameters;
-    "BluetoothEmulation.simulateGATTOperationResponse": BluetoothEmulation.simulateGATTOperationResponseParameters;
-    "BluetoothEmulation.addService": BluetoothEmulation.addServiceParameters;
-    "BluetoothEmulation.removeService": BluetoothEmulation.removeServiceParameters;
-    "BluetoothEmulation.addCharacteristic": BluetoothEmulation.addCharacteristicParameters;
-    "BluetoothEmulation.removeCharacteristic": BluetoothEmulation.removeCharacteristicParameters;
     "Console.clearMessages": Console.clearMessagesParameters;
     "Console.disable": Console.disableParameters;
     "Console.enable": Console.enableParameters;
@@ -21707,12 +22620,6 @@ Error was thrown.
     "Audits.enable": Audits.enableReturnValue;
     "Audits.checkContrast": Audits.checkContrastReturnValue;
     "Audits.checkFormsIssues": Audits.checkFormsIssuesReturnValue;
-    "Extensions.loadUnpacked": Extensions.loadUnpackedReturnValue;
-    "Extensions.uninstall": Extensions.uninstallReturnValue;
-    "Extensions.getStorageItems": Extensions.getStorageItemsReturnValue;
-    "Extensions.removeStorageItems": Extensions.removeStorageItemsReturnValue;
-    "Extensions.clearStorageItems": Extensions.clearStorageItemsReturnValue;
-    "Extensions.setStorageItems": Extensions.setStorageItemsReturnValue;
     "Autofill.trigger": Autofill.triggerReturnValue;
     "Autofill.setAddresses": Autofill.setAddressesReturnValue;
     "Autofill.disable": Autofill.disableReturnValue;
@@ -21721,6 +22628,21 @@ Error was thrown.
     "BackgroundService.stopObserving": BackgroundService.stopObservingReturnValue;
     "BackgroundService.setRecording": BackgroundService.setRecordingReturnValue;
     "BackgroundService.clearEvents": BackgroundService.clearEventsReturnValue;
+    "BluetoothEmulation.enable": BluetoothEmulation.enableReturnValue;
+    "BluetoothEmulation.setSimulatedCentralState": BluetoothEmulation.setSimulatedCentralStateReturnValue;
+    "BluetoothEmulation.disable": BluetoothEmulation.disableReturnValue;
+    "BluetoothEmulation.simulatePreconnectedPeripheral": BluetoothEmulation.simulatePreconnectedPeripheralReturnValue;
+    "BluetoothEmulation.simulateAdvertisement": BluetoothEmulation.simulateAdvertisementReturnValue;
+    "BluetoothEmulation.simulateGATTOperationResponse": BluetoothEmulation.simulateGATTOperationResponseReturnValue;
+    "BluetoothEmulation.simulateCharacteristicOperationResponse": BluetoothEmulation.simulateCharacteristicOperationResponseReturnValue;
+    "BluetoothEmulation.simulateDescriptorOperationResponse": BluetoothEmulation.simulateDescriptorOperationResponseReturnValue;
+    "BluetoothEmulation.addService": BluetoothEmulation.addServiceReturnValue;
+    "BluetoothEmulation.removeService": BluetoothEmulation.removeServiceReturnValue;
+    "BluetoothEmulation.addCharacteristic": BluetoothEmulation.addCharacteristicReturnValue;
+    "BluetoothEmulation.removeCharacteristic": BluetoothEmulation.removeCharacteristicReturnValue;
+    "BluetoothEmulation.addDescriptor": BluetoothEmulation.addDescriptorReturnValue;
+    "BluetoothEmulation.removeDescriptor": BluetoothEmulation.removeDescriptorReturnValue;
+    "BluetoothEmulation.simulateGATTDisconnection": BluetoothEmulation.simulateGATTDisconnectionReturnValue;
     "Browser.setPermission": Browser.setPermissionReturnValue;
     "Browser.grantPermissions": Browser.grantPermissionsReturnValue;
     "Browser.resetPermissions": Browser.resetPermissionsReturnValue;
@@ -21736,6 +22658,7 @@ Error was thrown.
     "Browser.getWindowBounds": Browser.getWindowBoundsReturnValue;
     "Browser.getWindowForTarget": Browser.getWindowForTargetReturnValue;
     "Browser.setWindowBounds": Browser.setWindowBoundsReturnValue;
+    "Browser.setContentsSize": Browser.setContentsSizeReturnValue;
     "Browser.setDockTile": Browser.setDockTileReturnValue;
     "Browser.executeBrowserCommand": Browser.executeBrowserCommandReturnValue;
     "Browser.addPrivacySandboxEnrollmentOverride": Browser.addPrivacySandboxEnrollmentOverrideReturnValue;
@@ -21754,6 +22677,7 @@ Error was thrown.
     "CSS.getInlineStylesForNode": CSS.getInlineStylesForNodeReturnValue;
     "CSS.getAnimatedStylesForNode": CSS.getAnimatedStylesForNodeReturnValue;
     "CSS.getMatchedStylesForNode": CSS.getMatchedStylesForNodeReturnValue;
+    "CSS.getEnvironmentVariables": CSS.getEnvironmentVariablesReturnValue;
     "CSS.getMediaQueries": CSS.getMediaQueriesReturnValue;
     "CSS.getPlatformFontsForNode": CSS.getPlatformFontsForNodeReturnValue;
     "CSS.getStyleSheetText": CSS.getStyleSheetTextReturnValue;
@@ -21839,6 +22763,7 @@ Error was thrown.
     "DOM.getContainerForNode": DOM.getContainerForNodeReturnValue;
     "DOM.getQueryingDescendantsForContainer": DOM.getQueryingDescendantsForContainerReturnValue;
     "DOM.getAnchorElement": DOM.getAnchorElementReturnValue;
+    "DOM.forceShowPopover": DOM.forceShowPopoverReturnValue;
     "DOMDebugger.getEventListeners": DOMDebugger.getEventListenersReturnValue;
     "DOMDebugger.removeDOMBreakpoint": DOMDebugger.removeDOMBreakpointReturnValue;
     "DOMDebugger.removeEventListenerBreakpoint": DOMDebugger.removeEventListenerBreakpointReturnValue;
@@ -21849,9 +22774,6 @@ Error was thrown.
     "DOMDebugger.setEventListenerBreakpoint": DOMDebugger.setEventListenerBreakpointReturnValue;
     "DOMDebugger.setInstrumentationBreakpoint": DOMDebugger.setInstrumentationBreakpointReturnValue;
     "DOMDebugger.setXHRBreakpoint": DOMDebugger.setXHRBreakpointReturnValue;
-    "EventBreakpoints.setInstrumentationBreakpoint": EventBreakpoints.setInstrumentationBreakpointReturnValue;
-    "EventBreakpoints.removeInstrumentationBreakpoint": EventBreakpoints.removeInstrumentationBreakpointReturnValue;
-    "EventBreakpoints.disable": EventBreakpoints.disableReturnValue;
     "DOMSnapshot.disable": DOMSnapshot.disableReturnValue;
     "DOMSnapshot.enable": DOMSnapshot.enableReturnValue;
     "DOMSnapshot.getSnapshot": DOMSnapshot.getSnapshotReturnValue;
@@ -21862,6 +22784,10 @@ Error was thrown.
     "DOMStorage.getDOMStorageItems": DOMStorage.getDOMStorageItemsReturnValue;
     "DOMStorage.removeDOMStorageItem": DOMStorage.removeDOMStorageItemReturnValue;
     "DOMStorage.setDOMStorageItem": DOMStorage.setDOMStorageItemReturnValue;
+    "DeviceAccess.enable": DeviceAccess.enableReturnValue;
+    "DeviceAccess.disable": DeviceAccess.disableReturnValue;
+    "DeviceAccess.selectPrompt": DeviceAccess.selectPromptReturnValue;
+    "DeviceAccess.cancelPrompt": DeviceAccess.cancelPromptReturnValue;
     "DeviceOrientation.clearDeviceOrientationOverride": DeviceOrientation.clearDeviceOrientationOverrideReturnValue;
     "DeviceOrientation.setDeviceOrientationOverride": DeviceOrientation.setDeviceOrientationOverrideReturnValue;
     "Emulation.canEmulate": Emulation.canEmulateReturnValue;
@@ -21883,12 +22809,14 @@ Error was thrown.
     "Emulation.setEmitTouchEventsForMouse": Emulation.setEmitTouchEventsForMouseReturnValue;
     "Emulation.setEmulatedMedia": Emulation.setEmulatedMediaReturnValue;
     "Emulation.setEmulatedVisionDeficiency": Emulation.setEmulatedVisionDeficiencyReturnValue;
+    "Emulation.setEmulatedOSTextScale": Emulation.setEmulatedOSTextScaleReturnValue;
     "Emulation.setGeolocationOverride": Emulation.setGeolocationOverrideReturnValue;
     "Emulation.getOverriddenSensorInformation": Emulation.getOverriddenSensorInformationReturnValue;
     "Emulation.setSensorOverrideEnabled": Emulation.setSensorOverrideEnabledReturnValue;
     "Emulation.setSensorOverrideReadings": Emulation.setSensorOverrideReadingsReturnValue;
     "Emulation.setPressureSourceOverrideEnabled": Emulation.setPressureSourceOverrideEnabledReturnValue;
     "Emulation.setPressureStateOverride": Emulation.setPressureStateOverrideReturnValue;
+    "Emulation.setPressureDataOverride": Emulation.setPressureDataOverrideReturnValue;
     "Emulation.setIdleOverride": Emulation.setIdleOverrideReturnValue;
     "Emulation.clearIdleOverride": Emulation.clearIdleOverrideReturnValue;
     "Emulation.setNavigatorOverrides": Emulation.setNavigatorOverridesReturnValue;
@@ -21900,16 +22828,46 @@ Error was thrown.
     "Emulation.setTimezoneOverride": Emulation.setTimezoneOverrideReturnValue;
     "Emulation.setVisibleSize": Emulation.setVisibleSizeReturnValue;
     "Emulation.setDisabledImageTypes": Emulation.setDisabledImageTypesReturnValue;
+    "Emulation.setDataSaverOverride": Emulation.setDataSaverOverrideReturnValue;
     "Emulation.setHardwareConcurrencyOverride": Emulation.setHardwareConcurrencyOverrideReturnValue;
     "Emulation.setUserAgentOverride": Emulation.setUserAgentOverrideReturnValue;
     "Emulation.setAutomationOverride": Emulation.setAutomationOverrideReturnValue;
+    "Emulation.setSmallViewportHeightDifferenceOverride": Emulation.setSmallViewportHeightDifferenceOverrideReturnValue;
+    "Emulation.getScreenInfos": Emulation.getScreenInfosReturnValue;
+    "Emulation.addScreen": Emulation.addScreenReturnValue;
+    "Emulation.removeScreen": Emulation.removeScreenReturnValue;
+    "EventBreakpoints.setInstrumentationBreakpoint": EventBreakpoints.setInstrumentationBreakpointReturnValue;
+    "EventBreakpoints.removeInstrumentationBreakpoint": EventBreakpoints.removeInstrumentationBreakpointReturnValue;
+    "EventBreakpoints.disable": EventBreakpoints.disableReturnValue;
+    "Extensions.loadUnpacked": Extensions.loadUnpackedReturnValue;
+    "Extensions.uninstall": Extensions.uninstallReturnValue;
+    "Extensions.getStorageItems": Extensions.getStorageItemsReturnValue;
+    "Extensions.removeStorageItems": Extensions.removeStorageItemsReturnValue;
+    "Extensions.clearStorageItems": Extensions.clearStorageItemsReturnValue;
+    "Extensions.setStorageItems": Extensions.setStorageItemsReturnValue;
+    "FedCm.enable": FedCm.enableReturnValue;
+    "FedCm.disable": FedCm.disableReturnValue;
+    "FedCm.selectAccount": FedCm.selectAccountReturnValue;
+    "FedCm.clickDialogButton": FedCm.clickDialogButtonReturnValue;
+    "FedCm.openUrl": FedCm.openUrlReturnValue;
+    "FedCm.dismissDialog": FedCm.dismissDialogReturnValue;
+    "FedCm.resetCooldown": FedCm.resetCooldownReturnValue;
+    "Fetch.disable": Fetch.disableReturnValue;
+    "Fetch.enable": Fetch.enableReturnValue;
+    "Fetch.failRequest": Fetch.failRequestReturnValue;
+    "Fetch.fulfillRequest": Fetch.fulfillRequestReturnValue;
+    "Fetch.continueRequest": Fetch.continueRequestReturnValue;
+    "Fetch.continueWithAuth": Fetch.continueWithAuthReturnValue;
+    "Fetch.continueResponse": Fetch.continueResponseReturnValue;
+    "Fetch.getResponseBody": Fetch.getResponseBodyReturnValue;
+    "Fetch.takeResponseBodyAsStream": Fetch.takeResponseBodyAsStreamReturnValue;
+    "FileSystem.getDirectory": FileSystem.getDirectoryReturnValue;
     "HeadlessExperimental.beginFrame": HeadlessExperimental.beginFrameReturnValue;
     "HeadlessExperimental.disable": HeadlessExperimental.disableReturnValue;
     "HeadlessExperimental.enable": HeadlessExperimental.enableReturnValue;
     "IO.close": IO.closeReturnValue;
     "IO.read": IO.readReturnValue;
     "IO.resolveBlob": IO.resolveBlobReturnValue;
-    "FileSystem.getDirectory": FileSystem.getDirectoryReturnValue;
     "IndexedDB.clearObjectStore": IndexedDB.clearObjectStoreReturnValue;
     "IndexedDB.deleteDatabase": IndexedDB.deleteDatabaseReturnValue;
     "IndexedDB.deleteObjectStoreEntries": IndexedDB.deleteObjectStoreEntriesReturnValue;
@@ -21948,6 +22906,8 @@ Error was thrown.
     "Log.enable": Log.enableReturnValue;
     "Log.startViolationsReport": Log.startViolationsReportReturnValue;
     "Log.stopViolationsReport": Log.stopViolationsReportReturnValue;
+    "Media.enable": Media.enableReturnValue;
+    "Media.disable": Media.disableReturnValue;
     "Memory.getDOMCounters": Memory.getDOMCountersReturnValue;
     "Memory.getDOMCountersForLeakDetection": Memory.getDOMCountersForLeakDetectionReturnValue;
     "Memory.prepareForLeakDetection": Memory.prepareForLeakDetectionReturnValue;
@@ -21959,6 +22919,8 @@ Error was thrown.
     "Memory.getAllTimeSamplingProfile": Memory.getAllTimeSamplingProfileReturnValue;
     "Memory.getBrowserSamplingProfile": Memory.getBrowserSamplingProfileReturnValue;
     "Memory.getSamplingProfile": Memory.getSamplingProfileReturnValue;
+    "Network.getIPProtectionProxyStatus": Network.getIPProtectionProxyStatusReturnValue;
+    "Network.setIPProtectionProxyBypassEnabled": Network.setIPProtectionProxyBypassEnabledReturnValue;
     "Network.setAcceptedEncodings": Network.setAcceptedEncodingsReturnValue;
     "Network.clearAcceptedEncodingsOverride": Network.clearAcceptedEncodingsOverrideReturnValue;
     "Network.canClearBrowserCache": Network.canClearBrowserCacheReturnValue;
@@ -21970,6 +22932,8 @@ Error was thrown.
     "Network.deleteCookies": Network.deleteCookiesReturnValue;
     "Network.disable": Network.disableReturnValue;
     "Network.emulateNetworkConditions": Network.emulateNetworkConditionsReturnValue;
+    "Network.emulateNetworkConditionsByRule": Network.emulateNetworkConditionsByRuleReturnValue;
+    "Network.overrideNetworkState": Network.overrideNetworkStateReturnValue;
     "Network.enable": Network.enableReturnValue;
     "Network.getAllCookies": Network.getAllCookiesReturnValue;
     "Network.getCertificate": Network.getCertificateReturnValue;
@@ -22023,6 +22987,13 @@ Error was thrown.
     "Overlay.setShowHinge": Overlay.setShowHingeReturnValue;
     "Overlay.setShowIsolatedElements": Overlay.setShowIsolatedElementsReturnValue;
     "Overlay.setShowWindowControlsOverlay": Overlay.setShowWindowControlsOverlayReturnValue;
+    "PWA.getOsAppState": PWA.getOsAppStateReturnValue;
+    "PWA.install": PWA.installReturnValue;
+    "PWA.uninstall": PWA.uninstallReturnValue;
+    "PWA.launch": PWA.launchReturnValue;
+    "PWA.launchFilesInApp": PWA.launchFilesInAppReturnValue;
+    "PWA.openCurrentPageInApp": PWA.openCurrentPageInAppReturnValue;
+    "PWA.changeAppUserSettings": PWA.changeAppUserSettingsReturnValue;
     "Page.addScriptToEvaluateOnLoad": Page.addScriptToEvaluateOnLoadReturnValue;
     "Page.addScriptToEvaluateOnNewDocument": Page.addScriptToEvaluateOnNewDocumentReturnValue;
     "Page.bringToFront": Page.bringToFrontReturnValue;
@@ -22039,7 +23010,7 @@ Error was thrown.
     "Page.getInstallabilityErrors": Page.getInstallabilityErrorsReturnValue;
     "Page.getManifestIcons": Page.getManifestIconsReturnValue;
     "Page.getAppId": Page.getAppIdReturnValue;
-    "Page.getAdScriptId": Page.getAdScriptIdReturnValue;
+    "Page.getAdScriptAncestry": Page.getAdScriptAncestryReturnValue;
     "Page.getFrameTree": Page.getFrameTreeReturnValue;
     "Page.getLayoutMetrics": Page.getLayoutMetricsReturnValue;
     "Page.getNavigationHistory": Page.getNavigationHistoryReturnValue;
@@ -22088,6 +23059,8 @@ Error was thrown.
     "Performance.setTimeDomain": Performance.setTimeDomainReturnValue;
     "Performance.getMetrics": Performance.getMetricsReturnValue;
     "PerformanceTimeline.enable": PerformanceTimeline.enableReturnValue;
+    "Preload.enable": Preload.enableReturnValue;
+    "Preload.disable": Preload.disableReturnValue;
     "Security.disable": Security.disableReturnValue;
     "Security.enable": Security.enableReturnValue;
     "Security.setIgnoreCertificateErrors": Security.setIgnoreCertificateErrorsReturnValue;
@@ -22098,7 +23071,6 @@ Error was thrown.
     "ServiceWorker.dispatchSyncEvent": ServiceWorker.dispatchSyncEventReturnValue;
     "ServiceWorker.dispatchPeriodicSyncEvent": ServiceWorker.dispatchPeriodicSyncEventReturnValue;
     "ServiceWorker.enable": ServiceWorker.enableReturnValue;
-    "ServiceWorker.inspectWorker": ServiceWorker.inspectWorkerReturnValue;
     "ServiceWorker.setForceUpdateOnPageLoad": ServiceWorker.setForceUpdateOnPageLoadReturnValue;
     "ServiceWorker.skipWaiting": ServiceWorker.skipWaitingReturnValue;
     "ServiceWorker.startWorker": ServiceWorker.startWorkerReturnValue;
@@ -22107,6 +23079,7 @@ Error was thrown.
     "ServiceWorker.unregister": ServiceWorker.unregisterReturnValue;
     "ServiceWorker.updateRegistration": ServiceWorker.updateRegistrationReturnValue;
     "Storage.getStorageKeyForFrame": Storage.getStorageKeyForFrameReturnValue;
+    "Storage.getStorageKey": Storage.getStorageKeyReturnValue;
     "Storage.clearDataForOrigin": Storage.clearDataForOriginReturnValue;
     "Storage.clearDataForStorageKey": Storage.clearDataForStorageKeyReturnValue;
     "Storage.getCookies": Storage.getCookiesReturnValue;
@@ -22142,6 +23115,7 @@ Error was thrown.
     "Storage.sendPendingAttributionReports": Storage.sendPendingAttributionReportsReturnValue;
     "Storage.getRelatedWebsiteSets": Storage.getRelatedWebsiteSetsReturnValue;
     "Storage.getAffectedUrlsForThirdPartyCookieMetadata": Storage.getAffectedUrlsForThirdPartyCookieMetadataReturnValue;
+    "Storage.setProtectedAudienceKAnonymity": Storage.setProtectedAudienceKAnonymityReturnValue;
     "SystemInfo.getInfo": SystemInfo.getInfoReturnValue;
     "SystemInfo.getFeatureState": SystemInfo.getFeatureStateReturnValue;
     "SystemInfo.getProcessInfo": SystemInfo.getProcessInfoReturnValue;
@@ -22162,6 +23136,7 @@ Error was thrown.
     "Target.autoAttachRelated": Target.autoAttachRelatedReturnValue;
     "Target.setDiscoverTargets": Target.setDiscoverTargetsReturnValue;
     "Target.setRemoteLocations": Target.setRemoteLocationsReturnValue;
+    "Target.openDevTools": Target.openDevToolsReturnValue;
     "Tethering.bind": Tethering.bindReturnValue;
     "Tethering.unbind": Tethering.unbindReturnValue;
     "Tracing.end": Tracing.endReturnValue;
@@ -22169,15 +23144,6 @@ Error was thrown.
     "Tracing.recordClockSyncMarker": Tracing.recordClockSyncMarkerReturnValue;
     "Tracing.requestMemoryDump": Tracing.requestMemoryDumpReturnValue;
     "Tracing.start": Tracing.startReturnValue;
-    "Fetch.disable": Fetch.disableReturnValue;
-    "Fetch.enable": Fetch.enableReturnValue;
-    "Fetch.failRequest": Fetch.failRequestReturnValue;
-    "Fetch.fulfillRequest": Fetch.fulfillRequestReturnValue;
-    "Fetch.continueRequest": Fetch.continueRequestReturnValue;
-    "Fetch.continueWithAuth": Fetch.continueWithAuthReturnValue;
-    "Fetch.continueResponse": Fetch.continueResponseReturnValue;
-    "Fetch.getResponseBody": Fetch.getResponseBodyReturnValue;
-    "Fetch.takeResponseBodyAsStream": Fetch.takeResponseBodyAsStreamReturnValue;
     "WebAudio.enable": WebAudio.enableReturnValue;
     "WebAudio.disable": WebAudio.disableReturnValue;
     "WebAudio.getRealtimeData": WebAudio.getRealtimeDataReturnValue;
@@ -22194,38 +23160,6 @@ Error was thrown.
     "WebAuthn.setUserVerified": WebAuthn.setUserVerifiedReturnValue;
     "WebAuthn.setAutomaticPresenceSimulation": WebAuthn.setAutomaticPresenceSimulationReturnValue;
     "WebAuthn.setCredentialProperties": WebAuthn.setCredentialPropertiesReturnValue;
-    "Media.enable": Media.enableReturnValue;
-    "Media.disable": Media.disableReturnValue;
-    "DeviceAccess.enable": DeviceAccess.enableReturnValue;
-    "DeviceAccess.disable": DeviceAccess.disableReturnValue;
-    "DeviceAccess.selectPrompt": DeviceAccess.selectPromptReturnValue;
-    "DeviceAccess.cancelPrompt": DeviceAccess.cancelPromptReturnValue;
-    "Preload.enable": Preload.enableReturnValue;
-    "Preload.disable": Preload.disableReturnValue;
-    "FedCm.enable": FedCm.enableReturnValue;
-    "FedCm.disable": FedCm.disableReturnValue;
-    "FedCm.selectAccount": FedCm.selectAccountReturnValue;
-    "FedCm.clickDialogButton": FedCm.clickDialogButtonReturnValue;
-    "FedCm.openUrl": FedCm.openUrlReturnValue;
-    "FedCm.dismissDialog": FedCm.dismissDialogReturnValue;
-    "FedCm.resetCooldown": FedCm.resetCooldownReturnValue;
-    "PWA.getOsAppState": PWA.getOsAppStateReturnValue;
-    "PWA.install": PWA.installReturnValue;
-    "PWA.uninstall": PWA.uninstallReturnValue;
-    "PWA.launch": PWA.launchReturnValue;
-    "PWA.launchFilesInApp": PWA.launchFilesInAppReturnValue;
-    "PWA.openCurrentPageInApp": PWA.openCurrentPageInAppReturnValue;
-    "PWA.changeAppUserSettings": PWA.changeAppUserSettingsReturnValue;
-    "BluetoothEmulation.enable": BluetoothEmulation.enableReturnValue;
-    "BluetoothEmulation.setSimulatedCentralState": BluetoothEmulation.setSimulatedCentralStateReturnValue;
-    "BluetoothEmulation.disable": BluetoothEmulation.disableReturnValue;
-    "BluetoothEmulation.simulatePreconnectedPeripheral": BluetoothEmulation.simulatePreconnectedPeripheralReturnValue;
-    "BluetoothEmulation.simulateAdvertisement": BluetoothEmulation.simulateAdvertisementReturnValue;
-    "BluetoothEmulation.simulateGATTOperationResponse": BluetoothEmulation.simulateGATTOperationResponseReturnValue;
-    "BluetoothEmulation.addService": BluetoothEmulation.addServiceReturnValue;
-    "BluetoothEmulation.removeService": BluetoothEmulation.removeServiceReturnValue;
-    "BluetoothEmulation.addCharacteristic": BluetoothEmulation.addCharacteristicReturnValue;
-    "BluetoothEmulation.removeCharacteristic": BluetoothEmulation.removeCharacteristicReturnValue;
     "Console.clearMessages": Console.clearMessagesReturnValue;
     "Console.disable": Console.disableReturnValue;
     "Console.enable": Console.enableReturnValue;

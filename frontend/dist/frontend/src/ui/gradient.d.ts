@@ -1,3 +1,7 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementTagMap } from "../elements/module.js";
 import { GradientType } from "../types/gradient.js";
 export { GradientType };
@@ -5,6 +9,8 @@ export declare const Gradient: <Extensions extends object = {}>(type: string, ..
 export declare const NullGradient: <Extensions extends object = {}>() => GradientType & Extensions;
 export declare class GradientBorderElement extends VElementTagMap.div {
     constructor();
+    border(): string;
+    border(width: string | number, color: string): this;
     border_color(): string;
     border_color(val: string): this;
     border_width(): string;

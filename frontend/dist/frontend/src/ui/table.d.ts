@@ -1,3 +1,7 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementTagMap, AppendType } from "../elements/module.js";
 export declare class TableHeadElement extends VElementTagMap.thead {
     constructor(...content: any[]);

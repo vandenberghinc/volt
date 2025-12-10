@@ -1,3 +1,7 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementTagMap } from "../elements/module.js";
 type ArrayCallback = ((item: any, index: number, is_last: boolean) => any);
 type ArrayCallback1 = ((item: any, index: number) => any);

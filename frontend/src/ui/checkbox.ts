@@ -1,12 +1,12 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
-import { Elements, VElementBaseSignature, VElement } from "../elements/module.js"
-import { VStack, VStackElement, HStack, HStackElement } from "./stack"
-import { Text, TextElement } from "./text"
+import { Elements, VElementBaseSignature, VElement, ValueOrThis } from "../elements/module.js"
+import { VStack, VStackElement, HStack, HStackElement } from "./stack.js"
+import { Text, TextElement } from "./text.js"
 
 // Interfaces.
 interface CircleExtension {
@@ -26,25 +26,29 @@ interface CircleExtension {
         // Custom.
         "--circle-border-color": "gray",
         "--circle-inner-bg": "#FFFFFF",
+        "--circle-inner-bg-focused": "#FFFFFF",
         "--focus-color": "#8EB8EB",
         "--missing-color": "#E8454E",
     },
 })
 export class CheckBoxElement extends (VStackElement as any as VElementBaseSignature) {
 
-    // Attributes.
-	public _border_color: string;
-	public _inner_bg: string;
-	public _focus_color: string;
-	public _missing_color: string;
-	public _missing: boolean;
-	public _required: boolean;
-	private _circle: VStackElement & CircleExtension;
-	// @ts-expect-error
-	public text: TextElement;
-	// @ts-expect-error
-	public content: HStackElement;
-	public error: TextElement;
+    /** Has error state. */
+    has_error = false;
+
+    // Internal ttributes.
+	_border_color: string;
+	_inner_bg: string;
+    _inner_bg_focused: string;
+	_focus_color: string;
+	_error_color: string;
+	_required: boolean;
+	 _circle: VStackElement & CircleExtension;
+	
+    // @ts-expect-error
+	text: TextElement;
+	container: HStackElement;
+	error_text: TextElement;
 
 	// Constructor.
 	constructor(text_or_obj: string | {
@@ -74,9 +78,9 @@ export class CheckBoxElement extends (VStackElement as any as VElementBaseSignat
 		// Attributes.
 		this._border_color = CheckBoxElement.default_style["--circle-border-color"];
 		this._inner_bg = CheckBoxElement.default_style["--circle-inner-bg"];
+        this._inner_bg_focused = CheckBoxElement.default_style["--circle-inner-bg-focused"];
 		this._focus_color = CheckBoxElement.default_style["--focus-color"];
-		this._missing_color = CheckBoxElement.default_style["--missing-color"];
-		this._missing = false;
+		this._error_color = CheckBoxElement.default_style["--missing-color"];
 		this._required = false;
 
 		// Circle element.
@@ -105,6 +109,7 @@ export class CheckBoxElement extends (VStackElement as any as VElementBaseSignat
 			.on_mouse_over((e) => e.box_shadow(`0 0 0 2px ${this._focus_color}`))
 			.on_mouse_out((e) => e.box_shadow(`0 0 0 0px transparent`))
 			.on_click((e) => e.toggle())
+            .parent(this)
 			.extend(
 				{
 					enabled: false,
@@ -116,10 +121,13 @@ export class CheckBoxElement extends (VStackElement as any as VElementBaseSignat
 						else if (to === true) {
 							this.enabled = true;
 							this.background(_this._focus_color);
-							_this.missing(false);
+                            this.inner.background(_this._inner_bg_focused);
+							_this.valid();
 						} else {
 							this.enabled = false;
 							this.background("transparent");
+                            this.inner.background(_this._inner_bg);
+                            _this.valid();
 						}
 						return this;
 					},
@@ -132,21 +140,24 @@ export class CheckBoxElement extends (VStackElement as any as VElementBaseSignat
 			.color("inherit")
 			.padding(0)
 			.margin(0)
+            .parent(this)
 
 		// The content.
-		this.content = HStack(this._circle, this.text)
+		this.container = HStack(this._circle, this.text)
 			.width("100%")
+            .parent(this)
 
 		// The error message.
-		this.error = Text("Incomplete field")
-			.color(this._missing_color)
+		this.error_text = Text("Incomplete field")
+			.color(this._error_color)
 			.font_size("0.8em")
 			.margin(5, 0, 0, 2.5)
 			.padding(0)
 			.hide()
+            .parent(this)
 
 		// Append.
-		this.append(this.content, this.error);
+		this.append(this.container, this.error_text);
 
 		// Set id.
 		if (id !== undefined) {
@@ -169,15 +180,33 @@ export class CheckBoxElement extends (VStackElement as any as VElementBaseSignat
 		return this;
 	}
 
-	// Set the focus color.
+	// Set inner bg color.
 	inner_bg(): string;
 	inner_bg(val: string) : this
 	inner_bg(val?: string) : this | string {
 		if (val == null) { return this._inner_bg; }
 		this._inner_bg = val;
-		this._circle.inner.background(this._inner_bg);
+        if (this._circle.enabled) {
+            this._circle.inner.background(this._inner_bg_focused);
+        } else {
+            this._circle.inner.background(this._inner_bg);
+        }
 		return this;
 	}
+
+    // Set inner bg color when focused.
+    inner_bg_focused(): string;
+    inner_bg_focused(val: string): this
+    inner_bg_focused(val?: string): this | string {
+        if (val == null) { return this._inner_bg_focused; }
+        this._inner_bg_focused = val;
+        if (this._circle.enabled) {
+            this._circle.inner.background(this._inner_bg_focused);
+        } else {
+            this._circle.inner.background(this._inner_bg);
+        }
+        return this;
+    }
 
 	// Get the styling attributes.
 	// The values of the children that may have been changed by the custom funcs should be added.
@@ -187,9 +216,10 @@ export class CheckBoxElement extends (VStackElement as any as VElementBaseSignat
 		if (style_dict == null) {
 			let styles = super.styles();
 			styles["--circle-inner-bg"] = this._inner_bg;
+            styles["--circle-inner-bg-focused"] = this._inner_bg_focused;
 			styles["--circle-border-color"] = this._border_color;
 			styles["--focus-color"] = this._focus_color;
-			styles["--missing-color"] = this._missing_color;
+			styles["--missing-color"] = this._error_color;
 			return styles;
 		} else {
 			return super.styles(style_dict);
@@ -237,43 +267,53 @@ export class CheckBoxElement extends (VStackElement as any as VElementBaseSignat
 		return this;
 	}
 
-	// Set the missing color.
-	missing_color(): string;
-	missing_color(val: string): this;
-	missing_color(val?: string): this | string {
-		if (val == null) { return this._missing_color; }
-		this._missing_color = val;
+	/** Set the missing color. */
+	error_color(): string;
+	error_color(val: string): this;
+	error_color(val?: string): this | string {
+		if (val == null) { return this._error_color; }
+		this._error_color = val;
 		return this;
 	}
 
-	// Set missing.
-	missing(): boolean;
-	missing(to: boolean): this;
-	missing(to: boolean = true): this | boolean {
-		if (to == null) { return this._missing; }
-		else if (to === true) {
-			this._missing = true;
-			this._circle.outline(`1px solid ${this._missing_color}`)
-			this._circle.box_shadow(`0 0 0 3px ${this._missing_color}80`)
-			this.error.color(this._missing_color);
-			this.error.show();
-		} else {
-			this._missing = false;
-			this._circle.outline("0px solid transparent")
-			this._circle.box_shadow(`0 0 0 0px transparent`)
-			this.error.hide();
-		}
-		return this;
+
+	/**
+     * Set the error state and message.
+     * Providing a truthy value will enable the error state and return the current instance for chaining.
+     * Providing a falsy value will disable the error state and return the current instance for chaining.
+     * Providing no value will return the current error message or `undefined` when no error is set.
+     */
+	error<V extends undefined | false | string = undefined>(err?: V): ValueOrThis<V, string | undefined, this> {
+        if (err == null) { return (this.has_error ? this.error_text.text() : undefined) as ValueOrThis<V, string | undefined, this>; }
+        else if (err) {
+            this.has_error = true;
+            this._circle.outline(`1px solid ${this._error_color}`)
+            this._circle.box_shadow(`0 0 0 3px ${this._error_color}80`)
+            this.error_text.color(this._error_color);
+            this.error_text.text(err);
+            this.error_text.show();
+        } else {
+            this.has_error = false;
+            this._circle.outline("0px solid transparent")
+            this._circle.box_shadow(`0 0 0 0px transparent`)
+            this.error_text.hide();
+        }
+        return this as ValueOrThis<V, string | undefined, this>;
 	}
+
+    /** Remove the error state and mark as valid. */
+    valid(): this {
+        return this.error(false);
+    }
 
 	// Submit the item, throws an error when the item is not enabled.
 	submit() : boolean {
 		const value = this.value();
 		if (value !== true) {
-			this.missing(true);
+			this.error("Incomplete field");
 			throw Error("Fill in all the required fields.");
 		}
-		this.missing(false);
+		this.valid();
 		return value;
 	}
 }

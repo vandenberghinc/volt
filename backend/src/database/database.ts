@@ -23,8 +23,10 @@ export namespace Database {
     export interface Opts {
         /** The database URI. */
         uri: string,
+        /** The database name, if not provided it will the database name from the connection URI will be used. */
+        database?: string,
         /** The additional cient options. */
-        client?: Record<string, any>,
+        client?: mongodb.MongoClientOptions,
     }
 }
 
@@ -36,6 +38,7 @@ export namespace Database {
 export class Database {
     static constructor_scheme = {
         uri: {type: "string", default: null},
+        database_name: {type: "string", default: undefined},
         client: {type: "object", default: {}},
         _server: {type: ["object", "undefined"]},
 
@@ -49,23 +52,24 @@ export class Database {
 
     // Attributes.
     uri: string;
-    client_opts?: Record<string, any>;
+    database_name: undefined | string;
+    client_opts?: mongodb.MongoClientOptions;
     server: Server;
     client?: MongoClient;
     _db?: Db;
     collections = new Map<string, Collection<any>>();
-
-    private _connect_promise?: Promise<void>;
 
     // System.
     public _listed_cols: any;
 
     constructor({
         uri,
+        database,
         client,
         _server,
     }: Database.Opts & { _server: Server }) {
         this.uri = uri;
+        this.database_name = database;
         this.client_opts = client;
         this.server = _server;
         
@@ -127,53 +131,75 @@ export class Database {
 
     // Connect.
     public connected: boolean = false;
+    private connect_promise?: Promise<void>;
     async connect(): Promise<void> {
-        try {
-            if (this.client == null) {
-                throw new Error('MongoDB client is not initialized.');
-            }
-            await this.client.connect();
-            this._db = this.client.db();
-            this.connected = true;
-            this.server.log(1, "Connected to the database.");
-        } catch (error) {
-            this.server.log.error(error);
-            throw new Error('Error connecting to the database');
+        if (this.connect_promise) {
+            return this.connect_promise;
         }
+        return this.connect_promise = new Promise(async (resolve, reject) => {
+            try {
+                if (this.client == null) {
+                    throw new Error('MongoDB client is not initialized.');
+                }
+                this.server.log(3, "Connecting to the database client.");
+                await this.client.connect();
+                this.server.log(3, "Connecting to the database.");
+                this._db = this.client.db(this.database_name);
+                this.connected = true;
+                this.server.log(1, "Connected to the database.");
+                resolve();
+            } catch (error) {
+                this.server.log.error(error);
+                reject(new Error('Error connecting to the database'));
+            }
+        });
     }
 
     /** Initialize. */
     async initialize(): Promise<void> {
+        this.server.log(3, "Initializing the database.");
         // Initialize client (same as before)
         const opts = this.client_opts ?? {};
-        opts.serverApi ??= {}
-        opts.serverApi.version ??= ServerApiVersion.v1;
-        opts.serverApi.strict ??= true;
-        opts.serverApi.deprecationErrors ??= true;
+        opts.serverApi ??= {
+            version: ServerApiVersion.v1,
+            strict: true,
+            deprecationErrors: true,
+        }
+        if (typeof opts.serverApi === "object") {
+            opts.serverApi.version ??= ServerApiVersion.v1;
+            opts.serverApi.strict ??= true;
+            opts.serverApi.deprecationErrors ??= true;
+        }
+        // for speeding up connect().
+        opts.serverSelectionTimeoutMS = 1000;
+        opts.connectTimeoutMS = 1000;
         this.client = new MongoClient(this.uri, opts);
 
-        // In development we start the connection in the background so the server
-        // can finish booting immediately. In production we still block.
-        if (this.server.production === false) {
-            this._connect_promise = this.connect();         // don’t await
-        } else {
-            await this.connect();                           // block in prod
+        // In production we instanlty connect and initialize all columns.
+        if (this.server.production) {
+            await this.connect(); // block in prod
+
+            // In production we also wanna initialize all collections right away.
+            for (const col of this.collections.values()) {
+                await col.init();
+            }
         }
+        this.server.log(3, "Database initialized.");
     }
 
 
     /** Ensure connection. */
     async ensure_connection(): Promise<void> {
-        if (this.connected) return;                         // already ready
-        if (this._connect_promise) return this._connect_promise; // wait for bg task
-        this._connect_promise = this.connect();             // cold-start (unlikely)
-        return this._connect_promise;
+        if (this.connected) return;
+        if (this.connect_promise) return this.connect_promise;
+        return this.connect();
     }
 
     // Close.
     async close(): Promise<void> {
         this.server.log(0, "Stopping the database.");
         await this.client?.close();
+        this.connect_promise = undefined;
     }
 
     /**
@@ -181,7 +207,7 @@ export class Database {
      * Initialize database collection.
      * @note When called multiple times with the same name, it will return the same cached collection.
      * @param info.unique If true, an error will be thrown if the collection already exists.
-     *                    By default it is false.
+     *                    Defauls to `true`.
      */
     collection<Data extends mongodb.Document = mongodb.Document>(info: 
         string |
@@ -192,12 +218,12 @@ export class Database {
         
         // Set name by single string argument.
         let name: string;
-        let unique = false;
+        let unique = true;
         let args: Omit<Collection.Opts<Data>, "db"> | undefined;
         if (typeof info === "string") {
             name = info;
         } else {
-            unique = info.unique || false;
+            unique = info.unique ?? true;
             name = info.name;
             args = info;
         }

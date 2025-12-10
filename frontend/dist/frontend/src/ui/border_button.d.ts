@@ -1,3 +1,7 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VDivElement, VElementTagMap } from "../elements/module.js";
 /**
  * Supports a gradient color for the border combined with border radius.

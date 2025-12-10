@@ -933,7 +933,7 @@ class Server {
         // Add the default static to statics.
         this.statics.append({
             path: `${__dirname}/../../frontend/static/`,
-            endpoint: "/volt_static",
+            endpoint: "/volt/assets",
         })
 
         // Set meta.
@@ -1746,7 +1746,7 @@ class Server {
                     const VIEW = View(
                         VStack(
                             HStack(
-                                ImageMask("/volt_static/admin/admin.png")
+                                ImageMask("/volt/assets/admin/admin.png")
                                     .mask_color(style.tint)
                                     .frame(22, 22), // ?format=webp&width=64&height=64
                                 Title("Admin Panel")
@@ -1777,7 +1777,7 @@ class Server {
                                 Text("Fill in your admin authentication password to visit the admin panel."),
                                 ExtendedInput({
                                     label: "Password",
-                                    image: "/volt_static/admin/password.webp",
+                                    image: "/volt/assets/admin/password.webp",
                                     type: "password",
                                     placeholder: "Password"
                                 })
@@ -3934,7 +3934,7 @@ class Server {
 
                 // Image.
                 TableRow(
-                    Image(`${this.full_domain}/volt_static/payments/party.png`)
+                    Image(`${this.full_domain}/volt/assets/payments/party.png`)
                         .frame(60, 60)
                         .margin(0, 0, 30, 0)
                 )
@@ -3997,7 +3997,7 @@ class Server {
 
                 // Image.
                 TableRow(
-                    ImageMask(`${this.full_domain}/volt_static/payments/error.png`)
+                    ImageMask(`${this.full_domain}/volt/assets/payments/error.png`)
                         .frame(40, 40)
                         .mask_color("#E8454E")
                         .margin(0, 0, 30, 0)
@@ -4060,7 +4060,7 @@ class Server {
 
                 // Image.
                 TableRow(
-                    Image(`${this.full_domain}/volt_static/payments/check.png`)
+                    Image(`${this.full_domain}/volt/assets/payments/check.png`)
                         .frame(40, 40)
                         .margin(0, 0, 30, 0)
                 )
@@ -4123,7 +4123,7 @@ class Server {
 
                 // Image.
                 TableRow(
-                    ImageMask(`${this.full_domain}/volt_static/payments/error.png`)
+                    ImageMask(`${this.full_domain}/volt/assets/payments/error.png`)
                         .frame(40, 40)
                         .mask_color("#E8454E")
                         .margin(0, 0, 30, 0)
@@ -4186,7 +4186,7 @@ class Server {
 
                 // Image.
                 TableRow(
-                    Image(`${this.full_domain}/volt_static/payments/party.png`)
+                    Image(`${this.full_domain}/volt/assets/payments/party.png`)
                         .frame(60, 60)
                         .margin(0, 0, 30, 0)
                 )
@@ -4249,7 +4249,7 @@ class Server {
 
                 // Image.
                 TableRow(
-                    ImageMask(`${this.full_domain}/volt_static/payments/error.png`)
+                    ImageMask(`${this.full_domain}/volt/assets/payments/error.png`)
                         .frame(40, 40)
                         .mask_color("#E8454E")
                         .margin(0, 0, 30, 0)
@@ -4312,7 +4312,7 @@ class Server {
 
                 // Image.
                 TableRow(
-                    Image(`${this.full_domain}/volt_static/payments/party.png`)
+                    Image(`${this.full_domain}/volt/assets/payments/party.png`)
                         .frame(60, 60)
                         .margin(0, 0, 30, 0)
                 )
@@ -4375,7 +4375,7 @@ class Server {
 
                 // Image.
                 TableRow(
-                    ImageMask(`${this.full_domain}/volt_static/payments/error.png`)
+                    ImageMask(`${this.full_domain}/volt/assets/payments/error.png`)
                         .frame(40, 40)
                         .mask_color("#E8454E")
                         .margin(0, 0, 30, 0)

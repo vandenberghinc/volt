@@ -1,7 +1,11 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementBaseSignature, VElementTagMap, VDivElement } from "../elements/module.js";
-import { VStackElement, HStackElement } from "./stack";
-import { ImageMaskElement } from "./image";
-import { DividerElement } from "./divider";
+import { VStackElement, HStackElement } from "./stack.js";
+import { ImageMaskElement } from "./image.js";
+import { DividerElement } from "./divider.js";
 export declare class CodeBlockElement extends VElementTagMap.code {
     language?: string;
     line_numbers?: boolean;

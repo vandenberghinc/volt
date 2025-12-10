@@ -10,6 +10,7 @@ import zlib from 'zlib';
 import * as vlib from "@vandenberghinc/vlib";
 import { IncomingMessage, ServerResponse } from 'http';
 import { ServerHttp2Stream, Http2Stream, IncomingHttpHeaders, Http2ServerRequest, Http2ServerResponse } from 'http2';
+import RateLimits from './rate_limit.js';
 
 const { debug } = vlib;
 
@@ -29,7 +30,7 @@ export type ResponseHeaderValue = string | number | boolean | null | undefined;
 export type ResponseHeaders = Record<string, ResponseHeaderValue>;
 
 /** Supported response body shapes. */
-type ResponseBody = string | boolean | number | any[] | Record<string, any> | Buffer<ArrayBufferLike> | Uint8Array<ArrayBufferLike>;
+type ResponseBody = undefined | string | boolean | number | any[] | Record<string, any> | Buffer<ArrayBufferLike> | Uint8Array<ArrayBufferLike>;
 
 // ---------------------------------------------------------
 // Request object.
@@ -62,6 +63,9 @@ export class Stream {
     private res_headers: Record<string, any> | [string, any][];
     public body: string;
     private promise: Promise<void> | undefined;
+
+    /** The cached value of {@link normalize_ip} */
+    private _normalized_ip: string | undefined;
 
     /**
      * Create a new Stream wrapper for HTTP/1.1 or HTTP/2.
@@ -441,6 +445,18 @@ export class Stream {
         return this._ip;
     }
 
+    /**
+     * Retrieve the normalized IP address, suitable for rate limiting and logging.
+     * @throws {Error} If the IP is invalid.
+     * @returns The normalized IP.
+     */
+    normalized_ip(): string {
+        if (this._normalized_ip != null) {
+            return this._normalized_ip;
+        }
+        return this._normalized_ip = RateLimits.normalize_ip(this._ip);
+    }
+
     // Get the requests port.
     /**
      * Get the request's port.
@@ -700,20 +716,20 @@ export class Stream {
         return this._parse_cookies();
     }
 
-    // Check if the stream is closed
-    /**
-     * Check if the stream is closed.
-     *
-     * @example
-     * ```ts
-     * const ip = stream.closed;
-     * ```
-     * @docs
-     */
-    get closed(): boolean {
-        if (!this.http2) { throw new Error("This function is only supported for http2 streams."); }
-        return this.s!.closed;
-    }
+    // DEPRECATED since its only available for http2.
+    // /**
+    //  * Check if the stream is closed.
+    //  *
+    //  * @example
+    //  * ```ts
+    //  * const ip = stream.closed;
+    //  * ```
+    //  * @docs
+    //  */
+    // get closed(): boolean {
+    //     if (!this.http2) { throw new Error("This function is only supported for http2 streams."); }
+    //     return this.s!.closed;
+    // }
 
     // Check if the stream is destroyed
     /**
@@ -1031,7 +1047,24 @@ export class Stream {
         return this;
     }
 
-    // Remove header.
+    /**
+     * Get an added header.
+     *
+     * @param name The header name.
+     * @example
+     * ```ts
+     * stream.get_header("Connection");
+     * ```
+     * @docs
+     */
+    get_header(name: string): ResponseHeaderValue | undefined {
+        if (this.http2) {
+            return this.res_headers[name];
+        } else {
+            return this.res_headers.find((header) => header[0] === name)?.[1];
+        }
+    }
+
     /**
      * Remove header names from the response data.
      *

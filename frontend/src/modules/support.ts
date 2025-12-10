@@ -1,11 +1,12 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
 import type { Users as UsersBackend } from "../../../backend/src/users.js";
-import { Utils } from "./utils.js"
+import { Attachment } from "./attachment.js";
+import { request, Request } from "./request.js";
 
 // Support module.
 export namespace Support {
@@ -21,28 +22,26 @@ export namespace Support {
      * @docs
      */
     export function submit(
-        payload: UsersBackend.Endpoints.SubmitSupport.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.SubmitSupport.Result> {
+        payload: Omit<UsersBackend.Endpoints.SubmitSupport["payload"], "attachments"> & {
+            attachments?: Attachment[];
+        }
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.SubmitSupport> {
         if (payload.attachments) {
-            const MAX_ATTACHMENTS = 5;
-            const MAX_BYTES = 5 * 1024 * 1024; // 5 MB per file
-            const keys = Object.keys(payload.attachments);
-            if (keys.length > MAX_ATTACHMENTS) {
-                throw new Error("Too many attachments. Maximum is 5.");
-            }
-            for (const key of keys) {
-                const raw = (payload.attachments as Record<string, string>)[key];
-                const is_base64 = /^[A-Za-z0-9+/]+=*$/.test(raw);
-                const buf = Buffer.from(raw, is_base64 ? "base64" : "utf-8");
-                if (buf.length > MAX_BYTES) {
-                    throw new Error(`Attachment "${key}" exceeds the maximum size of 5 MB.`);
-                }
+            const total_attachments_size = payload.attachments.reduce((acc, it) => acc + it.size, 0);
+            if (total_attachments_size > 5 * 1024 * 1024) { // 5 MB total
+                throw new Error(`Total attachments size exceeds the maximum of 5 MB.`);
             }
         }
-        return Utils.request({
+        return request<UsersBackend.Endpoints.SubmitSupport>({
             method: "POST",
-            url: "/volt/support/submit",
-            data: payload,
+            url: "/volt/api/v1/support/submit",
+            data: {
+                ...payload,
+                attachments: payload.attachments?.map(a => a.to_rest_api({
+                    decompress: true,
+                    encoding: "base64",
+                }))
+            },
         });
     }
 
@@ -52,10 +51,10 @@ export namespace Support {
      * @returns Returns a promise that resolves with an object containing `pin` (the user's support pin) on success, or a request error on failure.
      * @docs
      */
-    export function get_pin(): Utils.RequestResultPromise<UsersBackend.Endpoints.GetSupportPin.Result> {
-        return Utils.request({
+    export function get_pin(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.GetSupportPin> {
+        return request<UsersBackend.Endpoints.GetSupportPin>({
             method: "GET",
-            url: "/volt/support/pin",
+            url: "/volt/api/v1/support/pin",
         });
     }
 }

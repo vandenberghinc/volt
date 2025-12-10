@@ -47,7 +47,8 @@ async function downloadBrowserWithProgressBar(title, browserDirectory, executabl
     import_debugLogger.debugLogger.log("install", `${title} is already downloaded.`);
     return false;
   }
-  const zipPath = import_path.default.join(import_os.default.tmpdir(), downloadFileName);
+  const uniqueTempDir = await import_fs.default.promises.mkdtemp(import_path.default.join(import_os.default.tmpdir(), "playwright-download-"));
+  const zipPath = import_path.default.join(uniqueTempDir, downloadFileName);
   try {
     const retryCount = 5;
     for (let attempt = 1; attempt <= retryCount; ++attempt) {
@@ -73,8 +74,7 @@ async function downloadBrowserWithProgressBar(title, browserDirectory, executabl
     process.exitCode = 1;
     throw e;
   } finally {
-    if (await (0, import_fileUtils.existsAsync)(zipPath))
-      await import_fs.default.promises.unlink(zipPath);
+    await (0, import_fileUtils.removeFolders)([uniqueTempDir]);
   }
   logPolitely(`${title} downloaded to ${browserDirectory}`);
   return true;

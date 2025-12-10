@@ -1,14 +1,14 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 /** Utils module.  */
 export var Utils;
 (function (Utils) {
     /** True if the current browser's vendor string indicates Apple (e.g., Safari on iOS/macOS). */
-    Utils.is_apple = navigator.vendor.includes('Apple');
+    Utils.is_apple = navigator?.vendor?.includes('Apple');
     /** True if the current browser is identified via vendor as Safari/Apple (same check as {@link is_apple}). */
-    Utils.is_safari = navigator.vendor.includes('Apple');
+    Utils.is_safari = navigator?.vendor?.includes('Apple');
     /**
      * Determine whether the provided value is a string.
      * @param value The value to check.
@@ -351,102 +351,47 @@ export var Utils;
         });
     }
     Utils.copy_to_clipboard = copy_to_clipboard;
-    /** New request method. */
-    async function request(options) {
-        const { method = 'GET', url = null, data = null, json = true, credentials = "same-origin", headers = {}, } = options;
-        // — prepare headers —
-        if (json && data != null && !headers['Content-Type']) {
-            headers['Content-Type'] = 'application/json';
-        }
-        // — build URL + body —
-        let finalUrl = url;
-        let body;
-        if (data != null && typeof data === 'object') {
-            if (method.toUpperCase() === 'GET') {
-                finalUrl = `${url}?${new URLSearchParams(data).toString()}`;
-            }
-            else {
-                body = JSON.stringify(data);
-            }
-        }
-        else if (data != null) {
-            body = String(data);
-        }
-        const init = { method, credentials, headers };
-        if (body !== undefined)
-            init.body = body;
-        try {
-            const response = await fetch(finalUrl, init);
-            const status = response.status;
-            // — parse payload once —
-            let payload;
-            const clone = response.clone(); // @dev.
-            if (json) {
-                try {
-                    payload = await response.json();
-                }
-                catch (e) {
-                    // malformed JSON still counts as a “success” fetch
-                    console.log("[debug] Unable to parse a json from response:", await clone.text(), "- Error: ", JSON.stringify(e, null, 4));
-                    console.log("[debug] Response:", response);
-                    return {
-                        status,
-                        error: { message: `Failed to parse JSON response: ${e.message}` },
-                    };
-                }
-            }
-            else {
-                try {
-                    payload = await response.text();
-                }
-                catch (e) {
-                    return {
-                        status,
-                        error: { message: `Failed to parse text response: ${e.message}` },
-                    };
-                }
-            }
-            // console.log("Payload", json, payload)
-            // — handle HTTP errors (4xx/5xx) by resolving with an error object —
-            if (!response.ok) {
-                // if server wrapped its error in { error: { message, type?, invalid_fields? }, … }
-                if (payload &&
-                    typeof payload === 'object' &&
-                    payload.error &&
-                    typeof payload.error === 'object' &&
-                    typeof payload.error.message === 'string') {
-                    return {
-                        status,
-                        error: {
-                            message: payload.error.message,
-                            type: typeof payload.error.type === "string" ? payload.error.type : undefined,
-                            invalid_fields: payload.error.invalid_fields && typeof payload.error.invalid_fields === "object" && !Array.isArray(payload.error.invalid_fields)
-                                ? payload.error.invalid_fields
-                                : undefined,
-                        },
-                        data: payload.data,
-                    };
-                }
-                // otherwise fall back to a generic single‐message error
-                const msg = typeof payload === 'string'
-                    ? payload
-                    : payload?.error?.toString() ?? JSON.stringify(payload);
-                return {
-                    status,
-                    error: { message: msg },
-                    data: payload.data,
-                };
-            }
-            // — 2xx: success —
-            return { status, data: payload };
-        }
-        catch (networkErr) {
-            // genuine network / system failure
-            throw networkErr;
-        }
-    }
-    Utils.request = request;
-    ;
+    // /**
+    //  * Make a request with a specific generic typing, optionally passing
+    //  * the request method, endpoint, request body and response body types.
+    //  */
+    // export function request<Info extends RequestInfo>(
+    //     options: Info extends RequestInfo<infer M, infer E, infer P>
+    //         ? RequestOpts<M, E, P>
+    //         : never
+    // ): Promise<Info extends RequestInfo<any, any, any, infer S, infer E> ? RequestResult<S, E> : never>;
+    // /** Request with success body. */
+    // export function request<
+    //     SuccessBody extends ResponseBodyBase,
+    // >(
+    //     options: RequestOpts<Utils.Method, string, unknown>
+    // ): Promise<RequestResult<SuccessBody, unknown>>;
+    // /** Request with success body & request body generics. */
+    // export function request<
+    //     SuccessBody extends ResponseBodyBase,
+    //     RequestBody extends RequestBodyBase
+    // >(
+    //     options: RequestOpts<Utils.Method, string, RequestBody>
+    // ): Promise<RequestResult<SuccessBody, unknown>>;
+    // /** Request with success body & request info generics. */
+    // export function request<
+    //     SuccessBody extends ResponseBodyBase,
+    //     RequestInfo extends RegisteredEndpoint,
+    // >(
+    //     options: RequestInfo extends RegisteredEndpoint<infer M, infer E, infer P>
+    //         ? RequestOpts<M extends undefined ? "GET" : M, E, P>
+    //         : RequestOpts<Utils.Method, string, unknown>
+    // ): Promise<RequestResult<SuccessBody, unknown>>;
+    // /** Request with success body, error body & request body generics. */
+    // export function request<
+    //     SuccessBody extends ResponseBodyBase,
+    //     ErrorBody extends ResponseBodyBase,
+    //     RequestBody extends RequestBodyBase
+    // >(
+    //     options: RequestOpts<Utils.Method, string, RequestBody>
+    // ): Promise<RequestResult<SuccessBody, ErrorBody>>;
+    // /** New request method. */
+    // export async function request(options: RequestOpts<Utils.Method, string, any>): Promise<RequestResult<any, any>> {
     /**
      * Create a debounced version of a function that delays invoking it until after a specified delay.
      * @param delay The number of milliseconds to delay.

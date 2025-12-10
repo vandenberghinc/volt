@@ -1,16 +1,16 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
 import { Mutex } from "@vandenberghinc/vlib/frontend"
 import { Elements, VElementBaseSignature, VElement, AppendType } from "../elements/module.js"
-import { HStack, HStackElement, VStack, VStackElement } from "./stack"
-import { Text, TextElement } from "./text"
-import { Title, TitleElement } from "./title"
-import { LoaderButtonElement, LoaderButton } from "./loader_button"
-import { ImageMask, ImageMaskElement } from "./image"
+import { HStack, HStackElement, VStack, VStackElement } from "./stack.js"
+import { Text, TextElement } from "./text.js"
+import { Title, TitleElement } from "./title.js"
+import { LoaderButtonElement, LoaderButton } from "./button.js"
+import { ImageMask, ImageMaskElement } from "./image.js"
 
 
 // Macros.
@@ -41,6 +41,7 @@ export class YesNoPopupElement extends (VStackElement as any as VElementBaseSign
     public no_button: LoaderButtonElement;
     public yes_button: LoaderButtonElement;
     public buttons: HStackElement;
+    public header: VStackElement;
     // @ts-ignore
    	public content: VStackElement;
     public widget: VStackElement;
@@ -104,21 +105,26 @@ export class YesNoPopupElement extends (VStackElement as any as VElementBaseSign
 		// Image.
 		this.image = ImageMask(typeof image === "boolean" ? undefined : image)
             .mask_color(image_color)
-            .frame(35, 35)
-            .position(-17.5, "calc(50% - 17.5px)", null, null)
+            .square(25)
+            // .position(-17.5, "calc(50% - 17.5px)", null, null)
+            .margin_left(10)
             .parent(this)
             .abs_parent(this);
-        if (image === false) {
+        if (!image) {
         	this.image.hide();
+        } else {
+            this.image.show();
         }
 
         // Title.
         this.title = Title(title) // never user inner html instead use append incase of links or code lines.
+            .abs_parent(this)
+            .parent(this)
             .font_family("inherit")
             .font_weight(500)
             .font_size(34)
-            .abs_parent(this)
-            .parent(this)
+            .stretch(true)
+            .wrap(true)
 
         // Text.
         this.text = Text(text) // never user inner html instead use append incase of links or code lines.
@@ -186,14 +192,26 @@ export class YesNoPopupElement extends (VStackElement as any as VElementBaseSign
 
        	// The custom content.
        	this.content = VStack(...content)
-       		.abs_parent(this)
-       		.parent(this);
+                  .width("100%")
+       		.abs_parent(this).parent(this);
+
+        // use a header so the user can optionally add padding to only the header.
+        // and use no padding on the buttons or content, so a background can be put
+        // on the buttons etc.
+        this.header = VStack(
+            HStack(
+                this.title,
+                this.image,
+            )
+                .width("100%"),
+            this.text,
+        )
+        .width("100%")
+        .parent(this).abs_parent(this);
 
         // The content.
         this.widget = VStack(
-	            this.image,
-	            this.title,
-	            this.text,
+                this.header,
 	            this.content,
 	            this.buttons,
 	        )

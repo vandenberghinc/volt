@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -38,10 +38,10 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
 };
 // Imports.
 import { Elements, isVElement } from "../elements/module.js";
-import { VStack, VStackElement, HStack } from "./stack";
-import { Divider } from "./divider";
-import { Span } from "./span";
-import { ForEach } from "./for_each";
+import { VStack, VStackElement, HStack } from "./stack.js";
+import { Divider } from "./divider.js";
+import { Span } from "./span.js";
+import { ForEach } from "./for_each.js";
 /**
  * Steps element.
  * @nav Frontend/Elements

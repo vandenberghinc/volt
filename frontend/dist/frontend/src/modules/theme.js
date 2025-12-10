@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 // Imports.
 import { Color } from "./color.js";
@@ -108,23 +108,32 @@ export class Theme {
         if (ThemeIdList.includes(id) === false || this[id] === undefined) {
             throw Error(`Theme "${id}" does not exist.`);
         }
-        this.active_id = id;
-        this.active = this[id];
-        Object.keys(this.active).iterate((id) => {
-            document.documentElement.style.setProperty(`--${this._id}_${id}`, this.active[id] ?? "");
-        });
-        if (this._on_activate_callback != null) {
-            this._on_activate_callback(this, this.active_id);
-        }
-        if (this._linked_themes?.length) {
-            this._linked_themes.iterate((theme) => {
-                theme.activate(id, false);
+        try {
+            // Disable all transitions.
+            Theme.disable_transitions();
+            // Activate theme.
+            this.active_id = id;
+            this.active = this[id];
+            Object.keys(this.active).iterate((id) => {
+                document.documentElement.style.setProperty(`--${this._id}_${id}`, this.active[id] ?? "");
             });
+            if (this._on_activate_callback != null) {
+                this._on_activate_callback(this, this.active_id);
+            }
+            if (this._linked_themes?.length) {
+                this._linked_themes.iterate((theme) => {
+                    theme.activate(id, false);
+                });
+            }
+            if (apply_theme_update) {
+                ThemesModule.apply_theme_update();
+            }
+            localStorage.setItem(this._id, String(this.active_id));
         }
-        if (apply_theme_update) {
-            ThemesModule.apply_theme_update();
+        finally {
+            // Re-enable transitions.
+            Theme.enable_transitions(500);
         }
-        localStorage.setItem(this._id, String(this.active_id));
         return this;
     }
     /**
@@ -364,7 +373,7 @@ export class Theme {
     // ---------------------------------------------------------------------
     // Animation methods.
     /** Function to disable all transition attributes on all elements. */
-    disable_transitions() {
+    static disable_transitions() {
         // const style = document.createElement('style');
         //     style.id = '__libris_thme_disable_transitions__';
         //     style.innerHTML = `
@@ -375,22 +384,20 @@ export class Theme {
         // document.head.appendChild(style);
         document.body.classList.add("volt_notransition");
         // Force a reflow to apply the new styles immediately
-        // document.head.getBoundingClientRect();
+        // document.body.getBoundingClientRect();
         void document.body.offsetHeight;
-        return this;
     }
     /** Function to re-enable all transition attributes on all elements. */
-    enable_transitions(delay = 0) {
+    static enable_transitions(delay = 0) {
         if (delay > 0) {
-            setTimeout(() => this.enable_transitions(0), delay);
-            return this;
+            setTimeout(() => Theme.enable_transitions(0), delay);
+            return;
         }
         document.body.classList.remove("volt_notransition");
         // const style = document.getElementById('__libris_thme_disable_transitions__');
         // if (style) {
         //     style.remove();
         // }
-        document.head.getBoundingClientRect();
-        return this;
+        document.body.getBoundingClientRect();
     }
 }

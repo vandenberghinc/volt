@@ -1,10 +1,10 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
-import { Elements, VElementBaseSignature, VElement, VElementTagMap } from "../elements/module.js"
+import { Elements, VElementBaseSignature, VElement, VElementTagMap, BorderOpts } from "../elements/module.js"
 import { Utils } from "../modules/utils.js"
 import { GradientType } from "../types/gradient.js"
 
@@ -48,6 +48,32 @@ export class GradientBorderElement extends VElementTagMap.div {
 			"-webkit-mask-composite": (navigator.userAgent.includes("Firefox") || navigator.userAgent.includes("Mozilla")) ? "exclude" : "xor",
 		})
 	}
+
+    // @ts-ignore different signature than base.
+    border(): string;
+    // @ts-ignore different signature than base.
+    border(width: string | number, color: string): this;
+    /**
+     * Assigns the border color of this node, also supports a `GradientType` element. 
+     * @note This method supports a different set of parameters than the standard `VElement.border` method.
+     * @param width The width of the border.
+     * @param color The color of the border.
+     * @returns Returns the instance for chaining unless parameter `value` is `undefined`, then the attribute's value is returned. 
+     * @docs
+     */
+    // @ts-ignore different signature than base.
+    border(width?: string | number, color?: string): this | string {
+        if (width == null) {
+            return `${this.border_width().split(" ")[0]} ${this.border_color()}`;
+        }
+        else {
+            this.border_width(width);
+            if (color) {
+                this.border_color(color);
+            }
+        }
+        return this;
+    }
 
 	// Border color.
 	border_color() : string;

@@ -1,15 +1,15 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
 import { Elements, VElementBaseSignature, VElement } from "../elements/module.js"
 import { Schema } from "@vandenberghinc/vlib/frontend";
-import { VStack, VStackElement, HStack, HStackElement, ZStack } from "./stack"
-import { ForEach } from "./for_each"
-import { Text, TextElement } from "./text"
-import { Divider, DividerElement } from "./divider"
+import { VStack, VStackElement, HStack, HStackElement, ZStack } from "./stack.js"
+import { ForEach } from "./for_each.js"
+import { Text, TextElement } from "./text.js"
+import { Divider, DividerElement } from "./divider.js"
 
 /**
  * The header tab element interface used inside `TabsElement`. Extends `HStackElement` and exposes selection state and handlers for tab header items.

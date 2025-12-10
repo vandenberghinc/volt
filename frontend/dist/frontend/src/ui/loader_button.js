@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2023 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -37,12 +37,17 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     return useValue ? value : void 0;
 };
 // Imports.
-import { Elements, VDiv } from "../elements/module.js";
-import { AnchorHStackElement } from "./stack";
-import { RingLoader } from "./loaders";
-// export class myClass extends AnchorHStackElement {
-//     constructor() { super(); }
-// }
+import { Elements, VDiv, isVElement } from "../elements/module.js";
+import { AnchorHStackElement } from "./stack.js";
+import { RingLoader } from "./loaders.js";
+/**
+ * Is any loader button,
+ * excluding non loader buttons,
+ * use {@link IsButtonLike} for that.
+ */
+export function isLoaderButtonLike(element) {
+    return (element instanceof LoaderButtonElement) || (isVElement(element) && (element.element_name === "LoaderButtonElement"));
+}
 // Loader button.
 /**
  * @warning: you should not use function "LoaderButton.loader.hide() / LoaderButton.loader.show()" use "LoaderButton.hide_loader() / LoaderButton.show_loader()" instead.

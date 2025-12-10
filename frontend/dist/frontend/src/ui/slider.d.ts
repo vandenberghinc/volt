@@ -1,5 +1,9 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementBaseSignature } from "../elements/module.js";
-import { VStackElement } from "./stack";
+import { VStackElement } from "./stack.js";
 export declare namespace SliderElement {
     type OnChangeCallback<This> = (element: This, value: number) => void;
 }

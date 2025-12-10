@@ -1,15 +1,15 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
 import { Elements, VElementBaseSignature, VElement } from "../elements/module.js"
 import { Utils } from "../modules/utils.js"
-import { VStack, VStackElement, AnchorVStack, AnchorVStackElement, HStack, HStackElement, AnchorHStack, AnchorHStackElement } from "./stack"
-import { ForEach } from "./for_each"
-import { ImageMask, ImageMaskElement } from "./image"
-import { Text } from "./text"
+import { VStack, VStackElement, AnchorVStack, AnchorVStackElement, HStack, HStackElement, AnchorHStack, AnchorHStackElement } from "./stack.js"
+import { ForEach } from "./for_each.js"
+import { ImageMask, ImageMaskElement } from "./image.js"
+import { Text } from "./text.js"
 import { AnyElement } from "./any_element.js"
 
 /**

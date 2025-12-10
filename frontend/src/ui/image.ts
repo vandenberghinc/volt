@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
@@ -96,11 +96,11 @@ export class ImageElement extends VElementTagMap.img {;
 			return this._e.src;
 		}
 		(this._e as any).src = value;
-        console.log("Set aspect ratio?", set_aspect_ratio, "from src", value)
+        // console.log("Set aspect ratio?", set_aspect_ratio, "from src", value)
         if (set_aspect_ratio) {
             const aspect_ratio = Statics.aspect_ratio(value);
             if (aspect_ratio != null) {
-                console.log("Set aspect ratio",aspect_ratio, "from src",value)
+                // console.log("Set aspect ratio",aspect_ratio, "from src",value)
                 this.aspect_ratio(aspect_ratio)
             } else {
                 console.log("Unknown aspect ratio from src", value)

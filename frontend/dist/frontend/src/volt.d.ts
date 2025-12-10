@@ -13,5 +13,8 @@ export * from "./modules/themes.js";
 export * from "./modules/user.js";
 export * from "./modules/utils.js";
 export * from "./modules/theme.js";
+export * from "./modules/request.js";
+export * from "./modules/attachment.js";
 export * from "./elements/module.js";
 export * from "./ui/ui.js";
+export * from "../../backend/src/status.js";

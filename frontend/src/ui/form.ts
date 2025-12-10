@@ -1,17 +1,17 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
 import { Elements, VElementBaseSignature, VElement, isVElement, AppendType } from "../elements/module.js"
-import { AnyElement } from "./any_element.js"
+import { isButtonLike } from "./button.js"
 import { CheckBoxElement } from "./checkbox.js"
 import { ExtendedInputElement, ExtendedSelectElement, InputElement } from "./input.js"
-import { VStack, VStackElement } from "./stack"
+import { VStack, VStackElement } from "./stack.js"
 
 // Macros.
-export type OnSubmit<This> = (element: This, data: Record<string, any>) => any;
+export type OnSubmit<This> = (element: This, data: Record<string, string | boolean>) => any;
 export type OnSubmitError<This> = (element: This, error: Error) => any;
 
 // Extended input.
@@ -50,8 +50,8 @@ export class FormElement extends (VStackElement as any as VElementBaseSignature)
 				if (id != null && id !== "") {
 					_this.fields[id] = child as any;
 					child.on_input(() => {
-						if (child.missing() === true) {
-							child.missing(false);
+						if (child.has_error) {
+							child.valid();
 						}
 					})
 					child.on_enter(() => _this.submit())
@@ -59,11 +59,15 @@ export class FormElement extends (VStackElement as any as VElementBaseSignature)
 			}
 
 			// Initialize button.
-			else if (/*_this._button === undefined &&*/ (child.element_name === "ButtonElement" || child.element_name === "LoaderButtonElement") && child.on_click() == null) { //  && child.attr("submit_button") != "false"
+			else if (
+                isButtonLike(child)
+                && child.on_click() == null
+                && child.attr("submit_button") !== "false"
+            ) {
 				if (_this._button !== undefined) {
 					_this._button.on_click(() => {})
 				}
-				_this.button(child);
+				_this.button(child as VElement);
 			}
 
 			// Parse children.
@@ -84,8 +88,8 @@ export class FormElement extends (VStackElement as any as VElementBaseSignature)
 	// When an input field does not have an assigned id it will be skipped.
 	// Only supported extended input elements like `ExtendedInput`.
 	// @ts-expect-error
-	data() : Record<string, any> {
-		const params: Record<string, any> = {};
+    data(): Record<string, string | boolean> {
+        const params: Record<string, string | boolean> = {};
 	    let first_error;
 	    const ids = Object.keys(this.fields);
 	    for (let i = 0; i < ids.length; i++) {

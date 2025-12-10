@@ -10,12 +10,12 @@ APPLY_FIX // Ask final audit
 import * as vlib from "@vandenberghinc/vlib";
 
 // Imports.
-import { SystemError } from "../errors/system_error.js";
-import { Collection, TransactionCollection } from "./collection.js";
+import { SystemError } from "../../errors/system_error.js";
+import { Collection, TransactionCollection } from "../collection.js";
 import { InvalidUsageError } from "src/volt.js";
-import type { StrictFilter } from "./filters/strict_filter.js";
+import type { StrictFilter } from "../filters/strict_filter.js";
 import type { StrictUpdateFilter } from "mongodb";
-import { Server } from "../server.js"
+import { Server } from "../../server.js"
 
 /**
  * The quota manager.
@@ -60,7 +60,8 @@ export class QuotaManager<
             indexes: [
                 {
                     keys: { uid: 1, type: 1, name: 1 },
-                    unique: true
+                    unique: true,
+                    forced: true,
                 },
             ],
             record_version: 1,
@@ -1199,7 +1200,7 @@ export class QuotaManager<
         // Commit with error handling; abort on failure to preserve atomicity.
         try {
             await transaction.commit();
-        } catch (error: any) {
+        } catch (error: unknown) {
             await transaction.abort();
             SystemError.create_detach({
                 owner: "volt.QuotaManager",

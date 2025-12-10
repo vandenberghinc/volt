@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -39,7 +39,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
 // Imports.
 import { Elements, VElementTagMap } from "../elements/module.js";
 import { Utils } from "../modules/utils.js";
-import { Google } from "../modules/google";
+import { Google } from "../modules/google.js";
 // GoogleMap.
 let GoogleMapElement = (() => {
     let _classDecorators = [Elements.create({

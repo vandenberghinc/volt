@@ -42,18 +42,25 @@ var import_utils = require("../../../utils");
 var import_utils2 = require("../../../utils");
 var import_httpServer = require("../../utils/httpServer");
 var import_utilsBundle = require("../../../utilsBundle");
-var import_instrumentation = require("../../instrumentation");
 var import_launchApp = require("../../launchApp");
 var import_launchApp2 = require("../../launchApp");
 var import_playwright = require("../../playwright");
 var import_progress = require("../../progress");
-function validateTraceUrls(traceUrls) {
-  for (const traceUrl of traceUrls) {
-    let traceFile = traceUrl;
-    if (traceUrl.endsWith(".json"))
-      traceFile = traceUrl.substring(0, traceUrl.length - ".json".length);
-    if (!traceUrl.startsWith("http://") && !traceUrl.startsWith("https://") && !import_fs.default.existsSync(traceFile) && !import_fs.default.existsSync(traceFile + ".trace"))
-      throw new Error(`Trace file ${traceUrl} does not exist!`);
+const tracesDirMarker = "traces.dir";
+function validateTraceUrl(traceUrl) {
+  if (!traceUrl)
+    return traceUrl;
+  if (traceUrl.startsWith("http://") || traceUrl.startsWith("https://"))
+    return traceUrl;
+  if (traceUrl.endsWith(".json"))
+    return traceUrl;
+  try {
+    const stat = import_fs.default.statSync(traceUrl);
+    if (stat.isDirectory())
+      return import_path.default.join(traceUrl, tracesDirMarker);
+    return traceUrl;
+  } catch {
+    throw new Error(`Trace file ${traceUrl} does not exist!`);
   }
 }
 async function startTraceViewerServer(options) {
@@ -61,24 +68,18 @@ async function startTraceViewerServer(options) {
   server.routePrefix("/trace", (request, response) => {
     const url = new URL("http://localhost" + request.url);
     const relativePath = url.pathname.slice("/trace".length);
-    if (process.env.PW_HMR) {
-      response.appendHeader("Access-Control-Allow-Origin", "http://localhost:44223");
-    }
-    if (relativePath.endsWith("/stall.js"))
-      return true;
     if (relativePath.startsWith("/file")) {
       try {
         const filePath = url.searchParams.get("path");
         if (import_fs.default.existsSync(filePath))
           return server.serveFile(request, response, url.searchParams.get("path"));
         if (filePath.endsWith(".json")) {
-          const traceName = filePath.substring(0, filePath.length - ".json".length);
-          response.statusCode = 200;
-          response.setHeader("Content-Type", "application/json");
-          response.end(JSON.stringify(traceDescriptor(traceName)));
-          return true;
+          const fullPrefix = filePath.substring(0, filePath.length - ".json".length);
+          return sendTraceDescriptor(response, import_path.default.dirname(fullPrefix), import_path.default.basename(fullPrefix));
         }
-      } catch (e) {
+        if (filePath.endsWith(tracesDirMarker))
+          return sendTraceDescriptor(response, import_path.default.dirname(filePath));
+      } catch {
       }
       response.statusCode = 404;
       response.end();
@@ -94,11 +95,11 @@ async function startTraceViewerServer(options) {
   await server.start({ preferredPort: port, host });
   return server;
 }
-async function installRootRedirect(server, traceUrls, options) {
+async function installRootRedirect(server, traceUrl, options) {
   const params = new URLSearchParams();
   if (import_path.default.sep !== import_path.default.posix.sep)
     params.set("pathSeparator", import_path.default.sep);
-  for (const traceUrl of traceUrls)
+  if (traceUrl)
     params.append("trace", traceUrl);
   if (server.wsGuid())
     params.append("ws", server.wsGuid());
@@ -116,68 +117,55 @@ async function installRootRedirect(server, traceUrls, options) {
     params.append("project", project);
   for (const reporter of options.reporter || [])
     params.append("reporter", reporter);
-  let baseUrl = ".";
-  if (process.env.PW_HMR) {
-    baseUrl = "http://localhost:44223";
-    params.set("server", server.urlPrefix("precise"));
-  }
-  const urlPath = `${baseUrl}/trace/${options.webApp || "index.html"}?${params.toString()}`;
+  const urlPath = `./trace/${options.webApp || "index.html"}?${params.toString()}`;
   server.routePath("/", (_, response) => {
     response.statusCode = 302;
     response.setHeader("Location", urlPath);
-    if (process.env.EXPERIMENTAL_OPENAI_API_KEY)
-      response.appendHeader("Set-Cookie", `openai_api_key=${process.env.EXPERIMENTAL_OPENAI_API_KEY}`);
-    if (process.env.OPENAI_BASE_URL)
-      response.appendHeader("Set-Cookie", `openai_base_url=${process.env.OPENAI_BASE_URL}`);
-    if (process.env.EXPERIMENTAL_ANTHROPIC_API_KEY)
-      response.appendHeader("Set-Cookie", `anthropic_api_key=${process.env.EXPERIMENTAL_ANTHROPIC_API_KEY}`);
-    if (process.env.ANTHROPIC_BASE_URL)
-      response.appendHeader("Set-Cookie", `anthropic_base_url=${process.env.ANTHROPIC_BASE_URL}`);
     response.end();
     return true;
   });
 }
-async function runTraceViewerApp(traceUrls, browserName, options, exitOnClose) {
-  validateTraceUrls(traceUrls);
+async function runTraceViewerApp(traceUrl, browserName, options, exitOnClose) {
+  traceUrl = validateTraceUrl(traceUrl);
   const server = await startTraceViewerServer(options);
-  await installRootRedirect(server, traceUrls, options);
+  await installRootRedirect(server, traceUrl, options);
   const page = await openTraceViewerApp(server.urlPrefix("precise"), browserName, options);
   if (exitOnClose)
     page.on("close", () => (0, import_utils.gracefullyProcessExitDoNotHang)(0));
   return page;
 }
-async function runTraceInBrowser(traceUrls, options) {
-  validateTraceUrls(traceUrls);
+async function runTraceInBrowser(traceUrl, options) {
+  traceUrl = validateTraceUrl(traceUrl);
   const server = await startTraceViewerServer(options);
-  await installRootRedirect(server, traceUrls, options);
+  await installRootRedirect(server, traceUrl, options);
   await openTraceInBrowser(server.urlPrefix("human-readable"));
 }
 async function openTraceViewerApp(url, browserName, options) {
   const traceViewerPlaywright = (0, import_playwright.createPlaywright)({ sdkLanguage: "javascript", isInternalPlaywright: true });
   const traceViewerBrowser = (0, import_utils2.isUnderTest)() ? "chromium" : browserName;
   const { context, page } = await (0, import_launchApp2.launchApp)(traceViewerPlaywright[traceViewerBrowser], {
-    // TODO: store language in the trace.
     sdkLanguage: traceViewerPlaywright.options.sdkLanguage,
     windowSize: { width: 1280, height: 800 },
     persistentContextOptions: {
       ...options?.persistentContextOptions,
-      useWebSocket: (0, import_utils2.isUnderTest)(),
+      cdpPort: (0, import_utils2.isUnderTest)() ? 0 : void 0,
       headless: !!options?.headless,
       colorScheme: (0, import_utils2.isUnderTest)() ? "light" : void 0
     }
   });
-  const controller = new import_progress.ProgressController((0, import_instrumentation.serverSideCallMetadata)(), context._browser);
+  const controller = new import_progress.ProgressController();
   await controller.run(async (progress) => {
     await context._browser._defaultContext._loadDefaultContextAsIs(progress);
+    if (process.env.PWTEST_PRINT_WS_ENDPOINT) {
+      process.stderr.write("DevTools listening on: " + context._browser.options.wsEndpoint + "\n");
+    }
+    if (!(0, import_utils2.isUnderTest)())
+      await (0, import_launchApp.syncLocalStorageWithSettings)(page, "traceviewer");
+    if ((0, import_utils2.isUnderTest)())
+      page.on("close", () => context.close({ reason: "Trace viewer closed" }).catch(() => {
+      }));
+    await page.mainFrame().goto(progress, url);
   });
-  if (process.env.PWTEST_PRINT_WS_ENDPOINT)
-    process.stderr.write("DevTools listening on: " + context._browser.options.wsEndpoint + "\n");
-  if (!(0, import_utils2.isUnderTest)())
-    await (0, import_launchApp.syncLocalStorageWithSettings)(page, "traceviewer");
-  if ((0, import_utils2.isUnderTest)())
-    page.on("close", () => context.close({ reason: "Trace viewer closed" }).catch(() => {
-    }));
-  await page.mainFrame().goto((0, import_instrumentation.serverSideCallMetadata)(), url);
   return page;
 }
 async function openTraceInBrowser(url) {
@@ -221,14 +209,18 @@ class StdinServer {
     }, 500);
   }
 }
-function traceDescriptor(traceName) {
+function sendTraceDescriptor(response, traceDir, tracePrefix) {
+  response.statusCode = 200;
+  response.setHeader("Content-Type", "application/json");
+  response.end(JSON.stringify(traceDescriptor(traceDir, tracePrefix)));
+  return true;
+}
+function traceDescriptor(traceDir, tracePrefix) {
   const result = {
     entries: []
   };
-  const traceDir = import_path.default.dirname(traceName);
-  const traceFile = import_path.default.basename(traceName);
   for (const name of import_fs.default.readdirSync(traceDir)) {
-    if (name.startsWith(traceFile))
+    if (!tracePrefix || name.startsWith(tracePrefix))
       result.entries.push({ name, path: import_path.default.join(traceDir, name) });
   }
   const resourcesDir = import_path.default.join(traceDir, "resources");

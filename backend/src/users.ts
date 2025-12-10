@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh.
  */
 
 // ---------------------------------------------------------
@@ -9,14 +9,14 @@
 
 import * as crypto from "crypto"
 import * as vlib from "@vandenberghinc/vlib";
-import * as utils from "./utils.js";
-import * as Mail from "./plugins/mail/ui.js";
+import * as MailUI from "./plugins/mail/ui.js";
+import { Mail } from "./plugins/mail/mail.js"
 import { Status } from "./status.js";
-const { ExternalError } = utils;
+import { ExternalError } from "./errors/index.js";
 import { Stream, AuthStream } from "./stream.js"
-import { Server, MailAttachment } from "./server.js"
+import { Server } from "./server.js"
 import { Collection } from "./database/collection.js"
-
+import { Request } from "../../frontend/src/modules/request.js";
 
 // ---------------------------------------------------------
 // Types.
@@ -165,7 +165,7 @@ export class Users {
     private server: Server;
 
     /** The recipient email for support submit emails, defaults to `Server.smtp_sender`. */
-    private support_recipient?: string | [string, string];
+    private support_recipient?: Mail.Address;
 
     /** The avg wait time when sending 2FA codes. */
     private avg_send_2fa_time: number[] = [];
@@ -207,7 +207,7 @@ export class Users {
         this.enable_2fa = opts.enable_2fa ?? false;
         this.enable_account_activation = opts.enable_account_activation ?? true;
         this.token_expiration = opts.token_expiration ?? 86400;
-        this.support_recipient = opts.support_recipient ?? this.server.smtp_sender;
+        this.support_recipient = opts.support_recipient ?? this.server.mail?.sender;
 
         // Database collections.
         this._tokens_db = this.server.db.collection({
@@ -223,14 +223,14 @@ export class Users {
         this._users_db = this.server.db.collection({
             name: "Volt.Server.Users.Users",
             indexes: [
-                { key: "uid", unique: true },
-                { key: "email", unique: true },
-                { key: "username", unique: true },
+                { key: "uid", unique: true, forced: true },
+                { key: "email", unique: true, forced: true },
+                { key: "username", unique: true, forced: true },
                 {
-                    key: "api_key", options: {
-                        sparse: true, // api_key index sparse/partial so documents without api_key don’t bloat the index
-                    }
-                } // hashed; non-unique is fine if you only store one per user, and we dont retrieve uid's alike by api key, but extract from raw api key string instead.
+                    key: "api_key", sparse: true, // api_key index sparse/partial so documents without api_key don’t bloat the index
+                    forced: true
+                    // hashed; non-unique is fine if you only store one per user, and we dont retrieve uid's alike by api key, but extract from raw api key string instead.
+                } 
             ],
         });
 
@@ -338,32 +338,8 @@ export class Users {
     }
 
     /**
-     * Validate a UID against ASCII charset and allowed lengths (current + legacy).
-     * @warning If you change {@link Users.UID_CHARSET} or {@link Users.UID_LENGTH},
-     * update {@link Users.LEGACY_UID_LENGTHS} for backward compatibility.
-     */
-    private static _is_valid_uid(uid: string): boolean {
-        const len = uid.length; // ASCII-only, so code units == chars
-        if (len !== Users.UID_LENGTH) {
-            let ok = false;
-            for (let i = 0; i < Users.LEGACY_UID_LENGTHS.length; i++) {
-                if (len === Users.LEGACY_UID_LENGTHS[i]) { ok = true; break; }
-            }
-            if (!ok) return false;
-        }
-
-        const allow = Users.UID_ALLOW;
-        for (let i = 0; i < len; i++) {
-            const code = uid.charCodeAt(i);
-            if (code >= 128 || allow[code] === 0) return false;
-        }
-        return true;
-    }
-
-
-    /**
      * Parse the uid from `<prefix>_<uid>_<suffix>`, where prefix is `ak_` or `tk_`,
-     * `<uid>` passes {@link Users._is_valid_uid}, and `<suffix>`:
+     * `<uid>` passes {@link Users.is_valid_uid}, and `<suffix>`:
      *  - length equals {@link Users.TOKEN_SUFFIX_LEN} or a legacy size; and
      *  - every char is in {@link Users.TOKEN_SUFFIX_CHARSET} (ASCII).
      *
@@ -383,7 +359,7 @@ export class Users {
         if (delimPos === -1) return undefined;
 
         const uid = input.slice(pfxLen, delimPos);
-        if (uid.length === 0 || !Users._is_valid_uid(uid)) return undefined;
+        if (uid.length === 0 || !this.is_valid_uid(uid)) return undefined;
 
         const suffix = input.slice(delimPos + 1);
         const slen = suffix.length; // ASCII-only assumption
@@ -404,8 +380,6 @@ export class Users {
         return uid;
     }
 
-
-
     /**
      * Validate a proposed new password against basic rules and confirmation.
      * @param pass The new password to validate.
@@ -416,18 +390,18 @@ export class Users {
         let error: string | undefined = undefined;
         if (pass !== verify_pass) {
             error = "Passwords do not match.";
-            return { error, invalid_fields: { password: error, verify_password: error } };
         } else if (pass.length < 8) {
             error = "The password should at least include eight characters.";
-            return { error, invalid_fields: { password: error, verify_password: error } };
         } else if (pass.toLowerCase() === pass) {
             error = "The password should at least include one capital letter.";
-            return { error, invalid_fields: { password: error, verify_password: error } };
         } else if (!/\d|[!@#$%^&*]/.test(pass)) {
             error = "The password should at least include one numeric or special character.";
-            return { error, invalid_fields: { password: error, verify_password: error } };
         }
-        return { error: undefined, invalid_fields: undefined };
+        if (error) {
+            return { error, invalid_fields: { password: error, verify_password: error } };
+        } else {
+            return { error: undefined, invalid_fields: undefined };
+        }
     }
 
     // ---------------------------------------------------------
@@ -564,7 +538,7 @@ export class Users {
 
         // Response.
         if (opts?.send !== false) {
-            stream.send<Users.Endpoints.SignIn.Result>({
+            stream.send<Users.Endpoints.SignIn["result"]>({
                 status: 200,
                 data: { message: "Successfully signed in." },
             });
@@ -588,7 +562,7 @@ export class Users {
         }
         const max_age = this.token_expiration; // seconds
         const expires = new Date(Date.now() + max_age * 1000).toUTCString();
-        stream.set_cookie(`T=${encodeURIComponent(token ?? "")}; Max-Age=${max_age}; Path=/; Expires=${expires}; SameSite=Lax; Secure; HttpOnly;`);
+        stream.set_cookie(`T=${encodeURIComponent(token ?? "")}; Max-Age=${max_age}; Path=/; Expires=${expires}; SameSite=Strict; Secure; HttpOnly;`);
     }
 
     /**
@@ -598,13 +572,13 @@ export class Users {
      */
     async _create_user_cookie(stream: Stream, uid: string): Promise<void> {
         if (typeof uid === "string") {
-            stream.set_cookie(`UserID=${encodeURIComponent(uid ?? "")}; Path=/; SameSite=Lax; Secure; HttpOnly;`); // http only since we use this value for account activation without signin.
+            stream.set_cookie(`UserID=${encodeURIComponent(uid ?? "")}; Path=/; SameSite=Strict; Secure;`); // http only since we use this value for account activation without signin.
             const is_activated = this.enable_account_activation ? await this.is_activated(uid) : true;
-            stream.set_cookie(`UserActivated=${is_activated}; Path=/; SameSite=Lax; Secure; HttpOnly;`);
+            stream.set_cookie(`UserActivated=${is_activated}; Path=/; SameSite=Strict; Secure;`);
         } else {
-            stream.set_cookie(`UserID=-1; Path=/; SameSite=Lax; Secure; HttpOnly;`); // http only since we use this value for account activation without signin.
+            stream.set_cookie(`UserID=-1; Path=/; SameSite=Strict; Secure;`); // http only since we use this value for account activation without signin.
             const is_activated = this.enable_account_activation ? false : true;
-            stream.set_cookie(`UserActivated=${is_activated}; Path=/; SameSite=Lax; Secure; HttpOnly;`);
+            stream.set_cookie(`UserActivated=${is_activated}; Path=/; SameSite=Strict; Secure;`);
         }
     }
 
@@ -615,10 +589,10 @@ export class Users {
      */
     async _create_detailed_user_cookie(stream: Stream, uid: string): Promise<void> {
         const user = await this.get(uid);
-        stream.set_cookie(`UserName=${encodeURIComponent(user.username ?? "")}; Path=/; SameSite=Lax; Secure;`);
-        stream.set_cookie(`UserFirstName=${encodeURIComponent(user.first_name ?? "")}; Path=/; SameSite=Lax; Secure;`);
-        stream.set_cookie(`UserLastName=${encodeURIComponent(user.last_name ?? "")}; Path=/; SameSite=Lax; Secure;`);
-        stream.set_cookie(`UserEmail=${encodeURIComponent(user.email ?? "")}; Path=/; SameSite=Lax; Secure;`);
+        stream.set_cookie(`UserName=${encodeURIComponent(user.username ?? "")}; Path=/; SameSite=Strict; Secure;`);
+        stream.set_cookie(`UserFirstName=${encodeURIComponent(user.first_name ?? "")}; Path=/; SameSite=Strict; Secure;`);
+        stream.set_cookie(`UserLastName=${encodeURIComponent(user.last_name ?? "")}; Path=/; SameSite=Strict; Secure;`);
+        stream.set_cookie(`UserEmail=${encodeURIComponent(user.email ?? "")}; Path=/; SameSite=Strict; Secure;`);
     }
 
     /**
@@ -627,13 +601,13 @@ export class Users {
      */
     _reset_cookies(stream: Stream): void {
         const past = "Thu, 01 Jan 1970 00:00:00 GMT";
-        stream.set_cookie(`T=; Max-Age=0; Path=/; Expires=${past}; SameSite=Lax; Secure; HttpOnly;`);
-        stream.set_cookie(`UserID=; Max-Age=0; Path=/; Expires=${past}; SameSite=Lax; Secure; HttpOnly;`); // http only since we use this value for account activation without signin.
-        stream.set_cookie(`UserActivated=; Max-Age=0; Path=/; Expires=${past}; SameSite=Lax; Secure; HttpOnly;`);
-        stream.set_cookie(`UserName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Lax; Secure;`);
-        stream.set_cookie(`UserFirstName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Lax; Secure;`);
-        stream.set_cookie(`UserLastName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Lax; Secure;`);
-        stream.set_cookie(`UserEmail=; Max-Age=0; Path=/; Expires=${past}; SameSite=Lax; Secure;`);
+        stream.set_cookie(`T=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure; HttpOnly;`);
+        stream.set_cookie(`UserID=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`); // http only since we use this value for account activation without signin.
+        stream.set_cookie(`UserActivated=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
+        stream.set_cookie(`UserName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
+        stream.set_cookie(`UserFirstName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
+        stream.set_cookie(`UserLastName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
+        stream.set_cookie(`UserEmail=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
     }
 
     // ---------------------------------------------------------
@@ -651,7 +625,7 @@ export class Users {
         // Send 2fa.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/auth/2fa",
+            endpoint: "/volt/api/v1/auth/2fa",
             content_type: "application/json",
             rate_limit: "global",
             params: {
@@ -659,16 +633,16 @@ export class Users {
             },
             callback: async (stream, params) => {
                 // Get uid.
-                let uid;
+                let uid: string | undefined;
                 if ((uid = await this.get_uid_by_email(params.email)) == null) {
-                    return stream.success<Users.Endpoints.Send2FA.Result>({
+                    return stream.success<Users.Endpoints.Send2FA["result"]>({
                         data: { message: "A 2FA code was sent if the specified email exists." },
                     });
                 }
 
                 // Send.
                 await this.send_2fa({ uid: uid, stream });
-                return stream.success<Users.Endpoints.Send2FA.Result>({
+                return stream.success<Users.Endpoints.Send2FA["result"]>({
                     data: { message: "A 2FA code was sent if the specified email exists." },
                 });
             }
@@ -677,7 +651,7 @@ export class Users {
         // Sign in.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/auth/signin",
+            endpoint: "/volt/api/v1/auth/signin",
             content_type: "application/json",
             rate_limit: {
                 limit: 10,
@@ -685,7 +659,7 @@ export class Users {
                 group: "volt.auth"
             },
             callback: async (stream: Stream) => {
-
+                // console.log("signin 1")
                 // Uniform delay on failure.
                 // Basically wait for the same time as it would time on avg to send a mail, since this causes a very slow response.
                 const uniform_delay = async () => {
@@ -735,8 +709,19 @@ export class Users {
                         message: (err as any).message,
                     });
                 }
+                // console.log("signin 2", { email, username })
+
+                // Revert email to username etc.
+                if (email && email.indexOf("@") === -1) {
+                    username = email;
+                    email = undefined;
+                } else if (username && username.indexOf("@") !== -1) {
+                    email = username;
+                    username = undefined;
+                }
 
                 // Get uid.
+                // console.log("signin 3" ,{ email, username })
                 if (email) {
                     if ((uid = await this.get_uid_by_email(email)) == null) {
                         await uniform_delay();
@@ -750,8 +735,8 @@ export class Users {
                             },
                         });
                     }
-                } else {
-                    if ((uid = await this.get_uid(username as string)) == null) {
+                } else if (username) {
+                    if ((uid = await this.get_uid(username)) == null) {
                         await uniform_delay();
                         return stream.error({
                             status: Status.unauthorized,
@@ -763,6 +748,17 @@ export class Users {
                             },
                         });
                     }
+                } else {
+                    await uniform_delay();
+                    return stream.error({
+                        status: Status.unauthorized,
+                        type: "Unauthorized",
+                        message: "Unauthorized.",
+                        invalid_fields: {
+                            "username": "Invalid or unrecognized username",
+                            "password": "Invalid or unrecognized password",
+                        },
+                    });
                 }
 
                 // Verify password.
@@ -809,6 +805,7 @@ export class Users {
                     // Sign in.
                     return await this._sign_in_response(stream, uid);
                 }
+                // console.log("singin 4 failed password");
 
                 // Wait for the same time as it would time on avg to send a mail.
                 await uniform_delay();
@@ -829,7 +826,7 @@ export class Users {
         // Sign out.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/auth/signout",
+            endpoint: "/volt/api/v1/auth/signout",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -841,7 +838,7 @@ export class Users {
                 this._reset_cookies(stream);
 
                 // Response.
-                return stream.success<Users.Endpoints.SignOut.Result>({
+                return stream.success<Users.Endpoints.SignOut["result"]>({
                     data: { message: "Successfully signed out." },
                 });
             }
@@ -850,9 +847,12 @@ export class Users {
         // Sign up.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/auth/signup",
+            endpoint: "/volt/api/v1/auth/signup",
             content_type: "application/json",
-            rate_limit: "global",
+            rate_limit: [
+                "global",
+                { limit: 5, interval: 60 * 10, group: "volt/Users/signup" }
+            ],
             params: {
                 username: { type: "string", allow_empty: false },
                 first_name: { type: "string", allow_empty: false },
@@ -864,6 +864,8 @@ export class Users {
                 code: { type: "string", required: false },
             },
             callback: async (stream, params) => {
+                console.log("signup 1", params);
+
                 // Verify password.
                 const { error, invalid_fields } = this._verify_new_pass(params.password, params.verify_password);
                 if (error) {
@@ -939,9 +941,14 @@ export class Users {
                 let uid: string;
                 try {
                     uid = await this.create({
-                        ...params,
-                        // verify_password: undefined,
-                        // code: undefined,
+                        // dont unpack params since we are performing param validation inside create().
+                        first_name: params.first_name,
+                        last_name: params.last_name,
+                        username: params.username,
+                        email: params.email,
+                        password: params.password,
+                        verify_password: params.verify_password,
+                        phone_number: params.phone_number,
                         is_activated: true, // already verified by 2fa or no 2fa is enabled.
                         _check_username_email: false, // already checked.
                     });
@@ -962,7 +969,7 @@ export class Users {
         // Activate account.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/auth/activate",
+            endpoint: "/volt/api/v1/auth/activate",
             content_type: "application/json",
             rate_limit: "global",
             params: {
@@ -1002,14 +1009,14 @@ export class Users {
 
                 // Response.
                 await this._create_user_cookie(stream, uid);
-                return stream.success<Users.Endpoints.ActivateUser.Result>({ data: { message: "Successfully activated your account." } });
+                return stream.success<Users.Endpoints.ActivateUser["result"]>({ data: { message: "Successfully activated your account." } });
             }
         });
 
         // Forgot password.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/auth/forgot_password",
+            endpoint: "/volt/api/v1/auth/forgot_password",
             content_type: "application/json",
             rate_limit: "global",
             params: {
@@ -1061,7 +1068,7 @@ export class Users {
         // Get user.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/user",
+            endpoint: "/volt/api/v1/user",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1097,14 +1104,14 @@ export class Users {
                     is_activated: user.is_activated === true,
                     has_api_key: Boolean(user.api_key),
                 }
-                return stream.success<Users.Endpoints.GetUser.Result>({ data: frontend });
+                return stream.success<Users.Endpoints.GetUser["result"]>({ data: frontend });
             }
         });
 
         // Set user.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/user",
+            endpoint: "/volt/api/v1/user",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1148,14 +1155,14 @@ export class Users {
                     stream.uid,
                     { send: false },
                 );
-                return stream.success<Users.Endpoints.UpdateUser.Result>({ data: { message: "Successfully updated your account." } });
+                return stream.success<Users.Endpoints.UpdateUser["result"]>({ data: { message: "Successfully updated your account." } });
             }
         });
 
         // Change password.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/user/change_password",
+            endpoint: "/volt/api/v1/user/change_password",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1190,7 +1197,7 @@ export class Users {
                 await this.set_password(stream.uid, params.password);
 
                 // Success.
-                return stream.success<Users.Endpoints.ChangePassword.Result>({
+                return stream.success<Users.Endpoints.ChangePassword["result"]>({
                     status: Status.success,
                     data: { message: "Successfully updated your password." },
                 });
@@ -1200,7 +1207,7 @@ export class Users {
         // Delete account.
         this.server.endpoint({
             method: "DELETE",
-            endpoint: "/volt/user",
+            endpoint: "/volt/api/v1/user",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1212,7 +1219,7 @@ export class Users {
                 this._reset_cookies(stream);
 
                 // Success.
-                return stream.success<Users.Endpoints.DeleteUser.Result>({
+                return stream.success<Users.Endpoints.DeleteUser["result"]>({
                     status: Status.success,
                     data: { message: "Successfully deleted your account." },
                 });
@@ -1222,12 +1229,12 @@ export class Users {
         // Generate API key.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/user/api_key",
+            endpoint: "/volt/api/v1/user/api_key",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
             callback: async (stream: AuthStream) => {
-                return stream.success<Users.Endpoints.GenerateAPIKey.Result>({
+                return stream.success<Users.Endpoints.GenerateAPIKey["result"]>({
                     data: {
                         message: "Successfully generated an API key.",
                         api_key: await this.generate_api_key(stream.uid),
@@ -1239,12 +1246,12 @@ export class Users {
         // Has API key.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/user/has_api_key",
+            endpoint: "/volt/api/v1/user/has_api_key",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
             callback: async (stream: AuthStream) => {
-                return stream.success<Users.Endpoints.HasAPIKey.Result>({
+                return stream.success<Users.Endpoints.HasAPIKey["result"]>({
                     data: {
                         message: "Successfully checked your API key.",
                         has_api_key: await this.has_api_key(stream.uid),
@@ -1256,13 +1263,13 @@ export class Users {
         // Revoke API key.
         this.server.endpoint({
             method: "DELETE",
-            endpoint: "/volt/user/api_key",
+            endpoint: "/volt/api/v1/user/api_key",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
             callback: async (stream: AuthStream) => {
                 await this.revoke_api_key(stream.uid);
-                return stream.send<Users.Endpoints.RevokeAPIKey.Result>({
+                return stream.send<Users.Endpoints.RevokeAPIKey["result"]>({
                     status: Status.success,
                     data: { message: "Successfully revoked your API key." },
                 });
@@ -1328,7 +1335,7 @@ export class Users {
         // Load data.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/user/data",
+            endpoint: "/volt/api/v1/user/data",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1349,7 +1356,7 @@ export class Users {
                             retry: 3,
                         }
                     );
-                    return stream.send<Users.Endpoints.LoadUserData.Result>({
+                    return stream.send<Users.Endpoints.LoadUserData["result"]>({
                         status: Status.success,
                         data: {
                             message: "Successfully loaded the requested document.",
@@ -1372,7 +1379,7 @@ export class Users {
         // Set data.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/user/data",
+            endpoint: "/volt/api/v1/user/data",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1388,7 +1395,7 @@ export class Users {
                     { data: params.data },
                     { retry: 3, flatten: true }
                 );
-                return stream.send<Users.Endpoints.SetUserData.Result>({
+                return stream.send<Users.Endpoints.SetUserData["result"]>({
                     status: Status.success,
                     data: { message: "Successfully saved." },
                 });
@@ -1398,7 +1405,7 @@ export class Users {
         // Delete data.
         this.server.endpoint({
             method: "DELETE",
-            endpoint: "/volt/user/data",
+            endpoint: "/volt/api/v1/user/data",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1409,7 +1416,7 @@ export class Users {
                 const query = init_user_data_query(stream, stream.uid, params.query);
                 if (!query) return;
                 await this.public.delete(query);
-                return stream.send<Users.Endpoints.DeleteUserData.Result>({
+                return stream.send<Users.Endpoints.DeleteUserData["result"]>({
                     status: Status.success,
                     data: { message: "Successfully deleted." },
                 });
@@ -1419,7 +1426,7 @@ export class Users {
         // Load protected data.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/user/data/protected",
+            endpoint: "/volt/api/v1/user/data/protected",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1440,7 +1447,7 @@ export class Users {
                             retry: 3,
                         }
                     );
-                    return stream.send<Users.Endpoints.LoadProtectedUserData.Result>({
+                    return stream.send<Users.Endpoints.LoadProtectedUserData["result"]>({
                         status: Status.success,
                         data: {
                             message: "Successfully loaded the requested document.",
@@ -1460,21 +1467,20 @@ export class Users {
             }
         });
 
-
         // ---------------------------------------------------------
         // Default support endpoints.
 
         // Get PIN.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/support/pin",
+            endpoint: "/volt/api/v1/support/pin",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
             callback: async (stream: AuthStream) => {
                 // Sign in.
                 const pin = await this.get_support_pin(stream.uid);
-                return stream.success<Users.Endpoints.GetSupportPin.Result>({
+                return stream.success<Users.Endpoints.GetSupportPin["result"]>({
                     data: {
                         message: "Successfully retrieved your support PIN.",
                         pin: pin,
@@ -1486,7 +1492,7 @@ export class Users {
         // Support.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/support/submit",
+            endpoint: "/volt/api/v1/support/submit",
             content_type: "application/json",
             rate_limit: [
                 "global",
@@ -1495,7 +1501,21 @@ export class Users {
                     limit: 5,
                 },
             ],
-            callback: async (stream: Stream) => {
+            params: {
+                subject: { type: "string", required: false, allow_empty: false },
+                type: { type: "string", required: false, allow_empty: false },
+                support_pin: { type: "string", required: false, allow_empty: false },
+                email: { type: "string", required: false, allow_empty: false },
+                first_name: { type: "string", required: false, allow_empty: false },
+                last_name: { type: "string", required: false, allow_empty: false },
+                summary: { type: "string", required: true, allow_empty: false },
+                detailed: { type: "string", required: false, allow_empty: false },
+                attachments: { type: "array", required: false, value_schema: {
+                    type: "object",
+                    schema: Mail.Attachment.RestAPI.Schema
+                }},
+            },
+            callback: async (stream: Stream, params) => {
 
                 // Check recipient.
                 if (!this.support_recipient) {
@@ -1504,9 +1524,7 @@ export class Users {
                         type: "NoSMTPSender", message: "This server does not have a SMTP sender configured."
                     });
                 }
-
-                // Get params.
-                let params = stream.params as Record<string, any>;
+                this.server.assert_mail();
 
                 // When unauthenticated get contact params.
                 let user: null | User = null, email: string, first_name: string, last_name: string;
@@ -1529,12 +1547,8 @@ export class Users {
                 let body = "";
                 const subject = params.subject || (params.type == null ? "Support" : `Support ${params.type}`);
                 body += `<h1>${subject}</h1>`;
-                if (params.subject) {
-                    delete params.subject;
-                }
                 if (params.type) {
                     body += `<span style='font-weight: bold'>Type</span>: ${params.type}<br>`;
-                    delete params.type;
                 }
                 if (user) {
                     body += `<span style='font-weight: bold'>UID</span>: ${stream.uid}<br>`;
@@ -1548,66 +1562,80 @@ export class Users {
                     body += `<span style='font-weight: bold'>Support PIN</span>: ${support_pin} <span style='color: green'>verified</span><br>`;
                 } else if (params.support_pin) {
                     body += `<span style='font-weight: bold'>Support PIN</span>: ${params.support_pin} <span style='color: red'>not yet verified</span><br>`;
-                    delete params.support_pin;
                 } else {
                     body += `<span style='font-weight: bold'>Support PIN</span>: Unknown<br>`;
                 }
                 if (params.summary) {
                     body += `<br><span style='font-weight: bold'>Summary</span>:<br>${params.summary}<br>`;
-                    delete params.summary;
                 }
                 if (params.detailed) {
                     body += `<br><span style='font-weight: bold'>Detailed</span>:<br>${params.detailed}<br>`;
-                    delete params.detailed;
                 }
-                Object.keys(params).forEach((key) => {
-                    if (key !== "attachments" && key !== "recipient") {
-                        body += `<br><span style='font-weight: bold'>${key}</span>: ${params[key]}<br>`;
+                for (const key of Object.keys(params)) {
+                    switch (key) {
+                        case "subject":
+                        case "type":
+                        case "support_pin":
+                        case "summary":
+                        case "detailed":
+                        case "attachments":
+                        case "recipient":
+                            continue;
+                        default:
+                            body += `<br><span style='font-weight: bold'>${key}</span>: ${params[key]}<br>`;
                     }
-                });
-
-                // Attachments.
+                }
                 body += "<br>";
-                let attachments: MailAttachment[] = [];
-                const MAX_ATTACHMENTS = 5;
-                const MAX_BYTES = 5 * 1024 * 1024; // 5 MB per file
-                if (params.attachments) {
-                    const keys = Object.keys(params.attachments);
-                    if (keys.length > MAX_ATTACHMENTS) {
-                        throw new ExternalError({ status: Status.bad_request, type: "TooManyAttachments", message: `Too many attachments. Max is ${MAX_ATTACHMENTS}.` });
-                    }
-                    for (const key of keys) {
-                        const raw = (params.attachments as Record<string, string>)[key];
-                        const is_base64 = /^[A-Za-z0-9+/]+={0,2}$/.test(raw) && (raw.length % 4 === 0);
-                        const buf = Buffer.from(raw, is_base64 ? "base64" : "utf-8");
-                        if (buf.length > MAX_BYTES) {
-                            throw new ExternalError({ status: Status.bad_request, type: "AttachmentTooLarge", message: `${key} too large, maximum size is 5 MB.` });
-                        }
-                        attachments.push({ filename: key, content: buf });
-                    }
-                }
 
                 // Send email.
-                await this.server.send_mail({
+                await this.server.mail.send({
                     // Only send to support_recipient since we dont want users/people to send emails to random people.
                     recipients: [this.support_recipient],
                     subject: subject,
                     body: body,
-                    attachments: attachments,
+                    attachments: params.attachments,
+                    max_attachments_size: 5 * 1024 * 1024, // 5 MB
+                    allow_untrusted_urls: false,
                 });
 
                 // Sign in.
-                return stream.success<Users.Endpoints.SubmitSupport.Result>({
+                return stream.success<Users.Endpoints.SubmitSupport["result"]>({
                     data: { message: "Successfully sent your request." }
                 });
             }
         });
-
     }
 
     // ---------------------------------------------------------
     // Public methods.
     // ---------------------------------------------------------
+
+    /**
+     * DEVELOPMENT:
+     * @warning
+     * If you change {@link Users.UID_CHARSET} or {@link Users.UID_LENGTH},
+     * update {@link Users.LEGACY_UID_LENGTHS} for backward compatibility.
+     */
+    /**
+     * Validate a UID against ASCII charset and allowed lengths (current + legacy).
+     */
+    is_valid_uid(uid: string): boolean {
+        const len = uid.length; // ASCII-only, so code units == chars
+        if (len !== Users.UID_LENGTH) {
+            let ok = false;
+            for (let i = 0; i < Users.LEGACY_UID_LENGTHS.length; i++) {
+                if (len === Users.LEGACY_UID_LENGTHS[i]) { ok = true; break; }
+            }
+            if (!ok) return false;
+        }
+
+        const allow = Users.UID_ALLOW;
+        for (let i = 0; i < len; i++) {
+            const code = uid.charCodeAt(i);
+            if (code >= 128 || allow[code] === 0) return false;
+        }
+        return true;
+    }
 
     /**
      * Check if a uid exists.
@@ -1670,6 +1698,7 @@ export class Users {
      * @param username The username of the new account.
      * @param email The email of the new account.
      * @param password The password of the new account.
+     * @param verify_password An optional second password input to check against the first input to ensure its the same.
      * @param phone_number The phone number of the user account.
      * @param is_activated Whether the account should be set to activated; by default `!Server.enable_account_activation`.
      * @example
@@ -1687,6 +1716,7 @@ export class Users {
         username,
         email,
         password,
+        verify_password,
         phone_number = "",
         is_activated = undefined,
         _check_username_email = false,
@@ -1696,6 +1726,7 @@ export class Users {
         username: string;
         email: string;
         password: string;
+        verify_password?: string;
         phone_number?: string;
         is_activated?: boolean;
         _check_username_email?: boolean;
@@ -1710,11 +1741,23 @@ export class Users {
                 username: "string",
                 email: "string",
                 password: "string",
+                verify_password: { type: "string", required: false },
                 phone_number: { type: "string", required: false },
                 is_activated: { type: "boolean", required: false },
                 _check_username_email: { type: "boolean", required: false },
             }
         })
+
+        // Verify password.
+        const { error, invalid_fields } = this._verify_new_pass(password, verify_password ?? password);
+        if (error) {
+            throw new ExternalError({
+                type: "InvalidPassword",
+                message: `Invalid password: ${error}.`,
+                status: Status.bad_request,
+                invalid_fields,
+            });
+        }
 
         // Check if username & email already exist.
         if (_check_username_email) {
@@ -1755,6 +1798,18 @@ export class Users {
         };
         await this._users_db.set({ uid }, user);
 
+        // Execute event callbacks.
+        for (const cb of this.server.events.get("create_user")) {
+            try {
+                await cb({ user });
+            } catch (err: unknown) {
+                this.server.log.error(new Error(
+                    `Encountered an error in event callback "create_user".`,
+                    { cause: err }
+                ));
+            }
+        }
+
         // Response.
         return uid;
     }
@@ -1766,6 +1821,14 @@ export class Users {
      * await server.users.delete("0");
      */
     async delete(uid: string): Promise<void> {
+
+        // Load the user to verify it exists and to pass it to the callback.
+        const user = await this.get(uid);
+        if (!user) {
+            throw new ExternalError({ status: Status.not_found, type: "UserNotFound", message: `User with uid "${uid}" not found.` });
+        }
+        
+        // Delete the user from all collections.
         await this._users_db.delete_many({ uid });
         await this._tokens_db.delete_many({ uid });
         await this._2fa_tokens_db.delete_many({ uid });
@@ -1775,9 +1838,17 @@ export class Users {
         if (this.server.payments !== undefined) {
             await this.server.payments._delete_user(uid);
         }
-        const res = this.server.on_delete_user({ uid });
-        if (res instanceof Promise) {
-            await res;
+
+        // Execute event callbacks.
+        for (const cb of this.server.events.get("delete_user")) {
+            try {
+                await cb({ user });
+            } catch (err: unknown) {
+                this.server.log.error(new Error(
+                    `Encountered an error in event callback "delete_user".`,
+                    { cause: err }
+                ));
+            }
         }
     }
 
@@ -1871,6 +1942,7 @@ export class Users {
         let old_data;
         const set_data: Record<string, any> = {};
         for (const key of Object.keys(data)) {
+            if (data[key] === undefined) continue;
             switch (key) {
                 case "first_name":
                 case "last_name":
@@ -1961,6 +2033,25 @@ export class Users {
      */
     async get_by_username(username: string): Promise<User> {
         return await this._users_db.load({ username });
+    }
+
+    /**
+     * Get a user by uid or username. 
+     * This function can be used if you have a variable which can be both.
+     * Throws if the username does not exist.
+     * @returns Returns a User object.
+     * @param username The username of the user to fetch.
+     * @throws {Collection.NotFoundError} If the username or uid does not exist.
+     * @example
+     * const user = await server.users.get_by_username("myusername");
+     */
+    async get_by_uid_or_username(uid_or_username: string): Promise<User> {
+        return await this._users_db.load({
+            $or: [
+                { uid: uid_or_username },
+                { username: uid_or_username },
+            ],
+        });
     }
 
     /**
@@ -2312,13 +2403,14 @@ export class Users {
             device: user_agent,
         });
         let body = mail, subject: string | undefined;
-        if (mail instanceof Mail.MailElement) {
+        if (mail instanceof MailUI.MailElement) {
             body = mail.html();
             subject = mail.subject();
         }
 
         // Send mail.
-        await this.server.send_mail({
+        this.server.assert_mail();
+        await this.server.mail.send({
             recipients: [_email!],
             subject: subject ?? "Two Factor Authentication Code",
             body,
@@ -2348,7 +2440,7 @@ export namespace Users {
         /** Enable account activation by email after a user signs up. */
         enable_account_activation?: boolean;
         /** The email address to send support requests to, defaults to {@link Server.Opts.smtp.sender} if defined */
-        support_recipient?: string;
+        support_recipient?: Mail.Address;
     }
 
     /** The types for the frontend endpoints. */
@@ -2359,102 +2451,144 @@ export namespace Users {
         // ---------------------------------------------
 
         /** The get user endpoint. */
-        export namespace GetUser {
-            /** The request params. */
-            export interface Params {
-                // must be authenticated.
-            }
-            /** The result interface for a **successful** request. */
-            export type Result = User.Frontend;
-        }
+        export type GetUser = Request.Info<
+            // Method.
+            "GET", 
+            // Endpoint.
+            "/volt/api/v1/user", 
+            // Params.
+            undefined, 
+            // Result.
+            User.Frontend,
+            // Error.
+            undefined 
+        >
 
         /** The update user endpoint. */
-        export namespace UpdateUser {
-            /** The request params. */
-            export interface Params {
+        export type UpdateUser = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/user",
+            // Params.
+            {
                 first_name?: string;
                 last_name?: string;
                 phone_number?: string;
                 username?: string;
                 email?: string;
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The activate user endpoint. */
-        export namespace ActivateUser {
-            /** The request params. */
-            export interface Params {
+        export type ActivateUser = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/auth/activate",
+            // Params.
+            {
                 code: string;
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The change password endpoint. */
-        export namespace ChangePassword {
-            /** The request params. */
-            export interface Params {
+        export type ChangePassword = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/user/change_password",
+            // Params.
+            {
                 current_password: string;
                 password: string;
                 verify_password: string;
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The delete user endpoint. */
-        export namespace DeleteUser {
-            /** The request params. */
-            export interface Params {
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+        export type DeleteUser = Request.Info<
+            // Method.
+            "DELETE",
+            // Endpoint.
+            "/volt/api/v1/user",
+            // Params.
+            undefined,
+            // Result.
+            {
                 message: string;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The generate api key endpoint. */
-        export namespace GenerateAPIKey {
-            /** The request params. */
-            export interface Params {
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+        export type GenerateAPIKey = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/user/api_key",
+            // Params.
+            undefined,
+            // Result.
+            {
                 message: string;
                 api_key: string;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
         
         /** The has api key endpoint. */
-        export namespace HasAPIKey {
-            /** The request params. */
-            export interface Params {
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+        export type HasAPIKey = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/user/has_api_key",
+            // Params.
+            undefined,
+            // Result.
+            {
                 message: string;
                 has_api_key: boolean;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The revoke api key endpoint. */
-        export namespace RevokeAPIKey {
-            /** The request params. */
-            export interface Params {
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+        export type RevokeAPIKey = Request.Info<
+            // Method.
+            "DELETE",
+            // Endpoint.
+            "/volt/api/v1/user/api_key",
+            // Params.
+            undefined,
+            // Result.
+            {
                 message: string;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** JSON values for LoadUserData data field etc. */
         export type JsonValue = string | number | boolean | null | JsonArray | JsonObject;
@@ -2472,9 +2606,13 @@ export namespace Users {
         ] as const;
 
         /** The load public user data endpoint. */
-        export namespace LoadUserData {
-            /** The request params. */
-            export interface Params {
+        export type LoadUserData = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/user/data",
+            // Params.
+            {
                 /**
                  * The document query.
                  * @note The object form query may not include system
@@ -2486,18 +2624,24 @@ export namespace Users {
                  * see {@link Collection.LoadOpts.default}.
                  */
                 default?: JsonValue;
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
                 data: JsonValue;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The set public user data endpoint. */
-        export namespace SetUserData {
-            /** The request params. */
-            export interface Params {
+        export type SetUserData = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/user/data",
+            // Params.
+            {
                 /**
                  * The document query.
                  * @note The object form query may not include system
@@ -2506,34 +2650,48 @@ export namespace Users {
                 query: string | Record<string, any>;
                 /** The data to save. */
                 data: JsonValue;
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The delete public user data endpoint. */
-        export namespace DeleteUserData {
-            /** The request params. */
-            export interface Params {
+        export type DeleteUserData = Request.Info<
+            // Method.
+            "DELETE",
+            // Endpoint.
+            "/volt/api/v1/user/data",
+            // Params.
+            {
                 /**
                  * The document query.
                  * @note The object form query may not include system
                  *       reserved fields `_id`, `uid`, `query` and `data`.
                  */
                 query: string | Record<string, any>;
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+                /** The data to save. */
+                data: JsonValue;
+            },
+            // Result.
+            {
                 message: string;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The load protected user data endpoint. */
-        export namespace LoadProtectedUserData {
-            /** The request params. */
-            export interface Params {
+        export type LoadProtectedUserData = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/user/data/protected",
+            // Params.
+            {
                 /**
                  * The document query.
                  * @note The object form query may not include system
@@ -2542,37 +2700,49 @@ export namespace Users {
                 query: string | Record<string, any>;
                 /** The default value for document field `data`. */
                 default?: JsonValue;
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
                 data: JsonValue;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >
 
         // ---------------------------------------------
         // Authentication.
         // ---------------------------------------------
 
         /** The sign in endpoint. */
-        export namespace SignIn {
-            /** The request params. */
-            export interface Params {
+        export type SignIn = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/auth/signin",
+            // Params.
+            {
                 username: string,
                 email: string,
                 password: string,
                 code?: string,
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
-            }
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The sign up endpoint. */
-        export namespace SignUp {
-            /** The request params. */
-            export interface Params {
+        export type SignUp = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/auth/signup",
+            // Params.
+            {
                 username: string,
                 email: string,
                 first_name: string,
@@ -2581,58 +2751,82 @@ export namespace Users {
                 verify_password: string,
                 phone_number?: string,
                 code?: string,
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
-            }
-        }
-
+            },
+            // Error.
+            undefined
+        >
+        
         /** The sign out endpoint. */
-        export namespace SignOut {
-            /** The request params. */
-            export interface Params { }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+        export type SignOut = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/auth/signout",
+            // Params.
+            undefined,
+            // Result.
+            {
                 message: string;
-            }
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The send 2fa endpoint. */
-        export namespace Send2FA {
-            /** The request params. */
-            export interface Params {
+        export type Send2FA = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/auth/2fa",
+            // Params.
+            {
                 email: string;
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
-            }
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The send forgot password endpoint. */
-        export namespace ForgotPassword {
-            /** The request params. */
-            export interface Params {
+        export type ForgotPassword = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/auth/forgot_password",
+            // Params.
+            {
                 email: string,
                 password: string,
                 verify_password: string,
                 code: string,
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
-            }
-        }
-
+            },
+            // Error.
+            undefined
+        >
+        
         // ---------------------------------------------
         // Support.
         // ---------------------------------------------
 
         /** The submit support endpoint. */
-        export namespace SubmitSupport {
-            /** The request params. */
-            export interface Params {
+        export type SubmitSupport = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/support/submit",
+            // Params.
+            {
                 /** The support subject. */
                 subject?: string;
                 /** The support type for internal purpose only. */
@@ -2646,28 +2840,36 @@ export namespace Users {
                 /** The user's last name. This parameter will automatically be assigned when the user is authenticated. */
                 last_name?: string;
                 /** A summary of the support request. */
-                summary?: string;
+                summary: string;
                 /** A detailed description of the support request. */
                 detailed?: string;
                 /** An object with attachments, assigned as `{file_name: raw_file_data}`. */
-                attachments?: { [fileName: string]: any };
+                attachments?: Mail.Attachment.RestAPI[];
                 // Note that users can not specify a `recipient` field since this would allow them to send emails to everyone.
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 message: string;
-            }
-        }
+            },
+            // Error.
+            undefined
+        >
 
         /** The get support pin endpoint. */
-        export namespace GetSupportPin {
-            /** The request params. */
-            export interface Params { }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+        export type GetSupportPin = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/support/pin",
+            // Params.
+            undefined,
+            // Result.
+            {
                 message: string;
                 pin: string;
-            }
-        }
+            },
+            // Error.
+            undefined
+        >
     }
 }

@@ -1,6 +1,10 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementBaseSignature, VElement, VElementTagMap, AppendType } from "../elements/module.js";
 import { AnyElement } from "./any_element.js";
-import { VStackElement } from "./stack";
+import { VStackElement } from "./stack.js";
 type OnScrollCallback = ((element: ScrollerElement, event: Event) => any);
 interface ScrollCallbackItem {
     callback: (event: Event) => any;

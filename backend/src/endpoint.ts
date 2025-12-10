@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // ---------------------------------------------------------
@@ -10,7 +10,7 @@ import CleanCSS from 'clean-css';
 import zlib from 'zlib';
 import { View } from './view.js';
 import * as vlib from "@vandenberghinc/vlib";
-import { ExternalError, InternalError } from "./utils.js";
+import { ExternalError, InternalError } from "./errors/internal_external.js";
 import { Status } from "./status.js";
 import { RateLimits, RateLimitGroup, RateLimitData } from "./rate_limit.js";
 import { Stream, AuthStream } from "./stream.js";
@@ -114,7 +114,11 @@ const { debug } = vlib;
  *   these attributes are reassigned for the same group.
  */
 
-export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
+export class Endpoint<
+    const M extends Endpoint.Method = "GET",
+    const E extends string | RegExp = string,
+    const S extends vlib.Schema.Entries.Opts = {}
+> {
 
     // Static attributes.
     static compressed_content_types: string[] = [
@@ -177,7 +181,9 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
     authenticated: boolean;
 
     /** Parameter scheme validator */
-    params_schema?: vlib.Schema.Validator<object>;
+    params_validator: undefined | vlib.Schema.Validator<object>;
+    params_schema: undefined | vlib.Schema.Entries.Opts;
+    allow_unknown_params: undefined | boolean;
 
     /** The default response headers */
     headers: [string, string][];
@@ -215,14 +221,48 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
     private ip_whitelist?: string[];
     private _is_compressed?: boolean;
 
-    private _initialized = false;
+    private _dynamic_initialized = false;
 
     /** A reference to the server. */
     server?: Server;
 
+    /**
+     * Clone this endpoint, used to create a modified copy of the current endpoint.
+     * @param override Override specific endpoint options, note that this will be shallow merged.
+     */
+    clone<
+        const M extends Endpoint.Method = "GET",
+        const E extends string | RegExp = string,
+        const S extends vlib.Schema.Entries.Opts = {}
+    >(this: Endpoint<M, E, S>, override?: Partial<Endpoint.Opts<M, E, S>>): Endpoint<M, E, S> {
+        return new Endpoint({
+            ...vlib.Object.deep_copy({
+                method: this.route.method,
+                endpoint: this.route.endpoint,
+                authenticated: this.authenticated,
+                rate_limit: this.rate_limit_groups,
+                params: this.params_schema,
+                compress: this._compress,
+                cache: this._cache,
+                ip_whitelist: this.ip_whitelist,
+                sitemap: this.allow_sitemap,
+                robots: this.allow_robots,
+                allow_unknown_params: this.allow_unknown_params,
+                _is_static: this.is_static,
+                data: this.data,
+                file_path: this.file_path,
+                content_type: this.content_type,
+                callback: this.callback,
+            }),
+            view: this.view?.clone(),
+            ...override,
+        } as Endpoint.Opts<M, E, S>);
+    }
+
+    /** Construct an endpoint. */
     constructor({
-        method = "GET",
-        endpoint = "/",
+        method,
+        endpoint,
         authenticated = false,
         rate_limit = undefined,
         params = undefined,
@@ -239,71 +279,10 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
         data = undefined,
         file_path = undefined,
         content_type,// = "text/plain",
-    }: {
-        method?: string,
-        endpoint: string | RegExp,
-        rate_limit?: string | RateLimitGroup | (string | RateLimitGroup)[],
-        params?: S,
-        compress?: "auto" | boolean,
-        cache?: boolean | number,
-        ip_whitelist?: string[],
-        sitemap?: boolean,
-        robots?: boolean,
-        _is_static?: boolean,
-        allow_unknown_params?: boolean;
-    }
-        // Modes.
-        & (
-            // With data & content type.
-            | {
-                data?: Buffer | string | any[] | Record<any, any>;
-                file_path?: never;
-                view?: never;
-                authenticated?: boolean,
-                callback?: never;
-                content_type: string;
-            }
-            // With file path & content type.
-            | {
-                data?: never;
-                file_path: string | vlib.Path;
-                authenticated?: boolean,
-                callback?: never;
-                view?: never;
-                content_type: string;
-            }
-            // With callback & content type.
-            | {
-                data?: never;
-                file_path?: never;
-                authenticated?: false,
-                callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any)
-                view?: never;
-                content_type: string;
-            }
-            // With authenticated callback & content type.
-            | {
-                data?: never;
-                file_path?: never;
-                authenticated: true,
-                callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any),
-                view?: never;
-                content_type: string;
-            }
-            // With view, and optional content type.
-            | {
-                data?: never;
-                file_path?: never;
-                authenticated?: boolean,
-                callback?: never;
-                view: View | View.Opts;
-                content_type?: string;
-            }
-        )
-    ) {
+    }: Endpoint.Opts<M, E, S>) {
         
         // Attributes.
-        this.route = new Route(method, endpoint);
+        this.route = new Route(method ?? "GET", endpoint);
         this.id = this.route.id;
         this.authenticated = authenticated;
         if ((this as any).callback === undefined) { // only assign when undefined, so derived classes can also define the callback function.
@@ -318,6 +297,8 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
         this.ip_whitelist = Array.isArray(ip_whitelist) ? ip_whitelist : undefined;
         this.is_static = _is_static;
         this.headers = [];
+        this.params_schema = params;
+        this.allow_unknown_params = allow_unknown_params;
 
         // Excluded endpoint chars
         if (typeof endpoint === "string") {
@@ -407,24 +388,49 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
 
         // Initialize the parameter scheme validator.
         if (params_scheme != null) {
-            this.params_schema = new vlib.Schema.Validator({
+            this.params_validator = new vlib.Schema.Validator({
                 schema: params_scheme,
-                unknown: !allow_unknown_params,
+                unknown: allow_unknown_params,
                 parent: this.route.id + ":",
                 throw: false,
             });
         }
     }
 
+    /**
+     * Serve this endpoint manually from a stream.
+     * This can for instance be used to serve a HTML `/error` endpoint from within a callback.
+     */
+    async serve({
+        stream,
+        status = 200,
+        templates = undefined,
+    }: {
+        stream: Stream;
+        status: number;
+        /** Add new templates when rendering a `View`, overriding the default `View` templates. */
+        templates?: Record<string, any>;
+    }): Promise<void> {
+        return await this._serve(stream, status, { templates });
+    }
+
+    // ----------------------------------------------------------
+    // System methods.
+
     /** Initialize with server. */
     _initialize(server: Server): this {
+
+        // Already initialized.
+        if (this.server != null) {
+            return this;
+        }
 
         // Assign attribute.
         this.server = server;
         
         // Initialize view.
         if (this.view != null) {
-            this.view._initialize(server, this);
+            this.view.initialize(server, this);
         }
 
         // Init view meta.
@@ -443,10 +449,6 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
         if (!this.server) {
             throw new Error(`Endpoint "${this.id}" is not initialized by the server yet.`);
         }
-        // Build html code of view.
-        if (this.view != null) {
-            await this.view._build_html();
-        }
 
         /**
          * Load data by file path
@@ -464,19 +466,24 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
                 this.raw_data = this.data;
                 this.data = zlib.gzipSync(this.data, {level: zlib.constants.Z_BEST_COMPRESSION});
                 this.content_length = this.data.length;
-            } else if (this.view != null) {
-                this.view.raw_html = this.view.html;
-                this.view.html = zlib.gzipSync(this.view.html as any, {level: zlib.constants.Z_BEST_COMPRESSION});
-                this.content_length = this.view.html.length;
             }
+            // cant compress view html here since it contains unique nonces.
+            // else if (this.view != null) {
+            //     this.view.raw_html = this.view.html;
+            //     this.view.html = zlib.gzipSync(this.view.html as any, {level: zlib.constants.Z_BEST_COMPRESSION});
+            //     this.content_length = this.view.html.length;
+            // }
             debug(2, this.route.id, ": ", "Compressed - content_length:",this.content_length)
         }
 
         // Set cache headers.
-        // if (!this._server.production) {
-            this._cache = false as number | boolean; // @todo @tmp
-        // }
-        if ((this.callback == null || this.is_image_endpoint) && (typeof this._cache === "number" || this._cache === true)) {
+        if (!this.server.production) {
+           this._cache = false; // @todo @tmp
+        }
+        if (
+            // (this.callback == null || this.is_image_endpoint) &&
+            (typeof this._cache === "number" || this._cache === true)
+        ) {
             if (this._cache === 1 || this._cache === true) {
                 this.headers.push(["Cache-Control", "max-age=86400"]);
             } else {
@@ -503,7 +510,7 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
             debug(2, this.route.id,": ", "Compressed headers:", this.headers)
         }
 
-        this._initialized = true;
+        this._dynamic_initialized = true;
     }
 
     // Set default headers.
@@ -515,9 +522,10 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
 
     // Serve a client.
     async _serve_options(stream: Stream): Promise<void> {
-        if (!this._initialized) {
+        if (!this._dynamic_initialized) {
             await this._dynamic_initialize();
         }
+
         try {
             // Check IP whitelist.
             if (this.ip_whitelist && !this.ip_whitelist.includes(stream.ip)) {
@@ -532,6 +540,11 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
             // Set headers.
             this._set_headers(stream);
 
+            // Compute content length on view & when not defined.
+            if (this.content_length == null && this.view != null) {
+                stream.set_header("Content-Length", (await this.view.content_length()).toString());
+            }
+
             // Send.
             stream.send({ status: Status.no_content });
             
@@ -539,8 +552,11 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
             throw err; // must have another catch block here otherwise when an error occurs in here it is somehow not catched by the try and catch block from Server._serve which will cause the program to crash.
         }
     }
-    async _serve(stream: Stream, status_code: number = 200): Promise<void> {
-        if (!this._initialized) {
+    async _serve(stream: Stream, status_code: number = 200, opts?: {
+        /** Add new templates when rendering a `View`, overriding the default `View` templates. */
+        templates?: Record<string, any>
+    }): Promise<void> {
+        if (!this._dynamic_initialized) {
             await this._dynamic_initialize();
         }
         try {
@@ -560,8 +576,8 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
             // Callback.
             if (this.callback != null) {
                 this.server?.log(3, this.route.id, ": ", "Serving endpoint in callback mode.");
-                if (this.params_schema != null) {
-                    const { error, invalid_fields } = this.params_schema.validate(stream.params ?? {});
+                if (this.params_validator != null) {
+                    const { error, invalid_fields } = this.params_validator.validate(stream.params ?? {});
                     if (error) {
                         stream.send({
                             status: Status.bad_request, 
@@ -576,7 +592,7 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
                 }
                 try {
                     let promise;
-                    if (this.params_schema != null) {
+                    if (this.params_validator != null) {
                         promise = this.callback(stream, (stream.params ?? {}) as any);
                     } else {
                         promise = this.callback(stream, {} as any);
@@ -603,7 +619,7 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
             // View.
             else if (this.view != null) {
                 this.server?.log(3, this.route.id, ": ", "Serving endpoint in view mode.");
-                this.view._serve(stream, status_code);
+                await this.view._serve(stream, status_code, { compress: this._compress, templates: opts?.templates });
                 return;
             }
 
@@ -689,8 +705,80 @@ export class Endpoint<const S extends vlib.Schema.Entries.Opts = {}> {
 }
 export namespace Endpoint {
 
+    /** The endpoint method. */
+    export type Method = "GET" | "POST" | "DELETE" | "PUT" | "PATCH" | "OPTIONS";
+
     /** Options for constructing an endpoint. */
-    export type Opts<S extends vlib.Schema.Entries.Opts = {}> = ConstructorParameters<typeof Endpoint<S>>[0];
+    export type Opts<
+        M extends Method = Method,
+        E extends string | RegExp = string,
+        S extends vlib.Schema.Entries.Opts = {},
+    > = 
+        {
+            /**
+             * The endpoint method.
+             * @default "GET"
+             */
+            method?: M extends undefined ? "GET" : M,
+            endpoint: E,
+            rate_limit?: string | RateLimitGroup | (string | RateLimitGroup)[],
+            params?: S,
+            compress?: "auto" | boolean,
+            cache?: boolean | number,
+            ip_whitelist?: string[],
+            sitemap?: boolean,
+            robots?: boolean,
+            _is_static?: boolean,
+            allow_unknown_params?: boolean;
+        }
+        // Modes.
+        & (
+            // With data & content type.
+            | {
+                data?: Buffer | string | any[] | Record<any, any>;
+                file_path?: never;
+                view?: never;
+                authenticated?: boolean,
+                callback?: never;
+                content_type: string;
+            }
+            // With file path & content type.
+            | {
+                data?: never;
+                file_path: string | vlib.Path;
+                authenticated?: boolean,
+                callback?: never;
+                view?: never;
+                content_type: string;
+            }
+            // With callback & content type.
+            | {
+                data?: never;
+                file_path?: never;
+                authenticated?: false,
+                callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any)
+                view?: never;
+                content_type: string;
+            }
+            // With authenticated callback & content type.
+            | {
+                data?: never;
+                file_path?: never;
+                authenticated: true,
+                callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any),
+                view?: never;
+                content_type: string;
+            }
+            // With view, and optional content type.
+            | {
+                data?: never;
+                file_path?: never;
+                authenticated?: boolean,
+                callback?: never;
+                view: View | View.Opts;
+                content_type?: string;
+            }
+        )
 }
 
 // const e = new Endpoint({

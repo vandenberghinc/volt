@@ -1,21 +1,21 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // External imports.
-import { fuzzy } from "@vandenberghinc/vlib/frontend";
+import * as vlib from "@vandenberghinc/vlib/frontend";
 
 // Imports.
 import { Elements, VElementBaseSignature, VElement, VElementTagMap, VInputElement, VTextAreaElement, ElementKeyboardEvent, ElementEvent } from "../elements/module.js"
 import { Utils } from "../modules/utils.js"
-import { HStack, HStackElement, VStack, VStackElement } from "./stack"
-import { Text, TextElement } from "./text"
-import { ImageMask, ImageMaskElement } from "./image"
-import { GradientBorder, GradientBorderElement } from "./gradient"
-import { Scroller, ScrollerElement } from "./scroller"
-import { Divider } from "./divider"
-import { addSyntheticLeadingComment } from "typescript"
+import { HStack, HStackElement, VStack, VStackElement } from "./stack.js"
+import { Text, TextElement } from "./text.js"
+import { ImageMask, ImageMaskElement } from "./image.js"
+import { GradientBorder, GradientBorderElement } from "./gradient.js"
+import { Scroller, ScrollerElement } from "./scroller.js"
+import { Divider } from "./divider.js"
+import { ValueOrThis } from "../elements/types.js";
 
 // Input.
 @Elements.create({
@@ -77,10 +77,13 @@ export class InputElement extends VElementTagMap.input {
 	value(): string;
 	value(val: string | number): this;
 	value(val?: string | number): this | string {
-        console.log("InputElement.value", val, super.value);
-        if (this._e === undefined) { return super.value(val as any); }
-        if (val == null) { return this._e.getAttribute("value") ?? ""; }
-        this._e.setAttribute("value", val.toString());
+        if (this._e === undefined) {
+            return super.value(val as any);
+        }
+        if (val == null) { return this._e.value ?? ""; }
+        this._e.value = val.toString();
+        // if (val == null) { return this._e.getAttribute("value") ?? ""; }
+        // this._e.setAttribute("value", val.toString());
         return this;
     }
 	required(): boolean;
@@ -256,6 +259,120 @@ export const InputBox = Elements.wrapper(InputBoxElement);
 export const NullInputBox = Elements.create_null(InputBoxElement);
 declare module './any_element.d.ts' { interface AnyElementMap { InputBoxElement: InputBoxElement }}
 
+/** Nested types for the {@link ExtendedInputElement} class. */
+export namespace ExtendedInputElement {
+    export interface Opts {
+        /** Label text. */
+        label?: string | {
+            /** The label text. */
+            text: string;
+            /**
+             * The label color.
+             * @default "inherit"
+             */
+            color?: string;
+            /**
+             * The label font size.
+             * @default "inherit"
+             */
+            font_size?: string | number;
+            /**
+             * Spacing between the label and the input field.
+             * @default 7.5 | 12.5
+             */
+            spacing?: string | number;
+            /**
+             * Enable wrapping behaviour, by default the label will have an ellipsis overflow behaviour.
+             * @default false
+             */
+            wrap?: boolean;
+            /**
+             * The max width of the text label.
+             * @default "100%"
+             */
+            max_width?: string | number;
+        };
+        /** Placeholder text. */
+        placeholder?: string;
+        /** Input field ID. */
+        id?: string;
+        /** Whether the input is read-only. */
+        readonly?: boolean;
+        /** Whether the input is required. */
+        required?: boolean;
+        /** Input type. */
+        type?: string;
+        /** Initial value. */
+        value?: string;
+        /** Input options. */
+        input?: {
+            /** Input field padding. */
+            padding?: string | number[];
+            /** Input field background color. */
+            background?: string;
+            /** The height of the input node, useful when `type` is `box`. */
+            height?: number;
+            /** Options for configuring a border. */
+            border?: {
+                /** Default color. */
+                color?: string;
+                /** Hover color. */
+                hover?: string;
+                /** Focused color. */
+                focused?: string;
+                /** Missing color. */
+                missing?: string;
+                /**
+                 *  Border width.
+                 * @default 1px
+                 */
+                width?: string | number;
+                /**
+                 * Border radius.
+                 * @default 0
+                 */
+                radius?: string | number;
+                /**
+                 * Border type, either full for all sides or `bottom` for only a bottom border.
+                 * @default "full"
+                 */
+                type?: "full" | "bottom";
+            };
+        }
+        /** Left image url or options. */
+        image?: string | {
+            /** Image URL. */
+            url: string
+            /** Image size. */
+            size?: number | string;
+            /** Image color. */
+            color?: string;
+            /** Image alt text. */
+            alt?: string;
+        };
+        /** Add copy functionality */
+        copy?: {
+            /** Image url. */
+            url: string,
+            /** Image alt. */
+            alt?: string;
+            /** Image size. */
+            size?: number | string;
+            /** Image color. */
+            color?: string;
+            /** Image hover color. */
+            hover?: string;
+            /**
+             * On click event.
+             * By default this button does nog copy the current value to the clipboard.
+             * This functionality can be added manually here, see {@link Utils.copy_to_clipboard}.
+             */
+            on_click?: (val: string) => void | Promise<void>;
+        };
+        /** Validation options. */
+        validate?: vlib.Schema.Entry;
+    }
+}
 // Extended input.
 @Elements.create({
     name: "ExtendedInputElement",
@@ -263,63 +380,58 @@ declare module './any_element.d.ts' { interface AnyElementMap { InputBoxElement:
         ...VStackElement.default_style,
         "color": "inherit",
         "font-size": "16px",
-        // Custom.
-        "--input-padding": "12px 6px",
-        "--input-border-radius": "5px",
-        "--input-border-color": "gray",
-        "--input-hover-border-color": "gray",
-        "--input-background": "transparent",
-        "--image-mask-color": "#000",
-        "--image-size": "20px",
-        "--image-margin-right": "10px",
-        "--image-margin-left": "5px",
-        "--image-alt": "VWeb",
-        "--focus-color": "#8EB8EB",
-        "--missing-color": "#E8454E",
     },
 })
 export class ExtendedInputElement extends (VStackElement as any as VElementBaseSignature) {
 
-	private _focus_color: string;
-	private _missing_color: string;
-	private _mask_color: string;
-	private _initial_border_color: string;
-    private _hover_border_color: string;
+    private copy_opts: ExtendedInputElement.Opts["copy"];
+    private input_opts: Omit<ExtendedInputElement.Opts["input"], "border"> & { border: Required<NonNullable<NonNullable<ExtendedInputElement.Opts["input"]>["border"]>> };
 
-	// @ts-expect-error
-	public label: TextElement;
-	public image: ImageMaskElement;
-	public input: (InputElement | InputBoxElement);
-	public input_border: GradientBorderElement;
-	public container: HStackElement;
-	public error: TextElement;
-    public is_missing = false;
-    public is_focused = false;
+    /** The label node, always defined even when `opts.label` is undefined, so the user can still style it. */
+    // @ts-expect-error
+	label:  TextElement;
 
-	// @todo add readonly func
+    /** The left image element created by the `opts.image` field. */
+	image: undefined | ImageMaskElement;
+
+    /** The clickable copy node created by the `opts.copy` field. */
+    copyable: undefined | ImageMaskElement;
+
+    /** The input element created by the `opts.input` field. */
+	input: (InputElement | InputBoxElement);
+
+    /** The (gradient) border element used for the input field. */
+	input_border: GradientBorderElement;
+
+    /** The container element for the input field. */
+	container: HStackElement;
+
+    /** The error text element shown when the input is marked as missing. */
+	error_text: TextElement;
+
+    /** Has error state. */
+    has_error = false;
+
+    /** Is focused state. */
+    is_focused = false;
+
+    /** Validation options. */
+    private validation_entry: vlib.Schema.Entry | undefined;
 
 	// Constructor.
 	constructor({
-		label = undefined,
-		image = undefined,
-		alt = undefined,
+		label,
+		image,
 		placeholder = "Input",
-		id = undefined,
+		id,
 		readonly = false,
 		required = false,
 		type = "text",
-		value = undefined,
-	}: {
-		label?: string,
-		image?: string,
-		alt?: string,
-		placeholder?: string,
-		id?: string,
-		readonly?: boolean,
-		required?: boolean,
-		type?: string,
-		value?: string,
-	}) {
+		value,
+        copy,
+        input,
+        validate,
+	}: ExtendedInputElement.Opts) {
 
 		// Initialize super.
 		super();
@@ -327,51 +439,100 @@ export class ExtendedInputElement extends (VStackElement as any as VElementBaseS
 			derived: ExtendedInputElement,
 		})
 
+        // Cast image.
+        if (typeof image === "string") {
+            image = { url: image };
+        }
+
+        // Cast label.
+        if (typeof label === "string") {
+            label = { text: label };
+        }
+
+        // Direct attributes.
+        this.validation_entry = validate;
+
 		// Set id.
 		if (id != null) {
 			this.id(id);
 		}
 
-		// Attributes.
-		this._focus_color = ExtendedInputElement.default_style["--focus-color"];
-		this._missing_color = ExtendedInputElement.default_style["--missing-color"];
-		this._mask_color = ExtendedInputElement.default_style["--image-mask-color"];
-        this._initial_border_color = ExtendedInputElement.default_style["--input-border-color"];
-        this._hover_border_color = ExtendedInputElement.default_style["--input-hover-border-color"];
+        // Set input options..
+        this.input_opts = {
+            ...(input ?? {}),
+            border: {
+                color: input?.border?.color ?? "gray",
+                hover: input?.border?.hover ?? "gray",
+                focused: input?.border?.focused ?? "#8EB8EB",
+                missing: input?.border?.missing ?? "#E8454E",
+                width: input?.border?.width ?? "1px",
+                radius: input?.border?.radius ?? "5px",
+                type: input?.border?.type ?? "full",
+            },
+        };
+
+        // Set copy options.
+        this.copy_opts = copy;
 
 		// Set default styling.
 		this.styles(ExtendedInputElement.default_style);
 
 		// Title element.
-		this.label = Text(label)
+		this.label = Text(label?.text)
 			.parent(this)
-			.font_size("inherit")
-			.margin(0, 0, 7.5, 0)
-			.color("inherit")
-			.width("fit-content")
-			.ellipsis_overflow(true)
-		if (label == null) {
-			this.label.hide();
-		}
+            .font_size(label?.font_size ?? "inherit")
+			.margin(0, 0, label?.spacing ?? (input?.border?.type === "bottom" ? 12.5 : 7.5), 0)
+			.color(label?.color ?? "inherit");
+        if (!label) {
+            // always keep label present so uses can still style it with single-line code when needed.
+            this.label.hide();
+        }
+        else {
+            if (label.wrap) {
+                this.label
+                    .width("fit-content")
+                    .overflow_wrap("break-word") // or "anywhere" for more aggressive breaking
+                    .hyphens("auto")
+                    .display("inline-block") // so width constraints apply
+                    .max_width(label.max_width ?? "100%"); // ensure there’s something to wrap to
+            } else {
+                this.label.ellipsis_overflow(true)
+                    .width("fit-content")
+                    .max_width(label.max_width ?? "100%"); // ensure there’s something to wrap to
+            }
+        }
 
-		// Title element.
-		this.image = ImageMask(image)
+		// Input left image.
+		this.image = !image ? undefined : ImageMask(image.url)
 			.parent(this)
-            .mask_color(this._mask_color)
-            .frame(ExtendedInputElement.default_style["--image-size"], ExtendedInputElement.default_style["--image-size"])
-            .margin(0)
-            .margin_right(ExtendedInputElement.default_style["--image-margin-right"])
-            .margin_left(ExtendedInputElement.default_style["--image-margin-left"])
-            .alt(alt ? alt : ExtendedInputElement.default_style["--image-alt"]);
-        if (image == null) {
-			this.image.hide();
-		}
+            .mask_color(image.color ?? "#000")
+            .square(image.size ?? 20)
+            .margin(0, 10, 0, 5)
+            .alt(image?.alt ?? "Volt");
+
+        // Copyable right image.
+        this.copyable = !this.copy_opts ? undefined : ImageMask(this.copy_opts.url)
+            .parent(this)
+            .mask_color(this.copy_opts?.color ?? image?.color ?? "#000")
+            .square(this.copy_opts.size ?? 20)
+            .margin(0, 5, 0, 10)
+            .alt(this.copy_opts?.alt ?? "Copy")
+            .on_click(() => {
+                if (this.copy_opts?.on_click) {
+                    this.copy_opts.on_click(this.input.value());
+                }
+            })
+            .transition_mask("background 200ms ease-in-out")
+            .on_mouse_over_out(
+                e => e.mask_color(this.copy_opts?.hover ?? image?.color ?? "#000"),
+                e => e.mask_color(this.copy_opts?.color ?? image?.color ?? "#000"),
+            );
 
 		// Input element.
 		if (type === "box" || type === "area") {
 			this.input = InputBox(placeholder)
 		} else {
-			this.input = Input(placeholder, type)	
+			this.input = Input(placeholder, type);
 		}
 		(this.input as any as VElement)
 			.parent(this)
@@ -382,7 +543,8 @@ export class ExtendedInputElement extends (VStackElement as any as VElementBaseS
 			.margin(0)
 			.width("100%")
 			.stretch(true)
-			.padding(0, 5)
+			// .padding(0, 5)
+            .padding(0)
 			.line_height("1.6em")
 			.box_shadow("none")
 			.border("none")
@@ -390,66 +552,83 @@ export class ExtendedInputElement extends (VStackElement as any as VElementBaseS
 			.z_index(1)
 			.border_radius(0) // is required.
 			.on_focus(() => {
-                if (!this.is_missing) {
+                if (!this.has_error) {
                     this.is_focused = true;
-					this.input_border.border_color(this._focus_color)
-					this.container.box_shadow(`0 0 0 3px ${this._focus_color}80`)
+                    this._set_border_color(this.input_opts.border.focused, true);
 				}
 			})
 			.on_blur(() => {
-                if (!this.is_missing) {
+                if (!this.has_error) {
                     this.is_focused = false;
-					this.input_border.border_color(this._initial_border_color)
-					this.container.box_shadow(`0 0 0 0px transparent`)
+                    this._set_border_color(this.input_opts.border.color);
 				}
 			})
+
+        // Set input height.
+        if (input?.height != null) {
+            console.log("Setting fixed height to", input.height);
+            this.input.fixed_height(input.height)
+        }
 
 		// The input border to support gradients.
 		this.input_border = GradientBorder()
 			.z_index(0)
-			.position(0, 0, 0, 0)
-			.border_radius(ExtendedInputElement.default_style["--input-border-radius"])
-			.border_width(1)
-			.border_color(ExtendedInputElement.default_style["--input-border-color"])
-			.border_color("0px solid transparent")
+            .position(0, 0, 0, 0)
+            .border_width(this.input_opts.border.width)
+			.border_radius(this.input_opts.border.radius)
+			.border_color(this.input_opts.border.color)
 			.box_shadow(`0 0 0 0px transparent`)
 			.transition("background 200ms ease-in-out")
+            .pointer_events("none")
+        if (this.input_opts.border.type === "bottom") {
+            this.input_border.hide()
+        }
 
 		// The hstack container.
 		this.container = HStack(
-			VStack(
-				this.image,
-			)
+            !this.image ? undefined : VStack(this.image) // wrap in container for height.
             .width("fit-content")
 			.height("1.6em")
 			.center_vertical(),
-			this.input_border,
+
 			this.input,
+            
+            !this.copyable ? undefined : VStack(this.copyable) // wrap in container for height.
+            .width("fit-content")
+            .height("1.6em")
+            .center_vertical(),
+
+			this.input_border,
 		)
 		.parent(this)
 		.position("relative")
-		.background(ExtendedInputElement.default_style["--input-background"])
-		.padding(ExtendedInputElement.default_style["--input-padding"])
+        .background(input?.background ?? "transparent")
+        .padding((input?.padding ?? "12px 6px") as any)
+        .border_radius(this.input_opts.border.radius) // for outline when focused or missing etc.
 		.transition("box-shadow 0.2s ease-in-out")
 		.outline("0px solid transparent")
 		.box_shadow(`0 0 0 0px transparent`)
 		.width("100%")
         .on_mouse_over_out(
             (e) => {
-                if (!this.is_missing && !this.is_focused) {
-                    this.input_border.border_color(this._hover_border_color)
+                if (!this.has_error && !this.is_focused) {
+                    this._set_border_color(this.input_opts.border.hover);
                 }
             },
             (e) => {
-                if (!this.is_missing && !this.is_focused) {
-                    this.input_border.border_color(this._initial_border_color)
+                if (!this.has_error && !this.is_focused) {
+                    this._set_border_color(this.input_opts.border.color);
                 }
             },    
         )
+        if (this.input_opts.border.type === "bottom") {
+            this._set_border_color(this.input_opts.border.color);
+            this.container.padding_left(0).padding_right(0)
+        }
 
 		// The error message.
-		this.error = Text("Incomplete field")
-			.color(this._missing_color)
+		this.error_text = Text("Incomplete field")
+			.color(this.input_opts.border.missing)
 			.font_size("0.8em")
 			.margin(7.5, 0, 0, 2.5)
 			.padding(0)
@@ -462,12 +641,10 @@ export class ExtendedInputElement extends (VStackElement as any as VElementBaseS
 		}
 
 		// Set required.
-		if (required) {
-			this.required(required);
-		}
+		this.required(required);
 
 		// Append.
-		this.append(this.label, this.container, this.error);
+		this.append(this.label, this.container, this.error_text);
 
 		// Set value.
 		if (value) {
@@ -475,116 +652,87 @@ export class ExtendedInputElement extends (VStackElement as any as VElementBaseS
 		}
 	}
 
-	// Get the styling attributes.
-	// The values of the children that may have been changed by the custom funcs should be added.
-	styles() : Record<string, string>;
-	styles(style_dict: Record<string, any>) : this;
-	styles(style_dict?: Record<string, any>) : this | Record<string, string> {
-		if (style_dict == null) {
-			let styles = super.styles();
-			styles["--input-background"] = this.container.background();
-			styles["--input-padding"] = this.container.padding();
-			styles["--input-border-radius"] = this.container.border_radius();
-			styles["--input-border-color"] = this.container.border_color();
-            styles["--input-hover-border-color"] = this._hover_border_color;
-			styles["--image-mask-color"] = this._mask_color;
-			styles["--image-size"] = this.image.width().toString();
-			styles["--image-margin-right"] = this.image.margin_right().toString();
-			styles["--image-margin-left"] = this.image.margin_left().toString();
-			styles["--image-alt"] = this.image.alt() || "VWeb";
-			styles["--focus-color"] = this._focus_color;
-			styles["--missing-color"] = this._missing_color;
-			return styles;
-		} else {
-			return super.styles(style_dict);
-		}
-	}
+    /** Helper to set the border color. */
+    private _set_border_color(color: string, set_outline = false): void {
+        if (this.input_opts.border.type === "full") {
+            this.input_border.border_color(color);
+            if (set_outline) {
+                this.container.box_shadow(`0 0 0 3px ${color}80`)
+            } else {
+                this.container.box_shadow(`0 0 0 0px transparent`)
+            }
+        } else {
+            this.container.border_bottom(this.input_opts.border.width, color);
+        }
+    }
+
+    // Set the focus color.
+    focus_color<V extends string | undefined = undefined>(val?: V): ValueOrThis<V, string, this> {
+        if (val == null) { return (this.input_opts.border.focused ?? "") as ValueOrThis<V, string, this>; }
+        this.input_opts.border.focused = val;
+        return this as ValueOrThis<V, string, this>;
+    }
 
 	// Set default since it inherits an element.
 	set_default() : this {
 		return super.set_default(ExtendedInputElement);
 	}
 
-	// Set the focus color.
-	focus_color(): string; 
-	focus_color(val: string): this;
-	focus_color(val?: string): string | this {
-		if (val == null) { return this._focus_color ?? ""; }
-		this._focus_color = val;
-		return this;
-	}
+    /**
+     * Set the error state and message.
+     * Providing a truthy value will enable the error state and return the current instance for chaining.
+     * Providing a falsy value will disable the error state and return the current instance for chaining.
+     * Providing no value will return the current error message or `undefined` when no error is set.
+     */
+    error<V extends undefined | false | string = undefined>(err?: V): ValueOrThis<V, string | undefined, this> {
+        if (err == null) { return (this.has_error ? this.error_text.text() : undefined) as ValueOrThis<V, string | undefined, this>; }
+        else if (err) {
+            this.has_error = true;
+            this._set_border_color(this.input_opts.border.missing, true);
+            // this.image.mask_color(this._border_opts.missing)
+            this.error_text.show();
+            this.error_text.text(err);
+        } else {
+            this.has_error = false;
+            this._set_border_color(this.input_opts.border.color)
+            this.error_text.hide();
+        }
+        return this as ValueOrThis<V, string | undefined, this>;
+    }
 
-	// Set the missing color.
-	missing_color(): string; 
-	missing_color(val: string): this;
-	missing_color(val?: string): string | this {
-		if (val == null) { return this._missing_color ?? ""; }
-		this._missing_color = val;
-		this.error.color(this._missing_color);
-		return this;
-	}
-
-	// Set missing.
-	missing(): boolean;
-	missing(to: boolean, err?: string): this;
-	missing(to?: boolean, err: string = "Incomplete field"): boolean | this {
-        if (to == null) { return this.is_missing; }
-		else if (to === true) {
-            this.is_missing = true;
-			this.input_border.border_color(this._missing_color)
-			// this.container.outline(`1px solid ${this._missing_color}`)
-			this.container.box_shadow(`0 0 0 3px ${this._missing_color}80`)
-			// this.image.mask_color(this._missing_color)
-			this.error.show();
-			if (err) {
-				this.error.text(err);
-			}
-		} else {
-            this.is_missing = false;
-			this.input_border.border_color(this._initial_border_color)
-			// this.container.outline("0px solid transparent")
-			this.container.box_shadow(`0 0 0 0px transparent`)
-			// this.image.mask_color(this._mask_color)
-			this.error.hide();
-		}
-		return this;
-	}
-	set_error(err: string = "Incomplete field"): this {
-		return this.missing(true, err);
-	}
-
-	// Submit the item, throws an error when the item is not defined.
+    /** Remove the error state and mark as valid. */
+    valid(): this {
+        return this.error(false);
+    }
+    
+	/** Submit the item, throws an error when the item is not defined. */
 	submit(): string {
+
+        // Get value.
 		const value = this.value();
-		console.log("id:", this.id(), "value:", value)
 		if (value == null || value === "") {
-			this.missing(true);
+            this.error("Incomplete field");
 			throw Error("Fill in all the required fields.");
 		}
-		this.missing(false);
+
+        // Validate.
+        if (this.validation_entry) {
+            const res = vlib.Schema.validate_entry(
+                value,
+                this.validation_entry,
+                { throw: false, field_type: "field" }
+            );
+            if (res.error) {
+                // use raw error for showing.
+                this.error(res.raw_error ?? "Invalid value");
+                // use full error for throwing.
+                throw Error(res.error);
+            }
+        }
+
+        // Success.
+		this.valid();
 		return value;
-	}
-
-	// Set or get the mask color.
-	mask_color(): string;
-	mask_color(val: string): this;
-	mask_color(val?: string): this | string {
-		if (val == null) { return this._mask_color ?? ""; }
-		this._mask_color = val;
-		this.image.mask_color(this._mask_color);
-		return this;
-	}
-
-	// Show error.
-	show_error(err: string = "Incomplete field"): this {
-		this.missing(true, err);
-		return this;
-	}
-
-	// Hide error.
-	hide_error(): this {
-		this.missing(false);
-		return this;
 	}
 
 	// ---------------------------------------------------------
@@ -596,11 +744,15 @@ export class ExtendedInputElement extends (VStackElement as any as VElementBaseS
 
 	text(): string;
 	text(val: string): this;
-	text(val?: string): string | this { if (val == null) { return this.label.text(); } this.label.text(val); return this; }
+	text(val?: string): string | this { if (val == null) { return this.label?.text() ?? ""; } this.label?.text(val); return this; }
 
 	value(): string;
 	value(val: string): this;
-	value(val?: string): string | this { if (val == null) { return this.input.value(); } this.input.value(val); return this; }
+	value(val?: string): string | this {
+        if (val == null) { return this.input.value(); }
+        this.input.value(val);
+        return this;
+    }
 
 	required(): boolean;
 	required(val: boolean): this;
@@ -622,36 +774,6 @@ export class ExtendedInputElement extends (VStackElement as any as VElementBaseS
 		return this;
 	}
 
-	border_radius(): string;
-	border_radius(val: string): this;
-	border_radius(val?: string): string | this { if (val == null) { return this.container.border_radius(); } this.container.border_radius(val); this.input_border.border_radius(val); return this; }
-
-	border_color(): string;
-	border_color(val: string): this;
-	border_color(val?: string): string | this {
-		if (val == null) { return this.container.border_color(); }
-		this._initial_border_color = val;
-		this.container.border_color(val);
-		this.input_border.border_color(val);
-		return this;
-	}
-
-    hover_border_color(): string;
-    hover_border_color(val: string): this;
-    hover_border_color(val ?: string): string | this {
-        if (val == null) { return this._hover_border_color; }
-        this._hover_border_color = val;
-        return this;
-    }
-
-	border_width(): string;
-	border_width(val: string): this;
-	border_width(val?: string): string | this { if (val == null) { return this.container.border_width(); } this.container.border_width(val); this.input_border.border_width(val); return this; }
-
-	border_style(): string;
-	border_style(val: string): this;
-	border_style(val?: string): string | this { if (val == null) { return this.container.border_style(); } this.container.border_style(val); this.input_border.border_style(val); return this; }
-
 	background(): string;
 	background(val: string): this;
 	background(val?: string): string | this { if (val == null) { return this.container.background(); } this.container.background(val); return this; }
@@ -666,15 +788,50 @@ export class ExtendedInputElement extends (VStackElement as any as VElementBaseS
 		return this;
 	}
 
-	border(): string;
-	border(value: string): this;
-	border(width: string | number, color: string): this;
-	border(width: string | number, style: string, color: string): this;
-	border(...args: (string | number)[]): this | string {
-		if (args.length === 0 || (args.length === 1 && args[0] == null)) { return this.input_border.border(); }
-		this.input_border.border(...args as [number, string]);
-		return this;
-	}
+
+    // border_radius(): string | number;
+    // border_radius(val: string | number): this;
+    // border_radius(val?: string | number): string | number | this {
+    //     if (val == null) { return this._border_opts.radius; }
+    //     this._border_opts.radius = val;
+    //     this.input_border.border_radius(val);
+    //     return this;
+    // }
+
+    // border_color(): string;
+    // border_color(val: string): this;
+    // border_color(val?: string): string | this {
+    //     if (val == null) { return this._border_opts.color; }
+    //     this._border_opts.color = val;
+    // 	this.input_border.border_color(val);
+    // 	return this;
+    // }
+
+    // hover_border_color(): string;
+    // hover_border_color(val: string): this;
+    // hover_border_color(val ?: string): string | this {
+    //     if (val == null) { return this._hover_border_color; }
+    //     this._hover_border_color = val;
+    //     return this;
+    // }
+
+    // border_width(): string;
+    // border_width(val: string): this;
+    // border_width(val?: string): string | this { if (val == null) { return this.container.border_width(); } this.container.border_width(val); this.input_border.border_width(val); return this; }
+
+    // border_style(): string;
+    // border_style(val: string): this;
+    // border_style(val?: string): string | this { if (val == null) { return this.container.border_style(); } this.container.border_style(val); this.input_border.border_style(val); return this; }
+
+    // border(): string;
+    // border(value: string): this;
+    // border(width: string | number, color: string): this;
+    // border(width: string | number, style: string, color: string): this;
+    // border(...args: (string | number)[]): this | string {
+    // 	if (args.length === 0 || (args.length === 1 && args[0] == null)) { return this.input_border.border(); }
+    // 	this.input_border.border(...args as [number, string]);
+    // 	return this;
+    // }
 }
 export const ExtendedInput = Elements.wrapper(ExtendedInputElement);
 export const NullExtendedInput = Elements.create_null(ExtendedInputElement);
@@ -688,6 +845,70 @@ interface ExtendedSelectItem {
 }
 type ExtendedSelectOnChange = (element: ExtendedSelectElement, id: string) => any;
 
+/** Nested types for the {@link ExtendedSelectElement} class. */
+export namespace ExtendedSelectElement {
+    export interface Opts {
+        /** Label text. */
+        label?: string;
+        /** Placeholder text. */
+        placeholder?: string;
+        /** Input field ID. */
+        id?: string;
+        /** Whether the input is required. */
+        required?: boolean;
+        /** The selectable items. */
+        items: ExtendedSelectItem[] | Record<string, string> | Record<string, ExtendedSelectItem>,
+        /** Input options. */
+        input?: {
+            /** Input field padding. */
+            padding?: string | number[];
+            /** Input field background color. */
+            background?: string;
+            /** Options for configuring a border. */
+            border?: {
+                /** Default color. */
+                color?: string;
+                /** Hover color. */
+                hover?: string;
+                /** Focused color. */
+                focused?: string;
+                /** Missing color. */
+                missing?: string;
+                /**
+                 *  Border width.
+                 * @default 1px
+                 */
+                width?: string | number;
+                /**
+                 * Border radius.
+                 * @default 0
+                 */
+                radius?: string | number;
+                /**
+                 * Border type, either full for all sides or `bottom` for only a bottom border.
+                 * @default "full"
+                 */
+                type?: "full" | "bottom";
+            }
+        };
+        /** Left image url or options. */
+        image?: string | {
+            /** Image URL. */
+            url: string
+            /** Image size. */
+            size?: number | string;
+            /** Image color. */
+            color?: string;
+            /** Image alt text. */
+            alt?: string;
+        };
+        /** The hover background color of item containers inside the dropdown. */
+        dropdown?: {
+            hover?: string;
+        };
+    }
+}
+
 // Extended input.
 @Elements.create({
     name: "ExtendedSelectElement",
@@ -696,64 +917,58 @@ type ExtendedSelectOnChange = (element: ExtendedSelectElement, id: string) => an
         "color": "inherit",
         "font-size": "16px",
         "background": "#FFFFFF",
-        // Custom.
-        "--input-padding": "12px 6px",
-        "--input-border-radius": "5px",
-        "--input-border-color": "gray",
-        "--image-mask-color": "#000",
-        "--image-size": "20px",
-        "--image-margin-right": "10px",
-        "--image-margin-left": "5px",
-        "--image-alt": "VWeb",
-        "--hover-bg": "#00000007",
-        "--focus-color": "#8EB8EB",
-        "--missing-color": "#E8454E",
     }
 })
 export class ExtendedSelectElement extends (VStackElement as any as VElementBaseSignature) {
 
-	public _focus_color: string;
-	public _missing_color: string;
-	public _mask_color: string;
-	public _border_color: string;
-	public _hover_bg: string;
+    /** The selectable items. */
+	items: ExtendedSelectItem[];
 
-	public items: ExtendedSelectItem[];
-
+    /** The label node. */
 	// @ts-expect-error
-	public label: TextElement;
-	public image: ImageMaskElement;
-	public input: InputElement;
-	public container: HStackElement;
-	public error: TextElement;
-	public dropdown: ScrollerElement;
-    public is_missing = false;
+	label: TextElement;
 
-	public _on_change_callback?: ExtendedSelectOnChange;
+    /** The image node. */
+	image: undefined | ImageMaskElement;
 
+    /** The input node (readonly) with the selected value. */
+	input: InputElement;
+
+    /** The container node. */
+	container: HStackElement;
+
+    /** The error text node. */
+	error_text: TextElement;
+
+    /** The dropdown scroller element. */
+	dropdown: ScrollerElement;
+
+    /** Has error state. */
+    has_error = false;
+
+    /** Is focused state. */
+    is_focused = false;
+
+    // Internal attributes.
+    private input_opts: Omit<ExtendedSelectElement.Opts["input"], "border"> & { border: Required<NonNullable<NonNullable<ExtendedSelectElement.Opts["input"]>["border"]>> };
+    private image_opts: Exclude<ExtendedSelectElement.Opts["image"], string>;
+    private _dropdown_item_hover: string;
+	private _on_change_callback?: ExtendedSelectOnChange;
 	private _on_dropdown_close: any;
-
-	public _dropdown_height?: string | number;
-	public _value?: string;
+    private _dropdown_height?: string | number;
+    private _value?: string;
 
 	// Constructor.
 	constructor({
 		label = undefined,
 		image = undefined,
-		alt = "",
 		placeholder = "Placeholder",
 		id = undefined,
 		required = false,
 		items = [{id: "option", text: "Option", image: undefined}], // may also be an array with strings which will be used as the item's id and text.
-	}: {
-		label?: string,
-		image?: string,
-		alt?: string,
-		placeholder?: string,
-		id?: string,
-		required?: boolean,
-		items: ExtendedSelectItem[] | Record<string, string> | Record<string, ExtendedSelectItem>,
-	}) {
+        dropdown,
+        input,
+	}: ExtendedSelectElement.Opts) {
 
 		// Initialize super.
 		super();
@@ -761,6 +976,26 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 			derived: ExtendedSelectElement,
 		})
 
+        // Cast image.
+        if (typeof image === "string") {
+            image = { url: image };
+        }
+        this.image_opts = image;
+
+        // Set input options..
+        this.input_opts = {
+            ...(input ?? {}),
+            border: {
+                color: input?.border?.color ?? "gray",
+                hover: input?.border?.hover ?? "gray",
+                focused: input?.border?.focused ?? "#8EB8EB",
+                missing: input?.border?.missing ?? "#E8454E",
+                width: input?.border?.width ?? "1px",
+                radius: input?.border?.radius ?? "5px",
+                type: input?.border?.type ?? "full",
+            },
+        };
+        
 		// Arguments.
 		if (Array.isArray(items)) {
 			this.items = [];
@@ -797,11 +1032,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 		}
 
 		// Attributes.
-		this._focus_color = ExtendedSelectElement.default_style["--focus-color"];
-		this._missing_color = ExtendedSelectElement.default_style["--missing-color"];
-		this._mask_color = ExtendedSelectElement.default_style["--image-mask-color"];
-		this._border_color = ExtendedSelectElement.default_style["--input-border-color"];
-		this._hover_bg = ExtendedSelectElement.default_style["--hover-bg"]
+        this._dropdown_item_hover = dropdown?.hover ?? "#00000007";
 
 		// Set default styling.
 		this.styles(ExtendedSelectElement.default_style);
@@ -819,17 +1050,12 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 		}
 
 		// Title element.
-		this.image = ImageMask(image)
+		this.image = !image ? undefined : ImageMask(image.url)
 			.parent(this)
-            .mask_color(this._mask_color)
-            .frame(ExtendedSelectElement.default_style["--image-size"], ExtendedSelectElement.default_style["--image-size"])
-            .margin(0)
-            .margin_right(ExtendedSelectElement.default_style["--image-margin-right"])
-            .margin_left(ExtendedSelectElement.default_style["--image-margin-left"])
-            .alt(alt ? alt : ExtendedSelectElement.default_style["--image-alt"]);
-        if (image == null) {
-			this.image.hide();
-		}
+            .mask_color(image?.color ?? "#000")
+            .square(image?.size ?? 20)
+            .margin(0, 10, 0, 5)
+            .alt(image?.alt ?? "Volt");
 
 		// Input element.
 		this.input = Input(placeholder)
@@ -849,7 +1075,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 
 		// The hstack container.
 		this.container = HStack(
-			VStack(
+			!this.image ? undefined : VStack(
 				this.image,
 			)
             .width("fit-content")
@@ -858,25 +1084,39 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 			this.input,
 		)
 		.parent(this)
-		.background(ExtendedSelectElement.default_style["background"])
-		.padding(ExtendedSelectElement.default_style["--input-padding"])
-		.border_radius(ExtendedSelectElement.default_style["--input-border-radius"])
-		.border_width(1)
+        .background(input?.background ?? "transparent")
+        .padding((input?.padding ?? "12px 6px") as any)
+		.border_radius(this.input_opts.border.radius)
+        .border_width(this.input_opts.border.width)
 		.border_style("solid")
-		.border_color(this._border_color)
-		.transition("outline 0.2s ease-in-out, box-shadow 0.2s ease-in-out")
-		.outline("0px solid transparent")
+		.transition("border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out")
 		.box_shadow(`0 0 0 0px transparent`)
 		.width("100%")
+        .on_mouse_over_out(
+            (e) => {
+                if (!this.has_error && !this.is_focused) {
+                    this._set_border_color(this.input_opts.border.hover);
+                }
+            },
+            (e) => {
+                if (!this.has_error && !this.is_focused) {
+                    this._set_border_color(this.input_opts.border.color);
+                }
+            },
+        )
 		.on_click(() => {
 			if (this.dropdown.is_hidden()) {
 				this.expand();
 			}
 		})
+        this._set_border_color(this.input_opts.border.color);
+        if (this.input_opts.border.type === "bottom") {
+            this.container.padding_left(0).padding_right(0)
+        }
 
 		// The error message.
-		this.error = Text("Incomplete field")
-			.color(this._missing_color)
+		this.error_text = Text("Incomplete field")
+			.color(this.input_opts.border.missing)
 			.font_size("0.8em")
 			.margin(7.5, 0, 0, 2.5)
 			.padding(0)
@@ -888,17 +1128,17 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 			.parent(this)
 			.position(0, null, null, null)
 			.background(ExtendedSelectElement.default_style["background"])
-			.border_radius(ExtendedSelectElement.default_style["--input-border-radius"])
-			.border_width(1)
+			.border_radius(this.input_opts.border.radius)
+            .border_width(this.input_opts.border.width)
 			.border_style("solid")
-			.border_color(this._border_color)
+			.border_color(this.input_opts.border.color)
 			.box_shadow("0px 0px 5px #00000050")
 			.frame("100%", "100%")
 			.z_index(10)
 			.hide()
 
 		// Append.
-		this.append(this.label, this.container, this.error, this.dropdown);
+		this.append(this.label, this.container, this.error_text, this.dropdown);
 
 		// Styling.
 		this.position("relative")
@@ -929,15 +1169,54 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 			if (stop) {
 				this.dropdown.hide();
 				window.removeEventListener("mousedown", this._on_dropdown_close)
+
+                // Unfocus.
+                if (!this.has_error) {
+                    this.is_focused = false;
+                    this._set_border_color(this.input_opts.border.color);
+                }
 			}
 		}
 	}
+
+    /** Helper to set the border color. */
+    private _set_border_color(color: string, set_outline = false): void {
+        if (this.input_opts.border.type === "full") {
+            this.container.border_color(color);
+            if (set_outline) {
+                this.container.box_shadow(`0 0 0 3px ${color}80`)
+            } else {
+                this.container.box_shadow(`0 0 0 0px transparent`)
+            }
+        } else {
+            this.container.border_bottom(this.input_opts.border.width, color);
+        }
+    }
+
+    /** Set the focus color. */
+    focus_color(): string;
+    focus_color(val: string): this;
+    focus_color(val?: string): string | this {
+        if (val == null) { return this.input_opts.border.focused ?? ""; }
+        this.input_opts.border.focused = val;
+        return this;
+    }
+
+    /** Set the error color. */
+    error_color(): string;
+    error_color(val: string): this;
+    error_color(val?: string): string | this {
+        if (val == null) { return this.input_opts.border.missing ?? ""; }
+        this.input_opts.border.missing = val;
+        this.error_text.color(this.input_opts.border.missing);
+        return this;
+    }
 
     // readonly(): boolean;
     // readonly(val: boolean): this;
     // readonly(val?: boolean): boolean | this { if (val == null) { return this.input.readonly(); } this.input.readonly(val); return this; }
 
-	// Set dropdown height.
+	/** Set dropdown height. */
 	dropdown_height(): undefined | string | number;
 	dropdown_height(val: string | number): this;
 	dropdown_height(val?: string | number): this | undefined | string | number {
@@ -948,93 +1227,60 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 		return this;
 	}
 
-	// Get the styling attributes.
-	// The values of the children that may have been changed by the custom funcs should be added.
-	styles() : Record<string, string>;
-	styles(style_dict: Record<string, any>) : this;
-	styles(style_dict?: Record<string, any>) : this | Record<string, string> {
-		if (style_dict == null) {
-			let styles = super.styles();
-			styles["--input-padding"] = this.container.padding();
-			styles["--input-border-radius"] = this.container.border_radius();
-			styles["--input-border-color"] = this._border_color;
-			styles["--image-mask-color"] = this._mask_color;
-			styles["--image-size"] = this.image.width().toString();
-			styles["--image-margin-right"] = this.image.margin_right().toString();
-			styles["--image-margin-left"] = this.image.margin_left().toString();
-			styles["--image-alt"] = this.image.alt() || "VWeb";
-			styles["--focus-color"] = this._focus_color;
-			styles["--missing-color"] = this._missing_color;
-			return styles;
-		} else {
-			return super.styles(style_dict);
-		}
-	}
-
-	// Set default since it inherits an element.
+	/** Set default since it inherits an element. */
 	set_default(): this {
 		return super.set_default(ExtendedSelectElement);
 	}
 
-	// Set the focus color.
-	focus_color(): string; 
-	focus_color(val: string): this;
-	focus_color(val?: string): string | this {
-		if (val == null) { return this._focus_color ?? ""; }
-		this._focus_color = val;
-		return this;
-	}
+    /**
+     * Set the error state and message.
+     * Providing a truthy value will enable the error state and return the current instance for chaining.
+     * Providing a falsy value will disable the error state and return the current instance for chaining.
+     * Providing no value will return the current error message or `undefined` when no error is set.
+     */
+    error<V extends undefined | false | string = undefined>(err?: V): ValueOrThis<V, string | undefined, this> {
+        if (err == null) { return (this.has_error ? this.error_text.text() : undefined) as ValueOrThis<V, string | undefined, this>; }
+        else if (err) {
+            this.has_error = true;
+            this._set_border_color(this.input_opts.border.missing, true);
+            this.image?.mask_color(this.input_opts.border.missing)
+            this.error_text.show();
+            if (err) {
+                this.error_text.text(err);
+            }
+        } else {
+            this.has_error = false;
+            this._set_border_color(this.input_opts.border.color);
+            this.image?.mask_color(this.image_opts?.color ?? "#000")
+            this.error_text.hide();
+        }
+        return this as ValueOrThis<V, string | undefined, this>;
+    }
 
-	// Set the missing color.
-	missing_color(): string; 
-	missing_color(val: string): this;
-	missing_color(val?: string): string | this {
-		if (val == null) { return this._missing_color ?? ""; }
-		this._missing_color = val;
-		this.error.color(this._missing_color);
-		return this;
-	}
+    /** Remove the error state and mark as valid. */
+    valid(): this {
+        return this.error(false);
+    }
 
-	// Set missing.
-	missing(): boolean;
-	missing(to: boolean, err?: string): this;
-	missing(to?: boolean, err: string = "Incomplete field"): boolean | this {
-        if (to == null) { return this.is_missing; }
-		else if (to === true) {
-            this.is_missing = true;
-			this.container.outline(`1px solid ${this._missing_color}`)
-			this.container.box_shadow(`0 0 0 3px ${this._missing_color}80`)
-			this.image.mask_color(this._missing_color)
-			this.error.show();
-			if (err) {
-				this.error.text(err);
-			}
-		} else {
-            this.is_missing = false;
-			this.container.outline("0px solid transparent")
-			this.container.box_shadow(`0 0 0 0px transparent`)
-			this.image.mask_color(this._mask_color)
-			this.error.hide();
-		}
-		return this;
-	}
-	set_error(err: string = "Incomplete field"): this {
-		return this.missing(true, err);
-	}
-
-	// Submit the item, throws an error when the item is not defined.
+    /** Submit the item, throws an error when the item is not defined. */
 	submit(): string {
 		const value = this.value();
 		if (value == null || value === "") {
-			this.missing(true);
+			this.error("Incomplete field");
 			throw Error("Fill in all the required fields.");
 		}
-		this.missing(false);
+		this.valid();
 		return value;
 	}
 
-	// Expand dropdown.
+	/** Expand dropdown. */
 	expand(): this {
+
+        // Set focus.
+        if (!this.has_error) {
+            this.is_focused = true;
+            this._set_border_color(this.input_opts.border.focused, true);
+        }
 
 		// Add event listener.
 		window.addEventListener("mousedown", this._on_dropdown_close);
@@ -1064,7 +1310,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 						content.append(item.stack);
 					})
 				} else {
-					const results = fuzzy.search({
+					const results = vlib.fuzzy.search({
 						query, 
 						targets: this.items, 
 						limit: undefined,
@@ -1094,12 +1340,10 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 			let img;
 			if (item.image != null) {
 				img = ImageMask(item.image)
-		            .mask_color(this._mask_color)
-		            .frame(ExtendedSelectElement.default_style["--image-size"], ExtendedSelectElement.default_style["--image-size"])
-		            .margin(0)
-		            .margin_right(ExtendedSelectElement.default_style["--image-margin-right"])
-		            .margin_left(ExtendedSelectElement.default_style["--image-margin-left"])
-		            .alt(ExtendedSelectElement.default_style["--image-alt"])
+                    .mask_color(this.image_opts?.color ?? "#000")
+		            .square(this.image_opts?.size ?? 20)
+		            .margin(0, 10, 0, 5)
+		            .alt(this.image_opts?.alt ?? "Volt")
 		            .pointer_events("none") // so target element of mouse down is easier.
 		    }
 
@@ -1128,7 +1372,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 					}
 					window.removeEventListener("mousedown", this._on_dropdown_close)
 				})
-				.on_mouse_over((e) => e.background(this._hover_bg))
+				.on_mouse_over((e) => e.background(this._dropdown_item_hover))
 				.on_mouse_out((e) => e.background("transparent"))
 
 			// Update the item with the stack for searches.
@@ -1148,7 +1392,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 				search,
 				Divider()
 					.margin(0)
-					.background(this._border_color),
+					.background(this.input_opts.border.color),
 				content,
 			);
 		} else {
@@ -1179,7 +1423,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 		return this;
 	}
 
-	// Get or set the value, when it is being set it should be the id of one of the items otherwise nothing happens.
+	/** Get or set the value, when it is being set it should be the id of one of the items otherwise nothing happens. */
 	value(): string;
 	value(val: string): this;
 	value(val?: string): string | this {
@@ -1196,16 +1440,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 		return this;
 	}
 
-	// Styling.
-	mask_color(): string;
-	mask_color(val: string): this;
-	mask_color(val?: string): string | this {
-		if (val == null) { return this._mask_color; }
-		this._mask_color = val;
-		this.image.mask_color(this._mask_color);
-		return this;
-	}
-
+    /** Set or get the background color. */
 	background(): string;
 	background(val: string): this;
 	background(val?: string): string | this {
@@ -1215,42 +1450,53 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 		return this;
 	}
 
-	border_radius(): string;
-	border_radius(val: string | number): this;
-	border_radius(val?: string | number): string | this {
-		if (val == null) { return this.container.border_radius(); }
-		this.container.border_radius(val);
-		this.dropdown.border_radius(val);
-		return this;
-	}
+	// border_radius(): string;
+	// border_radius(val: string | number): this;
+	// border_radius(val?: string | number): string | this {
+	// 	if (val == null) { return this.container.border_radius(); }
+	// 	this.container.border_radius(val);
+	// 	this.dropdown.border_radius(val);
+	// 	return this;
+	// }
 
-	border_color(): string;
-	border_color(val: string): this;
-	border_color(val?: string): string | this {
-		if (val == null) { return this._border_color; }
-		this._border_color = val;
-		this.container.border_color(this._border_color);
-		this.dropdown.border_color(this._border_color);
-		return this;
-	}
+	// border_color(): string;
+	// border_color(val: string): this;
+	// border_color(val?: string): string | this {
+    //     if (val == null) { return this._border_opts.color; }
+    //     this._border_opts.color = val;
+    //     this.container.border_color(this._border_opts.color);
+    //     this.dropdown.border_color(this._border_opts.color);
+	// 	return this;
+	// }
 
-	border_width(): string;
-	border_width(val: number | string): this;
-	border_width(val?: number | string): string | this {
-		if (val == null) { return this.container.border_width(); }
-		this.container.border_width(val);
-		this.dropdown.border_width(val);
-		return this;
-	}
+	// border_width(): string;
+	// border_width(val: number | string): this;
+	// border_width(val?: number | string): string | this {
+	// 	if (val == null) { return this.container.border_width(); }
+	// 	this.container.border_width(val);
+	// 	this.dropdown.border_width(val);
+	// 	return this;
+	// }
 
-	border_style(): string;
-	border_style(val: string): this;
-	border_style(val?: string): string | this {
-		if (val == null) { return this.container.border_style(); }
-		this.container.border_style(val);
-		this.dropdown.border_style(val);
-		return this;
-	}
+	// border_style(): string;
+	// border_style(val: string): this;
+	// border_style(val?: string): string | this {
+	// 	if (val == null) { return this.container.border_style(); }
+	// 	this.container.border_style(val);
+	// 	this.dropdown.border_style(val);
+	// 	return this;
+	// }
+    
+    // border(): string;
+    // border(value: string): this;
+    // border(width: string | number, color: string): this;
+    // border(width: string | number, style: string, color: string): this;
+    // border(...args: (string | number)[]): this | string {
+    //     if (args.length === 0 || (args.length === 1 && args[0] == null)) { return this.container.border(); }
+    //     this.container.border(...args as [number, string]);
+    //     this.dropdown.border(...args as [number, string]);
+    //     return this;
+    // }
 
 	padding(): string;
 	padding(value: undefstrnr): this;
@@ -1260,17 +1506,6 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 		if (values.length === 0 || (values.length === 1 && values[0] == null)) { return this.container.padding(); }
 		this.container.padding(...values as [number, string]);
 		this.dropdown.padding(...values as [number, string]);
-		return this;
-	}
-
-	border(): string;
-	border(value: string): this;
-	border(width: string | number, color: string): this;
-	border(width: string | number, style: string, color: string): this;
-	border(...args: (string | number)[]): this | string {
-		if (args.length === 0 || (args.length === 1 && args[0] == null)) { return this.container.border(); }
-		this.container.border(...args as [number, string]);
-		this.dropdown.border(...args as [number, string]);
 		return this;
 	}
 

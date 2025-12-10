@@ -17278,7 +17278,7 @@ var LibrisWeb = (() => {
      */
     _render_steps_element: function() {
       const style = this._style;
-      this._prev_step_button = HStack(ImageMask("/volt_static/payments/arrow.long.webp").frame(15, 15).mask_color(this._style.fg_1).transition_mask("background 300ms ease-in-out").transform("rotate(180deg)").margin_right(10), Text("Previous Step").color(this._style.fg_1).transition("color 300ms ease-in-out").padding(0).margin(0).font_size(14)).hide().on_mouse_over_out((e) => {
+      this._prev_step_button = HStack(ImageMask("/volt/assets/payments/arrow.long.webp").frame(15, 15).mask_color(this._style.fg_1).transition_mask("background 300ms ease-in-out").transform("rotate(180deg)").margin_right(10), Text("Previous Step").color(this._style.fg_1).transition("color 300ms ease-in-out").padding(0).margin(0).font_size(14)).hide().on_mouse_over_out((e) => {
         e.child(0).color(this._style.fg);
         e.child(1).color(this._style.fg);
       }, (e) => {
@@ -17435,7 +17435,7 @@ var LibrisWeb = (() => {
           this.remove_children();
           if (cart_items.length === 0) {
             this.height(160);
-            this.append(VStack(Title("Empty Shopping Cart").color(style.fg_1).font_size(style.font_size - 2).flex_shrink(0).letter_spacing("1px").text_transform("uppercase").ellipsis_overflow(true).margin(0).padding(0).assign_to_parent_as("title_e"), Text(`Your shopping cart is empty.`).color(style.fg_2).font_size(style.font_size - 2).line_height(style.font_size).margin(5, 0, 0, 0).padding(0).assign_to_parent_as("text_e").white_space("pre").line_height("1.4em").center(), ImageMask("/volt_static/payments/shopping_cart.webp").frame(35, 35).margin_top(20).mask_color(style.theme_fg)).frame("100%", "100%").center().center_vertical());
+            this.append(VStack(Title("Empty Shopping Cart").color(style.fg_1).font_size(style.font_size - 2).flex_shrink(0).letter_spacing("1px").text_transform("uppercase").ellipsis_overflow(true).margin(0).padding(0).assign_to_parent_as("title_e"), Text(`Your shopping cart is empty.`).color(style.fg_2).font_size(style.font_size - 2).line_height(style.font_size).margin(5, 0, 0, 0).padding(0).assign_to_parent_as("text_e").white_space("pre").line_height("1.4em").center(), ImageMask("/volt/assets/payments/shopping_cart.webp").frame(35, 35).margin_top(20).mask_color(style.theme_fg)).frame("100%", "100%").center().center_vertical());
           } else {
             this.append(Title("Order Details").color(style.fg).width("fit-content").font_size(style.font_size - 2).flex_shrink(0).margin(0, 0, 0, 0).letter_spacing("1px").text_transform("uppercase").ellipsis_overflow(true), Divider().background(style.divider_bg).margin(10, 0, 20, 0), ForEach(cart_items, (item, index) => {
               let focus = false, mouse_over = false;
@@ -17490,7 +17490,7 @@ var LibrisWeb = (() => {
                   trial_text = `${item.product.trial.frequency} ${item.product.trial.interval}s free`;
                 }
               }
-              const stack = HStack(item.product.icon == null ? null : ImageMask(item.product.icon).frame(30, 30).flex_shrink(0).margin(0, 25, 0, 0), VStack(Title(item.product.name).color(style.fg).font_size(style.font_size).margin(0, 10, 0, 0).padding(0).wrap(false).overflow("hidden").text_overflow("ellipsis"), Text(item.product.description).color(style.fg_1).font_size(style.font_size - 2).line_height(style.font_size).margin(10, 10, 0, 0).wrap(true).padding(0), HStack(Text("Quantity:").color(style.fg_1).font_size(style.font_size - 2).margin(0, 10, 2, 0).padding(0).flex_shrink(0), quantity_input, ImageMask("/volt_static/payments/minus.webp").frame(20, 20).padding(5).margin_right(5).mask_color(style.fg_1).background(style.bg_1).border(1, style.divider_bg).border_radius("50%").flex_shrink(0).transition_mask("background 300ms ease-in-out").on_mouse_over_out((e) => e.mask_color(style.fg), (e) => e.mask_color(style.fg_1)).on_click(async () => {
+              const stack = HStack(item.product.icon == null ? null : ImageMask(item.product.icon).frame(30, 30).flex_shrink(0).margin(0, 25, 0, 0), VStack(Title(item.product.name).color(style.fg).font_size(style.font_size).margin(0, 10, 0, 0).padding(0).wrap(false).overflow("hidden").text_overflow("ellipsis"), Text(item.product.description).color(style.fg_1).font_size(style.font_size - 2).line_height(style.font_size).margin(10, 10, 0, 0).wrap(true).padding(0), HStack(Text("Quantity:").color(style.fg_1).font_size(style.font_size - 2).margin(0, 10, 2, 0).padding(0).flex_shrink(0), quantity_input, ImageMask("/volt/assets/payments/minus.webp").frame(20, 20).padding(5).margin_right(5).mask_color(style.fg_1).background(style.bg_1).border(1, style.divider_bg).border_radius("50%").flex_shrink(0).transition_mask("background 300ms ease-in-out").on_mouse_over_out((e) => e.mask_color(style.fg), (e) => e.mask_color(style.fg_1)).on_click(async () => {
                 if (item.quantity === 1) {
                   await cart.remove(item.product.id, "all");
                   this.refresh();
@@ -17498,10 +17498,10 @@ var LibrisWeb = (() => {
                   await cart.remove(item.product.id, 1);
                   this.refresh();
                 }
-              }), ImageMask("/volt_static/payments/plus.webp").frame(20, 20).padding(5).margin_right(5).mask_color(style.fg_1).background(style.bg_1).border(1, style.divider_bg).border_radius("50%").flex_shrink(0).transition_mask("background 300ms ease-in-out").on_mouse_over_out((e) => e.mask_color(style.fg), (e) => e.mask_color(style.fg_1)).on_click(async () => {
+              }), ImageMask("/volt/assets/payments/plus.webp").frame(20, 20).padding(5).margin_right(5).mask_color(style.fg_1).background(style.bg_1).border(1, style.divider_bg).border_radius("50%").flex_shrink(0).transition_mask("background 300ms ease-in-out").on_mouse_over_out((e) => e.mask_color(style.fg), (e) => e.mask_color(style.fg_1)).on_click(async () => {
                 await cart.add(item.product.id, 1);
                 this.refresh();
-              }), ImageMask("/volt_static/payments/trash.webp").frame(20, 20).padding(5).margin_right(5).mask_color(style.fg_1).background(style.bg_1).border(1, style.divider_bg).border_radius("50%").flex_shrink(0).transition_mask("background 300ms ease-in-out").on_mouse_over_out((e) => e.mask_color(style.fg), (e) => e.mask_color(style.fg_1)).on_click(async () => {
+              }), ImageMask("/volt/assets/payments/trash.webp").frame(20, 20).padding(5).margin_right(5).mask_color(style.fg_1).background(style.bg_1).border(1, style.divider_bg).border_radius("50%").flex_shrink(0).transition_mask("background 300ms ease-in-out").on_mouse_over_out((e) => e.mask_color(style.fg), (e) => e.mask_color(style.fg_1)).on_click(async () => {
                 await cart.remove(item.product.id, "all");
                 this.refresh();
               })).center_vertical().wrap(true).margin_top(17.5)).stretch(true), VStack(Title(trial_text ? trial_text : `${currency_symbol} ${(item.product.price * item.quantity).toFixed(2)}`).color(style.fg).font_size(style.font_size).margin(0).padding(0).flex_shrink(0).wrap(false).overflow("hidden").text_overflow("ellipsis"), Text(`${trial_text ? "Then " : ""}${currency_symbol} ${item.product.price} ${per_item}`).color(style.fg_1).font_size(style.font_size - 6).margin(5, 0, 0, 0).padding(0).flex_shrink(0), renews_every == null ? null : Text(renews_every).color(style.fg_1).font_size(style.font_size - 6).margin(2.5, 0, 0, 0).padding(0).flex_shrink(0))).overflow_x("scroll").class("hide_scrollbar").width("100%").media("width >= 800px", (e) => {
@@ -17613,7 +17613,7 @@ var LibrisWeb = (() => {
           let currency_symbol = null;
           await Promise.all([refundable_container, refunding_container, refunded_container].map(async (container) => {
             if (container.payments.length === 0) {
-              container.append(VStack(Title("No Payments").color(style.fg).font_size(style.font_size - 2).flex_shrink(0).letter_spacing("1px").text_transform("uppercase").ellipsis_overflow(true).margin(0).padding(0).assign_to_parent_as("title_e"), Text(`There are no ${container.title.toLowerCase()}.`).color(style.fg_1).font_size(style.font_size - 2).line_height(style.font_size).margin(5, 0, 0, 0).padding(0).assign_to_parent_as("text_e").white_space("pre").line_height("1.4em").center(), Image("/volt_static/payments/check.webp").frame(30, 30).margin_top(15).assign_to_parent_as("success_image_e")).min_height(160).frame("100%", "100%").center().center_vertical());
+              container.append(VStack(Title("No Payments").color(style.fg).font_size(style.font_size - 2).flex_shrink(0).letter_spacing("1px").text_transform("uppercase").ellipsis_overflow(true).margin(0).padding(0).assign_to_parent_as("title_e"), Text(`There are no ${container.title.toLowerCase()}.`).color(style.fg_1).font_size(style.font_size - 2).line_height(style.font_size).margin(5, 0, 0, 0).padding(0).assign_to_parent_as("text_e").white_space("pre").line_height("1.4em").center(), Image("/volt/assets/payments/check.webp").frame(30, 30).margin_top(15).assign_to_parent_as("success_image_e")).min_height(160).frame("100%", "100%").center().center_vertical());
             } else {
               await Promise.all(container.payments.map(async (payment) => {
                 await Promise.all(payment.line_items.map(async (item) => {
@@ -17636,7 +17636,7 @@ var LibrisWeb = (() => {
                     text: `You are about to request a refund for payment <span style='border-radius: 7px; background: ${style.bg_1}; padding: 1px 4px; font-size: 0.9em;'>${payment.id}</span>, do you wish to proceed?`,
                     no: "No",
                     yes: "Yes",
-                    image: "/volt_static/payments/error.webp",
+                    image: "/volt/assets/payments/error.webp",
                     blur: 5,
                     animation_duration: 300,
                     on_yes: async () => {
@@ -17652,7 +17652,7 @@ var LibrisWeb = (() => {
                       });
                     }
                   }).font(window.getComputedStyle(Payments._refunds_container).font).widget.background(style.bg).color(style.fg_1).border_bottom("4px solid #E8454E").parent().title.color(style.fg).font_size(style.font_size + 2).flex_shrink(0).margin(0, 0, 0, 10).center().parent().text.color(style.fg_1).font_size(style.font_size).margin_left(10).center().parent().image.padding(10).mask_color(style.bg).border_radius("50%").background("#E8454E").frame(40, 40).box_shadow("0 0 0 4px #E8454E50").parent().no_button.padding(10, 0).font_size(style.font_size).background(style.bg_1).color(style.fg_1).border(1, style.divider_bg).hover_brightness(...style.button.hover_brightness).box_shadow("0px 0px 5px #00000030").parent().yes_button.padding(10, 0).font_size(style.font_size).background("#E8454E").color(style.fg_1).border(1, style.divider_bg).hover_brightness(...style.button.hover_brightness).box_shadow("0px 0px 5px #00000030").parent());
-                }), !container.is_refunding ? null : RingLoader().frame(20, 20).background(style.theme_fg).margin(0, 5, 0, 0).update(), !container.is_refunded ? null : Image("/volt_static/payments/check.webp").frame(20, 20).margin(0, 5, 0, 0)).min_height(30), Text("").inner_html(`Purchased at ${Utils.unix_to_date(payment.timestamp / 1e3)} <span style='font-size: 0.8em'>${payment.id}<span>.`).color(style.fg_1).font_size(style.font_size - 6).line_height(style.font_size - 4).margin(-5, 0, 10, 0).wrap(true).padding(0).white_space("pre").line_height("1.4em").center(), items).width("100%");
+                }), !container.is_refunding ? null : RingLoader().frame(20, 20).background(style.theme_fg).margin(0, 5, 0, 0).update(), !container.is_refunded ? null : Image("/volt/assets/payments/check.webp").frame(20, 20).margin(0, 5, 0, 0)).min_height(30), Text("").inner_html(`Purchased at ${Utils.unix_to_date(payment.timestamp / 1e3)} <span style='font-size: 0.8em'>${payment.id}<span>.`).color(style.fg_1).font_size(style.font_size - 6).line_height(style.font_size - 4).margin(-5, 0, 10, 0).wrap(true).padding(0).white_space("pre").line_height("1.4em").center(), items).width("100%");
                 return [
                   stack,
                   index === container.payments.length - 1 ? null : Divider().background(style.divider_bg).margin(20, 0, 20, 0)
@@ -17840,7 +17840,7 @@ var LibrisWeb = (() => {
         this._processing_element.set_processing();
         return;
       }
-      this._processing_element = VStack(Title("Processing").color(this._style.fg).font_size(this._style.font_size - 2).flex_shrink(0).letter_spacing("1px").text_transform("uppercase").ellipsis_overflow(true).margin(0).padding(0).assign_to_parent_as("title_e"), Text("Processing your payment, please wait.").color(this._style.fg_1).font_size(this._style.font_size - 2).line_height(this._style.font_size).margin(5, 0, 0, 0).padding(0).assign_to_parent_as("text_e").white_space("pre").line_height("1.4em").center(), ImageMask("/volt_static/payments/error.webp").hide().frame(40, 40).padding(5).mask_color(this._style.missing_fg).margin_top(15).assign_to_parent_as("error_image_e"), Image("/volt_static/payments/party.webp").hide().frame(40, 40).margin_top(15).assign_to_parent_as("success_image_e"), RingLoader().background(this._style.theme_fg).frame(40, 40).update().margin_top(15).assign_to_parent_as("loader_e")).padding(15, 0).center().center_vertical().extend({
+      this._processing_element = VStack(Title("Processing").color(this._style.fg).font_size(this._style.font_size - 2).flex_shrink(0).letter_spacing("1px").text_transform("uppercase").ellipsis_overflow(true).margin(0).padding(0).assign_to_parent_as("title_e"), Text("Processing your payment, please wait.").color(this._style.fg_1).font_size(this._style.font_size - 2).line_height(this._style.font_size).margin(5, 0, 0, 0).padding(0).assign_to_parent_as("text_e").white_space("pre").line_height("1.4em").center(), ImageMask("/volt/assets/payments/error.webp").hide().frame(40, 40).padding(5).mask_color(this._style.missing_fg).margin_top(15).assign_to_parent_as("error_image_e"), Image("/volt/assets/payments/party.webp").hide().frame(40, 40).margin_top(15).assign_to_parent_as("success_image_e"), RingLoader().background(this._style.theme_fg).frame(40, 40).update().margin_top(15).assign_to_parent_as("loader_e")).padding(15, 0).center().center_vertical().extend({
         timestamp: Date.now(),
         /**
          * Set the processing element to display an error message.
@@ -17848,7 +17848,7 @@ var LibrisWeb = (() => {
          */
         set_error(message = "The payment has failed, please check your information and try again.\n If the problem persists, contact support for assistance.") {
           this.loader_e.hide();
-          this.error_image_e.src("/volt_static/payments/error.webp");
+          this.error_image_e.src("/volt/assets/payments/error.webp");
           this.error_image_e.show();
           this.success_image_e.hide();
           this.title_e.text("Error");
@@ -17860,7 +17860,7 @@ var LibrisWeb = (() => {
          */
         set_cancelled(message = "The payment has been cancelled.") {
           this.loader_e.hide();
-          this.error_image_e.src("/volt_static/payments/cancelled.webp");
+          this.error_image_e.src("/volt/assets/payments/cancelled.webp");
           this.error_image_e.show();
           this.success_image_e.hide();
           this.title_e.text("Cancelled");
@@ -27804,7 +27804,7 @@ ${stack.join("\n")}`);
           // Spacer.
           code.length > 1 ? null : Spacer(),
           // Copy image.
-          this._copy_img = ImageMask("/volt_static/icons/copy.webp").frame(15, 15).flex_shrink(0).margin(null, null, null, 10).mask_color(this._fg).transform("rotate(90deg)").opacity(this._title_opac).transition("opacity 250ms ease-in-out").on_mouse_over((e) => e.opacity(1)).on_mouse_out((e) => e.opacity(this._title_opac)).on_click(async () => {
+          this._copy_img = ImageMask("/volt/assets/icons/copy.webp").frame(15, 15).flex_shrink(0).margin(null, null, null, 10).mask_color(this._fg).transform("rotate(90deg)").opacity(this._title_opac).transition("opacity 250ms ease-in-out").on_mouse_over((e) => e.opacity(1)).on_mouse_out((e) => e.opacity(this._title_opac)).on_click(async () => {
             if (this.header?.selected_code_pre?.textContent) {
               Utils.copy_to_clipboard(this.header.selected_code_pre.textContent).then(() => {
                 if (typeof RESPONSE_STATUS !== "undefined") {

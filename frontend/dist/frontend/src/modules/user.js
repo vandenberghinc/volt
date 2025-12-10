@@ -1,10 +1,9 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
-// Imports.
-import { Utils } from "./utils.js";
 import { Cookies } from "./cookies";
+import { request } from "./request.js";
 // User module.
 export var User;
 (function (User) {
@@ -98,9 +97,9 @@ export var User;
      * @docs
      */
     async function get() {
-        return Utils.request({
+        return request({
             method: "GET",
-            url: "/volt/user",
+            url: "/volt/api/v1/user",
         });
     }
     User.get = get;
@@ -112,9 +111,9 @@ export var User;
      * @docs
      */
     async function update(payload) {
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/user",
+            url: "/volt/api/v1/user",
             data: payload,
         });
     }
@@ -127,9 +126,9 @@ export var User;
      * @docs
      */
     async function activate(payload) {
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/auth/activate",
+            url: "/volt/api/v1/auth/activate",
             data: payload,
         });
     }
@@ -142,9 +141,9 @@ export var User;
      * @docs
      */
     async function change_password(payload) {
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/user/change_password",
+            url: "/volt/api/v1/user/change_password",
             data: payload,
         });
     }
@@ -157,9 +156,9 @@ export var User;
      * @docs
      */
     async function delete_account() {
-        return Utils.request({
+        return request({
             method: "DELETE",
-            url: "/volt/user",
+            url: "/volt/api/v1/user",
         });
     }
     User.delete_account = delete_account;
@@ -171,9 +170,9 @@ export var User;
      * @docs
      */
     async function generate_api_key() {
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/user/api_key",
+            url: "/volt/api/v1/user/api_key",
         });
     }
     User.generate_api_key = generate_api_key;
@@ -183,9 +182,9 @@ export var User;
      * @docs
      */
     async function has_api_key() {
-        return Utils.request({
+        return request({
             method: "GET",
-            url: "/volt/user/has_api_key",
+            url: "/volt/api/v1/user/has_api_key",
         });
     }
     User.has_api_key = has_api_key;
@@ -197,9 +196,9 @@ export var User;
      * @docs
      */
     async function revoke_api_key() {
-        return Utils.request({
+        return request({
             method: "DELETE",
-            url: "/volt/user/api_key",
+            url: "/volt/api/v1/user/api_key",
         });
     }
     User.revoke_api_key = revoke_api_key;
@@ -213,9 +212,9 @@ export var User;
      * @docs
      */
     async function load_data(payload) {
-        return Utils.request({
+        return request({
             method: "GET",
-            url: "/volt/user/data",
+            url: "/volt/api/v1/user/data",
             data: payload,
         });
     }
@@ -228,9 +227,9 @@ export var User;
      * @docs
      */
     async function set_data(payload) {
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/user/data",
+            url: "/volt/api/v1/user/data",
             data: payload,
         });
     }
@@ -240,9 +239,9 @@ export var User;
      * @nav Frontend/User
      */
     async function delete_data(payload) {
-        return Utils.request({
+        return request({
             method: "DELETE",
-            url: "/volt/user/data",
+            url: "/volt/api/v1/user/data",
             data: payload,
         });
     }
@@ -257,9 +256,9 @@ export var User;
      * @docs
      */
     async function load_protected_data(payload) {
-        return Utils.request({
+        return request({
             method: "GET",
-            url: "/volt/user/data/protected",
+            url: "/volt/api/v1/user/data/protected",
             data: payload,
         });
     }

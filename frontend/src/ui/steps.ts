@@ -1,14 +1,14 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
 import { Elements, VElementBaseSignature, VElement, isVElement, VElementTagMap } from "../elements/module.js"
-import { VStack, VStackElement, HStack, HStackElement } from "./stack"
-import { Divider, DividerElement } from "./divider"
-import { Span } from "./span"
-import { ForEach } from "./for_each"
+import { VStack, VStackElement, HStack, HStackElement } from "./stack.js"
+import { Divider, DividerElement } from "./divider.js"
+import { Span } from "./span.js"
+import { ForEach } from "./for_each.js"
 
 /**
  * Options for a single step's content in the Steps element.

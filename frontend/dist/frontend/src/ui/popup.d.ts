@@ -1,10 +1,14 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { Mutex } from "@vandenberghinc/vlib/frontend";
 import { VElementBaseSignature } from "../elements/module.js";
-import { HStackElement, VStackElement } from "./stack";
-import { TextElement } from "./text";
-import { TitleElement } from "./title";
-import { LoaderButtonElement } from "./loader_button";
-import { ImageMaskElement } from "./image";
+import { HStackElement, VStackElement } from "./stack.js";
+import { TextElement } from "./text.js";
+import { TitleElement } from "./title.js";
+import { LoaderButtonElement } from "./button.js";
+import { ImageMaskElement } from "./image.js";
 export type OnYesNoPopup = ((element: YesNoPopupElement) => Promise<any> | void);
 declare const YesNoPopupElement_base: VElementBaseSignature;
 export declare class YesNoPopupElement extends YesNoPopupElement_base {
@@ -23,6 +27,7 @@ export declare class YesNoPopupElement extends YesNoPopupElement_base {
     no_button: LoaderButtonElement;
     yes_button: LoaderButtonElement;
     buttons: HStackElement;
+    header: VStackElement;
     content: VStackElement;
     widget: VStackElement;
     _on_no_called: boolean;

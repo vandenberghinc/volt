@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -39,11 +39,11 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
 // Imports.
 import { Mutex } from "@vandenberghinc/vlib/frontend";
 import { Elements } from "../elements/module.js";
-import { HStack, VStack, VStackElement } from "./stack";
-import { Text } from "./text";
-import { Title } from "./title";
-import { LoaderButton } from "./loader_button";
-import { ImageMask } from "./image";
+import { HStack, VStack, VStackElement } from "./stack.js";
+import { Text } from "./text.js";
+import { Title } from "./title.js";
+import { LoaderButton } from "./button.js";
+import { ImageMask } from "./image.js";
 // RingLoader.
 // - The width and height must be in pixels.
 let YesNoPopupElement = (() => {
@@ -81,6 +81,7 @@ let YesNoPopupElement = (() => {
         no_button;
         yes_button;
         buttons;
+        header;
         // @ts-ignore
         content;
         widget;
@@ -110,20 +111,26 @@ let YesNoPopupElement = (() => {
             // Image.
             this.image = ImageMask(typeof image === "boolean" ? undefined : image)
                 .mask_color(image_color)
-                .frame(35, 35)
-                .position(-17.5, "calc(50% - 17.5px)", null, null)
+                .square(25)
+                // .position(-17.5, "calc(50% - 17.5px)", null, null)
+                .margin_left(10)
                 .parent(this)
                 .abs_parent(this);
-            if (image === false) {
+            if (!image) {
                 this.image.hide();
+            }
+            else {
+                this.image.show();
             }
             // Title.
             this.title = Title(title) // never user inner html instead use append incase of links or code lines.
+                .abs_parent(this)
+                .parent(this)
                 .font_family("inherit")
                 .font_weight(500)
                 .font_size(34)
-                .abs_parent(this)
-                .parent(this);
+                .stretch(true)
+                .wrap(true);
             // Text.
             this.text = Text(text) // never user inner html instead use append incase of links or code lines.
                 .font_family("inherit")
@@ -193,10 +200,17 @@ let YesNoPopupElement = (() => {
                 .parent(this);
             // The custom content.
             this.content = VStack(...content)
-                .abs_parent(this)
-                .parent(this);
+                .width("100%")
+                .abs_parent(this).parent(this);
+            // use a header so the user can optionally add padding to only the header.
+            // and use no padding on the buttons or content, so a background can be put
+            // on the buttons etc.
+            this.header = VStack(HStack(this.title, this.image)
+                .width("100%"), this.text)
+                .width("100%")
+                .parent(this).abs_parent(this);
             // The content.
-            this.widget = VStack(this.image, this.title, this.text, this.content, this.buttons)
+            this.widget = VStack(this.header, this.content, this.buttons)
                 .position("relative")
                 .text_center()
                 .padding(40, 20, 20, 20)

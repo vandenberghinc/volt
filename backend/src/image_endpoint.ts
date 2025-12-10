@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // ---------------------------------------------------------
@@ -16,6 +16,7 @@ import * as vlib from "@vandenberghinc/vlib";
 import { Endpoint } from "./endpoint.js";
 import { RateLimitGroup } from "./rate_limit.js";
 import type { Server } from "./server.js";
+import Stream from './stream.js';
 
 // ---------------------------------------------------------
 // ImageEndpoint.
@@ -102,7 +103,7 @@ class ImageEndpoint extends Endpoint implements Endpoint {
         this.is_image_endpoint = true;
 
         // Assign callback.
-        this.callback = async (stream: any, params: {
+        this.callback = async (stream: Stream, params: {
             type: string | null,
             width: number | string | null,
             height: number | string | null,
@@ -234,7 +235,7 @@ class ImageEndpoint extends Endpoint implements Endpoint {
         try {
             const metadata = await sharp(this.file_path?.str()).metadata();
             return `${metadata.width} / ${metadata.height}`;
-        } catch (err: any) {
+        } catch (err: unknown) {
             this.server?.log.error(`Unable to determine the aspect ratio of image ${this.file_path}: `, err);
             return null;
         }

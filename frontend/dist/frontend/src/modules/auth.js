@@ -1,8 +1,8 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
-import { Utils } from "./utils.js";
+import { request } from "./request.js";
 // Namespace.
 export var Auth;
 (function (Auth) {
@@ -12,9 +12,9 @@ export var Auth;
      * @docs
      */
     function sign_in(payload) {
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/auth/signin",
+            url: "/volt/api/v1/auth/signin",
             data: payload,
         });
     }
@@ -31,9 +31,9 @@ export var Auth;
      * @docs
      */
     function sign_up(payload) {
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/auth/signup",
+            url: "/volt/api/v1/auth/signup",
             data: payload,
         });
     }
@@ -43,9 +43,9 @@ export var Auth;
      * @docs
      */
     function sign_out() {
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/auth/signout",
+            url: "/volt/api/v1/auth/signout",
         });
     }
     Auth.sign_out = sign_out;
@@ -55,9 +55,9 @@ export var Auth;
      * @docs
      */
     function send_2fa(payload) {
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/auth/2fa",
+            url: "/volt/api/v1/auth/2fa",
             data: payload,
         });
     }
@@ -68,9 +68,9 @@ export var Auth;
      * @docs
      */
     function forgot_password(payload) {
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/auth/forgot_password",
+            url: "/volt/api/v1/auth/forgot_password",
             data: payload,
         });
     }

@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -39,10 +39,10 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
 // Imports.
 import { Elements } from "../elements/module.js";
 import { Utils } from "../modules/utils.js";
-import { VStackElement, HStack, AnchorHStack } from "./stack";
-import { ForEach } from "./for_each";
-import { ImageMask } from "./image";
-import { Text } from "./text";
+import { VStackElement, HStack, AnchorHStack } from "./stack.js";
+import { ForEach } from "./for_each.js";
+import { ImageMask } from "./image.js";
+import { Text } from "./text.js";
 // Dropdown element. 
 /**
  * Easily create a dropdown element.

@@ -1,9 +1,10 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 // Import elements create func.
 export * from "./base.js";
+export * from "./types.js";
 import { extend as extend_velement, wrapper as _wrapper, create_null as _create_null, } from "./base.js";
 import { register_element as _register_element } from "./register_element.js";
 // Elements module.

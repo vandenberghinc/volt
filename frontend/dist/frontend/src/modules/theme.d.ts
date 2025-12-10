@@ -1,3 +1,7 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 /** Name of a theme attribute key. */
 type ThemeAttributeName = string;
 /** Identifier of a theme variant. */
@@ -119,9 +123,9 @@ export declare class Theme<ThemeOptions extends Record<string, any>> {
      */
     multiply(theme_attr: ThemeAttributeName, x?: number): string;
     /** Function to disable all transition attributes on all elements. */
-    disable_transitions(): this;
+    static disable_transitions(): void;
     /** Function to re-enable all transition attributes on all elements. */
-    enable_transitions(delay?: number): this;
+    static enable_transitions(delay?: number): void;
 }
 /** Interface merge to expose theme attributes as properties from ThemeOptions on Theme instances. */
 export interface Theme<ThemeOptions extends Record<string, any>> extends ThemeOptions {

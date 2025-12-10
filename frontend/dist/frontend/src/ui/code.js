@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -40,13 +40,13 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
 // Imports.
 import { Utils } from "../modules/utils.js";
 import { Elements, VElementTagMap, VDiv } from "../elements/module.js";
-import { Span } from "./span";
-import { VStack, VStackElement, HStack } from "./stack";
-import { ImageMask } from "./image";
-import { ForEach } from "./for_each";
-import { Spacer } from "./spacer";
-import { Divider } from "./divider";
-// import * as vhighlight from "/Users/administrator/persistance/private/dev/vinc/vhighlight"
+import { Span } from "./span.js";
+import { VStack, VStackElement, HStack } from "./stack.js";
+import { ImageMask } from "./image.js";
+import { ForEach } from "./for_each.js";
+import { Spacer } from "./spacer.js";
+import { Divider } from "./divider.js";
+// import * as vhighlight from "/Users/administrator/persistance/private/dev/vinc/vhighlight.js"
 import * as vhighlight from "@vandenberghinc/vhighlight";
 // All codeblocks using languages.
 const language_codeblocks = [];
@@ -800,7 +800,7 @@ let MultiLanguageCodeBlockElement = (() => {
             // Spacer.
             code.length > 1 ? null : Spacer(), 
             // Copy image.
-            this._copy_img = ImageMask("/volt_static/icons/copy.webp")
+            this._copy_img = ImageMask("/volt/assets/icons/copy.webp")
                 .frame(15, 15)
                 .flex_shrink(0)
                 .margin(null, null, null, 10)

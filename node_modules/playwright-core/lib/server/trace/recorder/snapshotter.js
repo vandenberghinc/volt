@@ -32,7 +32,6 @@ var import_page = require("../../page");
 class Snapshotter {
   constructor(context, delegate) {
     this._eventListeners = [];
-    this._initialized = false;
     this._started = false;
     this._context = context;
     this._delegate = delegate;
@@ -44,21 +43,23 @@ class Snapshotter {
   }
   async start() {
     this._started = true;
-    if (!this._initialized) {
-      this._initialized = true;
+    if (!this._initScript)
       await this._initialize();
-    }
     await this.reset();
   }
   async reset() {
     if (this._started)
-      await this._runInAllFrames(`window["${this._snapshotStreamer}"].reset()`);
+      await this._context.safeNonStallingEvaluateInAllFrames(`window["${this._snapshotStreamer}"].reset()`, "main");
   }
-  async stop() {
+  stop() {
     this._started = false;
   }
-  resetForReuse() {
-    this._initialized = false;
+  async resetForReuse() {
+    if (this._initScript) {
+      import_eventsHelper.eventsHelper.removeEventListeners(this._eventListeners);
+      await this._context.removeInitScripts([this._initScript]);
+      this._initScript = void 0;
+    }
   }
   async _initialize() {
     for (const page of this._context.pages())
@@ -67,25 +68,27 @@ class Snapshotter {
       import_eventsHelper.eventsHelper.addEventListener(this._context, import_browserContext.BrowserContext.Events.Page, this._onPage.bind(this))
     ];
     const { javaScriptEnabled } = this._context._options;
-    const initScript = `(${import_snapshotterInjected.frameSnapshotStreamer})("${this._snapshotStreamer}", ${javaScriptEnabled || javaScriptEnabled === void 0})`;
-    await this._context.addInitScript(initScript);
-    await this._runInAllFrames(initScript);
-  }
-  async _runInAllFrames(expression) {
-    const frames = [];
-    for (const page of this._context.pages())
-      frames.push(...page.frames());
-    await Promise.all(frames.map((frame) => {
-      return frame.nonStallingRawEvaluateInExistingMainContext(expression).catch((e) => import_debugLogger.debugLogger.log("error", e));
-    }));
+    const initScriptSource = `(${import_snapshotterInjected.frameSnapshotStreamer})("${this._snapshotStreamer}", ${javaScriptEnabled || javaScriptEnabled === void 0})`;
+    this._initScript = await this._context.addInitScript(void 0, initScriptSource);
+    await this._context.safeNonStallingEvaluateInAllFrames(initScriptSource, "main");
   }
   dispose() {
     import_eventsHelper.eventsHelper.removeEventListeners(this._eventListeners);
   }
+  async _captureFrameSnapshot(frame) {
+    const needsReset = !!frame[kNeedsResetSymbol];
+    frame[kNeedsResetSymbol] = false;
+    const expression = `window["${this._snapshotStreamer}"].captureSnapshot(${needsReset ? "true" : "false"})`;
+    try {
+      return await frame.nonStallingRawEvaluateInExistingMainContext(expression);
+    } catch (e) {
+      frame[kNeedsResetSymbol] = true;
+      import_debugLogger.debugLogger.log("error", e);
+    }
+  }
   async captureSnapshot(page, callId, snapshotName) {
-    const expression = `window["${this._snapshotStreamer}"].captureSnapshot(${JSON.stringify(snapshotName)})`;
     const snapshots = page.frames().map(async (frame) => {
-      const data = await frame.nonStallingRawEvaluateInExistingMainContext(expression).catch((e) => import_debugLogger.debugLogger.log("error", e));
+      const data = await this._captureFrameSnapshot(frame);
       if (!data || !this._started)
         return;
       const snapshot = {
@@ -137,6 +140,7 @@ class Snapshotter {
     }
   }
 }
+const kNeedsResetSymbol = Symbol("kNeedsReset");
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   Snapshotter

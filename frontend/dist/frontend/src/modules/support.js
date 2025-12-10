@@ -1,8 +1,8 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
-import { Utils } from "./utils.js";
+import { request } from "./request.js";
 // Support module.
 export var Support;
 (function (Support) {
@@ -18,25 +18,21 @@ export var Support;
      */
     function submit(payload) {
         if (payload.attachments) {
-            const MAX_ATTACHMENTS = 5;
-            const MAX_BYTES = 5 * 1024 * 1024; // 5 MB per file
-            const keys = Object.keys(payload.attachments);
-            if (keys.length > MAX_ATTACHMENTS) {
-                throw new Error("Too many attachments. Maximum is 5.");
-            }
-            for (const key of keys) {
-                const raw = payload.attachments[key];
-                const is_base64 = /^[A-Za-z0-9+/]+=*$/.test(raw);
-                const buf = Buffer.from(raw, is_base64 ? "base64" : "utf-8");
-                if (buf.length > MAX_BYTES) {
-                    throw new Error(`Attachment "${key}" exceeds the maximum size of 5 MB.`);
-                }
+            const total_attachments_size = payload.attachments.reduce((acc, it) => acc + it.size, 0);
+            if (total_attachments_size > 5 * 1024 * 1024) { // 5 MB total
+                throw new Error(`Total attachments size exceeds the maximum of 5 MB.`);
             }
         }
-        return Utils.request({
+        return request({
             method: "POST",
-            url: "/volt/support/submit",
-            data: payload,
+            url: "/volt/api/v1/support/submit",
+            data: {
+                ...payload,
+                attachments: payload.attachments?.map(a => a.to_rest_api({
+                    decompress: true,
+                    encoding: "base64",
+                }))
+            },
         });
     }
     Support.submit = submit;
@@ -47,9 +43,9 @@ export var Support;
      * @docs
      */
     function get_pin() {
-        return Utils.request({
+        return request({
             method: "GET",
-            url: "/volt/support/pin",
+            url: "/volt/api/v1/support/pin",
         });
     }
     Support.get_pin = get_pin;

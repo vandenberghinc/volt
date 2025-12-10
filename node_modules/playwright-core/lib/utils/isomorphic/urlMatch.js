@@ -25,9 +25,8 @@ __export(urlMatch_exports, {
   urlMatchesEqual: () => urlMatchesEqual
 });
 module.exports = __toCommonJS(urlMatch_exports);
-var import_builtins = require("./builtins");
 var import_stringUtils = require("./stringUtils");
-const escapedChars = new import_builtins.Set(["$", "^", "+", ".", "*", "(", ")", "|", "\\", "?", "{", "}", "[", "]"]);
+const escapedChars = /* @__PURE__ */ new Set(["$", "^", "+", ".", "*", "(", ")", "|", "\\", "?", "{", "}", "[", "]"]);
 function globToRegexPattern(glob) {
   const tokens = ["^"];
   let inGroup = false;
@@ -39,17 +38,23 @@ function globToRegexPattern(glob) {
       continue;
     }
     if (c === "*") {
-      const beforeDeep = glob[i - 1];
+      const charBefore = glob[i - 1];
       let starCount = 1;
       while (glob[i + 1] === "*") {
         starCount++;
         i++;
       }
-      const afterDeep = glob[i + 1];
-      const isDeep = starCount > 1 && (beforeDeep === "/" || beforeDeep === void 0) && (afterDeep === "/" || afterDeep === void 0);
-      if (isDeep) {
-        tokens.push("((?:[^/]*(?:/|$))*)");
-        i++;
+      if (starCount > 1) {
+        const charAfter = glob[i + 1];
+        if (charAfter === "/") {
+          if (charBefore === "/")
+            tokens.push("((.+/)|)");
+          else
+            tokens.push("(.*/)");
+          ++i;
+        } else {
+          tokens.push("(.*)");
+        }
       } else {
         tokens.push("([^/]*)");
       }
@@ -122,13 +127,18 @@ function resolveGlobBase(baseURL, match) {
       return replacement;
     };
     var mapToken = mapToken2;
-    const tokenMap = new import_builtins.Map();
+    const tokenMap = /* @__PURE__ */ new Map();
     match = match.replaceAll(/\\\\\?/g, "?");
+    if (match.startsWith("about:") || match.startsWith("data:") || match.startsWith("chrome:") || match.startsWith("edge:") || match.startsWith("file:"))
+      return match;
     const relativePath = match.split("/").map((token, index) => {
       if (token === "." || token === ".." || token === "")
         return token;
-      if (index === 0 && token.endsWith(":"))
-        return mapToken2(token, "http:");
+      if (index === 0 && token.endsWith(":")) {
+        if (token.indexOf("*") !== -1 || token.indexOf("{") !== -1)
+          return mapToken2(token, "http:");
+        return token;
+      }
       const questionIndex = token.indexOf("?");
       if (questionIndex === -1)
         return mapToken2(token, `$_${index}_$`);
@@ -136,9 +146,12 @@ function resolveGlobBase(baseURL, match) {
       const newSuffix = mapToken2(token.substring(questionIndex), `?$_${index}_$`);
       return newPrefix + newSuffix;
     }).join("/");
-    let resolved = constructURLBasedOnBaseURL(baseURL, relativePath);
-    for (const [token, original] of tokenMap)
-      resolved = resolved.replace(token, original);
+    const result = resolveBaseURL(baseURL, relativePath);
+    let resolved = result.resolved;
+    for (const [token, original] of tokenMap) {
+      const normalize = result.caseInsensitivePart?.includes(token);
+      resolved = resolved.replace(token, normalize ? original.toLowerCase() : original);
+    }
     match = resolved;
   }
   return match;
@@ -152,9 +165,19 @@ function parseURL(url) {
 }
 function constructURLBasedOnBaseURL(baseURL, givenURL) {
   try {
-    return new URL(givenURL, baseURL).toString();
+    return resolveBaseURL(baseURL, givenURL).resolved;
   } catch (e) {
     return givenURL;
+  }
+}
+function resolveBaseURL(baseURL, givenURL) {
+  try {
+    const url = new URL(givenURL, baseURL);
+    const resolved = url.toString();
+    const caseInsensitivePrefix = url.origin;
+    return { resolved, caseInsensitivePart: caseInsensitivePrefix };
+  } catch (e) {
+    return { resolved: givenURL };
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

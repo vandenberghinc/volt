@@ -21,31 +21,17 @@ __export(chromiumSwitches_exports, {
   chromiumSwitches: () => chromiumSwitches
 });
 module.exports = __toCommonJS(chromiumSwitches_exports);
-const disabledFeatures = [
+const disabledFeatures = (assistantMode) => [
   // See https://github.com/microsoft/playwright/pull/10380
   "AcceptCHFrame",
-  // See https://github.com/microsoft/playwright/pull/10679
-  "AutoExpandDetailsElement",
   // See https://github.com/microsoft/playwright/issues/14047
   "AvoidUnnecessaryBeforeUnloadCheckSync",
-  // See https://github.com/microsoft/playwright/pull/12992
-  "CertificateTransparencyComponentUpdater",
-  // This makes Page.frameScheduledNavigation arrive much later after a click,
-  // making our navigation auto-wait after click not working.
-  // Can be removed once we deperecate noWaitAfter.
-  // See https://github.com/microsoft/playwright/pull/34372.
-  "DeferRendererTasksAfterInput",
   "DestroyProfileOnBrowserClose",
   // See https://github.com/microsoft/playwright/pull/13854
   "DialMediaRouteProvider",
-  // Chromium is disabling manifest version 2. Allow testing it as long as Chromium can actually run it.
-  // Disabled in https://chromium-review.googlesource.com/c/chromium/src/+/6265903.
-  "ExtensionManifestV2Disabled",
   "GlobalMediaControls",
   // See https://github.com/microsoft/playwright/pull/27605
   "HttpsUpgrades",
-  "ImprovedCookieControls",
-  "LazyFrameLoading",
   // Hides the Lens feature in the URL address bar. Its not working in unofficial builds.
   "LensOverlay",
   // See https://github.com/microsoft/playwright/pull/8162
@@ -55,9 +41,16 @@ const disabledFeatures = [
   // See https://github.com/microsoft/playwright/issues/32230
   "ThirdPartyStoragePartitioning",
   // See https://github.com/microsoft/playwright/issues/16126
-  "Translate"
-];
-const chromiumSwitches = [
+  "Translate",
+  // See https://issues.chromium.org/u/1/issues/435410220
+  "AutoDeElevate",
+  // See https://github.com/microsoft/playwright/issues/37714
+  "RenderDocument",
+  // Prevents downloading optimization hints on startup.
+  "OptimizationHints",
+  assistantMode ? "AutomationControlled" : ""
+].filter(Boolean);
+const chromiumSwitches = (assistantMode, channel, android) => [
   "--disable-field-trial-config",
   // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
   "--disable-background-networking",
@@ -74,7 +67,8 @@ const chromiumSwitches = [
   "--disable-default-apps",
   "--disable-dev-shm-usage",
   "--disable-extensions",
-  "--disable-features=" + disabledFeatures.join(","),
+  "--disable-features=" + disabledFeatures(assistantMode).join(","),
+  process.env.PLAYWRIGHT_LEGACY_SCREENSHOT ? "" : "--enable-features=CDPScreenshotNewSurface",
   "--allow-pre-commit-input",
   "--disable-hang-monitor",
   "--disable-ipc-flooding-protection",
@@ -84,7 +78,6 @@ const chromiumSwitches = [
   "--force-color-profile=srgb",
   "--metrics-recording-only",
   "--no-first-run",
-  "--enable-automation",
   "--password-store=basic",
   "--use-mock-keychain",
   // See https://chromium-review.googlesource.com/c/chromium/src/+/2436773
@@ -93,8 +86,18 @@ const chromiumSwitches = [
   // https://chromium-review.googlesource.com/c/chromium/src/+/4853540
   "--disable-search-engine-choice-screen",
   // https://issues.chromium.org/41491762
-  "--unsafely-disable-devtools-self-xss-warnings"
-];
+  "--unsafely-disable-devtools-self-xss-warnings",
+  // Edge can potentially restart on Windows (msRelaunchNoCompatLayer) which looses its file descriptors (stdout/stderr) and CDP (3/4). Disable until fixed upstream.
+  "--edge-skip-compat-layer-relaunch",
+  assistantMode ? "" : "--enable-automation",
+  // This disables Chrome for Testing infobar that is visible in the persistent context.
+  // The switch is ignored everywhere else, including Chromium/Chrome/Edge.
+  "--disable-infobars",
+  // Less annoying popups.
+  "--disable-search-engine-choice-screen",
+  // Prevents the "three dots" menu crash in IdentityManager::HasPrimaryAccount for ephemeral contexts.
+  android ? "" : "--disable-sync"
+].filter(Boolean);
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   chromiumSwitches

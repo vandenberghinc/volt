@@ -575,12 +575,14 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      */
     async init(): Promise<this> {
         if (this.initialized === false) {
+            this.db.server.log(3, "Initializing collection: ", this.name);
 
             // Initialize NON transaction based.
             if (!this.is_transaction) {
 
                 // Create collection.
                 if (this._col == null) {
+                    this.db.server.log(3, "Checking collection: ", this.name);
 
                     // Start connection in dev mode.
                     if (!this.db.server.production) {
@@ -596,10 +598,13 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
                     }
                     // Check if the collection exists
                     if (this.db._listed_cols == null) {
+                        this.db.server.log(3, "Listing collections...");
                         this.db._listed_cols = await this.db._db.listCollections().toArray();
+                        this.db.server.log(3, "Listed collections: " + this.db._listed_cols.map(x => x.name).join(", "));
                     }
                     // Create collection with retry logic for race conditions
                     if (!this.db._listed_cols.find(x => x.name === this.name)) {
+                        this.db.server.log(3, "Creating collection: " + this.name);
                         let create_col_retries = 3;
                         let last_error: any = null;
                         let collection_created = false;
@@ -625,6 +630,7 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
                     }
 
                     // Create collection.
+                    this.db.server.log(3, "Initializing mongodb collection connection: " + this.name);
                     this._col = this.db._db.collection(this.name);
 
                 }
@@ -635,12 +641,14 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
 
                 // Create ttl index.
                 if (this.ttl_enabled) {
+                    this.db.server.log(3, "Setting up TTL index for collection: " + this.name);
                     await this._setup_ttl();
                 }
 
                 // Create indexes.
                 if (this._init_indexes?.length) {
                     for (const item of this._init_indexes) {
+                        this.db.server.log(3, "Creating index " + JSON.stringify(item) + " on collection: " + this.name);
                         await this.create_index(item)
                     }
                 }
@@ -771,30 +779,48 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
         // ---- Normalize inputs ----
         let key: string | undefined;
         let keys: string[] | Record<string, number> | undefined;
-        let options: Collection.IndexOpts["options"] | undefined;
+        let options: mongodb.CreateIndexesOptions | undefined;
         let unique: boolean | undefined;
+        let sparse: boolean | undefined;
         let forced = false;
 
         if (typeof opts === "string") {
             key = opts;
-            unique = false;
+            unique = undefined;
+            sparse = undefined;
         } else {
-            ({ key, keys, options, forced = false } = opts);
+            ({ key, keys, forced = false } = opts);
+            const options = opts.options as unknown as undefined | mongodb.CreateIndexesOptions;
 
             // Conflict guard between `unique` and `options.unique`
-            if (opts.unique != null && opts.options?.unique != null && opts.unique !== opts.options.unique) {
+            if (opts.unique != null && options?.unique != null && opts.unique !== options.unique) {
                 throw new InvalidUsageError({
-                    message: `Encountered different values for attribute 'unique': ${opts.unique} and 'options.unique': ${opts.options.unique}.`,
+                    message: `Encountered different values for attribute 'unique': ${opts.unique} and 'options.unique': ${options.unique}.`,
                     reason: "invalid_unique_option",
                 });
             }
             unique = opts.unique ?? options?.unique;
+
+            // Conflict guard between `sparse` and `options.sparse`
+            if (opts.sparse != null && options?.sparse != null && opts.sparse !== options.sparse) {
+                throw new InvalidUsageError({
+                    message: `Encountered different values for attribute 'sparse': ${opts.sparse} and 'options.sparse': ${options.sparse}.`,
+                    reason: "invalid_sparse_option",
+                });
+            }
+            sparse = opts.sparse ?? options?.sparse;
         }
 
         // Ensure `unique` in options when provided
         if (unique) {
             options = options || {};
             options.unique = unique;
+        }
+
+        // Ensure `sparse` in options when provided
+        if (sparse) {
+            options = options || {};
+            options.sparse = sparse;
         }
 
         // Build keys object
@@ -813,8 +839,7 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
             });
         }
 
-        // ---- Forced drop (resolve actual existing index name by key pattern) ----
-        if (forced) {
+        const drop_index = async () => {
             try {
                 const existing = await this._col.listIndexes().toArray();
                 const match = existing.find(ix => {
@@ -846,12 +871,28 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
                 }
             } catch (err) {
                 // If listIndexes itself fails for some reason, do not hide the error
-                throw err;
+                throw new Error(`Failed to create index on collection "${this.name}": ${err}`, { cause: err });
             }
         }
 
-        // Create (or re-create)
-        return await this._col.createIndex(keys_obj, options);
+        try {
+            // Create (or re-create)
+            try {
+                return await this._col.createIndex(keys_obj, options);
+            }
+            // Retry once on IndexKeySpecsConflict when forced=true
+            catch (err) {
+                if (forced && err && typeof err === "object" && (
+                    (err as any).codeName === "IndexKeySpecsConflict"
+                )) {
+                    await drop_index();
+                    return await this._col.createIndex(keys_obj, options);
+                }
+                throw err;
+            }
+        } catch (err) {
+            throw new Error(`Failed to create index on collection "${this.name}": ${err}`, { cause: err });
+        }
     }
 
     /**
@@ -3714,30 +3755,33 @@ export namespace Collection {
     export type IndexOpts = {
         /**
          * Creates a unique index.
+         * When used with multiple fields, the combination of values must be unique.
          * @warning An error will be thrown both when `unique` and `options.unique` are booleans with different values.
          */
         unique?: boolean;
+        /** Creates a sparse index, so documents without the indexed field don’t bloat the index. */
+        sparse?: boolean;
         /** When forced is enabled, the potentially existing index will be dropped and recreated later. */
         forced?: boolean;
         /** The options from {@link mongodb.CreateIndexesOptions} */
         options?: {
-            unique?: boolean;
             name?: string;
-            sparse?: boolean;
             expireAfterSeconds?: number;
             partialFilterExpression?: mongodb.Document;
             collation?: mongodb.CollationOptions;
+            // unique?: boolean;
+            // sparse?: boolean;
         };
     } & (
-            | {
-                key: string;
-                keys?: never
-            }
-            | {
-                key?: never;
-                keys: string[] | Record<string, number>
-            }
-        )
+        | {
+            key: string;
+            keys?: never
+        }
+        | {
+            key?: never;
+            keys: string[] | Record<string, number>
+        }
+    )
 
     // -------------------------------------------------------------------
     // Query types.

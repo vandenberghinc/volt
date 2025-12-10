@@ -1,0 +1,113 @@
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var stdin_exports = {};
+__export(stdin_exports, {
+  SplashScreen: () => SplashScreen,
+  default: () => stdin_default
+});
+module.exports = __toCommonJS(stdin_exports);
+var vlib = __toESM(require("@vandenberghinc/vlib"));
+class SplashScreen {
+  background;
+  image;
+  loader;
+  style;
+  _html;
+  /**
+   * Create a new splash screen configuration.
+   *
+   * @param background The background color of the splash screen.
+   * @param image The image settings. When left undefined, no image will be shown.
+   * @param image.src The image source.
+   * @param image.width The image width in pixels as a number.
+   * @param image.height The image height in pixels as a number.
+   * @param image.style The CSS style for the image element.
+   * @param loader The loader settings. When left undefined, no loader will be shown.
+   * @param loader.color The color of the loader.
+   * @param loader.size The loader size in pixels as a number.
+   * @param style The CSS style to add to the main element of the splash screen.
+   */
+  constructor({ background = null, image = null, loader = true, style = null }) {
+    this.background = background;
+    this.image = image;
+    this.loader = loader;
+    this.style = style;
+    this._html = void 0;
+  }
+  /**
+   * Clone this splash screen,
+   * creating a new instance with the same properties not shared by reference.
+   */
+  clone() {
+    return new SplashScreen(vlib.Object.deep_copy({
+      background: this.background,
+      image: this.image,
+      loader: this.loader,
+      style: this.style
+    }));
+  }
+  /**
+   * Generate and return the splash screen HTML. Result is cached after the first call.
+   *
+   * @returns The splash screen HTML markup.
+   */
+  get html() {
+    if (this._html !== void 0) {
+      return this._html;
+    }
+    this._html = `<div id='__volt_splash_screen' style='width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; ${this.background == null ? "" : "background: " + this.background}; ${this.style == null ? "" : this.style};'>`;
+    const margin_between_img_and_loader = this.loader && this.image != null && this.image.src != null ? "50px" : null;
+    if (this.image != null && this.image.src != null) {
+      this._html += `<img src='${this.image.src}' alt='${this.image.alt || "Icon"}' ${this.image.width ? "width='" + this.image.width + "'" : ""} ${this.image.height ? "height='" + this.image.height + "'" : ""} style='${this.image.width ? "width: " + this.image.width + ";" : ""} ${this.image.height ? "height: " + this.image.height + ";" : ""} ${margin_between_img_and_loader ? "margin-bottom: " + margin_between_img_and_loader : ""}; ${this.image.style == null ? "" : this.image.style};'>`;
+    }
+    if (this.loader) {
+      const size = typeof this.loader === "object" && this.loader.size ? this.loader.size : 60;
+      const color = typeof this.loader === "object" && this.loader.color ? this.loader.color : "#fff";
+      this._html += `<style>.__volt_splash_screen_loader {  display: inline-block;  position: relative;  width: calc(${size}px / 2);  height: calc(${size}px / 2);  position: absolute; bottom: 50px;}.__volt_splash_screen_loader div {  box-sizing: border-box;  display: block;  position: absolute;  width: calc(${64 / 80 * size}px / 2);  height: calc(${64 / 80 * size}px / 2);  margin: calc(${8 / 80 * size}px / 2);  border: calc(${8 / 80 * size}px / 2) solid ${color};  border-radius: 50%;  animation: __volt_splash_screen_loader 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;  border-color: ${color} transparent transparent transparent;}.__volt_splash_screen_loader div:nth-child(1) {  animation-delay: -0.45s;}.__volt_splash_screen_loader div:nth-child(2) {  animation-delay: -0.3s;}.__volt_splash_screen_loader div:nth-child(3) {  animation-delay: -0.15s;}@keyframes __volt_splash_screen_loader {  0% {    transform: rotate(0deg);  }  100% {    transform: rotate(360deg);  }}</style><div class='__volt_splash_screen_loader'><div></div><div></div><div></div><div></div></div>`;
+    }
+    this._html += "</div>";
+    return this._html;
+  }
+  /**
+   * Serve the splash screen HTML to a client over the provided stream.
+   *
+   * @param stream The stream used to send the HTTP response.
+   */
+  _serve(stream) {
+    stream.send({
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+      data: this.html
+    });
+  }
+}
+var stdin_default = SplashScreen;
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  SplashScreen
+});

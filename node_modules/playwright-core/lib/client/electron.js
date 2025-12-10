@@ -39,13 +39,18 @@ class Electron extends import_channelOwner.ChannelOwner {
     super(parent, type, guid, initializer);
   }
   async launch(options = {}) {
+    options = this._playwright.selectors._withSelectorOptions(options);
     const params = {
       ...await (0, import_browserContext.prepareBrowserContextParams)(this._platform, options),
       env: (0, import_clientHelper.envObjectToArray)(options.env ? options.env : this._platform.env),
-      tracesDir: options.tracesDir
+      tracesDir: options.tracesDir,
+      timeout: new import_timeoutSettings.TimeoutSettings(this._platform).launchTimeout(options)
     };
     const app = ElectronApplication.from((await this._channel.launch(params)).electronApplication);
-    app._context._setOptions(params, options);
+    this._playwright.selectors._contextsForSelectors.add(app._context);
+    app.once(import_events.Events.ElectronApplication.Close, () => this._playwright.selectors._contextsForSelectors.delete(app._context));
+    await app._context._initializeHarFromOptions(options.recordHar);
+    app._context.tracing._tracesDir = options.tracesDir;
     return app;
   }
 }
@@ -61,7 +66,7 @@ class ElectronApplication extends import_channelOwner.ChannelOwner {
     this._channel.on("close", () => {
       this.emit(import_events.Events.ElectronApplication.Close);
     });
-    this._channel.on("console", (event) => this.emit(import_events.Events.ElectronApplication.Console, new import_consoleMessage.ConsoleMessage(this._platform, event)));
+    this._channel.on("console", (event) => this.emit(import_events.Events.ElectronApplication.Console, new import_consoleMessage.ConsoleMessage(this._platform, event, null, null)));
     this._setEventToSubscriptionMapping(/* @__PURE__ */ new Map([
       [import_events.Events.ElectronApplication.Console, "console"]
     ]));
@@ -70,7 +75,7 @@ class ElectronApplication extends import_channelOwner.ChannelOwner {
     return electronApplication._object;
   }
   process() {
-    return this._toImpl().process();
+    return this._connection.toImpl?.(this)?.process();
   }
   _onPage(page) {
     this._windows.add(page);

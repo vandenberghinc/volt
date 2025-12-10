@@ -1,3 +1,7 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementBaseSignature } from "../elements/module.js";
 declare const StyleElement_base: VElementBaseSignature;
 export declare class StyleElement extends StyleElement_base {

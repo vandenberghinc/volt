@@ -20,6 +20,7 @@ var utilsBundle_exports = {};
 __export(utilsBundle_exports, {
   HttpsProxyAgent: () => HttpsProxyAgent,
   PNG: () => PNG,
+  ProgramOption: () => ProgramOption,
   SocksProxyAgent: () => SocksProxyAgent,
   colors: () => colors,
   debug: () => debug,
@@ -38,7 +39,8 @@ __export(utilsBundle_exports, {
   wsReceiver: () => wsReceiver,
   wsSender: () => wsSender,
   wsServer: () => wsServer,
-  yaml: () => yaml
+  yaml: () => yaml,
+  zod: () => zod
 });
 module.exports = __toCommonJS(utilsBundle_exports);
 const colors = require("./utilsBundleImpl").colors;
@@ -54,13 +56,15 @@ const minimatch = require("./utilsBundleImpl").minimatch;
 const open = require("./utilsBundleImpl").open;
 const PNG = require("./utilsBundleImpl").PNG;
 const program = require("./utilsBundleImpl").program;
+const ProgramOption = require("./utilsBundleImpl").ProgramOption;
 const progress = require("./utilsBundleImpl").progress;
 const SocksProxyAgent = require("./utilsBundleImpl").SocksProxyAgent;
-const yaml = require("./utilsBundleImpl").yaml;
 const ws = require("./utilsBundleImpl").ws;
 const wsServer = require("./utilsBundleImpl").wsServer;
 const wsReceiver = require("./utilsBundleImpl").wsReceiver;
 const wsSender = require("./utilsBundleImpl").wsSender;
+const yaml = require("./utilsBundleImpl").yaml;
+const zod = require("./utilsBundleImpl").zod;
 function ms(ms2) {
   if (!isFinite(ms2))
     return "-";
@@ -84,6 +88,7 @@ function ms(ms2) {
 0 && (module.exports = {
   HttpsProxyAgent,
   PNG,
+  ProgramOption,
   SocksProxyAgent,
   colors,
   debug,
@@ -102,5 +107,6 @@ function ms(ms2) {
   wsReceiver,
   wsSender,
   wsServer,
-  yaml
+  yaml,
+  zod
 });

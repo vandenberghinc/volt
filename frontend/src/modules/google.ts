@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Google wrapper module.
@@ -31,7 +31,7 @@ export namespace Google {
 
     // Auto initialize (internal use).
     function _initialize(): void {
-        if (Google.id) {
+        if (Google.id && typeof window !== "undefined") {
             // @ts-ignore
             window.dataLayer = window.dataLayer || [];
             function gtag(...args: any[]): void {

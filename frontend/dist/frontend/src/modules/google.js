@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 // Google wrapper module.
 export var Google;
@@ -30,7 +30,7 @@ export var Google;
     Google.disable_tracking = disable_tracking;
     // Auto initialize (internal use).
     function _initialize() {
-        if (Google.id) {
+        if (Google.id && typeof window !== "undefined") {
             // @ts-ignore
             window.dataLayer = window.dataLayer || [];
             function gtag(...args) {

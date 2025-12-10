@@ -41,13 +41,14 @@ function browserDirectoryToMarkerFilePath(browserDirectory) {
 function downloadFile(options) {
   let downloadedBytes = 0;
   let totalBytes = 0;
+  let chunked = false;
   const promise = new import_manualPromise.ManualPromise();
   (0, import_network.httpRequest)({
     url: options.url,
     headers: {
       "User-Agent": options.userAgent
     },
-    timeout: options.socketTimeout
+    socketTimeout: options.socketTimeout
   }, (response) => {
     log(`-- response status code: ${response.statusCode}`);
     if (response.statusCode !== 200) {
@@ -60,11 +61,13 @@ function downloadFile(options) {
       response.on("data", (chunk) => content += chunk).on("end", handleError).on("error", handleError);
       return;
     }
+    chunked = response.headers["transfer-encoding"] === "chunked";
+    log(`-- is chunked: ${chunked}`);
     totalBytes = parseInt(response.headers["content-length"] || "0", 10);
     log(`-- total bytes: ${totalBytes}`);
     const file = import_fs.default.createWriteStream(options.zipPath);
     file.on("finish", () => {
-      if (downloadedBytes !== totalBytes) {
+      if (!chunked && downloadedBytes !== totalBytes) {
         log(`-- download failed, size mismatch: ${downloadedBytes} != ${totalBytes}`);
         promise.reject(new Error(`Download failed: size mismatch, file size: ${downloadedBytes}, expected size: ${totalBytes} URL: ${options.url}`));
       } else {
@@ -89,7 +92,8 @@ function downloadFile(options) {
   return promise;
   function onData(chunk) {
     downloadedBytes += chunk.length;
-    progress(downloadedBytes, totalBytes);
+    if (!chunked)
+      progress(downloadedBytes, totalBytes);
   }
 }
 async function main(options) {

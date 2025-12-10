@@ -1,4 +1,8 @@
 /**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
+/**
  * Create a gradient object.
  *
  * Can also be constructed with wrapper function `Gradient`.

@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -87,6 +87,27 @@ let GradientBorderElement = (() => {
                 "-webkit-mask": "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
                 "-webkit-mask-composite": (navigator.userAgent.includes("Firefox") || navigator.userAgent.includes("Mozilla")) ? "exclude" : "xor",
             });
+        }
+        /**
+         * Assigns the border color of this node, also supports a `GradientType` element.
+         * @note This method supports a different set of parameters than the standard `VElement.border` method.
+         * @param width The width of the border.
+         * @param color The color of the border.
+         * @returns Returns the instance for chaining unless parameter `value` is `undefined`, then the attribute's value is returned.
+         * @docs
+         */
+        // @ts-ignore different signature than base.
+        border(width, color) {
+            if (width == null) {
+                return `${this.border_width().split(" ")[0]} ${this.border_color()}`;
+            }
+            else {
+                this.border_width(width);
+                if (color) {
+                    this.border_color(color);
+                }
+            }
+            return this;
         }
         border_color(val) {
             if (val === undefined) {

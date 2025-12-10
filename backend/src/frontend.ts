@@ -8,7 +8,7 @@ export const Frontend = {
 	/** CSS exports. */
 	css: {
         /** The default volt css export. */
-		volt: __dirname + "/../../../frontend/src/css/volt.css",
+		volt: __dirname + "/../../../../../frontend/dist/frontend/src/css/volt.css",
 	}
 }
 export default Frontend;

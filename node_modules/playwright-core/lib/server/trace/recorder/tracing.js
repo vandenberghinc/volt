@@ -28,19 +28,19 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var tracing_exports = {};
 __export(tracing_exports, {
-  Tracing: () => Tracing,
-  shouldCaptureSnapshot: () => shouldCaptureSnapshot
+  Tracing: () => Tracing
 });
 module.exports = __toCommonJS(tracing_exports);
 var import_fs = __toESM(require("fs"));
 var import_os = __toESM(require("os"));
 var import_path = __toESM(require("path"));
 var import_snapshotter = require("./snapshotter");
-var import_debug = require("../../../protocol/debug");
+var import_protocolMetainfo = require("../../../utils/isomorphic/protocolMetainfo");
 var import_assert = require("../../../utils/isomorphic/assert");
 var import_time = require("../../../utils/isomorphic/time");
 var import_eventsHelper = require("../../utils/eventsHelper");
 var import_crypto = require("../../utils/crypto");
+var import_userAgent = require("../../utils/userAgent");
 var import_artifact = require("../../artifact");
 var import_browserContext = require("../../browserContext");
 var import_dispatcher = require("../../dispatchers/dispatcher");
@@ -49,7 +49,8 @@ var import_fileUtils = require("../../utils/fileUtils");
 var import_harTracer = require("../../har/harTracer");
 var import_instrumentation = require("../../instrumentation");
 var import_page = require("../../page");
-const version = 7;
+var import_progress = require("../../progress");
+const version = 8;
 const kScreencastOptions = { width: 800, height: 600, quality: 90 };
 class Tracing extends import_instrumentation.SdkObject {
   constructor(context, tracesDir) {
@@ -74,11 +75,12 @@ class Tracing extends import_instrumentation.SdkObject {
       type: "context-options",
       origin: "library",
       browserName: "",
+      playwrightVersion: (0, import_userAgent.getPlaywrightVersion)(),
       options: {},
       platform: process.platform,
       wallTime: 0,
       monotonicTime: 0,
-      sdkLanguage: context.attribution.playwright.options.sdkLanguage,
+      sdkLanguage: this._sdkLanguage(),
       testIdAttributeName,
       contextId: context.guid
     };
@@ -90,18 +92,22 @@ class Tracing extends import_instrumentation.SdkObject {
       this._contextCreatedEvent.options = context._options;
     }
   }
-  async resetForReuse() {
-    await this.stopChunk({ mode: "discard" }).catch(() => {
-    });
-    await this.stop();
-    this._snapshotter?.resetForReuse();
+  _sdkLanguage() {
+    return this._context instanceof import_browserContext.BrowserContext ? this._context._browser.sdkLanguage() : this._context.attribution.playwright.options.sdkLanguage;
   }
-  async start(options) {
+  async resetForReuse(progress) {
+    await this.stopChunk(progress, { mode: "discard" }).catch(() => {
+    });
+    await this.stop(progress);
+    if (this._snapshotter)
+      await progress.race(this._snapshotter.resetForReuse());
+  }
+  start(options) {
     if (this._isStopping)
       throw new Error("Cannot start tracing while stopping");
     if (this._state)
       throw new Error("Tracing has been already started");
-    this._contextCreatedEvent.sdkLanguage = this._context.attribution.playwright.options.sdkLanguage;
+    this._contextCreatedEvent.sdkLanguage = this._sdkLanguage();
     const traceName = options.name || (0, import_crypto.createGuid)();
     const tracesDir = this._createTracesDirIfNeeded();
     this._state = {
@@ -123,9 +129,9 @@ class Tracing extends import_instrumentation.SdkObject {
     if (options.snapshots)
       this._harTracer.start({ omitScripts: !options.live });
   }
-  async startChunk(options = {}) {
+  async startChunk(progress, options = {}) {
     if (this._state && this._state.recording)
-      await this.stopChunk({ mode: "discard" });
+      await this.stopChunk(progress, { mode: "discard" });
     if (!this._state)
       throw new Error("Must start tracing before starting a new chunk");
     if (this._isStopping)
@@ -161,7 +167,7 @@ class Tracing extends import_instrumentation.SdkObject {
   _currentGroupId() {
     return this._state?.groupStack.length ? this._state.groupStack[this._state.groupStack.length - 1] : void 0;
   }
-  async group(name, location, metadata) {
+  group(name, location, metadata) {
     if (!this._state)
       return;
     const stackFrames = [];
@@ -177,7 +183,7 @@ class Tracing extends import_instrumentation.SdkObject {
       type: "before",
       callId: metadata.id,
       startTime: metadata.startTime,
-      apiName: name,
+      title: name,
       class: "Tracing",
       method: "tracingGroup",
       params: {},
@@ -232,7 +238,7 @@ class Tracing extends import_instrumentation.SdkObject {
       this._fs.copyFile(state.networkFile, newNetworkFile);
     state.networkFile = newNetworkFile;
   }
-  async stop() {
+  async stop(progress) {
     if (!this._state)
       return;
     if (this._isStopping)
@@ -242,8 +248,10 @@ class Tracing extends import_instrumentation.SdkObject {
     this._closeAllGroups();
     this._harTracer.stop();
     this.flushHarEntries();
-    await this._fs.syncAndGetError();
-    this._state = void 0;
+    const promise = progress ? progress.race(this._fs.syncAndGetError()) : this._fs.syncAndGetError();
+    await promise.finally(() => {
+      this._state = void 0;
+    });
   }
   async deleteTmpTracesDir() {
     if (this._tracesTmpDir)
@@ -267,7 +275,7 @@ class Tracing extends import_instrumentation.SdkObject {
     while (this._currentGroupId())
       this.groupEnd();
   }
-  async stopChunk(params) {
+  async stopChunk(progress, params) {
     if (this._isStopping)
       throw new Error(`Tracing is already stopping`);
     this._isStopping = true;
@@ -283,7 +291,7 @@ class Tracing extends import_instrumentation.SdkObject {
     if (this._state.options.screenshots)
       this._stopScreencast();
     if (this._state.options.snapshots)
-      await this._snapshotter?.stop();
+      this._snapshotter?.stop();
     this.flushHarEntries();
     const newNetworkFile = import_path.default.join(this._state.tracesDir, this._state.traceName + `-pwnetcopy-${this._state.chunkOrdinal}.network`);
     const entries = [];
@@ -301,12 +309,13 @@ class Tracing extends import_instrumentation.SdkObject {
     const zipFileName = this._state.traceFile + ".zip";
     if (params.mode === "archive")
       this._fs.zip(entries, zipFileName);
-    const error = await this._fs.syncAndGetError();
+    const promise = progress ? progress.race(this._fs.syncAndGetError()) : this._fs.syncAndGetError();
+    const error = await promise.catch((e) => e);
     this._isStopping = false;
     if (this._state)
       this._state.recording = false;
     if (error) {
-      if (this._context instanceof import_browserContext.BrowserContext && !this._context._browser.isConnected())
+      if (!(0, import_progress.isAbortError)(error) && this._context instanceof import_browserContext.BrowserContext && !this._context._browser.isConnected())
         return {};
       throw error;
     }
@@ -350,7 +359,9 @@ class Tracing extends import_instrumentation.SdkObject {
     return this._captureSnapshot(event.inputSnapshot, sdkObject, metadata);
   }
   onCallLog(sdkObject, metadata, logName, message) {
-    if (metadata.isServerSide || metadata.internal)
+    if (!this._state?.callIds.has(metadata.id))
+      return;
+    if (metadata.internal)
       return;
     if (logName !== "api")
       return;
@@ -535,7 +546,8 @@ function visitTraceEvent(object, sha1s) {
   return object;
 }
 function shouldCaptureSnapshot(metadata) {
-  return import_debug.commandsWithTracingSnapshots.has(metadata.type + "." + metadata.method);
+  const metainfo = import_protocolMetainfo.methodMetainfo.get(metadata.type + "." + metadata.method);
+  return !!metainfo?.snapshot;
 }
 function createBeforeActionTraceEvent(metadata, parentId) {
   if (metadata.internal || metadata.method.startsWith("tracing"))
@@ -544,7 +556,7 @@ function createBeforeActionTraceEvent(metadata, parentId) {
     type: "before",
     callId: metadata.id,
     startTime: metadata.startTime,
-    apiName: metadata.apiName || metadata.type + "." + metadata.method,
+    title: metadata.title,
     class: metadata.type,
     method: metadata.method,
     params: metadata.params,
@@ -588,6 +600,5 @@ function createAfterActionTraceEvent(metadata) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  Tracing,
-  shouldCaptureSnapshot
+  Tracing
 });

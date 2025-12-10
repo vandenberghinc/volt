@@ -39,15 +39,12 @@ var import_eventsHelper = require("../utils/eventsHelper");
 var import_hostPlatform = require("../utils/hostPlatform");
 var import_stackTrace = require("../../utils/isomorphic/stackTrace");
 var import_utilsBundle = require("../../utilsBundle");
-var import_browserContext = require("../browserContext");
 var dialog = __toESM(require("../dialog"));
 var dom = __toESM(require("../dom"));
 var import_errors = require("../errors");
 var import_helper = require("../helper");
 var network = __toESM(require("../network"));
 var import_page = require("../page");
-var import_page2 = require("../page");
-var import_wkAccessibility = require("./wkAccessibility");
 var import_wkConnection = require("./wkConnection");
 var import_wkExecutionContext = require("./wkExecutionContext");
 var import_wkInput = require("./wkInput");
@@ -55,6 +52,7 @@ var import_wkInterceptableRequest = require("./wkInterceptableRequest");
 var import_wkProvisionalPage = require("./wkProvisionalPage");
 var import_wkWorkers = require("./wkWorkers");
 var import_debugLogger = require("../utils/debugLogger");
+var import_webkit = require("./webkit");
 const UTILITY_WORLD_NAME = "__playwright_utility_world__";
 class WKPage {
   constructor(browserContext, pageProxySession, opener) {
@@ -76,12 +74,12 @@ class WKPage {
     this.rawMouse = new import_wkInput.RawMouseImpl(pageProxySession);
     this.rawTouchscreen = new import_wkInput.RawTouchscreenImpl(pageProxySession);
     this._contextIdToContext = /* @__PURE__ */ new Map();
-    this._page = new import_page2.Page(this, browserContext);
+    this._page = new import_page.Page(this, browserContext);
     this.rawMouse.setPage(this._page);
     this._workers = new import_wkWorkers.WKWorkers(this._page);
     this._session = void 0;
     this._browserContext = browserContext;
-    this._page.on(import_page2.Page.Events.FrameDetached, (frame) => this._removeContextsForFrame(frame, false));
+    this._page.on(import_page.Page.Events.FrameDetached, (frame) => this._removeContextsForFrame(frame, false));
     this._eventListeners = [
       import_eventsHelper.eventsHelper.addEventListener(this._pageProxySession, "Target.targetCreated", this._onTargetCreated.bind(this)),
       import_eventsHelper.eventsHelper.addEventListener(this._pageProxySession, "Target.targetDestroyed", this._onTargetDestroyed.bind(this)),
@@ -93,15 +91,17 @@ class WKPage {
       this._firstNonInitialNavigationCommittedFulfill = f;
       this._firstNonInitialNavigationCommittedReject = r;
     });
+    this._firstNonInitialNavigationCommittedPromise.catch(() => {
+    });
     if (opener && !browserContext._options.noDefaultViewport && opener._nextWindowOpenPopupFeatures) {
       const viewportSize = import_helper.helper.getViewportSizeFromWindowFeatures(opener._nextWindowOpenPopupFeatures);
       opener._nextWindowOpenPopupFeatures = void 0;
       if (viewportSize)
-        this._page._emulatedSize = { viewport: viewportSize, screen: viewportSize };
+        this._page.setEmulatedSizeFromWindowOpen({ viewport: viewportSize, screen: viewportSize });
     }
   }
   async _initializePageProxySession() {
-    if (this._page._browserContext.isSettingStorageState())
+    if (this._page.isStorageStatePage)
       return;
     const promises = [
       this._pageProxySession.send("Dialog.enable"),
@@ -156,7 +156,6 @@ class WKPage {
     const promises = [
       // Resource tree should be received before first execution context.
       session.send("Runtime.enable"),
-      session.send("Runtime.addBinding", { name: import_page.PageBinding.kPlaywrightBinding }),
       session.send("Page.createUserWorld", { name: UTILITY_WORLD_NAME }).catch((_) => {
       }),
       // Worlds are per-process
@@ -164,12 +163,14 @@ class WKPage {
       session.send("Network.enable"),
       this._workers.initializeSession(session)
     ];
+    if (this._page.browserContext.needsPlaywrightBinding())
+      promises.push(session.send("Runtime.addBinding", { name: import_page.PageBinding.kBindingName }));
     if (this._page.needsRequestInterception()) {
       promises.push(session.send("Network.setInterceptionEnabled", { enabled: true }));
       promises.push(session.send("Network.setResourceCachingDisabled", { disabled: true }));
       promises.push(session.send("Network.addInterception", { url: ".*", stage: "request", isRegex: true }));
     }
-    if (this._page._browserContext.isSettingStorageState()) {
+    if (this._page.isStorageStatePage) {
       await Promise.all(promises);
       return;
     }
@@ -272,7 +273,7 @@ class WKPage {
     let errorText = event.error;
     if (errorText.includes("cancelled"))
       errorText += "; maybe frame was detached?";
-    this._page._frameManager.frameAbortedNavigation(this._page.mainFrame()._id, errorText, event.loaderId);
+    this._page.frameManager.frameAbortedNavigation(this._page.mainFrame()._id, errorText, event.loaderId);
   }
   handleWindowOpen(event) {
     this._nextWindowOpenPopupFeatures = event.windowFeatures;
@@ -287,6 +288,8 @@ class WKPage {
         session.dispatchMessage({ id: message.id, error: { message: e.message } });
       });
     });
+    if (targetInfo.type === "frame")
+      return;
     (0, import_utils.assert)(targetInfo.type === "page", "Only page targets are expected in WebKit, received: " + targetInfo.type);
     if (!targetInfo.isProvisional) {
       (0, import_utils.assert)(!this._page.initializedOrUndefined());
@@ -303,17 +306,14 @@ class WKPage {
       }
       if (targetInfo.isPaused)
         this._pageProxySession.sendMayFail("Target.resume", { targetId: targetInfo.targetId });
-      if (pageOrError instanceof import_page2.Page && this._page.mainFrame().url() === "") {
+      if (pageOrError instanceof import_page.Page && this._page.mainFrame().url() === "") {
         try {
           await this._firstNonInitialNavigationCommittedPromise;
         } catch (e) {
           pageOrError = e;
         }
-      } else {
-        this._firstNonInitialNavigationCommittedPromise.catch(() => {
-        });
       }
-      this._page.reportAsNew(this._opener?._page, pageOrError instanceof import_page2.Page ? void 0 : pageOrError);
+      this._page.reportAsNew(this._opener?._page, pageOrError instanceof import_page.Page ? void 0 : pageOrError);
     } else {
       (0, import_utils.assert)(targetInfo.isProvisional);
       (0, import_utils.assert)(!this._provisionalPage);
@@ -342,9 +342,8 @@ class WKPage {
       import_eventsHelper.eventsHelper.addEventListener(this._session, "Page.frameDetached", (event) => this._onFrameDetached(event.frameId)),
       import_eventsHelper.eventsHelper.addEventListener(this._session, "Page.willCheckNavigationPolicy", (event) => this._onWillCheckNavigationPolicy(event.frameId)),
       import_eventsHelper.eventsHelper.addEventListener(this._session, "Page.didCheckNavigationPolicy", (event) => this._onDidCheckNavigationPolicy(event.frameId, event.cancel)),
-      import_eventsHelper.eventsHelper.addEventListener(this._session, "Page.frameScheduledNavigation", (event) => this._onFrameScheduledNavigation(event.frameId, event.delay, event.targetIsCurrentFrame)),
-      import_eventsHelper.eventsHelper.addEventListener(this._session, "Page.loadEventFired", (event) => this._page._frameManager.frameLifecycleEvent(event.frameId, "load")),
-      import_eventsHelper.eventsHelper.addEventListener(this._session, "Page.domContentEventFired", (event) => this._page._frameManager.frameLifecycleEvent(event.frameId, "domcontentloaded")),
+      import_eventsHelper.eventsHelper.addEventListener(this._session, "Page.loadEventFired", (event) => this._page.frameManager.frameLifecycleEvent(event.frameId, "load")),
+      import_eventsHelper.eventsHelper.addEventListener(this._session, "Page.domContentEventFired", (event) => this._page.frameManager.frameLifecycleEvent(event.frameId, "domcontentloaded")),
       import_eventsHelper.eventsHelper.addEventListener(this._session, "Runtime.executionContextCreated", (event) => this._onExecutionContextCreated(event.context)),
       import_eventsHelper.eventsHelper.addEventListener(this._session, "Runtime.bindingCalled", (event) => this._onBindingCalled(event.contextId, event.argument)),
       import_eventsHelper.eventsHelper.addEventListener(this._session, "Console.messageAdded", (event) => this._onConsoleMessage(event)),
@@ -356,13 +355,13 @@ class WKPage {
       import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.responseReceived", (e) => this._onResponseReceived(this._session, e)),
       import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.loadingFinished", (e) => this._onLoadingFinished(e)),
       import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.loadingFailed", (e) => this._onLoadingFailed(this._session, e)),
-      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketCreated", (e) => this._page._frameManager.onWebSocketCreated(e.requestId, e.url)),
-      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketWillSendHandshakeRequest", (e) => this._page._frameManager.onWebSocketRequest(e.requestId)),
-      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketHandshakeResponseReceived", (e) => this._page._frameManager.onWebSocketResponse(e.requestId, e.response.status, e.response.statusText)),
-      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketFrameSent", (e) => e.response.payloadData && this._page._frameManager.onWebSocketFrameSent(e.requestId, e.response.opcode, e.response.payloadData)),
-      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketFrameReceived", (e) => e.response.payloadData && this._page._frameManager.webSocketFrameReceived(e.requestId, e.response.opcode, e.response.payloadData)),
-      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketClosed", (e) => this._page._frameManager.webSocketClosed(e.requestId)),
-      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketFrameError", (e) => this._page._frameManager.webSocketError(e.requestId, e.errorMessage))
+      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketCreated", (e) => this._page.frameManager.onWebSocketCreated(e.requestId, e.url)),
+      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketWillSendHandshakeRequest", (e) => this._page.frameManager.onWebSocketRequest(e.requestId)),
+      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketHandshakeResponseReceived", (e) => this._page.frameManager.onWebSocketResponse(e.requestId, e.response.status, e.response.statusText)),
+      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketFrameSent", (e) => e.response.payloadData && this._page.frameManager.onWebSocketFrameSent(e.requestId, e.response.opcode, e.response.payloadData)),
+      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketFrameReceived", (e) => e.response.payloadData && this._page.frameManager.webSocketFrameReceived(e.requestId, e.response.opcode, e.response.payloadData)),
+      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketClosed", (e) => this._page.frameManager.webSocketClosed(e.requestId)),
+      import_eventsHelper.eventsHelper.addEventListener(this._session, "Network.webSocketFrameError", (e) => this._page.frameManager.webSocketError(e.requestId, e.errorMessage))
     ];
   }
   async _updateState(method, params) {
@@ -380,47 +379,43 @@ class WKPage {
   _onWillCheckNavigationPolicy(frameId) {
     if (this._provisionalPage)
       return;
-    this._page._frameManager.frameRequestedNavigation(frameId);
+    this._page.frameManager.frameRequestedNavigation(frameId);
   }
   _onDidCheckNavigationPolicy(frameId, cancel) {
     if (!cancel)
       return;
     if (this._provisionalPage)
       return;
-    this._page._frameManager.frameAbortedNavigation(frameId, "Navigation canceled by policy check");
-  }
-  _onFrameScheduledNavigation(frameId, delay, targetIsCurrentFrame) {
-    if (targetIsCurrentFrame)
-      this._page._frameManager.frameRequestedNavigation(frameId);
+    this._page.frameManager.frameAbortedNavigation(frameId, "Navigation canceled by policy check");
   }
   _handleFrameTree(frameTree) {
     this._onFrameAttached(frameTree.frame.id, frameTree.frame.parentId || null);
     this._onFrameNavigated(frameTree.frame, true);
-    this._page._frameManager.frameLifecycleEvent(frameTree.frame.id, "domcontentloaded");
-    this._page._frameManager.frameLifecycleEvent(frameTree.frame.id, "load");
+    this._page.frameManager.frameLifecycleEvent(frameTree.frame.id, "domcontentloaded");
+    this._page.frameManager.frameLifecycleEvent(frameTree.frame.id, "load");
     if (!frameTree.childFrames)
       return;
     for (const child of frameTree.childFrames)
       this._handleFrameTree(child);
   }
   _onFrameAttached(frameId, parentFrameId) {
-    return this._page._frameManager.frameAttached(frameId, parentFrameId);
+    return this._page.frameManager.frameAttached(frameId, parentFrameId);
   }
   _onFrameNavigated(framePayload, initial) {
-    const frame = this._page._frameManager.frame(framePayload.id);
+    const frame = this._page.frameManager.frame(framePayload.id);
     (0, import_utils.assert)(frame);
     this._removeContextsForFrame(frame, true);
     if (!framePayload.parentId)
       this._workers.clear();
-    this._page._frameManager.frameCommittedNewDocumentNavigation(framePayload.id, framePayload.url, framePayload.name || "", framePayload.loaderId, initial);
+    this._page.frameManager.frameCommittedNewDocumentNavigation(framePayload.id, framePayload.url, framePayload.name || "", framePayload.loaderId, initial);
     if (!initial)
       this._firstNonInitialNavigationCommittedFulfill();
   }
   _onFrameNavigatedWithinDocument(frameId, url) {
-    this._page._frameManager.frameCommittedSameDocumentNavigation(frameId, url);
+    this._page.frameManager.frameCommittedSameDocumentNavigation(frameId, url);
   }
   _onFrameDetached(frameId) {
-    this._page._frameManager.frameDetached(frameId);
+    this._page.frameManager.frameDetached(frameId);
   }
   _removeContextsForFrame(frame, notifyFrame) {
     for (const [contextId, context] of this._contextIdToContext) {
@@ -434,7 +429,7 @@ class WKPage {
   _onExecutionContextCreated(contextPayload) {
     if (this._contextIdToContext.has(contextPayload.id))
       return;
-    const frame = this._page._frameManager.frame(contextPayload.frameId);
+    const frame = this._page.frameManager.frame(contextPayload.frameId);
     if (!frame)
       return;
     const delegate = new import_wkExecutionContext.WKExecutionContext(this._session, contextPayload.id);
@@ -453,7 +448,7 @@ class WKPage {
     if (!(pageOrError instanceof Error)) {
       const context = this._contextIdToContext.get(contextId);
       if (context)
-        await this._page._onBindingCalled(argument, context);
+        await this._page.onBindingCalled(argument, context);
     }
   }
   async navigateFrame(frame, url, referrer) {
@@ -479,7 +474,7 @@ class WKPage {
       const error = new Error(message);
       error.stack = stack;
       error.name = name;
-      this._page.emitOnContextOnceInitialized(import_browserContext.BrowserContext.Events.PageError, error, this._page);
+      this._page.addPageError(error);
       return;
     }
     let derivedType = type || "";
@@ -523,18 +518,18 @@ class WKPage {
         location
       } = this._lastConsoleMessage;
       for (let i = count; i < event.count; ++i)
-        this._page._addConsoleMessage(derivedType, handles, location, handles.length ? void 0 : text);
+        this._page.addConsoleMessage(null, derivedType, handles, location, handles.length ? void 0 : text);
       this._lastConsoleMessage.count = event.count;
     }
   }
   _onDialog(event) {
-    this._page.emitOnContext(import_browserContext.BrowserContext.Events.Dialog, new dialog.Dialog(
+    this._page.browserContext.dialogManager.dialogDidOpen(new dialog.Dialog(
       this._page,
       event.type,
       event.message,
       async (accept, promptText) => {
         if (event.type === "beforeunload" && !accept)
-          this._page._frameManager.frameAbortedNavigation(this._page.mainFrame()._id, "navigation cancelled by beforeunload dialog");
+          this._page.frameManager.frameAbortedNavigation(this._page.mainFrame()._id, "navigation cancelled by beforeunload dialog");
         await this._pageProxySession.send("Dialog.handleJavaScriptDialog", { accept, promptText });
       },
       event.defaultPrompt
@@ -543,7 +538,7 @@ class WKPage {
   async _onFileChooserOpened(event) {
     let handle;
     try {
-      const context = await this._page._frameManager.frame(event.frameId)._mainContext();
+      const context = await this._page.frameManager.frame(event.frameId)._mainContext();
       handle = (0, import_wkExecutionContext.createHandle)(context, event.element).asElement();
     } catch (e) {
       return;
@@ -632,7 +627,7 @@ class WKPage {
     await this._forAllSessions((session) => WKPage._setEmulateMedia(session, emulatedMedia.media, colorScheme, reducedMotion, forcedColors, contrast));
   }
   async updateEmulatedViewportSize() {
-    this._browserContext._validateEmulatedViewport(this._page.viewportSize());
+    this._browserContext._validateEmulatedViewport(this._page.emulatedSize()?.viewport);
     await this._updateViewport();
   }
   async updateUserAgent() {
@@ -646,11 +641,11 @@ class WKPage {
   }
   async _updateViewport() {
     const options = this._browserContext._options;
-    const deviceSize = this._page.emulatedSize();
-    if (deviceSize === null)
+    const emulatedSize = this._page.emulatedSize();
+    if (!emulatedSize)
       return;
-    const viewportSize = deviceSize.viewport;
-    const screenSize = deviceSize.screen;
+    const viewportSize = emulatedSize.viewport;
+    const screenSize = emulatedSize.screen;
     const promises = [
       this._pageProxySession.send("Emulation.setDeviceMetricsOverride", {
         width: viewportSize.width,
@@ -668,6 +663,8 @@ class WKPage {
       promises.push(this._pageProxySession.send("Emulation.setOrientationOverride", { angle }));
     }
     await Promise.all(promises);
+    if (!this._browserContext._browser?.options.headful && (import_hostPlatform.hostPlatform === "ubuntu22.04-x64" || import_hostPlatform.hostPlatform.startsWith("debian12")))
+      await new Promise((r) => setTimeout(r, 500));
   }
   async updateRequestInterception() {
     const enabled = this._page.needsRequestInterception();
@@ -712,20 +709,40 @@ class WKPage {
   async addInitScript(initScript) {
     await this._updateBootstrapScript();
   }
-  async removeNonInternalInitScripts() {
+  async removeInitScripts(initScripts) {
     await this._updateBootstrapScript();
+  }
+  async exposePlaywrightBinding() {
+    await this._updateState("Runtime.addBinding", { name: import_page.PageBinding.kBindingName });
   }
   _calculateBootstrapScript() {
     const scripts = [];
-    if (!this._page.context()._options.isMobile) {
+    if (!this._page.browserContext._options.isMobile) {
       scripts.push("delete window.orientation");
       scripts.push("delete window.ondevicemotion");
       scripts.push("delete window.ondeviceorientation");
     }
     scripts.push('if (!window.safari) window.safari = { pushNotification: { toString() { return "[object SafariRemoteNotification]"; } } };');
     scripts.push("if (!window.GestureEvent) window.GestureEvent = function GestureEvent() {};");
+    scripts.push(this._publicKeyCredentialScript());
     scripts.push(...this._page.allInitScripts().map((script) => script.source));
     return scripts.join(";\n");
+  }
+  _publicKeyCredentialScript() {
+    function polyfill() {
+      window.PublicKeyCredential ??= {
+        async getClientCapabilities() {
+          return {};
+        },
+        async isConditionalMediationAvailable() {
+          return false;
+        },
+        async isUserVerifyingPlatformAuthenticatorAvailable() {
+          return false;
+        }
+      };
+    }
+    return `(${polyfill.toString()})();`;
   }
   async _updateBootstrapScript() {
     await this._updateState("Page.setBootstrapScript", { source: this._calculateBootstrapScript() });
@@ -741,14 +758,14 @@ class WKPage {
     await this._session.send("Page.setDefaultBackgroundColorOverride", { color });
   }
   _toolbarHeight() {
-    if (this._page._browserContext._browser?.options.headful)
+    if (this._page.browserContext._browser?.options.headful)
       return import_hostPlatform.hostPlatform === "mac10.15" ? 55 : 59;
     return 0;
   }
   async _startVideo(options) {
     (0, import_utils.assert)(!this._recordingVideoFile);
     const { screencastId } = await this._pageProxySession.send("Screencast.startVideo", {
-      file: options.outputFile,
+      file: this._browserContext._browser.options.channel === "webkit-wsl" ? await (0, import_webkit.translatePathToWSL)(options.outputFile) : options.outputFile,
       width: options.width,
       height: options.height,
       toolbarHeight: this._toolbarHeight()
@@ -765,8 +782,8 @@ class WKPage {
   validateScreenshotDimension(side, omitDeviceScaleFactor) {
     if (process.platform === "darwin")
       return;
-    if (!omitDeviceScaleFactor && this._page._browserContext._options.deviceScaleFactor)
-      side = Math.ceil(side * this._page._browserContext._options.deviceScaleFactor);
+    if (!omitDeviceScaleFactor && this._page.browserContext._options.deviceScaleFactor)
+      side = Math.ceil(side * this._page.browserContext._options.deviceScaleFactor);
     if (side > 32767)
       throw new Error("Cannot take screenshot larger than 32767 pixels on any dimension");
   }
@@ -775,7 +792,7 @@ class WKPage {
     const omitDeviceScaleFactor = scale === "css";
     this.validateScreenshotDimension(rect.width, omitDeviceScaleFactor);
     this.validateScreenshotDimension(rect.height, omitDeviceScaleFactor);
-    const result = await this._session.send("Page.snapshotRect", { ...rect, coordinateSystem: documentRect ? "Page" : "Viewport", omitDeviceScaleFactor });
+    const result = await progress.race(this._session.send("Page.snapshotRect", { ...rect, coordinateSystem: documentRect ? "Page" : "Viewport", omitDeviceScaleFactor }));
     const prefix = "data:image/png;base64,";
     let buffer = Buffer.from(result.dataURL.substr(prefix.length), "base64");
     if (format === "jpeg")
@@ -788,7 +805,7 @@ class WKPage {
     });
     if (!nodeInfo.contentFrameId)
       return null;
-    return this._page._frameManager.frame(nodeInfo.contentFrameId);
+    return this._page.frameManager.frame(nodeInfo.contentFrameId);
   }
   async getOwnerFrame(handle) {
     if (!handle._objectId)
@@ -843,7 +860,7 @@ class WKPage {
       this._pageProxySession.send("Screencast.screencastFrameAck", { generation }).catch((e) => import_debugLogger.debugLogger.log("error", e));
     });
     const buffer = Buffer.from(event.data, "base64");
-    this._page.emit(import_page2.Page.Events.ScreencastFrame, {
+    this._page.emit(import_page.Page.Events.ScreencastFrame, {
       buffer,
       width: event.deviceWidth,
       height: event.deviceHeight
@@ -868,6 +885,8 @@ class WKPage {
   async setInputFilePaths(handle, paths) {
     const pageProxyId = this._pageProxySession.sessionId;
     const objectId = handle._objectId;
+    if (this._browserContext._browser?.options.channel === "webkit-wsl")
+      paths = await Promise.all(paths.map((path2) => (0, import_webkit.translatePathToWSL)(path2)));
     await Promise.all([
       this._pageProxySession.connection.browserSession.send("Playwright.grantFileReadAccess", { pageProxyId, paths }),
       this._session.send("DOM.setInputFiles", { objectId, paths })
@@ -882,12 +901,9 @@ class WKPage {
       throw new Error(dom.kUnableToAdoptErrorMessage);
     return (0, import_wkExecutionContext.createHandle)(to, result.object);
   }
-  async getAccessibilityTree(needle) {
-    return (0, import_wkAccessibility.getAccessibilityTree)(this._session, needle);
-  }
   async inputActionEpilogue() {
   }
-  async resetForReuse() {
+  async resetForReuse(progress) {
   }
   async getFrameElement(frame) {
     const parent = frame.parentFrame();
@@ -945,7 +961,7 @@ class WKPage {
         redirectedFrom = request2;
       }
     }
-    const frame = redirectedFrom ? redirectedFrom.request.frame() : this._page._frameManager.frame(event.frameId);
+    const frame = redirectedFrom ? redirectedFrom.request.frame() : this._page.frameManager.frame(event.frameId);
     if (!frame)
       return;
     const isNavigationRequest = event.type === "Document";
@@ -957,7 +973,7 @@ class WKPage {
       request.request.setRawRequestHeaders(null);
     }
     this._requestIdToRequest.set(event.requestId, request);
-    this._page._frameManager.requestStarted(request.request, route);
+    this._page.frameManager.requestStarted(request.request, route);
   }
   _handleRequestRedirect(request, requestId, responsePayload, timestamp) {
     const response = request.createResponse(responsePayload);
@@ -967,8 +983,8 @@ class WKPage {
     response.setEncodedBodySize(null);
     response._requestFinished(responsePayload.timing ? import_helper.helper.secondsToRoundishMillis(timestamp - request._timestamp) : -1);
     this._requestIdToRequest.delete(requestId);
-    this._page._frameManager.requestReceivedResponse(response);
-    this._page._frameManager.reportRequestFinished(request.request, response);
+    this._page.frameManager.requestReceivedResponse(response);
+    this._page.frameManager.reportRequestFinished(request.request, response);
   }
   _onRequestIntercepted(session, event) {
     const requestWillBeSentEvent = this._requestIdToRequestWillBeSentEvent.get(event.requestId);
@@ -990,7 +1006,7 @@ class WKPage {
       return;
     this._requestIdToResponseReceivedPayloadEvent.set(event.requestId, event);
     const response = request.createResponse(event.response);
-    this._page._frameManager.requestReceivedResponse(response);
+    this._page.frameManager.requestReceivedResponse(response);
     if (response.status() === 204 && request.request.isNavigationRequest()) {
       this._onLoadingFailed(session, {
         requestId: event.requestId,
@@ -1023,7 +1039,7 @@ class WKPage {
     }
     this._requestIdToResponseReceivedPayloadEvent.delete(event.requestId);
     this._requestIdToRequest.delete(event.requestId);
-    this._page._frameManager.reportRequestFinished(request.request, response);
+    this._page.frameManager.reportRequestFinished(request.request, response);
   }
   _onLoadingFailed(session, event) {
     const requestWillBeSentEvent = this._requestIdToRequestWillBeSentEvent.get(event.requestId);
@@ -1046,7 +1062,7 @@ class WKPage {
     }
     this._requestIdToRequest.delete(event.requestId);
     request.request._setFailureText(event.errorText);
-    this._page._frameManager.requestFailed(request.request, event.errorText.includes("cancelled"));
+    this._page.frameManager.requestFailed(request.request, event.errorText.includes("cancelled"));
   }
   async _grantPermissions(origin, permissions) {
     const webPermissionToProtocol = /* @__PURE__ */ new Map([

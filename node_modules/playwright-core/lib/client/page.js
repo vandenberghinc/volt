@@ -22,7 +22,6 @@ __export(page_exports, {
   Page: () => Page
 });
 module.exports = __toCommonJS(page_exports);
-var import_accessibility = require("./accessibility");
 var import_artifact = require("./artifact");
 var import_channelOwner = require("./channelOwner");
 var import_clientHelper = require("./clientHelper");
@@ -48,6 +47,7 @@ var import_stringUtils = require("../utils/isomorphic/stringUtils");
 var import_urlMatch = require("../utils/isomorphic/urlMatch");
 var import_manualPromise = require("../utils/isomorphic/manualPromise");
 var import_rtti = require("../utils/isomorphic/rtti");
+var import_consoleMessage = require("./consoleMessage");
 class Page extends import_channelOwner.ChannelOwner {
   constructor(parent, type, guid, initializer) {
     super(parent, type, guid, initializer);
@@ -64,7 +64,6 @@ class Page extends import_channelOwner.ChannelOwner {
     this._locatorHandlers = /* @__PURE__ */ new Map();
     this._browserContext = parent;
     this._timeoutSettings = new import_timeoutSettings.TimeoutSettings(this._platform, this._browserContext._timeoutSettings);
-    this.accessibility = new import_accessibility.Accessibility(this._channel);
     this.keyboard = new import_input.Keyboard(this);
     this.mouse = new import_input.Mouse(this);
     this.request = this._browserContext.request;
@@ -73,7 +72,7 @@ class Page extends import_channelOwner.ChannelOwner {
     this._mainFrame = import_frame.Frame.from(initializer.mainFrame);
     this._mainFrame._page = this;
     this._frames.add(this._mainFrame);
-    this._viewportSize = initializer.viewportSize || null;
+    this._viewportSize = initializer.viewportSize;
     this._closed = initializer.isClosed;
     this._opener = Page.fromNullable(initializer.opener);
     this._channel.on("bindingCall", ({ binding }) => this._onBinding(BindingCall.from(binding)));
@@ -93,6 +92,7 @@ class Page extends import_channelOwner.ChannelOwner {
       const artifactObject = import_artifact.Artifact.from(artifact);
       this._forceVideo()._artifactReady(artifactObject);
     });
+    this._channel.on("viewportSizeChanged", ({ viewportSize }) => this._viewportSize = viewportSize);
     this._channel.on("webSocket", ({ webSocket }) => this.emit(import_events.Events.Page.WebSocket, import_network.WebSocket.from(webSocket)));
     this._channel.on("worker", ({ worker }) => this._onWorker(import_worker.Worker.from(worker)));
     this.coverage = new import_coverage.Coverage(this._channel);
@@ -132,7 +132,7 @@ class Page extends import_channelOwner.ChannelOwner {
     route._context = this.context();
     const routeHandlers = this._routes.slice();
     for (const routeHandler of routeHandlers) {
-      if (this._closeWasCalled || this._browserContext._closeWasCalled)
+      if (this._closeWasCalled || this._browserContext._closingStatus !== "none")
         return;
       if (!routeHandler.matches(route.request().url()))
         continue;
@@ -143,7 +143,7 @@ class Page extends import_channelOwner.ChannelOwner {
         this._routes.splice(index, 1);
       const handled = await routeHandler.handle(route);
       if (!this._routes.length)
-        this._wrapApiCall(() => this._updateInterceptionPatterns(), true).catch(() => {
+        this._updateInterceptionPatterns({ internal: true }).catch(() => {
         });
       if (handled)
         return;
@@ -173,7 +173,6 @@ class Page extends import_channelOwner.ChannelOwner {
   _onClose() {
     this._closed = true;
     this._browserContext._pages.delete(this);
-    this._browserContext._backgroundPages.delete(this);
     this._disposeHarRouters();
     this.emit(import_events.Events.Page.Close, this);
   }
@@ -206,17 +205,9 @@ class Page extends import_channelOwner.ChannelOwner {
   }
   setDefaultNavigationTimeout(timeout) {
     this._timeoutSettings.setDefaultNavigationTimeout(timeout);
-    this._wrapApiCall(async () => {
-      await this._channel.setDefaultNavigationTimeoutNoReply({ timeout });
-    }, true).catch(() => {
-    });
   }
   setDefaultTimeout(timeout) {
     this._timeoutSettings.setDefaultTimeout(timeout);
-    this._wrapApiCall(async () => {
-      await this._channel.setDefaultTimeoutNoReply({ timeout });
-    }, true).catch(() => {
-    });
   }
   _forceVideo() {
     if (!this._video)
@@ -285,7 +276,7 @@ class Page extends import_channelOwner.ChannelOwner {
   }
   async reload(options = {}) {
     const waitUntil = (0, import_frame.verifyLoadState)("waitUntil", options.waitUntil === void 0 ? "load" : options.waitUntil);
-    return import_network.Response.fromNullable((await this._channel.reload({ ...options, waitUntil })).response);
+    return import_network.Response.fromNullable((await this._channel.reload({ ...options, waitUntil, timeout: this._timeoutSettings.navigationTimeout(options) })).response);
   }
   async addLocatorHandler(locator, handler, options = {}) {
     if (locator._frame !== this._mainFrame)
@@ -308,7 +299,7 @@ class Page extends import_channelOwner.ChannelOwner {
     } finally {
       if (remove)
         this._locatorHandlers.delete(uid);
-      this._wrapApiCall(() => this._channel.resolveLocatorHandlerNoReply({ uid, remove }), true).catch(() => {
+      this._channel.resolveLocatorHandlerNoReply({ uid, remove }).catch(() => {
       });
     }
   }
@@ -375,11 +366,11 @@ class Page extends import_channelOwner.ChannelOwner {
   }
   async goBack(options = {}) {
     const waitUntil = (0, import_frame.verifyLoadState)("waitUntil", options.waitUntil === void 0 ? "load" : options.waitUntil);
-    return import_network.Response.fromNullable((await this._channel.goBack({ ...options, waitUntil })).response);
+    return import_network.Response.fromNullable((await this._channel.goBack({ ...options, waitUntil, timeout: this._timeoutSettings.navigationTimeout(options) })).response);
   }
   async goForward(options = {}) {
     const waitUntil = (0, import_frame.verifyLoadState)("waitUntil", options.waitUntil === void 0 ? "load" : options.waitUntil);
-    return import_network.Response.fromNullable((await this._channel.goForward({ ...options, waitUntil })).response);
+    return import_network.Response.fromNullable((await this._channel.goForward({ ...options, waitUntil, timeout: this._timeoutSettings.navigationTimeout(options) })).response);
   }
   async requestGC() {
     await this._channel.requestGC();
@@ -398,11 +389,14 @@ class Page extends import_channelOwner.ChannelOwner {
     await this._channel.setViewportSize({ viewportSize });
   }
   viewportSize() {
-    return this._viewportSize;
+    return this._viewportSize || null;
   }
   async evaluate(pageFunction, arg) {
     (0, import_jsHandle.assertMaxArguments)(arguments.length, 2);
     return await this._mainFrame.evaluate(pageFunction, arg);
+  }
+  async _evaluateFunction(functionDeclaration) {
+    return this._mainFrame._evaluateFunction(functionDeclaration);
   }
   async addInitScript(script, arg) {
     const source = await (0, import_clientHelper.evaluationScript)(this._platform, script, arg);
@@ -410,7 +404,7 @@ class Page extends import_channelOwner.ChannelOwner {
   }
   async route(url, handler, options = {}) {
     this._routes.unshift(new import_network.RouteHandler(this._platform, this._browserContext._options.baseURL, url, handler, options.times));
-    await this._updateInterceptionPatterns();
+    await this._updateInterceptionPatterns({ title: "Route requests" });
   }
   async routeFromHAR(har, options = {}) {
     const localUtils = this._connection.localUtils();
@@ -426,7 +420,7 @@ class Page extends import_channelOwner.ChannelOwner {
   }
   async routeWebSocket(url, handler) {
     this._webSocketRoutes.unshift(new import_network.WebSocketRouteHandler(this._browserContext._options.baseURL, url, handler));
-    await this._updateWebSocketInterceptionPatterns();
+    await this._updateWebSocketInterceptionPatterns({ title: "Route WebSockets" });
   }
   _disposeHarRouters() {
     this._harRouters.forEach((router) => router.dispose());
@@ -449,23 +443,23 @@ class Page extends import_channelOwner.ChannelOwner {
   }
   async _unrouteInternal(removed, remaining, behavior) {
     this._routes = remaining;
-    await this._updateInterceptionPatterns();
-    if (!behavior || behavior === "default")
-      return;
-    const promises = removed.map((routeHandler) => routeHandler.stop(behavior));
-    await Promise.all(promises);
+    if (behavior && behavior !== "default") {
+      const promises = removed.map((routeHandler) => routeHandler.stop(behavior));
+      await Promise.all(promises);
+    }
+    await this._updateInterceptionPatterns({ title: "Unroute requests" });
   }
-  async _updateInterceptionPatterns() {
+  async _updateInterceptionPatterns(options) {
     const patterns = import_network.RouteHandler.prepareInterceptionPatterns(this._routes);
-    await this._channel.setNetworkInterceptionPatterns({ patterns });
+    await this._wrapApiCall(() => this._channel.setNetworkInterceptionPatterns({ patterns }), options);
   }
-  async _updateWebSocketInterceptionPatterns() {
+  async _updateWebSocketInterceptionPatterns(options) {
     const patterns = import_network.WebSocketRouteHandler.prepareInterceptionPatterns(this._webSocketRoutes);
-    await this._channel.setWebSocketInterceptionPatterns({ patterns });
+    await this._wrapApiCall(() => this._channel.setWebSocketInterceptionPatterns({ patterns }), options);
   }
   async screenshot(options = {}) {
     const mask = options.mask;
-    const copy = { ...options, mask: void 0 };
+    const copy = { ...options, mask: void 0, timeout: this._timeoutSettings.timeout(options) };
     if (!copy.type)
       copy.type = (0, import_elementHandle.determineScreenshotType)(options);
     if (mask) {
@@ -530,13 +524,21 @@ class Page extends import_channelOwner.ChannelOwner {
     return await this._mainFrame.dragAndDrop(source, target, options);
   }
   async dblclick(selector, options) {
-    return await this._mainFrame.dblclick(selector, options);
+    await this._mainFrame.dblclick(selector, options);
   }
   async tap(selector, options) {
     return await this._mainFrame.tap(selector, options);
   }
   async fill(selector, value, options) {
     return await this._mainFrame.fill(selector, value, options);
+  }
+  async consoleMessages() {
+    const { messages } = await this._channel.consoleMessages();
+    return messages.map((message) => new import_consoleMessage.ConsoleMessage(this._platform, message, this, null));
+  }
+  async pageErrors() {
+    const { errors } = await this._channel.pageErrors();
+    return errors.map((error) => (0, import_errors.parseError)(error));
   }
   locator(selector, options) {
     return this.mainFrame().locator(selector, options);
@@ -631,6 +633,10 @@ class Page extends import_channelOwner.ChannelOwner {
   async waitForFunction(pageFunction, arg, options) {
     return await this._mainFrame.waitForFunction(pageFunction, arg, options);
   }
+  async requests() {
+    const { requests } = await this._channel.requests();
+    return requests.map((request) => import_network.Request.from(request));
+  }
   workers() {
     return [...this._workers];
   }
@@ -666,6 +672,9 @@ class Page extends import_channelOwner.ChannelOwner {
       await platform.fs().promises.writeFile(options.path, result.pdf);
     }
     return result.pdf;
+  }
+  async _snapshotForAI(options = {}) {
+    return await this._channel.snapshotForAI({ timeout: this._timeoutSettings.timeout(options), track: options.track });
   }
 }
 class BindingCall extends import_channelOwner.ChannelOwner {

@@ -1,5 +1,9 @@
-import { Utils } from "./utils.js";
-import { User as UserBackend, Users as UsersBackend } from "../../../backend/src/users.js";
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
+import type { User as UserBackend, Users as UsersBackend } from "../../../backend/src/users.js";
+import { Request } from "./request.js";
 export declare namespace User {
     /**
      * Frontend user object as exposed by the backend.
@@ -68,7 +72,7 @@ export declare namespace User {
      * @return Returns a promise with the authenticated user's object or a request error on a failed request.
      * @docs
      */
-    function get(): Promise<Utils.RequestResult<UsersBackend.Endpoints.GetUser.Result>>;
+    function get(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.GetUser>;
     /**
      * Update the authenticated user object.
      * @nav Frontend/User
@@ -76,7 +80,7 @@ export declare namespace User {
      * @return Returns a promise with a successful update response or a request error on a failed request.
      * @docs
      */
-    function update(payload: UsersBackend.Endpoints.UpdateUser.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.UpdateUser.Result>;
+    function update(payload: UsersBackend.Endpoints.UpdateUser["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.UpdateUser>;
     /**
      * Activate the authenticated user.
      * @nav Frontend/User
@@ -84,7 +88,7 @@ export declare namespace User {
      * @return Returns a promise with a successful update response or a request error on a failed request.
      * @docs
      */
-    function activate(payload: UsersBackend.Endpoints.ActivateUser.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.ActivateUser.Result>;
+    function activate(payload: UsersBackend.Endpoints.ActivateUser["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.ActivateUser>;
     /**
      * Change the password of the authenticated user.
      * @nav Frontend/User
@@ -92,7 +96,7 @@ export declare namespace User {
      * @return Returns a promise with a successful update response or a request error on a failed request.
      * @docs
      */
-    function change_password(payload: UsersBackend.Endpoints.ChangePassword.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.ChangePassword.Result>;
+    function change_password(payload: UsersBackend.Endpoints.ChangePassword["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.ChangePassword>;
     /**
      * Delete the user account.
      * @nav Frontend/User
@@ -100,7 +104,7 @@ export declare namespace User {
      * @return Returns a promise with a successful update response or a request error on a failed request.
      * @docs
      */
-    function delete_account(): Utils.RequestResultPromise<UsersBackend.Endpoints.DeleteUser.Result>;
+    function delete_account(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.DeleteUser>;
     /**
      * Generate a new API key for the authenticated user.
      * @nav Frontend/User
@@ -108,13 +112,13 @@ export declare namespace User {
      * @return Returns a promise with a successful update response with the newly generated API key as an attribute or a request error on a failed request.
      * @docs
      */
-    function generate_api_key(): Utils.RequestResultPromise<UsersBackend.Endpoints.GenerateAPIKey.Result>;
+    function generate_api_key(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.GenerateAPIKey>;
     /**
      * Generate a new API key for the authenticated user.
      * @nav Frontend/User
      * @docs
      */
-    function has_api_key(): Utils.RequestResultPromise<UsersBackend.Endpoints.HasAPIKey.Result>;
+    function has_api_key(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.HasAPIKey>;
     /**
      * Revoke the API key of the authenticated user.
      * @nav Frontend/User
@@ -122,7 +126,7 @@ export declare namespace User {
      * @return Returns a promise with a successful update response or a request error on a failed request.
      * @docs
      */
-    function revoke_api_key(): Utils.RequestResultPromise<UsersBackend.Endpoints.RevokeAPIKey.Result>;
+    function revoke_api_key(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.RevokeAPIKey>;
     /**
      * Load data from the authenticated user's database.
      * @nav Frontend/User
@@ -132,7 +136,7 @@ export declare namespace User {
      *         unless a `default` value is provided in the request payload. In that case, the default value will be inserted
      * @docs
      */
-    function load_data(payload: UsersBackend.Endpoints.LoadUserData.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.LoadUserData.Result>;
+    function load_data(payload: UsersBackend.Endpoints.LoadUserData["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.LoadUserData>;
     /**
      * Set data to the authenticated user's database, only updating the supplied fields.
      * @nav Frontend/User
@@ -140,12 +144,12 @@ export declare namespace User {
      * @return Returns a promise with a successful update response or a request error on a failed request.
      * @docs
      */
-    function set_data(payload: UsersBackend.Endpoints.SetUserData.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.SetUserData.Result>;
+    function set_data(payload: UsersBackend.Endpoints.SetUserData["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.SetUserData>;
     /**
      * Delete public user data.
      * @nav Frontend/User
      */
-    function delete_data(payload: UsersBackend.Endpoints.DeleteUserData.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.DeleteUserData.Result>;
+    function delete_data(payload: UsersBackend.Endpoints.DeleteUserData["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.DeleteUserData>;
     /**
      * Load protected data from the authenticated user's database.
      * @nav Frontend/User
@@ -155,6 +159,6 @@ export declare namespace User {
      *         unless a `default` value is provided in the request payload. In that case, the default value will be inserted
      * @docs
      */
-    function load_protected_data(payload: UsersBackend.Endpoints.LoadProtectedUserData.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.LoadProtectedUserData.Result>;
+    function load_protected_data(payload: UsersBackend.Endpoints.LoadProtectedUserData["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.LoadProtectedUserData>;
 }
 export { User as user };

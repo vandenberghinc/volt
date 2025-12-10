@@ -1,17 +1,22 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
-import { APIError } from "../../../backend/src/stream";
-import { AnyElement } from "../ui/any_element";
+import { RegisteredEndpoint } from "../../../backend/src/server.js";
+import type { APIError } from "../../../backend/src/stream.js";
+import { AnyElement } from "../ui/any_element.js";
+
+
+
+
 
 /** Utils module.  */
 export namespace Utils {
     /** True if the current browser's vendor string indicates Apple (e.g., Safari on iOS/macOS). */
-    export const is_apple = navigator.vendor.includes('Apple');
+    export const is_apple = navigator?.vendor?.includes('Apple');
     /** True if the current browser is identified via vendor as Safari/Apple (same check as {@link is_apple}). */
-    export const is_safari = navigator.vendor.includes('Apple');
+    export const is_safari = navigator?.vendor?.includes('Apple');
 
     /**
      * Determine whether the provided value is a string.
@@ -345,177 +350,48 @@ export namespace Utils {
         });
     }
 
-    /** The request options. */
-    export interface RequestOpts<RequestBody extends RequestBodyBase = unknown> {
-        method?: string;
-        url?: string | null;
-        data?: RequestBody;
-        json?: boolean;
-        credentials?: RequestCredentials;
-        headers?: Record<string, string>;
-    }
+    // /**
+    //  * Make a request with a specific generic typing, optionally passing
+    //  * the request method, endpoint, request body and response body types.
+    //  */
+    // export function request<Info extends RequestInfo>(
+    //     options: Info extends RequestInfo<infer M, infer E, infer P>
+    //         ? RequestOpts<M, E, P>
+    //         : never
+    // ): Promise<Info extends RequestInfo<any, any, any, infer S, infer E> ? RequestResult<S, E> : never>;
 
-    /** The response data template base. */
-    type ResponseBodyBase = unknown | null | undefined | number | boolean | string | any[] | Record<string, any>;
-
-    /** The request data template base. */
-    type RequestBodyBase = unknown | null | undefined | string | Record<string, any>;
-
-    /** The returned result */
-    export type RequestResult<
-        SuccessBody extends ResponseBodyBase = unknown,
-        ErrorBody extends ResponseBodyBase = unknown
-    > =
-        {
-            /** The request status. */
-            status: number;
-        } & (
-            | {
-                /** The api error from the backend {@link Stream.error}. */
-                error: APIError;
-                /** The error response body, always optional in case of body parsing failure. */
-                data?: ErrorBody;
-            }
-            | {
-                /** The success response body. */
-                data: SuccessBody;
-                /** No API error from the backend {@link Stream.error} was found. */
-                error?: never;
-            }
-        );
-
-    /** A promise to {@link RequestResult}, for convenience. */
-    export type RequestResultPromise<
-        SuccessBody extends ResponseBodyBase = unknown,
-        ErrorBody extends ResponseBodyBase = unknown
-    > = Promise<RequestResult<SuccessBody, ErrorBody>>;
-
-    /** Request with success body. */
-    export function request<
-        SuccessBody extends ResponseBodyBase,
-    >(
-        options: RequestOpts<unknown>
-    ): Promise<RequestResult<SuccessBody, unknown>>;
-    /** Request with success body & request body generics. */
-    export function request<
-        SuccessBody extends ResponseBodyBase,
-        RequestBody extends RequestBodyBase
-    >(
-        options: RequestOpts<RequestBody>
-    ): Promise<RequestResult<SuccessBody, unknown>>;
-    /** Request with success body, error body & request body generics. */
-    export function request<
-        SuccessBody extends ResponseBodyBase,
-        ErrorBody extends ResponseBodyBase,
-        RequestBody extends RequestBodyBase
-    >(
-        options: RequestOpts<RequestBody>
-    ): Promise<RequestResult<SuccessBody, ErrorBody>>;
-    /** New request method. */
-    export async function request(options: RequestOpts<any>): Promise<RequestResult<any, any>> {
-        const {
-            method = 'GET',
-            url = null,
-            data = null,
-            json = true,
-            credentials = "same-origin",
-            headers = {},
-        } = options;
-
-        // — prepare headers —
-        if (json && data != null && !headers['Content-Type']) {
-            headers['Content-Type'] = 'application/json';
-        }
-
-        // — build URL + body —
-        let finalUrl = url!;
-        let body: string | undefined;
-        if (data != null && typeof data === 'object') {
-            if (method.toUpperCase() === 'GET') {
-                finalUrl = `${url}?${new URLSearchParams(data).toString()}`;
-            } else {
-                body = JSON.stringify(data);
-            }
-        } else if (data != null) {
-            body = String(data);
-        }
-
-        const init: RequestInit = { method, credentials, headers };
-        if (body !== undefined) init.body = body;
-
-        try {
-            const response = await fetch(finalUrl, init);
-            const status = response.status;
-
-            // — parse payload once —
-            let payload: any;
-            const clone = response.clone(); // @dev.
-            if (json) {
-                try {
-                    payload = await response.json();
-                } catch (e: any) {
-                    // malformed JSON still counts as a “success” fetch
-                    console.log("[debug] Unable to parse a json from response:", await clone.text(), "- Error: ", JSON.stringify(e, null, 4))
-                    console.log("[debug] Response:", response);
-                    return {
-                        status,
-                        error: { message: `Failed to parse JSON response: ${e.message}` },
-                    };
-                }
-            } else {
-                try {
-                    payload = await response.text();
-                } catch (e: any) {
-                    return {
-                        status,
-                        error: { message: `Failed to parse text response: ${e.message}` },
-                    };
-                }
-            }
-            // console.log("Payload", json, payload)
-
-            // — handle HTTP errors (4xx/5xx) by resolving with an error object —
-            if (!response.ok) {
-                // if server wrapped its error in { error: { message, type?, invalid_fields? }, … }
-                if (
-                    payload &&
-                    typeof payload === 'object' &&
-                    payload.error &&
-                    typeof payload.error === 'object' &&
-                    typeof payload.error.message === 'string'
-                ) {
-                    return {
-                        status,
-                        error: {
-                            message: payload.error.message,
-                            type: typeof payload.error.type === "string" ? payload.error.type : undefined,
-                            invalid_fields: payload.error.invalid_fields && typeof payload.error.invalid_fields === "object" && !Array.isArray(payload.error.invalid_fields)
-                                ? payload.error.invalid_fields
-                                : undefined,
-                        },
-                        data: payload.data,
-                    };
-                }
-
-                // otherwise fall back to a generic single‐message error
-                const msg =
-                    typeof payload === 'string'
-                        ? payload
-                        : payload?.error?.toString() ?? JSON.stringify(payload);
-                return {
-                    status,
-                    error: { message: msg },
-                    data: payload.data,
-                };
-            }
-
-            // — 2xx: success —
-            return { status, data: payload };
-        } catch (networkErr) {
-            // genuine network / system failure
-            throw networkErr;
-        }
-    };
+    // /** Request with success body. */
+    // export function request<
+    //     SuccessBody extends ResponseBodyBase,
+    // >(
+    //     options: RequestOpts<Utils.Method, string, unknown>
+    // ): Promise<RequestResult<SuccessBody, unknown>>;
+    // /** Request with success body & request body generics. */
+    // export function request<
+    //     SuccessBody extends ResponseBodyBase,
+    //     RequestBody extends RequestBodyBase
+    // >(
+    //     options: RequestOpts<Utils.Method, string, RequestBody>
+    // ): Promise<RequestResult<SuccessBody, unknown>>;
+    // /** Request with success body & request info generics. */
+    // export function request<
+    //     SuccessBody extends ResponseBodyBase,
+    //     RequestInfo extends RegisteredEndpoint,
+    // >(
+    //     options: RequestInfo extends RegisteredEndpoint<infer M, infer E, infer P>
+    //         ? RequestOpts<M extends undefined ? "GET" : M, E, P>
+    //         : RequestOpts<Utils.Method, string, unknown>
+    // ): Promise<RequestResult<SuccessBody, unknown>>;
+    // /** Request with success body, error body & request body generics. */
+    // export function request<
+    //     SuccessBody extends ResponseBodyBase,
+    //     ErrorBody extends ResponseBodyBase,
+    //     RequestBody extends RequestBodyBase
+    // >(
+    //     options: RequestOpts<Utils.Method, string, RequestBody>
+    // ): Promise<RequestResult<SuccessBody, ErrorBody>>;
+    // /** New request method. */
+    // export async function request(options: RequestOpts<Utils.Method, string, any>): Promise<RequestResult<any, any>> {
 
 
     /**

@@ -52,9 +52,7 @@ class CSharpLanguageGenerator {
     const action = actionInContext.action;
     if (this._mode !== "library" && (action.name === "openPage" || action.name === "closePage"))
       return "";
-    let pageAlias = actionInContext.frame.pageAlias;
-    if (this._mode !== "library")
-      pageAlias = pageAlias.replace("page", "Page");
+    const pageAlias = this._formatPageAlias(actionInContext.frame.pageAlias);
     const formatter = new CSharpFormatter(this._mode === "library" ? 0 : 8);
     if (action.name === "openPage") {
       formatter.add(`var ${pageAlias} = await context.NewPageAsync();`);
@@ -82,13 +80,20 @@ class CSharpLanguageGenerator {
       lines.push(`});`);
     }
     if (signals.popup) {
-      lines.unshift(`var ${signals.popup.popupAlias} = await ${pageAlias}.RunAndWaitForPopupAsync(async () =>
+      lines.unshift(`var ${this._formatPageAlias(signals.popup.popupAlias)} = await ${pageAlias}.RunAndWaitForPopupAsync(async () =>
 {`);
       lines.push(`});`);
     }
     for (const line of lines)
       formatter.add(line);
     return formatter.format();
+  }
+  _formatPageAlias(pageAlias) {
+    if (this._mode === "library")
+      return pageAlias;
+    if (pageAlias === "page")
+      return "Page";
+    return pageAlias;
   }
   _generateActionCall(subject, actionInContext) {
     const action = actionInContext.action;
@@ -104,8 +109,12 @@ class CSharpLanguageGenerator {
         const options = (0, import_language.toClickOptionsForSourceCode)(action);
         if (!Object.entries(options).length)
           return `await ${subject}.${this._asLocator(action.selector)}.${method}Async();`;
-        const optionsString = formatObject(options, "    ", "Locator" + method + "Options");
+        const optionsString = formatObject(options, "    ");
         return `await ${subject}.${this._asLocator(action.selector)}.${method}Async(${optionsString});`;
+      }
+      case "hover": {
+        const optionsString = action.position ? formatObject({ position: action.position }, "    ") : "";
+        return `await ${subject}.${this._asLocator(action.selector)}.HoverAsync(${optionsString});`;
       }
       case "check":
         return `await ${subject}.${this._asLocator(action.selector)}.CheckAsync();`;
@@ -135,7 +144,7 @@ class CSharpLanguageGenerator {
         return `await Expect(${subject}.${this._asLocator(action.selector)}).${assertion};`;
       }
       case "assertSnapshot":
-        return `await Expect(${subject}.${this._asLocator(action.selector)}).ToMatchAriaSnapshotAsync(${quote(action.snapshot)});`;
+        return `await Expect(${subject}.${this._asLocator(action.selector)}).ToMatchAriaSnapshotAsync(${quote(action.ariaSnapshot)});`;
     }
   }
   _asLocator(selector) {
@@ -154,11 +163,11 @@ class CSharpLanguageGenerator {
       using System.Threading.Tasks;
 
       using var playwright = await Playwright.CreateAsync();
-      await using var browser = await playwright.${toPascal(options.browserName)}.LaunchAsync(${formatObject(options.launchOptions, "    ", "BrowserTypeLaunchOptions")});
+      await using var browser = await playwright.${toPascal(options.browserName)}.LaunchAsync(${formatObject(options.launchOptions, "    ")});
       var context = await browser.NewContextAsync(${formatContextOptions(options.contextOptions, options.deviceName)});`);
     if (options.contextOptions.recordHar) {
       const url = options.contextOptions.recordHar.urlFilter;
-      formatter.add(`      await context.RouteFromHARAsync(${quote(options.contextOptions.recordHar.path)}${url ? `, ${formatObject({ url }, "    ", "BrowserContextRouteFromHAROptions")}` : ""});`);
+      formatter.add(`      await context.RouteFromHARAsync(${quote(options.contextOptions.recordHar.path)}${url ? `, ${formatObject({ url }, "    ")}` : ""});`);
     }
     formatter.newLine();
     return formatter.format();
@@ -186,14 +195,14 @@ class CSharpLanguageGenerator {
     {`);
     if (options.contextOptions.recordHar) {
       const url = options.contextOptions.recordHar.urlFilter;
-      formatter.add(`    await Context.RouteFromHARAsync(${quote(options.contextOptions.recordHar.path)}${url ? `, ${formatObject({ url }, "    ", "BrowserContextRouteFromHAROptions")}` : ""});`);
+      formatter.add(`    await Context.RouteFromHARAsync(${quote(options.contextOptions.recordHar.path)}${url ? `, ${formatObject({ url }, "    ")}` : ""});`);
     }
     return formatter.format();
   }
   generateFooter(saveStorage) {
     const offset = this._mode === "library" ? "" : "        ";
     let storageStateLine = saveStorage ? `
-${offset}await context.StorageStateAsync(new BrowserContextStorageStateOptions
+${offset}await context.StorageStateAsync(new()
 ${offset}{
 ${offset}    Path = ${quote(saveStorage)}
 ${offset}});
@@ -207,8 +216,8 @@ ${offset}});
 }
 function formatObject(value, indent = "    ", name = "") {
   if (typeof value === "string") {
-    if (["permissions", "colorScheme", "modifiers", "button", "recordHarContent", "recordHarMode", "serviceWorkers"].includes(name))
-      return `${getClassName(name)}.${toPascal(value)}`;
+    if (["colorScheme", "modifiers", "button", "recordHarContent", "recordHarMode", "serviceWorkers"].includes(name))
+      return `${getEnumName(name)}.${toPascal(value)}`;
     return quote(value);
   }
   if (Array.isArray(value))
@@ -216,19 +225,14 @@ function formatObject(value, indent = "    ", name = "") {
   if (typeof value === "object") {
     const keys = Object.keys(value).filter((key) => value[key] !== void 0).sort();
     if (!keys.length)
-      return name ? `new ${getClassName(name)}` : "";
+      return `new()`;
     const tokens = [];
     for (const key of keys) {
       const property = getPropertyName(key);
       tokens.push(`${property} = ${formatObject(value[key], indent, key)},`);
     }
-    if (name)
-      return `new ${getClassName(name)}
+    return `new()
 {
-${indent}${tokens.join(`
-${indent}`)}
-${indent}}`;
-    return `{
 ${indent}${tokens.join(`
 ${indent}`)}
 ${indent}}`;
@@ -237,14 +241,8 @@ ${indent}}`;
     return String(value) + "m";
   return String(value);
 }
-function getClassName(value) {
+function getEnumName(value) {
   switch (value) {
-    case "viewport":
-      return "ViewportSize";
-    case "proxy":
-      return "ProxySettings";
-    case "permissions":
-      return "ContextPermission";
     case "modifiers":
       return "KeyboardModifier";
     case "button":
@@ -273,18 +271,18 @@ function toPascal(value) {
   return value[0].toUpperCase() + value.slice(1);
 }
 function formatContextOptions(contextOptions, deviceName) {
-  let options = { ...contextOptions };
+  const options = { ...contextOptions };
   delete options.recordHar;
   const device = deviceName && import_deviceDescriptors.deviceDescriptors[deviceName];
   if (!device) {
     if (!Object.entries(options).length)
       return "";
-    return formatObject(options, "    ", "BrowserNewContextOptions");
+    return formatObject(options, "    ");
   }
-  options = (0, import_language.sanitizeDeviceOptions)(device, options);
-  if (!Object.entries(options).length)
+  if (!Object.entries((0, import_language.sanitizeDeviceOptions)(device, options)).length)
     return `playwright.Devices[${quote(deviceName)}]`;
-  return formatObject(options, "    ", `BrowserNewContextOptions(playwright.Devices[${quote(deviceName)}])`);
+  delete options["defaultBrowserType"];
+  return formatObject(options, "    ");
 }
 class CSharpFormatter {
   constructor(offset = 0) {

@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // @exports: CodeBlockElement, CodeBlock, CodePreElement, CodePre, CodeLineElement, CodeLine, MultiLanguageCodeBlockElement, MultiLanguageCodeBlock
@@ -8,14 +8,14 @@
 // Imports.
 import { Utils } from "../modules/utils.js"
 import { Elements, VElementBaseSignature, VElement, VElementTagMap, VHTMLElement, VPreElement, VSpanElement, VDiv, VDivElement } from "../elements/module.js"
-import { Span } from "./span"
-import { VStack, VStackElement, HStack, HStackElement } from "./stack"
-import { ImageMaskElement, ImageMask } from "./image"
-import { ForEach } from "./for_each"
-import { Spacer } from "./spacer"
-import { DividerElement, Divider } from "./divider"
+import { Span } from "./span.js"
+import { VStack, VStackElement, HStack, HStackElement } from "./stack.js"
+import { ImageMaskElement, ImageMask } from "./image.js"
+import { ForEach } from "./for_each.js"
+import { Spacer } from "./spacer.js"
+import { DividerElement, Divider } from "./divider.js"
 
-// import * as vhighlight from "/Users/administrator/persistance/private/dev/vinc/vhighlight"
+// import * as vhighlight from "/Users/administrator/persistance/private/dev/vinc/vhighlight.js"
 import * as vhighlight from "@vandenberghinc/vhighlight"
 
 // All codeblocks using languages.
@@ -837,7 +837,7 @@ export class MultiLanguageCodeBlockElement extends (VStackElement as any as VEle
             code.length > 1 ? null : Spacer(),
 
             // Copy image.
-            this._copy_img = ImageMask("/volt_static/icons/copy.webp")
+            this._copy_img = ImageMask("/volt/assets/icons/copy.webp")
                 .frame(15, 15)
                 .flex_shrink(0)
                 .margin(null, null, null, 10)

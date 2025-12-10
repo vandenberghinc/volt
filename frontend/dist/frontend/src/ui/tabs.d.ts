@@ -1,7 +1,11 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementBaseSignature } from "../elements/module.js";
-import { VStackElement, HStackElement } from "./stack";
-import { TextElement } from "./text";
-import { DividerElement } from "./divider";
+import { VStackElement, HStackElement } from "./stack.js";
+import { TextElement } from "./text.js";
+import { DividerElement } from "./divider.js";
 /**
  * The header tab element interface used inside `TabsElement`. Extends `HStackElement` and exposes selection state and handlers for tab header items.
  */

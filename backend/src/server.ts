@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh.
  */
 
 import { fileURLToPath } from 'url';
@@ -14,7 +14,6 @@ const __dirname = path.dirname(__filename);
 import * as http from "http";
 import * as http2 from "http2";
 import * as crypto from "crypto";
-import * as nodemailer from 'nodemailer';
 import libcluster from 'cluster';
 import * as os from 'os';
 
@@ -26,7 +25,8 @@ const { debug } = vlib;
 
 import { Utils } from "./utils.js";
 import { Meta } from './meta.js';
-import * as Mail from './plugins/mail/ui.js';
+import * as MailUI from './plugins/mail/ui.js';
+import { Mail } from "./plugins/mail/mail.js";
 import { Status } from "./status.js";
 import { Endpoint } from "./endpoint.js";
 import { ImageEndpoint } from "./image_endpoint.js";
@@ -37,6 +37,8 @@ import { Users } from "./users.js";
 import { Paddle } from "./payments/paddle.js";
 import { RateLimits, RateLimitServer, RateLimitClient } from "./rate_limit.js";
 import { Route } from "./route.js";
+import { EventCallback, EventName, Events } from './events.js';
+import { ExternalError } from '@vandenberghinc/volt';
 
 // import { ThreadMonitor } from "./plugins/thread_monitor.js";
 // const thread_monitor = new ThreadMonitor()
@@ -91,38 +93,21 @@ export interface TLSConfig {
     passphrase?: string;
 }
 
-/** Style tokens used to theme automatically generated emails. */
-export interface MailStyle {
-    /** The font family. */
-    font: string;
-    title_fg: string;
-    subtitle_fg: string;
-    text_fg: string;
-    /** The background color of the buttons in your mails. */
-    button_fg: string;
-    footer_fg: string;
-    bg: string;
-    widget_bg: string;
-    widget_border: string;
-    button_bg: string;
-    divider_bg: string;
-}
+// /** Optional administrator configuration for protected endpoints. */
+// export interface AdminConfig {
+//     password: string | null;
+//     ips: string[];
+//     tokens?: Array<{
+//         token: string;
+//         expiration: number;
+//     }>;
+// }
 
-/** Optional administrator configuration for protected endpoints. */
-export interface AdminConfig {
-    password: string | null;
-    ips: string[];
-    tokens?: Array<{
-        token: string;
-        expiration: number;
-    }>;
-}
-
-/** TypeScript build options for endpoint source generation. */
-export interface TypeScriptConfig {
-    compiler_opts: Record<string, any>;
-    output?: string;
-}
+// /** TypeScript build options for endpoint source generation. */
+// export interface TypeScriptConfig {
+//     compiler_opts: Record<string, any>;
+//     output?: string;
+// }
 
 /** Description of a static directory or file that should be served. */
 export interface StaticDirectory {
@@ -138,23 +123,34 @@ export interface StaticDirectory {
     exclude?: Array<string | RegExp>;
 }
 
-/** Attachment representation when sending emails. */
-export interface MailAttachment {
-    filename: string;
-    path?: string;
-    content: any;
-}
-
 /**
  * A definition of a registered endpoint, can be used to export params and response types to the frontend.
  * @prop params The inferred interface of the endpoint parameters, note that the runtime value of this property is always `undefined`.
  * @prop Params Alias for property {@link RegisteredEndpoint.params}.
  */
 export type RegisteredEndpoint<
-    P extends vlib.Schema.Entries.Opts = {}
+    M extends Endpoint.Method,
+    E extends string | RegExp,
+    P extends Record<string, any>,
 > = {
-    params: vlib.Schema.Entries.Infer<P>;
-    Params: vlib.Schema.Entries.Infer<P>;
+    /** The HTTP method for the endpoint (e.g. GET, POST). */
+    method: M;
+    /** A pascal cased alias for the endpoint, for type exports conforming with `Params`. */
+    Method: M;
+    /**
+     * The route's endpoint endpoint, string or regex,
+     * use `route.endpoint_str` for the string representation.
+     */
+    endpoint: E;
+    /** A pascal cased alias for the method, for type exports conforming with `Params`. */
+    Endpoint: E;
+    /** The endpoint route. */
+    route: Route;
+    /**
+     * The inferred params type, can be used to export the params payload type.
+     * @warning This value is `undefined` at runtime, but contains the correct params payload type at compile time.
+     */
+    Params: P;
 };
 
 /** The payment options. */
@@ -210,38 +206,8 @@ export namespace Server {
         meta?: Meta | Meta.Opts;
         /** The TLS settings for HTTPS, see {@link TLSConfig}. */
         tls?: TLSConfig;
-        /**
-         * The SMTP nodemailer arguments object.
-         * More information can be found at the nodemailer documentation.
-         * @attr sender The SMTP sender address; either a string email, e.g. `your@email.com`, or `[name, email]`.
-         * @attr host The mail server's host address.
-         * @attr port The mail server's port.
-         * @attr secure Enable secure options.
-         * @attr auth The authentication settings.
-         * @attr auth.user The email used for authentication.
-         * @attr auth.pass The password used for authentication.
-         */
-        smtp?: {
-            /** The SMTP sender address; either a string email, e.g. `your@email.com`, or`[name, email]`. */
-            sender: string | [string, string];
-            /** The mail server's host address. */
-            host?: string;
-            /** The mail server's port. */
-            port?: number;
-            /** Enable secure options. */
-            secure?: boolean;
-            /** The authentication settings. */
-            auth?: {
-                /** The email used for authentication. */
-                user: string;
-                /** The password used for authentication. */
-                pass: string;
-            };
-            /** The smtp `nodemailer.createTransport` argument that override the other {@link Server.Opts.smtp} options. */
-            override?: nodemailer.TransportOptions;
-        };
-        /** The mail settings to customize automatically generated mails, see {@link MailStyle}. */
-        mail_style?: Partial<MailStyle>;
+        /** The mail options. */
+        mail?: Mail.Opts;
         /**
          * The rate limit server and client settings. Rate limiting works with a centralizer websocket server and secondary clients.
          * By default rate limiting is enabled but can be disabled by explicitly setting `rate_limit` to `false`.
@@ -298,7 +264,6 @@ export namespace Server {
 // @tdo implement 3D secure "requires_action" status for a refund and payment intent.
 // https://stripe.com/docs/payments/3d-secure
 
-// @ts-ignore
 export class Server {
 
     // ---------------------------------------------------------
@@ -495,10 +460,6 @@ export class Server {
     /** The database instance. */
     db: Database;
 
-    /** The smpt mailer. */
-    smtp?: nodemailer.Transporter;
-    smtp_sender?: string | [string, string]; // is defined when `smtp` is defined.
-    
     /** The rate limit instance. */
     rate_limit?: RateLimitServer | RateLimitClient;
     
@@ -529,12 +490,17 @@ export class Server {
     /** Daemon instance to manage a live daemon. */
     daemon?: vlib.Daemon;
 
+    /** The mail instance. */
+    mail?: Mail;
+
     // Public for internal use:
-    public mail_style: MailStyle;
     public csp: Record<string, string>;
     public statics_aspect_ratios: Map<string | RegExp, any>;
     public google_tag?: string;
     public rate_limit_api_key: string | undefined;
+    public performance: vlib.Performance;
+    /** The events map @internal */
+    public events: vlib.Events<Events> = new vlib.Events();
 
     // Private.
     private favicon?: string;
@@ -542,7 +508,6 @@ export class Server {
     private _user_keys_opts: Array<string | { name: string, length: number }>;
     private additional_sitemap_endpoints: string[];
     private tls?: TLSConfig;
-    private performance: vlib.Performance;
     private default_headers: Record<string, string>;
     private http!: http.Server;
     private https!: http2.Http2SecureServer;
@@ -550,11 +515,6 @@ export class Server {
         enabled: boolean;
         threads: number;
     };
-    /**
-     * The master hash key.
-     */
-    FIX // deprecate this key and use a key that indicates for what it is.
-    private master_hmac_key: string | null = null;
 
     // Private ollections.
     private _keys_db: Collection<{
@@ -563,7 +523,6 @@ export class Server {
     }>;
     private _sys_keys_db: Collection<{
         id: "sys_keys",
-        master_hmac_key: undefined | string;
         rate_limit_api_key: undefined | string;
     }>;
     private _website_status_db: Collection<{
@@ -573,11 +532,7 @@ export class Server {
         total_threads: number,
     }>;
 
-    /** User defined callbacks. */
-    private _on_start: Array<(args: { forked: boolean }) => void | Promise<void>> = [];
-    private _on_initialize: Array<() => void | Promise<void>> = [];
-    private _on_stop: Array<() => void | Promise<void>> = [];
-
+    /** Construct a new server instance. */
     constructor({
         ip = "127.0.0.1",
         port, // leave undefined for blank detection.
@@ -590,20 +545,7 @@ export class Server {
         company,
         meta = new Meta(),
         tls,
-        smtp,
-        mail_style = {
-            font: '"Helvetica", sans-serif',
-            title_fg: "#121B23",
-            subtitle_fg: "#121B23",
-            text_fg: "#1F2F3D",
-            button_fg: "#FFFFFF",
-            footer_fg: "#686B80",
-            bg: "#EEEEEE",
-            widget_bg: "#FFFFFF",
-            widget_border: "#E6E6E6",
-            button_bg: "#1F2F3D",
-            divider_bg: "#706780",
-        },
+        mail,
         rate_limit = {
             server: {
                 ip: undefined,
@@ -775,7 +717,6 @@ export class Server {
         this.google_tag = google_tag;
         this.production = production;
         this.company = company;
-        this.mail_style = mail_style as MailStyle;
         this.offline = offline;
         this._user_keys_opts = keys;
         this.additional_sitemap_endpoints = additional_sitemap_endpoints;
@@ -833,9 +774,13 @@ export class Server {
         this.statics_aspect_ratios = new Map();
 
         // Add the default static to statics.
+        const volt_assets_path = new vlib.Path(`${__dirname}/../../../../../frontend/src/assets/`);
+        if (!volt_assets_path.exists()) {
+            this.log.warning(`${vlib.Color.yellow_bold("Warning")}: Could not find volt assets directory at "${volt_assets_path.abs().str()}". Please create a GitHub issue to report this.`)
+        }
         this.statics.push({
-            path: `${__dirname}/../../../frontend/src/static/`,
-            endpoint: "/volt_static",
+            path: volt_assets_path.str(),
+            endpoint: "/volt/assets",
         });
 
         // Set meta.
@@ -984,17 +929,14 @@ export class Server {
 
         // Initialize the users class.
         this.users = new Users({
-            ...users,
+            support_recipient: mail?.smtp.sender, // ensure we assign the support recipient, so we dont need to define `this.mail` beforehand.
+            ...users, // override support recipient if provided,
             _server: this,
         });
 
-        // The smtp instance.
-        if (smtp) {
-            this.smtp_sender = smtp.sender;
-            this.smtp = nodemailer.createTransport({
-                ...smtp,
-                ...(smtp.override ?? {}),
-            });
+        // The mail instance.
+        if (mail) {
+            this.mail = new Mail(mail);
         }
 
         // The rate limit server/client.
@@ -1012,8 +954,8 @@ export class Server {
 
     // ---------------------------------------------------------
     // Utils.
-
     /** Get a content type (MIME) from a file extension. */
+
     get_content_type(extension: string): string {
         return Server.content_type_mimes.get(extension.toLowerCase()) ?? "application/octet-stream"
     }
@@ -1103,29 +1045,6 @@ export class Server {
     // ---------------------------------------------------------
     // Endpoints (private).
 
-    // Find endpoint.
-    private _find_endpoint(route: Route): Endpoint | undefined;
-    private _find_endpoint(endpoint: string, method?: string): Endpoint | undefined;
-    private _find_endpoint(endpoint: Route | string, method?: string): Endpoint | undefined {
-        let route: Route | undefined;
-        if (endpoint instanceof Route) {
-            route = endpoint;
-            endpoint = route.endpoint_str;
-            method = route.method;
-        }
-        method ??= "GET";
-        const result = this.endpoints.get(`${method}:${endpoint}`);
-        if (!result) {
-            if (!route) route = new Route(method, endpoint);
-            for (const e of this.endpoints.values()) {
-                if (e.route.is_regex && e.route.match(route)) {
-                    return e;
-                }
-            }
-        }
-        return result;
-    }
-
     // Create default endpoints.
     private _create_default_endpoints() {
 
@@ -1163,7 +1082,7 @@ export class Server {
             params: {
                 key: "string",
             },
-            callback: async (stream: any, params) => {
+            callback: async (stream: Stream, params) => {
                 // Check key.
                 if (params.key !== status_key) {
                     return stream.send({
@@ -1333,7 +1252,7 @@ export class Server {
                 password: "string",
             },
             ip_whitelist: this.admin.ips,
-            callback: async (stream: any, params: {password: string}) => {
+            callback: async (stream: Stream, params: {password: string}) => {
                 // Check key.
                 if (params.password !== this.admin.password) {
                     return stream.send({
@@ -1369,7 +1288,7 @@ export class Server {
                 token: "string",
             },
             ip_whitelist: this.admin.ips,
-            callback: async (stream: any, params: {token: string}) => {
+            callback: async (stream: Stream, params: {token: string}) => {
                 // Verify token.
                 if (!verify_token(params.token)) {
                     return stream.send({
@@ -1457,10 +1376,13 @@ export class Server {
 
         // Add static file.
         const add_static_file = async (
-            path: any,  // vlib.Path type
+            path: vlib.Path,  // vlib.Path type
             endpoint: string,
             cache: boolean | number = true
         ): Promise<void> => {
+
+            // Logs.
+            // this.log(3, "Adding static file " + path.str())
 
             // Add to static paths.
             static_paths.push(path.str());
@@ -1509,6 +1431,8 @@ export class Server {
         const add_static = async (opts: string | StaticDirectory | null): Promise<void> => {
             if (opts == null) { return; }
             if (typeof opts === "object") {
+                this.log(3, "Adding static directory " + opts.path)
+
                 // Check object.
                 vlib.schema.validate(opts, {
                     unknown: false,
@@ -1523,7 +1447,7 @@ export class Server {
                 });
 
                 // Vars.
-                const paths: any[] = [];  // vlib.Path[]
+                const paths: vlib.Path[] = [];
                 const source = new vlib.Path(opts.path).abs();
                 if (!source.exists()) {
                     this.log(1, `Static path "${source.str()}" does not exist; skipping.`);
@@ -1562,7 +1486,7 @@ export class Server {
 
                 // First extract all paths recursively.
                 // non recursive to ignore .old etc dirs.
-                const read_dir = async (path: any): Promise<void> => {  // vlib.Path
+                const read_dir = async (path: vlib.Path): Promise<void> => {
                     const dir_paths = await path.paths();
                     const promises: Promise<void>[] = [];
                     for (let i = 0; i < dir_paths.length; i++) {
@@ -1609,267 +1533,91 @@ export class Server {
         return static_paths;
     }
 
-    // ---------------------------------------------------------
-    // Server (private).
+    /** Initialize the system and user defined keys. */
+    async _initialize_keys(): Promise<void> {
 
-    // Initialize.
-    // Initialize.
-    async initialize(): Promise<void> {
+        // Await database initialization.
+        const start = Date.now();
+        await this._db_init_promise;
+        /* @performance */ this.performance.end("_initialize_keys():await-db-init", start);
+        
+        // Load system keys.
+        const sys_keys = await this._sys_keys_db.load({ id: "sys_keys" }, {
+            default: {
+                id: "sys_keys",
+                rate_limit_api_key: undefined,
+            }
+        });
+        let perform_sys_keys_save = false;
 
-        // Logs.
-        this.log(1, "Initializing server.");
-
-        /* @performance */ this.performance.start()
-
-
-        // Create HTTPS server.
-        if (this.tls) {
-            this.https = http2.createSecureServer(
-                {
-                    key: new vlib.Path(this.tls.key).load_sync({ encoding: 'utf8' }),
-                    cert: new vlib.Path(this.tls.cert).load_sync({ encoding: 'utf8' }),
-                    ca: this.tls.ca == null ? undefined : new vlib.Path(this.tls.ca).load_sync({ encoding: 'utf8' }),
-                    passphrase: this.tls.passphrase,
-                    allowHTTP1: true,
-                },
-                // code below replaced by this.https.on("request", ...)
-                // // Support for http1.
-                // // Does not work, requests get triggered on the stream and on this callback.
-                // (req: http2.Http2ServerRequest, res: http2.Http2ServerResponse) => {
-                //     if (req.httpVersion.charAt(0) !== "2") {
-                //         this._serve(undefined, undefined, req, res)
-                //     }
-                // },
-            );
-            this.https.on('stream', (stream: http2.ServerHttp2Stream, headers: any) => {
-                this._serve(stream, headers, undefined, undefined)
-            });
-            this.https.on('request', (req: http.IncomingMessage, res: http.ServerResponse) => {
-                this._serve(undefined, undefined, req, res);
-            });
-        }
-
-        // Payments require HTTPS in production.
-        else if (this.production && this.payments) {
-            throw Error("Accepting payments in production mode requires HTTPS.");
-        }
-
-        // Create http server.
-        if (this.tls) {
-            // Redirect HTTP requests to HTTPS.
-            this.http = http.createServer((request: http.IncomingMessage, response: http.ServerResponse) => {
-                const reqUrl = typeof request.url === "string" ? request.url : "/";
-                // Build redirect using the canonical configured domain, not the untrusted Host header.
-                const location = `https://${this.domain}${reqUrl}`;
-                // 308 preserves method and body; safe for non-GET as well.
-                response.writeHead(308, { Location: location });
-                response.end();
-            });
+        // Check rate limit api key.
+        if (sys_keys.rate_limit_api_key == null) {
+            this.rate_limit_api_key = this.generate_crypto_key(32);
+            sys_keys.rate_limit_api_key = this.rate_limit_api_key;
+            perform_sys_keys_save = true;
         } else {
-            // Serve http.
-            this.http = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
-                this._serve(undefined, undefined, req, res)
-            });
+            this.rate_limit_api_key = sys_keys.rate_limit_api_key;
         }
 
-        /* @performance */ this.performance.end("create-http-server");
+        // Save.
+        if (perform_sys_keys_save) {
+            await this._sys_keys_db.set({ id: "sys_keys" }, sys_keys);
+        }
 
-        // Start the database.
-        if (this.db) {
-            await this.db.initialize();
-            /* @performance */ this.performance.end("init-db");
-
-            // Load system keys.
-            const sys_keys = await this._sys_keys_db.load({ id: "sys_keys" }, {
-                default: {
-                    id: "sys_keys",
-                    master_hmac_key: undefined,
-                    rate_limit_api_key: undefined,
-                }
-            });
-            let perform_sys_keys_save = false;
-            
-            // Check master hash key.
-            if (sys_keys.master_hmac_key == null) {
-                this.master_hmac_key = this.generate_crypto_key(32);
-                sys_keys.master_hmac_key = this.master_hmac_key;
-                perform_sys_keys_save = true;
+        // Check user defined crypto keys.
+        const user_keys = await this._keys_db.load({ id: "user_keys" }, {
+            default: {
+                id: "user_keys",
+                keys: {},
+            }
+        });
+        let perform_user_keys_save = false;
+        for (const key of this._user_keys_opts) {
+            const name = typeof key === "string" ? key : key.name;
+            if (user_keys[name]) {
+                this.keys[name] = user_keys[name];
             } else {
-                this.master_hmac_key = sys_keys.master_hmac_key;
-            }
-
-            // Check rate limit api key.
-            if (sys_keys.rate_limit_api_key == null) {
-                this.rate_limit_api_key = this.generate_crypto_key(32);
-                sys_keys.rate_limit_api_key = this.rate_limit_api_key;
-                perform_sys_keys_save = true;
-            } else {
-                this.rate_limit_api_key = sys_keys.rate_limit_api_key;
-            }
-
-            // Save.
-            if (perform_sys_keys_save) {
-                await this._sys_keys_db.set({ id: "sys_keys" }, sys_keys);
-            }
-
-            // Check user defined crypto keys.
-            // const gen_user_crypto_key = (key: string | { name: string, length: number }) => {
-            //     if (typeof key === "string") {
-            //         sys_keys.keys[key] = this.generate_crypto_key(32);
-            //     } else {
-            //         if (key.length == null) {
-            //             throw Error(`Crypto key object "${JSON.stringify(key)}" does not contain a "length" attribute.`);
-            //         }
-            //         if (typeof key.length !== "number") {
-            //             throw Error(`Crypto key object "${JSON.stringify(key)}" has an invalid type fo attribute "length", the valid type is "number".`);
-            //         }
-            //         if (key.name == null) {
-            //             throw Error(`Crypto key object "${JSON.stringify(key)}" does not contain a "name" attribute.`);
-            //         }
-            //         if (typeof key.name !== "string") {
-            //             throw Error(`Crypto key object "${JSON.stringify(key)}" has an invalid type fo attribute "name", the valid type is "string".`);
-            //         }
-            //         const generated_key = this.generate_crypto_key(key.length);
-            //         sys_keys.keys[key.name] = generated_key;
-            //         this.keys[key.name] = generated_key;
-            //     }
-            // }
-            const user_keys = await this._keys_db.load({ id: "user_keys" }, {
-                default: {
-                    id: "user_keys",
-                    keys: {},
-                }
-            });
-            let perform_user_keys_save = false;
-            for (const key of this._user_keys_opts) {
-                const name = typeof key === "string" ? key : key.name;
-                if (user_keys[name]) {
-                    this.keys[name] = user_keys[name];
-                } else {
-                    perform_user_keys_save = true;
-                    if (typeof key === "string") {
-                        if (!key) {
-                            throw Error(`Crypto key "${key}" is an invalid key name.`);
-                        }
-                        const generated_key = this.generate_crypto_key(32);
-                        user_keys.keys[key] = generated_key;
-                        this.keys[key] = generated_key;
-                    } else {
-                        if (!key.name) {
-                            throw Error(`Crypto key "${key.name}" is an invalid key name.`);
-                        }
-                        if (key.length == null) {
-                            throw Error(`Crypto key "${key.name}" does not contain a "length" attribute.`);
-                        }
-                        if (typeof key.length !== "number") {
-                            throw Error(`Crypto key "${key.name}" has an invalid type for attribute "length", the valid type is "number".`);
-                        }
-                        const generated_key = this.generate_crypto_key(key.length);
-                        user_keys.keys[key.name] = generated_key;
-                        this.keys[key.name] = generated_key;
+                perform_user_keys_save = true;
+                if (typeof key === "string") {
+                    if (!key) {
+                        throw Error(`Crypto key "${key}" is an invalid key name.`);
                     }
+                    const generated_key = this.generate_crypto_key(32);
+                    user_keys.keys[key] = generated_key;
+                    this.keys[key] = generated_key;
+                } else {
+                    if (!key.name) {
+                        throw Error(`Crypto key "${key.name}" is an invalid key name.`);
+                    }
+                    if (key.length == null) {
+                        throw Error(`Crypto key "${key.name}" does not contain a "length" attribute.`);
+                    }
+                    if (typeof key.length !== "number") {
+                        throw Error(`Crypto key "${key.name}" has an invalid type for attribute "length", the valid type is "number".`);
+                    }
+                    const generated_key = this.generate_crypto_key(key.length);
+                    user_keys.keys[key.name] = generated_key;
+                    this.keys[key.name] = generated_key;
                 }
             }
-            if (perform_user_keys_save) {
-                await this._keys_db.set({ id: "user_keys" }, user_keys);
-            }
-
-            /* @performance */ this.performance.end("load-keys");
         }
-
-        // Initialize default headers.
-        this._init_default_headers();
-        /* @performance */ this.performance.end("init-default-headers");
-
-        // Create default endpoints.
-        this._create_default_endpoints();
-        /* @performance */ this.performance.end("create-default-endpoints");
-
-        // Create admin endpoints.
-        // this._create_admin_endpoint();
-        // /* @performance */ this.performance.end("create-admin-endpoints");
-
-        // Create static endpoints.
-        const promises: Promise<any>[] = [];
-        promises.push(this._initialize_statics());
-        // /* @performance */ this.performance.end("create-static-endpoints");
-
-        // Initialize users.
-        if (this.db) {
-            promises.push(this.users._initialize());
-            // /* @performance */ this.performance.end("init-users");
-        }
-
-        // Database preview endpoints (only when production mode is disabled).
-        // if (this.db) {
-        //     this.db._initialize_db_preview();
-        //     /* @performance */ this.performance.end("init-db-preview");
-        // }
-
-        // Payments.
-        if (this.payments !== undefined) {
-            promises.push(this.payments._initialize());
-        }
-        // /* @performance */ this.performance.end("init-payments");
-
-        // Create sitemap when it does not exist.
-        // Must be done at the end of initialization func since some funcs might still create endpoints.
-        if (this._find_endpoint("/sitemap.xml") == null) {
-            promises.push(this._create_sitemap());
-        }
-        // /* @performance */ this.performance.end("create-sitemap");
-
-        // Create robots.txt when it does not exist.
-        // Must be done at the end of initialization func since some funcs might still create endpoints.
-        if (this._find_endpoint("/robots.txt") == null) {
-            promises.push(this._create_robots_txt());
-        }
-        // /* @performance */ this.performance.end("create-robots.txt");
-
-        // Await all promises.
-        await Promise.all(promises);
-
-        // Get the icon and stroke icon file paths when defined.
-        if (this.company.stroke_icon || this.company.icon) {
-            for (const endpoint of this.endpoints.values()) {
-                if (this.company.stroke_icon_path == null && endpoint.route.endpoint === this.company.stroke_icon) {
-                    this.company.stroke_icon_path = endpoint.file_path?.str() || undefined;
-                }
-                if (this.company.icon_path == null && endpoint.route.endpoint === this.company.icon) {
-                    this.company.icon_path = endpoint.file_path?.str() || undefined;
-                }
-            }
-            if (this.company.stroke_icon != null && this.company.stroke_icon_path == null) {
-                throw Error(`Unable to find the company's stroke icon endpoint "${this.company.stroke_icon}".`);
-            }
-            if (this.company.icon != null && this.company.icon_path == null) {
-                throw Error(`Unable to find the company's icon endpoint "${this.company.icon}".`);
-            }
-        }
-
-        // Initialize all endpoints.
-        for (const endpoint of this.endpoints.values()) {
-            endpoint._initialize(this);
-        }
-        for (const endpoint of this.err_endpoints.values()) {
-            endpoint._initialize(this);
-        }
-
-        // On initialize callbacks.
-        for (const callback of this._on_initialize) {
-            const res = callback();
-            if (res instanceof Promise) {
-                await res;
-            }
+        if (perform_user_keys_save) {
+            await this._keys_db.set({ id: "user_keys" }, user_keys);
         }
     }
 
     /**
-     * Add callback to be called when the server is initialized.
-     * @param callback The callback to be called when the server is initialized.
+     * Checks if an endpoint route already exists.
+     * @param method    HTTP method
+     * @param endpoint  String path or RegExp
      */
-    on_initialize(callback: () => void | Promise<void>): void {
-        this._on_initialize.push(callback);
+    private _check_duplicate_route(
+        route: Route
+    ): void {
+        const e = this.find_endpoint(route);
+        if (e) {
+            throw new Error(`Duplicate "${route.method}:${route.endpoint_str}" endpoint route, it is already defined by endpoint "${e.id}".`);
+        }
     }
 
     // Serve a client.
@@ -1941,16 +1689,24 @@ export class Server {
                 if (!this.err_endpoints.has(status_code)) {
                     stream.send(default_response);
                 } else {
-                    const err_endpoint = this.err_endpoints.get(status_code);
-                    if (err_endpoint) {
-                        try {
-                            await err_endpoint._serve(stream, status_code);
-                        } catch (err: any) {
-                            this.log.error(`Error endpoint ${status_code}: `, err);
-                            stream.send(default_response);
-                        }
+                    const err_endpoint = this.err_endpoints.get(status_code)!;
+                    // if (typeof err_endpoint === "function") {
+                    //     const res = await err_endpoint({ 
+                    //         status: status_code,
+                    //     });
+                    //     if (res instanceof Endpoint) {
+                    //         err_endpoint = res;
+                    //     } else {
+                    //         err_endpoint = new Endpoint(res);
+                    //     }
+                    //     err_endpoint._initialize(this);
+                    // }
+                    try {
+                        await err_endpoint._serve(stream, status_code);
+                    } catch (err: any) {
+                        this.log.error(`Error endpoint ${status_code}: `, err);
+                        stream.send(default_response);
                     }
-                    // @todo also serve something here.
                 }
             };
 
@@ -1997,7 +1753,7 @@ export class Server {
                 // Check OPTIONS request.
                 if (method === "OPTIONS") {
                     const original_method = stream.headers['access-control-request-method'];
-                    const original_endpoint = this._find_endpoint(endpoint_url, original_method);
+                    const original_endpoint = this.find_endpoint(endpoint_url, original_method);
                     if (original_endpoint) {
                         // Set headers.
                         this._set_header_defaults(stream);
@@ -2029,7 +1785,7 @@ export class Server {
                     await endpoint._serve_options(stream);
                 } catch (err: any) {
                     this.log.error(`${method}:${endpoint_url}: `, err);
-                    if (!stream.destroyed && !stream.closed) {
+                    if (!stream.destroyed && !stream.finished) {
                         await serve_error_endpoint(500);
                         log_endpoint_result();
                     }
@@ -2074,7 +1830,6 @@ export class Server {
                 return;
             }
 
-
             // Do not authenticate on static endpoints, unless "authenticated" flag is somehow enabled.
             if (!endpoint.is_static || endpoint.authenticated) {
                 // Always perform authentication so the stream.uid will also be assigned even when the endpoint is not authenticated.
@@ -2083,6 +1838,11 @@ export class Server {
                 // Reset cookies when authentication has failed.
                 if (auth_result != null && !endpoint.is_static) {
                     this.users._reset_cookies(stream);
+                }
+
+                // When the endpoint has a view or is text/html then redirect to signin page.
+                if (auth_result != null && !endpoint.is_static && (endpoint.view != null || endpoint.content_type === "text/html")) {
+                    stream.set_header("Location", `/signin?next=${encodeURIComponent(stream.endpoint)}`)
                 }
 
                 // When the endpoint is authenticated and the authentication has failed then send the error response.
@@ -2098,7 +1858,7 @@ export class Server {
                 await endpoint._serve(stream);
             } catch (err: any) {
                 this.log.error(`${method}:${endpoint_url}: `, err);
-                if (!stream.destroyed && !stream.closed) {
+                if (!stream.destroyed && !stream.finished) {
                     await serve_error_endpoint(500);
                     log_endpoint_result();
                 }
@@ -2116,14 +1876,202 @@ export class Server {
             // Log.
             log_endpoint_result();
         } catch (err: any) {
-            this.log.error("Fatal error:", err);
+            this.log.error(err);
         }
     }
 
     // ---------------------------------------------------------
-    // Server.
+    // Server (private).
 
-    // Start the server.
+    /** The promise of database initialization and connecting. */
+    private _db_init_promise: Promise<void> | undefined;
+
+    // Initialize.
+    // Initialize.
+    async initialize(): Promise<void> {
+
+        // Logs.
+        this.log(1, "Initializing server.");
+        /* @performance */ const initialize_start = Date.now();
+        /* @performance */ this.performance.start()
+
+        // Initialize the database & connect first since this takes the longest.
+        this._db_init_promise = (async () => {
+            /* @performance */ let start = Date.now();
+            await this.db.initialize();
+            /* @performance */ this.performance.end("init-db", start);
+            /* @performance */ start = Date.now();
+            await this.db.connect();
+            /* @performance */ this.performance.end("connect-db", start);
+        })();
+
+        // Create HTTPS server.
+        if (this.tls) {
+            this.https = http2.createSecureServer(
+                {
+                    key: new vlib.Path(this.tls.key).load_sync({ encoding: 'utf8' }),
+                    cert: new vlib.Path(this.tls.cert).load_sync({ encoding: 'utf8' }),
+                    ca: this.tls.ca == null ? undefined : new vlib.Path(this.tls.ca).load_sync({ encoding: 'utf8' }),
+                    passphrase: this.tls.passphrase,
+                    allowHTTP1: true,
+                },
+            );
+            this.https.on('stream', (stream: http2.ServerHttp2Stream, headers: any) => {
+                this._serve(stream, headers, undefined, undefined)
+            });
+            // HTTP/1.1 (compatibility 'request' is also emitted for HTTP/2; filter it out)
+            this.https.on("request", (req: http.IncomingMessage, res: http.ServerResponse) => {
+                if (req.httpVersionMajor === 1) {
+                    this._serve(undefined, undefined, req, res);
+                }
+            });
+        }
+
+        // Payments require HTTPS in production.
+        else if (this.production && this.payments) {
+            throw Error("Accepting payments in production mode requires HTTPS.");
+        }
+        /* @performance */ this.performance.end("create-https-server");
+
+        // Create http server.
+        if (this.tls) {
+            // Redirect HTTP requests to HTTPS.
+            this.http = http.createServer((request: http.IncomingMessage, response: http.ServerResponse) => {
+                const reqUrl = typeof request.url === "string" ? request.url : "/";
+                // Build redirect using the canonical configured domain, not the untrusted Host header.
+                const location = `https://${this.domain}${reqUrl}`;
+                // 308 preserves method and body; safe for non-GET as well.
+                response.writeHead(308, { Location: location });
+                response.end();
+            });
+        } else {
+            // Serve http.
+            this.http = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
+                this._serve(undefined, undefined, req, res)
+            });
+        }
+        /* @performance */ this.performance.end("create-http-server");
+
+        // Initialize default headers.
+        this._init_default_headers();
+        /* @performance */ this.performance.end("init-default-headers");
+
+        // Create default endpoints.
+        this._create_default_endpoints();
+        /* @performance */ this.performance.end("create-default-endpoints");
+
+        // Create admin endpoints.
+        // this._create_admin_endpoint();
+        // /* @performance */ this.performance.end("create-admin-endpoints");
+
+        // Create static endpoints.
+        await this._initialize_statics();
+        /* @performance */ this.performance.end("_initialize_statics()");
+
+        /**
+         * Initialize keys.
+         * Its required to await this in case no keys exist.
+         * If in this case a user would perform any key requiring operations inside an
+         * "initialize" callback, then it would not yet be created.
+         */
+        await this._initialize_keys();
+        /* @performance */ this.performance.end("load-keys");
+
+        // Add promises using the database.
+        const promises: Promise<any>[] = [];
+        /* @performance */ this.performance.start();
+
+        // Initialize users.
+        promises.push(this.users._initialize());
+        // /* @performance */ this.performance.end("users._initialize()");
+
+        // Payments.
+        if (this.payments !== undefined) {
+            promises.push(this.payments._initialize());
+            // /* @performance */ this.performance.end("payments._initialize()");
+        }
+
+        // Create sitemap when it does not exist.
+        // Must be done at the end of initialization func since some funcs might still create endpoints.
+        if (this.find_endpoint("/sitemap.xml") == null) {
+            promises.push(this._create_sitemap());
+            // /* @performance */ this.performance.end("_create_sitemap()");
+        }
+
+        // Create robots.txt when it does not exist.
+        // Must be done at the end of initialization func since some funcs might still create endpoints.
+        if (this.find_endpoint("/robots.txt") == null) {
+            promises.push(this._create_robots_txt());
+            // /* @performance */ this.performance.end("_create_robots_txt()");
+        }
+
+        // Get the icon and stroke icon file paths when defined.
+        if (this.company.stroke_icon || this.company.icon) {
+            for (const endpoint of this.endpoints.values()) {
+                if (this.company.stroke_icon_path == null && endpoint.route.endpoint === this.company.stroke_icon) {
+                    this.company.stroke_icon_path = endpoint.file_path?.str() || undefined;
+                }
+                if (this.company.icon_path == null && endpoint.route.endpoint === this.company.icon) {
+                    this.company.icon_path = endpoint.file_path?.str() || undefined;
+                }
+            }
+            if (this.company.stroke_icon != null && this.company.stroke_icon_path == null) {
+                throw Error(`Unable to find the company's stroke icon endpoint "${this.company.stroke_icon}".`);
+            }
+            if (this.company.icon != null && this.company.icon_path == null) {
+                throw Error(`Unable to find the company's icon endpoint "${this.company.icon}".`);
+            }
+        }
+
+        // Await all promises.
+        await Promise.all(promises);
+        /* @performance */ this.performance.end("awaiting-promise-list");
+
+        // Initialize all endpoints.
+        this.performance.start();
+        for (const endpoint of this.endpoints.values()) {
+            endpoint._initialize(this);
+        }
+        for (const endpoint of this.err_endpoints.values()) {
+            endpoint._initialize(this);
+        }
+        /* @performance */ this.performance.end("initialize-endpoints");
+
+        // On initialize callbacks.
+        for (const callback of this.events.get("initialize")) {
+            await callback();
+        }
+        /* @performance */ this.performance.end("on-initialize-callbacks");
+
+        /* @performance */ this.performance.end("initialize()", initialize_start);
+    }
+
+    // Find endpoint.
+    find_endpoint(route: Route): Endpoint | undefined;
+    find_endpoint(endpoint: string, method?: string): Endpoint | undefined;
+    find_endpoint(endpoint: Route | string, method?: string): Endpoint | undefined {
+        let route: Route | undefined;
+        if (endpoint instanceof Route) {
+            route = endpoint;
+            endpoint = route.endpoint_str;
+            method = route.method;
+        }
+        method ??= "GET";
+        const result = this.endpoints.get(`${method}:${endpoint}`);
+        if (!result) {
+            if (!route) route = new Route(method, endpoint);
+            for (const e of this.endpoints.values()) {
+                if (e.route.is_regex && e.route.match(route)) {
+                    return e;
+                }
+            }
+        }
+        return result;
+    }
+
+
+    // ---------------------------------------------------------
+    // Server.
 
     /**
      * Start the server.
@@ -2136,17 +2084,17 @@ export class Server {
         // Always initialize, even when forking.
         await this.initialize();
 
-        // On production bundle all view endpoints.
+        // On production also exec the endpoint production init.
         if (this.production) {
             for (const endpoint of this.endpoints.values()) {
                 if (endpoint.view) {
-                    await endpoint.view.ensure_bundle();
+                    await endpoint.view.production_initialize();
                 }
             }
         }
 
         // Start the rate limiting client/server, also when forking.
-        if (this.db && this.rate_limit) {
+        if (this.rate_limit) {
             /* @performance */ this.performance.start();
             await this.rate_limit.start();
             /* @performance */ this.performance.end("init-rate-limit");
@@ -2195,7 +2143,7 @@ export class Server {
                 running_since: Date.now(),
                 total_threads: active_threads,
                 running_threads: active_threads,
-            });
+            }); 
 
             // On exit.
             libcluster.addListener('exit', async (worker, code, signal) => {
@@ -2223,6 +2171,14 @@ export class Server {
                     }
                 }
             });
+
+            // Close the database connections on master.
+            await this.db.close();
+
+            //
+            // Ensure we dont spawn server listener here, to keep correct architecture.
+            //
+
         } else {
             forked = this.production && this.threading.enabled;
 
@@ -2301,12 +2257,14 @@ export class Server {
         }
 
         // On start callbacks.
-        for (const callback of this._on_start) {
+        this.performance.start();
+        for (const callback of this.events.get("start")) {
             const res = callback({ forked });
             if (res instanceof Promise) {
                 await res;
             }
         }
+        /* @performance */ this.performance.end("on-start-callbacks");
 
         // Start browser preview on primary node.
         // if (this.browser_preview && !forked) {
@@ -2315,18 +2273,9 @@ export class Server {
         // }
 
         /* @performance */
-        debug(2, () => this.performance.dump(v => v >= 50));
-    }
-
-    /**
-     * Add an (async) callback executed at the end of `server.start()`. The callback may take arguments `({forked <boolean>})`.
-     * @param callback The callback to run; receives `{ forked }`.
-     * @example
-     * ...
-     * server.on_start(({forked}) => console.log("Hello World!"));
-     */
-    on_start(callback: ({ forked }: { forked: boolean }) => void | Promise<void>): void {
-        this._on_start.push(callback);
+        console.log(this.performance.dump());
+        // console.log(this.performance.dump(v => v >= 50));
+        // debug(2, () => this.performance.dump(v => v >= 50));
     }
 
     // Stop the server.
@@ -2340,7 +2289,7 @@ export class Server {
         this.log(0, "Stopping the server...");
 
         // On stop callbacks.
-        for (const callback of this._on_stop) {
+        for (const callback of this.events.get("stop")) {
             const res = callback();
             if (res instanceof Promise) {
                 await res;
@@ -2355,7 +2304,7 @@ export class Server {
         // Stop sockets.
         if (this.https) this.https.close();
         if (this.http) this.http.close();
-        if (this.db) await this.db.close();
+        await this.db.close();
 
         // Stop the logger.
         this.log.stop();
@@ -2373,58 +2322,104 @@ export class Server {
 
     }
 
-    /**
-     * Set an (async) callback which will be executed at the start of `server.stop()`.
-     * @param callback The callback to run.
-     * @example
-     * ...
-     * server.on_stop(() => console.log("Hello World!"));
-     */
-    on_stop(callback: () => void | Promise<void>): void {
-        this._on_stop.push(callback);
+    // ---------------------------------------------------------
+    // Events.
+
+    /** Add an event callback. */
+    on<N extends EventName>(name: N, callback: EventCallback<N>): this {
+        this.events.add(name, callback);
+        return this;
     }
 
-    // Fetch status.
+    /** Remove an event callback. */
+    off<N extends EventName>(name: N, callback: EventCallback<N>): this {
+        this.events.remove(name, callback);
+        return this;
+    }
+
+    // ---------------------------------------------------------
+    // Endpoints.
+
     /**
-     * This function is meant to be used when the server is in production mode, it will make an API request to your server through the defined `Server.domain` parameter.
-     * @note This function can be called without initializing the server.
-     * @param type The wanted output type. Either an `object` or a `string` type for CLI purposes.
+     * Add a single endpoint. 
+     * Only supports a single endpoint due to parameter inference.
+     * @note An error is thrown when the endpoint route already exists.
+     * @template Response User inputted response type that will be returned as response, optionaly typing used for consistency.
+     * @template S system template for inferring the endpoint callback parameters.
+     * @param endpoint The endpoint or endpoint options to add.
+     * @returns A registered endpoint object that can for instance be used to infer the endpoint parameters.
      */
-    async fetch_status(type: "object" | "string" = "object"): Promise<string | Record<string, any>> {
+    endpoint<
+        const M extends Endpoint.Method = "GET",
+        const E extends string | RegExp = string,
+        const S extends vlib.Schema.Entries.Opts = {},
+    >(
+        endpoint: Endpoint<M, E, S> | ConstructorParameters<typeof Endpoint<M, E, S>>[0]
+    ): RegisteredEndpoint<M, E, vlib.Schema.Entries.Infer<S>> {
+        const e = endpoint instanceof Endpoint ? endpoint : new Endpoint<M, E, S>(endpoint);
+        this._check_duplicate_route(e.route);
+        this.endpoints.set(e.route.id, e);
+        return {
+            Params: undefined as unknown as vlib.Schema.Entries.Infer<S>,
+            method: e.route.method as M,
+            Method: e.route.method as M,
+            endpoint: e.route.endpoint as E,
+            Endpoint: e.route.endpoint as E,
+            route: e.route,
+        };
+    }
 
-        // Load key.
-        const key_path = this.source.join(".status/key");
-        if (!key_path.exists()) {
-            throw new Error("No status key has been generated yet. Start your server first.");
-        }
-        const key = key_path.load_sync();
-
-        // Make request.
-        const { body: status } = await vlib.request({
-            host: this.domain,
-            endpoint: "/.status",
-            method: "GET",
-            params: { key },
-            query: true,
-            json: true,
-        });
-
-        // String type.
-        if (type === "string") {
-            if (status.running_since != null) {
-                status.running_since = new vlib.Date(status.running_since).format("%d-%m-%y %H:%M:%S");
-            }
-            let str = `${this.domain}:\n`;
-            Object.keys(status).forEach((key) => {
-                str += ` * ${key}: ${status[key]}\n`;
+    // Add an error endpoint.
+    /**
+     *  Add an endpoint per error status code.
+     * @param status_code
+     *      The status code of the error.
+     * 
+     *      The supported status codes are:
+     *      * `*` For all errors not specifically defined.
+     *      * `status >= 400`
+     * @param endpoint The error endpoint or error endpoint options.
+     * 
+     * @note
+     * Best practice is to define a universal `/error` endpoint using `Endpoint.templates` to render the error details.
+     * Then this endpoint can be cloned using `Endpoint.clone()` and defined with specific template values per status code.
+     */
+    error_endpoint<
+        const S extends vlib.Schema.Entries.Opts = {}
+    >(
+        status_code: "*" | number,
+        endpoint: Endpoint<any, any, S> | Omit<Endpoint.Opts<any, any, S>, "method" | "endpoint">
+    ): this {
+        let e: Endpoint<any, any, S>;
+        if (endpoint instanceof Endpoint) {
+            e = endpoint;
+        } else {
+            e = new Endpoint({
+                ...endpoint as Endpoint.Opts<any, any, S>,
+                method: "GET",
+                endpoint: `/error/${status_code}`,
             });
-            str = str.substr(0, str.length - 1);
-            return str;
         }
-
-        // Response.
-        return status;
+        // we dont check the route since we dont need methods and endpoints to be unique here.
+        // this._check_duplicate_route(e.route);
+        if (status_code === "*") {
+            Object.values(Status).forEach(status => {
+                if (typeof status === "number" && status >= 400 && !this.err_endpoints.has(status)) {
+                    this.err_endpoints.set(
+                        status,
+                        e,
+                    );
+                }
+            })
+        } else {
+            this.err_endpoints.set(
+                status_code,
+                e,
+            );
+        }
+        return this;
     }
+
 
     // ---------------------------------------------------------
     // Content Security Policy.
@@ -2492,9 +2487,54 @@ export class Server {
     }
 
     // ---------------------------------------------------------
+    // Status.
+
+    // Fetch status.
+    /**
+     * This function is meant to be used when the server is in production mode, it will make an API request to your server through the defined `Server.domain` parameter.
+     * @note This function can be called without initializing the server.
+     * @param type The wanted output type. Either an `object` or a `string` type for CLI purposes.
+     */
+    async fetch_status(type: "object" | "string" = "object"): Promise<string | Record<string, any>> {
+
+        // Load key.
+        const key_path = this.source.join(".status/key");
+        if (!key_path.exists()) {
+            throw new Error("No status key has been generated yet. Start your server first.");
+        }
+        const key = key_path.load_sync();
+
+        // Make request.
+        const { body: status } = await vlib.request({
+            host: this.domain,
+            endpoint: "/.status",
+            method: "GET",
+            params: { key },
+            query: true,
+            json: true,
+        });
+
+        // String type.
+        if (type === "string") {
+            if (status.running_since != null) {
+                status.running_since = new vlib.Date(status.running_since).format("%d-%m-%y %H:%M:%S");
+            }
+            let str = `${this.domain}:\n`;
+            Object.keys(status).forEach((key) => {
+                str += ` * ${key}: ${status[key]}\n`;
+            });
+            str = str.substr(0, str.length - 1);
+            return str;
+        }
+
+        // Response.
+        return status;
+    }
+
+    // ---------------------------------------------------------
     // TLS.
 
-    // Generate a key and csr for tls.
+    /** Generate a key and csr for tls. */
     async generate_ssl_key({
         output_path,
         ec = true,
@@ -2528,7 +2568,7 @@ export class Server {
         }
     }
 
-    // Generate a csr for tls.
+    /** Generate a csr for tls. */
     async generate_csr({
         output_path,
         key_path,
@@ -2585,194 +2625,8 @@ export class Server {
     }
 
     // ---------------------------------------------------------
-    // Endpoints.
-    // private registered_routes: Map<string, Array<string | RegExp>> = new Map();
-
-    /**
-     * Checks if an endpoint route already exists.
-     * @param method    HTTP method
-     * @param endpoint  String path or RegExp
-     */
-    private _check_duplicate_route(
-        route: Route
-    ): void {
-        const e = this._find_endpoint(route);
-        if (e) {
-            throw new Error(`Duplicate "${route.method}:${route.endpoint_str}" endpoint route, it is already defined by endpoint "${e.id}".`);
-        }
-    }
-
-    /**
-     * Add a single endpoint. 
-     * Only supports a single endpoint due to parameter inference.
-     * @template Response User inputted response type that will be returned as response, optionaly typing used for consistency.
-     * @template S system template for inferring the endpoint callback parameters.
-     * @param endpoint The endpoint or endpoint options to add.
-     * @returns A registered endpoint object that can for instance be used to infer the endpoint parameters.
-     */
-    endpoint<const S extends vlib.Schema.Entries.Opts = {}>(
-        endpoint: Endpoint<S> | ConstructorParameters<typeof Endpoint<S>>[0]
-    ): RegisteredEndpoint<S> {
-        const e = endpoint instanceof Endpoint ? endpoint : new Endpoint<S>(endpoint);
-        this._check_duplicate_route(e.route);
-        this.endpoints.set(e.route.id, e);
-        return {
-            params: undefined as any,
-            Params: undefined as any,
-        };
-    }
-
-    // Add an error endpoint.
-    /**
-     *  Add an endpoint per error status code.
-     * @param status_code
-     *      The status code of the error.
-     * 
-     *      The supported status codes are:
-     *      * `404`
-     *      * `400` (Will not be used when the endpoint uses an API callback).
-     *      * `403`
-     *      * `404`
-     *      * `500`
-     * @param endpoint The error endpoint or error endpoint options
-    */
-    error_endpoint<const S extends vlib.Schema.Entries.Opts = {}>(
-        status_code: number,
-        endpoint: Endpoint<S> | Endpoint.Opts<S>,
-    ): this {
-        const e = endpoint instanceof Endpoint ? endpoint : new Endpoint<S>(endpoint)
-        this._check_duplicate_route(e.route);
-        this.err_endpoints.set(
-            status_code,
-            e,
-        );
-        return this;
-    }
-
-    // ---------------------------------------------------------
-    // Functions.
-
-    // Send a mail.
-    /**
-     * Send one or multiple mails.
-     * @note Make sure the domain's DNS records SPF and DKIM are properly configured when sending attachments.
-     * @returns Returns a promise that will be resolved or rejected when the mail has been sent.
-     * @param sender The sender address. Either a string email (e.g. `your@email.com`) or `[name, email]`.
-     * @param recipients The recipient addresses. Each item is either a string email or `[name, email]`.
-     * @param subject The subject text.
-     * @param body The body text or a `MailElement` instance.
-     * @param attachments An array with absolute file paths for attachments, or an array with nodemailer attachment objects.
-     * @example
-     * ...
-     * await server.send_mail({
-     *   sender: ["Sender Name", "sender@email.com"],
-     *   recipients: [
-     *     ["Recipient Name", "recipient1@email.com"],
-     *     "recipient2@email.com",
-     *   ],
-     *   subject: "Example Mail",
-     *   body: "Hello World!",
-     *   attachments: ["/path/to/image.png"]
-     * });
-     */
-    async send_mail({
-        sender = undefined,
-        recipients = [],
-        subject = undefined,
-        body = "",
-        attachments = [],
-    }: {
-        sender?: string | [string, string];
-        recipients?: (string | [string, string])[];
-        subject?: string;
-        body?: string | Mail.MailElement;
-        attachments?: (string | vlib.Path | MailAttachment)[];
-    }): Promise<void> {
-
-        // Not enabled.
-        if (this.smtp === undefined) {
-            throw new Error("SMTP is not enabled, define the required server argument on initialization to enable smtp.");
-        }
-
-        // Convert MailElement to html.
-        if (body instanceof Mail.MailElement) {
-            body = body.html();
-        }
-
-        // Check args.
-        if (sender == null && this.smtp_sender != null) {
-            sender = this.smtp_sender;
-        }
-        if (recipients.length === 0) {
-            throw new Error(`The mail has no recipients.`);
-        }
-        if (sender == null) {
-            throw new Error(`Parameter "sender" should be a defined value of type "string" or "array".`);
-        }
-
-        // Format address wrapper.
-        const format_address = (address: string | [string, string]): string => {
-            if (Array.isArray(address)) {
-                return `${address[0]} <${address[1]}>`;
-            }
-            return address;
-        };
-
-        // Create to array.
-        const to: string[] = [];
-        recipients.forEach((address) => to.push(format_address(address)));
-
-        // Create attachments array.
-        let attached_files: MailAttachment[] = [];
-        if (attachments != null) {
-            attachments.forEach((path: string | vlib.Path | MailAttachment) => {
-                if (path instanceof vlib.Path) {
-                    attached_files.push({
-                        filename: path.full_name(),
-                        path: path.str(),
-                        content: path.load_sync(),
-                    });
-                } else if (typeof path === "string") {
-                    const p = new vlib.Path(path);
-                    attached_files.push({
-                        filename: p.full_name(),
-                        path: path,
-                        content: p.load_sync(),
-                    });
-                } else {
-                    attached_files.push(path as MailAttachment);
-                }
-            });
-        }
-
-        // Send mail.
-        try {
-            await this.smtp.sendMail({
-                from: format_address(sender),
-                to: to,
-                subject: subject,
-                html: body,
-                attachments: attached_files,
-            });
-        } catch (error: any) {
-            throw new Error(error.message); // to keep readable stacktrace.
-        }
-    }
-
-    // ---------------------------------------------------------
-    // Default callbacks.
-    // These can all be overwritten by the user.
-    // @todo add scheme for payment params.
-
-    // On delete user.
-    /**
-     * This function can be overridden with a callback for when a user is deleted.
-     * @param uid The uid of the deleted user.
-     * @example
-     * ...
-     * server.on_delete_user = ({uid}) => {}
-     */
-    async on_delete_user({ uid }: { uid: string | string[] }): Promise<void> { }
+    // DEPRECATED 
+    // these will all be removed and replaced when using stripe instead of paddle.
 
     /** Called for each product in a successful one-time payment. Override to implement your logic. */
     async on_payment({ product, payment }: { product: any; payment: any }): Promise<void> { }
@@ -2810,8 +2664,9 @@ export class Server {
         max_width?: number;
         children?: any[];
     }): any {
-        const style = this.mail_style;
-        const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
+        this.assert_mail();
+        const style = this.mail.style;
+        const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
 
         // Create header.
         let header;
@@ -2834,7 +2689,7 @@ export class Server {
         }
 
         // Create mail.
-        return Mail.Mail(
+        return MailUI.Mail(
             Table(
                 TableData(
                     Table(
@@ -2878,10 +2733,11 @@ export class Server {
         show_total_due?: boolean;
     }): any[] {
         if (!this.payments) throw new Error("Payments not initialized");
+        this.assert_mail();
 
         // Shortcuts.
-        const style = this.mail_style;
-        const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
+        const style = this.mail.style;
+        const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
 
         // Render payment line item for a mail.
         const _render_mail_payment_line_item = ({
@@ -3069,11 +2925,19 @@ export class Server {
         ];
     }
 
+    /** Assert mail is configured. */
+    assert_mail(): asserts this is { mail: Mail } {
+        if (!this.mail) {
+            throw new ExternalError({ message: "Mail is not configured." });
+        }
+    }
+
     // On 2fa mail.
     /** Build the 2FA verification email content. */
     on_2fa_mail({ code, username, email, date, ip, device }: { code: string; username: string; email: string; date: string; ip: string; device: string }): any {
-        const style = this.mail_style;
-        const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
+        this.assert_mail();
+        const style = this.mail.style;
+        const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
         return this._mail_template({
             max_width: 400,
             children: [
@@ -3152,10 +3016,11 @@ export class Server {
     // On successfull payment mail.
     /** Build the successful payment email content. */
     on_payment_mail({ payment }: { payment: any }): any {
+        this.assert_mail();
 
         // Shortcuts.
-        const style = this.mail_style;
-        const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
+        const style = this.mail.style;
+        const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
 
         // Create mail.
         return this._mail_template({
@@ -3181,7 +3046,7 @@ export class Server {
 
                 // Image.
                 TableRow(
-                    Image(`${this.full_domain}/volt_static/payments/party.png`)
+                    Image(`${this.full_domain}/volt/assets/payments/party.png`)
                         .frame(60, 60)
                         .margin(0, 0, 30, 0)
                 ).center(),
@@ -3214,10 +3079,11 @@ export class Server {
     // On failed payment mail.
     /** Build the failed payment email content. */
     on_failed_payment_mail({ payment }: { payment: any }): any {
+        this.assert_mail();
 
         // Shortcuts.
-        const style = this.mail_style;
-        const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = Mail;
+        const style = this.mail.style;
+        const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = MailUI;
 
         // Create mail.
         return this._mail_template({
@@ -3243,7 +3109,7 @@ export class Server {
 
                 // Image.
                 TableRow(
-                    ImageMask(`${this.full_domain}/volt_static/payments/error.png`)
+                    ImageMask(`${this.full_domain}/volt/assets/payments/error.png`)
                         .frame(40, 40)
                         .mask_color("#E8454E")
                         .margin(0, 0, 30, 0)
@@ -3276,10 +3142,11 @@ export class Server {
     // On cancellation mail.
     /** Build the successful cancellation email content. */
     on_cancellation_mail({ payment, line_items }: { payment: any; line_items: any[] }): any {
+        this.assert_mail();
 
         // Shortcuts.
-        const style = this.mail_style;
-        const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
+        const style = this.mail.style;
+        const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
 
         // Create mail.
         return this._mail_template({
@@ -3305,7 +3172,7 @@ export class Server {
 
                 // Image.
                 TableRow(
-                    Image(`${this.full_domain}/volt_static/payments/check.png`)
+                    Image(`${this.full_domain}/volt/assets/payments/check.png`)
                         .frame(40, 40)
                         .margin(0, 0, 30, 0)
                 ).center(),
@@ -3337,10 +3204,11 @@ export class Server {
     // On refund mail.
     /** Build the failed cancellation email content. */
     on_failed_cancellation_mail({ payment }: { payment: any }): any {
+        this.assert_mail();
 
         // Shortcuts.
-        const style = this.mail_style;
-        const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = Mail;
+        const style = this.mail.style;
+        const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = MailUI;
 
         // Create mail.
         return this._mail_template({
@@ -3366,7 +3234,7 @@ export class Server {
 
                 // Image.
                 TableRow(
-                    ImageMask(`${this.full_domain}/volt_static/payments/error.png`)
+                    ImageMask(`${this.full_domain}/volt/assets/payments/error.png`)
                         .frame(40, 40)
                         .mask_color("#E8454E")
                         .margin(0, 0, 30, 0)
@@ -3399,10 +3267,11 @@ export class Server {
     // On refund mail.
     /** Build the successful refund email content. */
     on_refund_mail({ payment, line_items }: { payment: any; line_items: any[] }): any {
+        this.assert_mail();
 
         // Shortcuts.
-        const style = this.mail_style;
-        const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
+        const style = this.mail.style;
+        const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
 
         // Create mail.
         return this._mail_template({
@@ -3428,7 +3297,7 @@ export class Server {
 
                 // Image.
                 TableRow(
-                    Image(`${this.full_domain}/volt_static/payments/party.png`)
+                    Image(`${this.full_domain}/volt/assets/payments/party.png`)
                         .frame(60, 60)
                         .margin(0, 0, 30, 0)
                 ).center(),
@@ -3460,10 +3329,11 @@ export class Server {
     // On refund mail.
     /** Build the failed refund email content. */
     on_failed_refund_mail({ payment, line_items }: { payment: any; line_items: any[] }): any {
+        this.assert_mail();
 
         // Shortcuts.
-        const style = this.mail_style;
-        const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = Mail;
+        const style = this.mail.style;
+        const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = MailUI;
 
         // Create mail.
         return this._mail_template({
@@ -3489,7 +3359,7 @@ export class Server {
 
                 // Image.
                 TableRow(
-                    ImageMask(`${this.full_domain}/volt_static/payments/error.png`)
+                    ImageMask(`${this.full_domain}/volt/assets/payments/error.png`)
                         .frame(40, 40)
                         .mask_color("#E8454E")
                         .margin(0, 0, 30, 0)
@@ -3522,10 +3392,11 @@ export class Server {
     // On refund mail.
     /** Build the successful chargeback email content. */
     on_chargeback_mail({ payment, line_items }: { payment: any; line_items: any[] }): any {
+        this.assert_mail();
 
         // Shortcuts.
-        const style = this.mail_style;
-        const { Title, Text, Image, Table, TableRow, TableData, VStack } = Mail;
+        const style = this.mail.style;
+        const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
 
         // Create mail.
         return this._mail_template({
@@ -3551,7 +3422,7 @@ export class Server {
 
                 // Image.
                 TableRow(
-                    Image(`${this.full_domain}/volt_static/payments/party.png`)
+                    Image(`${this.full_domain}/volt/assets/payments/party.png`)
                         .frame(60, 60)
                         .margin(0, 0, 30, 0)
                 ).center(),
@@ -3583,10 +3454,11 @@ export class Server {
     // On refund mail.
     /** Build the failed chargeback email content. */
     on_failed_chargeback_mail({ payment, line_items }: { payment: any; line_items: any[] }): any {
+        this.assert_mail();
 
         // Shortcuts.
-        const style = this.mail_style;
-        const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = Mail;
+        const style = this.mail.style;
+        const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = MailUI;
 
         // Create mail.
         return this._mail_template({
@@ -3612,7 +3484,7 @@ export class Server {
 
                 // Image.
                 TableRow(
-                    ImageMask(`${this.full_domain}/volt_static/payments/error.png`)
+                    ImageMask(`${this.full_domain}/volt/assets/payments/error.png`)
                         .frame(40, 40)
                         .mask_color("#E8454E")
                         .margin(0, 0, 30, 0)
@@ -3641,4 +3513,118 @@ export class Server {
             ],
         });
     }
+
+
+    // -------------------------- DEPRECATED -------------------------------
+
+    // // Send a mail.
+    // /**
+    //  * Send one or multiple mails.
+    //  * @note Make sure the domain's DNS records SPF and DKIM are properly configured when sending attachments.
+    //  * @returns Returns a promise that will be resolved or rejected when the mail has been sent.
+    //  * @param sender The sender address. Either a string email (e.g. `your@email.com`) or `[name, email]`.
+    //  * @param recipients The recipient addresses. Each item is either a string email or `[name, email]`.
+    //  * @param subject The subject text.
+    //  * @param body The body text or a `MailElement` instance.
+    //  * @param attachments An array with absolute file paths for attachments, or an array with nodemailer attachment objects.
+    //  * @example
+    //  * ...
+    //  * await server.send_mail({
+    //  *   sender: ["Sender Name", "sender@email.com"],
+    //  *   recipients: [
+    //  *     ["Recipient Name", "recipient1@email.com"],
+    //  *     "recipient2@email.com",
+    //  *   ],
+    //  *   subject: "Example Mail",
+    //  *   body: "Hello World!",
+    //  *   attachments: ["/path/to/image.png"]
+    //  * });
+    //  */
+    // async send_mail({
+    //     sender = undefined,
+    //     recipients = [],
+    //     subject = undefined,
+    //     body = "",
+    //     attachments = [],
+    // }: {
+    //     sender?: string | [string, string];
+    //     recipients?: (string | [string, string])[];
+    //     subject?: string;
+    //     body?: string | MailUI.MailElement;
+    //     attachments?: (string | vlib.Path | MailAttachment)[];
+    // }): Promise<void> {
+
+    //     // Not enabled.
+    //     if (this.smtp === undefined) {
+    //         throw new Error("SMTP is not enabled, define the required server argument on initialization to enable smtp.");
+    //     }
+
+    //     // Convert MailElement to html.
+    //     if (body instanceof MailUI.MailElement) {
+    //         body = body.html();
+    //     }
+
+    //     // Check args.
+    //     if (sender == null && this.smtp_sender != null) {
+    //         sender = this.smtp_sender;
+    //     }
+    //     if (recipients.length === 0) {
+    //         throw new Error(`The mail has no recipients.`);
+    //     }
+    //     if (sender == null) {
+    //         throw new Error(`Parameter "sender" should be a defined value of type "string" or "array".`);
+    //     }
+
+    //     // Format address wrapper.
+    //     const format_address = (address: string | [string, string]): string => {
+    //         if (Array.isArray(address)) {
+    //             return `${address[0]} <${address[1]}>`;
+    //         }
+    //         return address;
+    //     };
+
+    //     // Create to array.
+    //     const to: string[] = [];
+    //     recipients.forEach((address) => to.push(format_address(address)));
+
+    //     // Create attachments array.
+    //     let attached_files: MailAttachment[] = [];
+    //     if (attachments != null) {
+    //         attachments.forEach((path: string | vlib.Path | MailAttachment) => {
+    //             if (path instanceof vlib.Path) {
+    //                 attached_files.push({
+    //                     filename: path.full_name(),
+    //                     path: path.str(),
+    //                     content: path.load_sync(),
+    //                 });
+    //             } else if (typeof path === "string") {
+    //                 const p = new vlib.Path(path);
+    //                 attached_files.push({
+    //                     filename: p.full_name(),
+    //                     path: path,
+    //                     content: p.load_sync(),
+    //                 });
+    //             } else {
+    //                 const is_base64 = /^[A-Za-z0-9+/]+={0,2}$/.test(path.content) && (path.content.length % 4 === 0);
+    //                 if (is_base64) {
+    //                     path.encoding = "base64";
+    //                 }
+    //                 attached_files.push(path);
+    //             }
+    //         });
+    //     }
+
+    //     // Send mail.
+    //     try {
+    //         await this.smtp.sendMail({
+    //             from: format_address(sender),
+    //             to: to,
+    //             subject: subject,
+    //             html: body,
+    //             attachments: attached_files,
+    //         });
+    //     } catch (error: any) {
+    //         throw new Error(error.message); // to keep readable stacktrace.
+    //     }
+    // }
 }

@@ -1,3 +1,7 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 export declare class Stylesheet {
     _element: HTMLStyleElement;
     /** @warning This function may cause security issues if the data is unsafe provided by the user, since this assigns to innerHTML. */

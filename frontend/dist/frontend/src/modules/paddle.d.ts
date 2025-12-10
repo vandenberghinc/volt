@@ -1,5 +1,5 @@
-import { Utils } from "./utils.js";
-import { Paddle as PaddleBackend, Product } from "../../../backend/src/payments/paddle.js";
+import type { Paddle as PaddleBackend, Product } from "../../../backend/src/payments/paddle.js";
+import { Request } from "./request.js";
 /**
  * @deprecated using stripe from now on.
  */
@@ -1033,273 +1033,173 @@ export declare namespace Payments {
         } | undefined;
     }): void;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Currency Symbol
-     * @description: Get the currency symbol for a product currency.
-     * @type: string | null
-     * @return: Returns the currency symbol when the currency is supported, otherwise `null`
-     * @param:
-     *   @name: currency
-     *   @description: The currency from the product object.
+     * {Get Currency Symbol}
+     * Get the currency symbol for a product currency.
+     * @nav Frontend/Payments
+     * @parameter currency The currency from the product object.
+     * @returns Returns the currency symbol when the currency is supported, otherwise `null`
+     * @docs
      */
     function get_currency_symbol(currency: string): string | null;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Payment Products
-     * @description: Get the backend defined payment products asynchronously.
-     * @type: array[object]
-     * @return: Returns the backend defined payment products.
+     * {Payment Products}
+     * Get the backend defined payment products asynchronously.
+     * @nav Frontend/Payments
+     * @returns Returns the backend defined payment products.
+     * @docs
      */
-    function get_products(): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetProducts.Result>;
+    function get_products(): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetProducts>;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Payment Product
-     * @description: Get the backend defined payment product by id asynchronously.
-     * @type: object
-     * @return: Returns the backend defined payment product.
-     * @param:
-     *   @name: id
-     *   @required: true
-     *   @type: string
-     *   @desc: The id of the payment product.
+     * {Get Payment Product}
+     * Get the backend defined payment product by id asynchronously.
+     * @nav Frontend/Payments
+     * @parameter id The id of the payment product.
+     * @returns Returns the backend defined payment product.
+     * @docs
      */
-    function get_product(id: string): Utils.RequestResultPromise<Product>;
+    function get_product(id: string): Request.ResultPromise<Product>;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Payment.
-     * @desc: Get a payment by id.
-     * @param:
-     *   @name: id
-     *   @required: true
-     *   @type: string
-     *   @desc: The id of the payment.
+     * {Get Payment}
+     * Get a payment by id.
+     * @nav Frontend/Payments
+     * @parameter id The id of the payment.
+     * @docs
      */
-    function get_payment(payload: PaddleBackend.Endpoints.GetPayment.Params): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetPayment.Result>;
+    function get_payment(payload: PaddleBackend.Endpoints.GetPayment["payload"]): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetPayment>;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Refunded Payments.
-     * @desc:
-     *   Get all payments of the authenticated user
+     * {Get Refunded Payments}
+     * Get all payments of the authenticated user
      *
-     *   All failed payments are no longer stored in the database.
-     * @param:
-     *   @name: days
-     *   @type: number
-     *   @desc: Retrieve payments from the last amount of days.
-     * @param:
-     *   @name: limit
-     *   @type: number
-     *   @desc: Limit the amount of response payment objects.
-     * @param:
-     *   @name: status
-     *   @type: string
-     *   @desc: Filter the payments by status. Be aware that the line items of a payment also have a status with possible values of `open`, `cancelled`, `refunding` or `refunded.`
-     *   @enum:
-     *     @value: "open"
-     *     @desc: Payments that are still open and unpaid.
-     *   @enum:
-     *     @value: "paid"
-     *     @desc: Payments that are paid.
+     * All failed payments are no longer stored in the database.
+     * @nav Frontend/Payments
+     * @parameter days Retrieve payments from the last amount of days.
+     * @parameter limit Limit the amount of response payment objects.
+     * @parameter status Filter the payments by status. Be aware that the line items of a payment also have a status with possible values of `open`, `cancelled`, `refunding` or `refunded.`
+     * @docs
      */
-    function get_payments(payload: PaddleBackend.Endpoints.GetPayments.Params): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetPayments.Result>;
+    function get_payments(payload: PaddleBackend.Endpoints.GetPayments["payload"]): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetPayments>;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Refundable Payments.
-     * @desc: Get all payments that are refundable for the authenticated user.
-     * @param:
-     *   @name: days
-     *   @type: number
-     *   @desc: Retrieve payments from the last amount of days.
-     * @param:
-     *   @name: limit
-     *   @type: number
-     *   @desc: Limit the amount of response payment objects.
+     * {Get Refundable Payments}
+     * Get all payments that are refundable for the authenticated user.
+     * @nav Frontend/Payments
+     * @parameter days Retrieve payments from the last amount of days.
+     * @parameter limit Limit the amount of response payment objects.
+     * @docs
      */
-    function get_refundable_payments(payload?: PaddleBackend.Endpoints.GetRefundablePayments.Params): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetRefundablePayments.Result>;
+    function get_refundable_payments(payload?: PaddleBackend.Endpoints.GetRefundablePayments["payload"]): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetRefundablePayments>;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Refunded Payments.
-     * @desc: Get all successfully refunded payments of the authenticated user.
-     * @param:
-     *   @name: days
-     *   @type: number
-     *   @desc: Retrieve payments from the last amount of days.
-     * @param:
-     *   @name: limit
-     *   @type: number
-     *   @desc: Limit the amount of response payment objects.
+     * {Get Refunded Payments}
+     * Get all successfully refunded payments of the authenticated user.
+     * @nav Frontend/Payments
+     * @parameter days Retrieve payments from the last amount of days.
+     * @parameter limit Limit the amount of response payment objects.
+     * @docs
      */
-    function get_refunded_payments(payload?: PaddleBackend.Endpoints.GetRefundedPayments.Params): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetRefundedPayments.Result>;
+    function get_refunded_payments(payload?: PaddleBackend.Endpoints.GetRefundedPayments["payload"]): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetRefundedPayments>;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Refunding Payments.
-     * @desc: Get all payments that are currently in the refunding process of the authenticated user.
-     * @param:
-     *   @name: days
-     *   @type: number
-     *   @desc: Retrieve payments from the last amount of days.
-     * @param:
-     *   @name: limit
-     *   @type: number
-     *   @desc: Limit the amount of response payment objects.
+     * {Get Refunding Payments}
+     * Get all payments that are currently in the refunding process of the authenticated user.
+     * @nav Frontend/Payments
+     * @parameter days Retrieve payments from the last amount of days.
+     * @parameter limit Limit the amount of response payment objects.
+     * @docs
      */
-    function get_refunding_payments(payload?: PaddleBackend.Endpoints.GetRefundingPayments.Params): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetRefundingPayments.Result>;
+    function get_refunding_payments(payload?: PaddleBackend.Endpoints.GetRefundingPayments["payload"]): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetRefundingPayments>;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Refund Payment.
-     * @desc: Refund a payment based on the payment id for the authenticated user.
-     * @warning: Refunding a subscription will also cancel all other subscriptions that were created by the same payment request.
-     * @param:
-     *   @name: payment
-     *   @required: true
-     *   @type: number | string
-     *   @desc: The id of the payment object or the payment object itself.
-     * @param:
-     *   @name: line_items
-     *   @required: true
-     *   @type: array[object]
-     *   @desc: The line items to refund, these must be retrieved from the original payment line items otherwise it may cause undefined behaviour. When undefined the entire payment will be refunded.
-     * @param:
-     *   @name: reason
-     *   @type: string
-     *   @desc: The refund reason.
+     * {Refund Payment}
+     * Refund a payment based on the payment id for the authenticated user.
+     * @warning Refunding a subscription will also cancel all other subscriptions that were created by the same payment request.
+     * @nav Frontend/Payments
+     * @parameter payment The id of the payment object or the payment object itself.
+     * @parameter line_items The line items to refund, these must be retrieved from the original payment line items otherwise it may cause undefined behaviour. When undefined the entire payment will be refunded.
+     * @parameter reason The refund reason.
+     * @docs
      */
-    function create_refund(payload: PaddleBackend.Endpoints.RefundPayment.Params): Utils.RequestResultPromise<PaddleBackend.Endpoints.RefundPayment.Result>;
+    function create_refund(payload: PaddleBackend.Endpoints.RefundPayment["payload"]): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.RefundPayment>;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Cancel Subscription.
-     * @desc: Cancel a subscription based on the product id.
-     * @warning: Cancelling a subscription will also cancel all other subscriptions that were created by the same payment request.
-     * @param:
-     *   @name: product
-     *   @required: true
-     *   @type: string
-     *   @desc: The product id.
+     * {Cancel Subscription}
+     * Cancel a subscription based on the product id.
+     * @warning Cancelling a subscription will also cancel all other subscriptions that were created by the same payment request.
+     * @nav Frontend/Payments
+     * @parameter product The product id.
+     * @docs
      */
-    function cancel_subscription(payload: PaddleBackend.Endpoints.CancelSubscription.Params): Utils.RequestResultPromise<PaddleBackend.Endpoints.CancelSubscription.Result>;
+    function cancel_subscription(payload: PaddleBackend.Endpoints.CancelSubscription["payload"]): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.CancelSubscription>;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Is Subscribed.
-     * @desc: Check if the authenticated user is subscribed to a product plan.
-     * @param:
-     *   @name: product
-     *   @required: true
-     *   @type: string
-     *   @desc: The product id.
+     * {Is Subscribed}
+     * Check if the authenticated user is subscribed to a product plan.
+     * @nav Frontend/Payments
+     * @parameter product The product id.
+     * @docs
      */
-    function is_subscribed(payload: PaddleBackend.Endpoints.IsSubscribed.Params): Utils.RequestResultPromise<PaddleBackend.Endpoints.IsSubscribed.Result>;
+    function is_subscribed(payload: PaddleBackend.Endpoints.IsSubscribed["payload"]): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.IsSubscribed>;
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get active subscriptions
-     * @desc: Get the active subscriptions of the authenticated user.
+     * {Get active subscriptions}
+     * Get the active subscriptions of the authenticated user.
+     * @nav Frontend/Payments
+     * @docs
      */
-    function get_active_subscriptions(): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetActiveSubscriptions.Result>;
+    function get_active_subscriptions(): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetActiveSubscriptions>;
     namespace Cart {
         let items: {
             product: Product;
             quantity: number;
         }[];
         /**
-         * @docs:
-         * @nav: Frontend
-         * @chapter: Payments
-         * @title: Refresh Cart
-         * @description:
-         *   Refresh the shopping cart.
+         * {Refresh Cart}
+         * Refresh the shopping cart.
          *
-         *   The current cart items are accessible as `Payments.cart.items`.
+         * The current cart items are accessible as `Payments.cart.items`.
+         * @nav Frontend/Payments
+         * @docs
          */
         function refresh(): void;
         /**
-         * @docs:
-         * @nav: Frontend
-         * @chapter: Payments
-         * @title: Save Cart
-         * @description:
-         *   Save the shopping cart in the local storage.
+         * {Save Cart}
+         * Save the shopping cart in the local storage.
          *
-         *   The current cart items are accessible as `Payments.cart.items`.
+         * The current cart items are accessible as `Payments.cart.items`.
+         * @nav Frontend/Payments
+         * @docs
          */
         function save(): void;
         /**
-         * @docs:
-         * @nav: Frontend
-         * @chapter: Payments
-         * @title: Add to Cart
-         * @description:
-         *   Add a product to the shopping cart.
+         * {Add to Cart}
+         * Add a product to the shopping cart.
          *
-         *   When the product was already added to the shopping cart only the quantity will be incremented.
+         * When the product was already added to the shopping cart only the quantity will be incremented.
          *
-         *   An error will be thrown if the product id does not exist.
+         * An error will be thrown if the product id does not exist.
          *
-         *   The current cart items are accessible as `Payments.cart.items`.
-         * @param:
-         *   @name: id
-         *   @description: The product's id.
-         *   @type: string
-         * @param:
-         *   @name: quantity
-         *   @description: The quantity to add.
-         *   @type: number
+         * The current cart items are accessible as `Payments.cart.items`.
+         * @nav Frontend/Payments
+         * @parameter id The product's id.
+         * @parameter quantity The quantity to add.
+         * @docs
          */
         function add(id: string, quantity?: number): Promise<void>;
         /**
-         * @docs:
-         * @nav: Frontend
-         * @chapter: Payments
-         * @title: Remove from Cart
-         * @description:
-         *   Remove a product from the shopping cart.
+         * {Remove from Cart}
+         * Remove a product from the shopping cart.
          *
-         *   Does not throw an error when the product was not added to the shopping cart.
+         * Does not throw an error when the product was not added to the shopping cart.
          *
-         *   The current cart items are accessible as `Payments.cart.items`.
-         * @param:
-         *   @name: id
-         *   @description: The product's id.
-         *   @type: string
-         * @param:
-         *   @name: quantity
-         *   @description: The quantity to remove. When the quantity value is "all", the entire product will be removed from the shopping cart.
-         *   @type: number | "all"
+         * The current cart items are accessible as `Payments.cart.items`.
+         * @nav Frontend/Payments
+         * @parameter id The product's id.
+         * @parameter quantity The quantity to remove. When the quantity value is "all", the entire product will be removed from the shopping cart.
+         * @docs
          */
         function remove(id: string, quantity?: number | "all"): Promise<void>;
         /**
-         * @docs:
-         * @nav: Frontend
-         * @chapter: Payments
-         * @title: Clear Cart
-         * @description:
-         *   Clear the shopping cart.
+         * {Clear Cart}
+         * Clear the shopping cart.
          *
-         *   Will automatically be called if `Payments.confirm_charge()` finishes without any errors.
+         * Will automatically be called if `Payments.confirm_charge()` finishes without any errors.
          *
-         *   The current cart items are accessible as `Payments.cart.items`.
+         * The current cart items are accessible as `Payments.cart.items`.
+         * @nav Frontend/Payments
+         * @docs
          */
         function clear(): Promise<void>;
     }

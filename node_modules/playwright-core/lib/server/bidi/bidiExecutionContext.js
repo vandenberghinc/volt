@@ -33,6 +33,7 @@ __export(bidiExecutionContext_exports, {
 });
 module.exports = __toCommonJS(bidiExecutionContext_exports);
 var import_utils = require("../../utils");
+var import_utilityScriptSerializers = require("../../utils/isomorphic/utilityScriptSerializers");
 var js = __toESM(require("../javascript"));
 var dom = __toESM(require("../dom"));
 var import_bidiDeserializer = require("./third_party/bidiDeserializer");
@@ -66,7 +67,7 @@ class BidiExecutionContext {
     if (response.type === "success")
       return import_bidiDeserializer.BidiDeserializer.deserialize(response.result);
     if (response.type === "exception")
-      throw new js.JavaScriptErrorInEvaluate(response.exceptionDetails.text + "\nFull val: " + JSON.stringify(response.exceptionDetails));
+      throw new js.JavaScriptErrorInEvaluate(response.exceptionDetails.text);
     throw new js.JavaScriptErrorInEvaluate("Unexpected response type: " + JSON.stringify(response));
   }
   async rawEvaluateHandle(context, expression) {
@@ -85,7 +86,7 @@ class BidiExecutionContext {
       throw new js.JavaScriptErrorInEvaluate("Cannot get handle: " + JSON.stringify(response.result));
     }
     if (response.type === "exception")
-      throw new js.JavaScriptErrorInEvaluate(response.exceptionDetails.text + "\nFull val: " + JSON.stringify(response.exceptionDetails));
+      throw new js.JavaScriptErrorInEvaluate(response.exceptionDetails.text);
     throw new js.JavaScriptErrorInEvaluate("Unexpected response type: " + JSON.stringify(response));
   }
   async evaluateWithArguments(functionDeclaration, returnByValue, utilityScript, values, handles) {
@@ -104,10 +105,10 @@ class BidiExecutionContext {
       userActivation: true
     });
     if (response.type === "exception")
-      throw new js.JavaScriptErrorInEvaluate(response.exceptionDetails.text + "\nFull val: " + JSON.stringify(response.exceptionDetails));
+      throw new js.JavaScriptErrorInEvaluate(response.exceptionDetails.text);
     if (response.type === "success") {
       if (returnByValue)
-        return js.parseEvaluationResultValue(import_bidiDeserializer.BidiDeserializer.deserialize(response.result));
+        return (0, import_utilityScriptSerializers.parseEvaluationResultValue)(import_bidiDeserializer.BidiDeserializer.deserialize(response.result));
       return createHandle(utilityScript._context, response.result);
     }
     throw new js.JavaScriptErrorInEvaluate("Unexpected response type: " + JSON.stringify(response));
@@ -179,7 +180,7 @@ class BidiExecutionContext {
       userActivation: true
     });
     if (response.type === "exception")
-      throw new js.JavaScriptErrorInEvaluate(response.exceptionDetails.text + "\nFull val: " + JSON.stringify(response.exceptionDetails));
+      throw new js.JavaScriptErrorInEvaluate(response.exceptionDetails.text);
     if (response.type === "success")
       return response.result;
     throw new js.JavaScriptErrorInEvaluate("Unexpected response type: " + JSON.stringify(response));

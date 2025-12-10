@@ -27,51 +27,56 @@ class Tracing extends import_channelOwner.ChannelOwner {
   constructor(parent, type, guid, initializer) {
     super(parent, type, guid, initializer);
     this._includeSources = false;
+    this._isLive = false;
     this._isTracing = false;
-    this.markAsInternalType();
   }
   static from(channel) {
     return channel._object;
   }
   async start(options = {}) {
-    this._includeSources = !!options.sources;
-    await this._channel.tracingStart({
-      name: options.name,
-      snapshots: options.snapshots,
-      screenshots: options.screenshots,
-      live: options._live
+    await this._wrapApiCall(async () => {
+      this._includeSources = !!options.sources;
+      this._isLive = !!options._live;
+      await this._channel.tracingStart({
+        name: options.name,
+        snapshots: options.snapshots,
+        screenshots: options.screenshots,
+        live: options._live
+      });
+      const { traceName } = await this._channel.tracingStartChunk({ name: options.name, title: options.title });
+      await this._startCollectingStacks(traceName, this._isLive);
     });
-    const { traceName } = await this._channel.tracingStartChunk({ name: options.name, title: options.title });
-    await this._startCollectingStacks(traceName);
   }
   async startChunk(options = {}) {
-    const { traceName } = await this._channel.tracingStartChunk(options);
-    await this._startCollectingStacks(traceName);
+    await this._wrapApiCall(async () => {
+      const { traceName } = await this._channel.tracingStartChunk(options);
+      await this._startCollectingStacks(traceName, this._isLive);
+    });
   }
   async group(name, options = {}) {
-    await this._wrapApiCall(async () => {
-      await this._channel.tracingGroup({ name, location: options.location });
-    }, false);
+    await this._channel.tracingGroup({ name, location: options.location });
   }
   async groupEnd() {
-    await this._wrapApiCall(async () => {
-      await this._channel.tracingGroupEnd();
-    }, false);
+    await this._channel.tracingGroupEnd();
   }
-  async _startCollectingStacks(traceName) {
+  async _startCollectingStacks(traceName, live) {
     if (!this._isTracing) {
       this._isTracing = true;
       this._connection.setIsTracing(true);
     }
-    const result = await this._connection.localUtils()?.tracingStarted({ tracesDir: this._tracesDir, traceName });
+    const result = await this._connection.localUtils()?.tracingStarted({ tracesDir: this._tracesDir, traceName, live });
     this._stacksId = result?.stacksId;
   }
   async stopChunk(options = {}) {
-    await this._doStopChunk(options.path);
+    await this._wrapApiCall(async () => {
+      await this._doStopChunk(options.path);
+    });
   }
   async stop(options = {}) {
-    await this._doStopChunk(options.path);
-    await this._channel.tracingStop();
+    await this._wrapApiCall(async () => {
+      await this._doStopChunk(options.path);
+      await this._channel.tracingStop();
+    });
   }
   async _doStopChunk(filePath) {
     this._resetStackCounter();

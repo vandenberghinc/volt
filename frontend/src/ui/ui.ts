@@ -3,7 +3,6 @@
 export * from "./span.js"
 export * from "./style.js"
 export * from "./button.js"
-export * from "./loader_button.js"
 export * from "./border_button.js"
 export * from "./canvas.js"
 export * from "./checkbox.js"

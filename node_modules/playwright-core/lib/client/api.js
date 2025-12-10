@@ -21,7 +21,6 @@ __export(api_exports, {
   APIRequest: () => import_fetch.APIRequest,
   APIRequestContext: () => import_fetch.APIRequestContext,
   APIResponse: () => import_fetch.APIResponse,
-  Accessibility: () => import_accessibility.Accessibility,
   Android: () => import_android.Android,
   AndroidDevice: () => import_android.AndroidDevice,
   AndroidInput: () => import_android.AndroidInput,
@@ -62,7 +61,6 @@ __export(api_exports, {
   Worker: () => import_worker.Worker
 });
 module.exports = __toCommonJS(api_exports);
-var import_accessibility = require("./accessibility");
 var import_android = require("./android");
 var import_browser = require("./browser");
 var import_browserContext = require("./browserContext");
@@ -95,7 +93,6 @@ var import_webError = require("./webError");
   APIRequest,
   APIRequestContext,
   APIResponse,
-  Accessibility,
   Android,
   AndroidDevice,
   AndroidInput,

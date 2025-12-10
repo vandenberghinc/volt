@@ -1,3 +1,7 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementBaseSignature, VElementTagMap } from "../elements/module.js";
 import { VStackElement } from "./stack.js";
 export declare class ImageElement extends VElementTagMap.img {

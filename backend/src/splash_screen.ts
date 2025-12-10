@@ -1,8 +1,9 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
+import * as vlib from "@vandenberghinc/vlib"
 import { Stream } from "./stream.js"
 
 // ---------------------------------------------------------
@@ -84,6 +85,19 @@ export class SplashScreen {
 
         // Attributes.
         this._html = undefined;
+    }
+
+    /**
+     * Clone this splash screen,
+     * creating a new instance with the same properties not shared by reference.
+     */
+    clone(): SplashScreen {
+        return new SplashScreen(vlib.Object.deep_copy({
+            background: this.background,
+            image: this.image,
+            loader: this.loader,
+            style: this.style,
+        }));
     }
 
     /**

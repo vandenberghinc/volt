@@ -42,10 +42,7 @@ var frames = __toESM(require("../frames"));
 var import_helper = require("../helper");
 var network = __toESM(require("../network"));
 var import_page = require("../page");
-var import_page2 = require("../page");
 var import_registry = require("../registry");
-var import_crAccessibility = require("./crAccessibility");
-var import_crBrowser = require("./crBrowser");
 var import_crCoverage = require("./crCoverage");
 var import_crDragDrop = require("./crDragDrop");
 var import_crExecutionContext = require("./crExecutionContext");
@@ -55,10 +52,8 @@ var import_crPdf = require("./crPdf");
 var import_crProtocolHelper = require("./crProtocolHelper");
 var import_defaultFontFamilies = require("./defaultFontFamilies");
 var import_videoRecorder = require("./videoRecorder");
-var import_browserContext = require("../browserContext");
 var import_errors = require("../errors");
 var import_protocolError = require("../protocolError");
-const UTILITY_WORLD_NAME = "__playwright_utility_world__";
 class CRPage {
   constructor(client, targetId, browserContext, opener, bits) {
     this._sessions = /* @__PURE__ */ new Map();
@@ -70,7 +65,6 @@ class CRPage {
     this._nextWindowOpenPopupFeatures = [];
     this._targetId = targetId;
     this._opener = opener;
-    this._isBackgroundPage = bits.isBackgroundPage;
     const dragManager = new import_crDragDrop.DragManager(this);
     this.rawKeyboard = new import_crInput.RawKeyboardImpl(client, browserContext._browser._platform() === "mac", dragManager);
     this.rawMouse = new import_crInput.RawMouseImpl(this, client, dragManager);
@@ -78,7 +72,8 @@ class CRPage {
     this._pdf = new import_crPdf.CRPDF(client);
     this._coverage = new import_crCoverage.CRCoverage(client);
     this._browserContext = browserContext;
-    this._page = new import_page2.Page(this, browserContext);
+    this._page = new import_page.Page(this, browserContext);
+    this.utilityWorldName = `__playwright_utility_world_${this._page.guid}`;
     this._networkManager = new import_crNetworkManager.CRNetworkManager(this._page, null);
     this.updateOffline();
     this.updateExtraHTTPHeaders();
@@ -90,16 +85,15 @@ class CRPage {
       const features = opener._nextWindowOpenPopupFeatures.shift() || [];
       const viewportSize = import_helper.helper.getViewportSizeFromWindowFeatures(features);
       if (viewportSize)
-        this._page._emulatedSize = { viewport: viewportSize, screen: viewportSize };
+        this._page.setEmulatedSizeFromWindowOpen({ viewport: viewportSize, screen: viewportSize });
     }
-    const createdEvent = this._isBackgroundPage ? import_crBrowser.CRBrowserContext.CREvents.BackgroundPage : import_browserContext.BrowserContext.Events.Page;
     this._mainFrameSession._initialize(bits.hasUIWindow).then(
-      () => this._page.reportAsNew(this._opener?._page, void 0, createdEvent),
-      (error) => this._page.reportAsNew(this._opener?._page, error, createdEvent)
+      () => this._page.reportAsNew(this._opener?._page, void 0),
+      (error) => this._page.reportAsNew(this._opener?._page, error)
     );
   }
   static mainFrameSession(page) {
-    const crPage = page._delegate;
+    const crPage = page.delegate;
     return crPage._mainFrameSession;
   }
   async _forAllFrameSessions(cb) {
@@ -195,8 +189,11 @@ class CRPage {
   async addInitScript(initScript, world = "main") {
     await this._forAllFrameSessions((frame) => frame._evaluateOnNewDocument(initScript, world));
   }
-  async removeNonInternalInitScripts() {
-    await this._forAllFrameSessions((frame) => frame._removeEvaluatesOnNewDocument());
+  async exposePlaywrightBinding() {
+    await this._forAllFrameSessions((frame) => frame.exposePlaywrightBinding());
+  }
+  async removeInitScripts(initScripts) {
+    await this._forAllFrameSessions((frame) => frame._removeEvaluatesOnNewDocument(initScripts));
   }
   async closePage(runBeforeUnload) {
     if (runBeforeUnload)
@@ -208,7 +205,7 @@ class CRPage {
     await this._mainFrameSession._client.send("Emulation.setDefaultBackgroundColorOverride", { color });
   }
   async takeScreenshot(progress, format, documentRect, viewportRect, quality, fitsViewport, scale) {
-    const { visualViewport } = await this._mainFrameSession._client.send("Page.getLayoutMetrics");
+    const { visualViewport } = await progress.race(this._mainFrameSession._client.send("Page.getLayoutMetrics"));
     if (!documentRect) {
       documentRect = {
         x: visualViewport.pageX + viewportRect.x,
@@ -224,8 +221,7 @@ class CRPage {
       const deviceScaleFactor = this._browserContext._options.deviceScaleFactor || 1;
       clip.scale /= deviceScaleFactor;
     }
-    progress.throwIfAborted();
-    const result = await this._mainFrameSession._client.send("Page.captureScreenshot", { format, quality, clip, captureBeyondViewport: !fitsViewport });
+    const result = await progress.race(this._mainFrameSession._client.send("Page.captureScreenshot", { format, quality, clip, captureBeyondViewport: !fitsViewport }));
     return Buffer.from(result.data, "base64");
   }
   async getContentFrame(handle) {
@@ -271,15 +267,12 @@ class CRPage {
   async adoptElementHandle(handle, to) {
     return this._sessionForHandle(handle)._adoptElementHandle(handle, to);
   }
-  async getAccessibilityTree(needle) {
-    return (0, import_crAccessibility.getAccessibilityTree)(this._mainFrameSession._client, needle);
-  }
   async inputActionEpilogue() {
     await this._mainFrameSession._client.send("Page.enable").catch((e) => {
     });
   }
-  async resetForReuse() {
-    await this.rawMouse.move(-1, -1, "none", /* @__PURE__ */ new Set(), /* @__PURE__ */ new Set(), true);
+  async resetForReuse(progress) {
+    await this.rawMouse.move(progress, -1, -1, "none", /* @__PURE__ */ new Set(), /* @__PURE__ */ new Set(), true);
   }
   async pdf(options) {
     return this._pdf.generate(options);
@@ -321,8 +314,8 @@ class FrameSession {
     this._videoRecorder = null;
     this._screencastId = null;
     this._screencastClients = /* @__PURE__ */ new Set();
-    this._evaluateOnNewDocumentIdentifiers = [];
     this._workerSessions = /* @__PURE__ */ new Map();
+    this._initScriptIds = /* @__PURE__ */ new Map();
     this._client = client;
     this._crPage = crPage;
     this._page = crPage._page;
@@ -355,26 +348,25 @@ class FrameSession {
       import_eventsHelper.eventsHelper.addEventListener(this._client, "Runtime.exceptionThrown", (exception) => this._handleException(exception.exceptionDetails)),
       import_eventsHelper.eventsHelper.addEventListener(this._client, "Runtime.executionContextCreated", (event) => this._onExecutionContextCreated(event.context)),
       import_eventsHelper.eventsHelper.addEventListener(this._client, "Runtime.executionContextDestroyed", (event) => this._onExecutionContextDestroyed(event.executionContextId)),
-      import_eventsHelper.eventsHelper.addEventListener(this._client, "Runtime.executionContextsCleared", (event) => this._onExecutionContextsCleared()),
-      import_eventsHelper.eventsHelper.addEventListener(this._client, "Target.attachedToTarget", (event) => this._onAttachedToTarget(event)),
-      import_eventsHelper.eventsHelper.addEventListener(this._client, "Target.detachedFromTarget", (event) => this._onDetachedFromTarget(event))
+      import_eventsHelper.eventsHelper.addEventListener(this._client, "Runtime.executionContextsCleared", (event) => this._onExecutionContextsCleared())
     ]);
   }
   _addBrowserListeners() {
     this._eventListeners.push(...[
+      import_eventsHelper.eventsHelper.addEventListener(this._client, "Target.attachedToTarget", (event) => this._onAttachedToTarget(event)),
+      import_eventsHelper.eventsHelper.addEventListener(this._client, "Target.detachedFromTarget", (event) => this._onDetachedFromTarget(event)),
       import_eventsHelper.eventsHelper.addEventListener(this._client, "Inspector.targetCrashed", (event) => this._onTargetCrashed()),
       import_eventsHelper.eventsHelper.addEventListener(this._client, "Page.screencastFrame", (event) => this._onScreencastFrame(event)),
       import_eventsHelper.eventsHelper.addEventListener(this._client, "Page.windowOpen", (event) => this._onWindowOpen(event))
     ]);
   }
   async _initialize(hasUIWindow) {
-    const isSettingStorageState = this._page._browserContext.isSettingStorageState();
-    if (!isSettingStorageState && hasUIWindow && !this._crPage._browserContext._browser.isClank() && !this._crPage._browserContext._options.noDefaultViewport) {
+    if (!this._page.isStorageStatePage && hasUIWindow && !this._crPage._browserContext._browser.isClank() && !this._crPage._browserContext._options.noDefaultViewport) {
       const { windowId } = await this._client.send("Browser.getWindowForTarget");
       this._windowId = windowId;
     }
     let screencastOptions;
-    if (!isSettingStorageState && this._isMainFrame() && this._crPage._browserContext._options.recordVideo && hasUIWindow) {
+    if (!this._page.isStorageStatePage && this._isMainFrame() && this._crPage._browserContext._options.recordVideo && hasUIWindow) {
       const screencastId = (0, import_crypto.createGuid)();
       const outputFile = import_path.default.join(this._crPage._browserContext._options.recordVideo.dir, screencastId + ".webm");
       screencastOptions = {
@@ -394,6 +386,7 @@ class FrameSession {
     if (!this._isMainFrame())
       this._addRendererListeners();
     this._addBrowserListeners();
+    this._bufferedAttachedToTargetEvents = [];
     const promises = [
       this._client.send("Page.enable"),
       this._client.send("Page.getFrameTree").then(({ frameTree }) => {
@@ -401,16 +394,17 @@ class FrameSession {
           this._handleFrameTree(frameTree);
           this._addRendererListeners();
         }
-        const localFrames = this._isMainFrame() ? this._page.frames() : [this._page._frameManager.frame(this._targetId)];
+        const attachedToTargetEvents = this._bufferedAttachedToTargetEvents || [];
+        this._bufferedAttachedToTargetEvents = void 0;
+        for (const event of attachedToTargetEvents)
+          this._onAttachedToTarget(event);
+        const localFrames = this._isMainFrame() ? this._page.frames() : [this._page.frameManager.frame(this._targetId)];
         for (const frame of localFrames) {
           this._client._sendMayFail("Page.createIsolatedWorld", {
             frameId: frame._id,
             grantUniveralAccess: true,
-            worldName: UTILITY_WORLD_NAME
+            worldName: this._crPage.utilityWorldName
           });
-          for (const initScript of this._crPage._page.allInitScripts())
-            frame.evaluateExpression(initScript.source).catch((e) => {
-            });
         }
         const isInitialEmptyPage = this._isMainFrame() && this._page.mainFrame().url() === ":";
         if (isInitialEmptyPage) {
@@ -426,15 +420,16 @@ class FrameSession {
       this._client.send("Log.enable", {}),
       lifecycleEventsEnabled = this._client.send("Page.setLifecycleEventsEnabled", { enabled: true }),
       this._client.send("Runtime.enable", {}),
-      this._client.send("Runtime.addBinding", { name: import_page.PageBinding.kPlaywrightBinding }),
       this._client.send("Page.addScriptToEvaluateOnNewDocument", {
         source: "",
-        worldName: UTILITY_WORLD_NAME
+        worldName: this._crPage.utilityWorldName
       }),
       this._crPage._networkManager.addSession(this._client, void 0, this._isMainFrame()),
       this._client.send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: true, flatten: true })
     ];
-    if (!isSettingStorageState) {
+    if (!this._page.isStorageStatePage) {
+      if (this._crPage._browserContext.needsPlaywrightBinding())
+        promises.push(this.exposePlaywrightBinding());
       if (this._isMainFrame())
         promises.push(this._client.send("Emulation.setFocusEmulationEnabled", { enabled: true }));
       const options = this._crPage._browserContext._options;
@@ -460,7 +455,12 @@ class FrameSession {
       promises.push(this._updateEmulateMedia());
       promises.push(this._updateFileChooserInterception(true));
       for (const initScript of this._crPage._page.allInitScripts())
-        promises.push(this._evaluateOnNewDocument(initScript, "main"));
+        promises.push(this._evaluateOnNewDocument(
+          initScript,
+          "main",
+          true
+          /* runImmediately */
+        ));
       if (screencastOptions)
         promises.push(this._startVideoRecording(screencastOptions));
     }
@@ -481,6 +481,8 @@ class FrameSession {
   }
   async _navigate(frame, url, referrer) {
     const response = await this._client.send("Page.navigate", { url, referrer, frameId: frame._id, referrerPolicy: "unsafeUrl" });
+    if (response.isDownload)
+      throw new frames.NavigationAbortedError(response.loaderId, "Download is starting");
     if (response.errorText)
       throw new frames.NavigationAbortedError(response.loaderId, `${response.errorText} at ${url}`);
     return { newDocumentId: response.loaderId };
@@ -489,9 +491,9 @@ class FrameSession {
     if (this._eventBelongsToStaleFrame(event.frameId))
       return;
     if (event.name === "load")
-      this._page._frameManager.frameLifecycleEvent(event.frameId, "load");
+      this._page.frameManager.frameLifecycleEvent(event.frameId, "load");
     else if (event.name === "DOMContentLoaded")
-      this._page._frameManager.frameLifecycleEvent(event.frameId, "domcontentloaded");
+      this._page.frameManager.frameLifecycleEvent(event.frameId, "domcontentloaded");
   }
   _handleFrameTree(frameTree) {
     this._onFrameAttached(frameTree.frame.id, frameTree.frame.parentId || null);
@@ -502,7 +504,7 @@ class FrameSession {
       this._handleFrameTree(child);
   }
   _eventBelongsToStaleFrame(frameId) {
-    const frame = this._page._frameManager.frame(frameId);
+    const frame = this._page.frameManager.frame(frameId);
     if (!frame)
       return true;
     const session = this._crPage._sessionForFrame(frame);
@@ -512,20 +514,20 @@ class FrameSession {
     const frameSession = this._crPage._sessions.get(frameId);
     if (frameSession && frameId !== this._targetId) {
       frameSession._swappedIn = true;
-      const frame = this._page._frameManager.frame(frameId);
+      const frame = this._page.frameManager.frame(frameId);
       if (frame)
-        this._page._frameManager.removeChildFramesRecursively(frame);
+        this._page.frameManager.removeChildFramesRecursively(frame);
       return;
     }
-    if (parentFrameId && !this._page._frameManager.frame(parentFrameId)) {
+    if (parentFrameId && !this._page.frameManager.frame(parentFrameId)) {
       return;
     }
-    this._page._frameManager.frameAttached(frameId, parentFrameId);
+    this._page.frameManager.frameAttached(frameId, parentFrameId);
   }
   _onFrameNavigated(framePayload, initial) {
     if (this._eventBelongsToStaleFrame(framePayload.id))
       return;
-    this._page._frameManager.frameCommittedNewDocumentNavigation(framePayload.id, framePayload.url + (framePayload.urlFragment || ""), framePayload.name || "", framePayload.loaderId, initial);
+    this._page.frameManager.frameCommittedNewDocumentNavigation(framePayload.id, framePayload.url + (framePayload.urlFragment || ""), framePayload.name || "", framePayload.loaderId, initial);
     if (!initial)
       this._firstNonInitialNavigationCommittedFulfill();
   }
@@ -533,34 +535,34 @@ class FrameSession {
     if (this._eventBelongsToStaleFrame(payload.frameId))
       return;
     if (payload.disposition === "currentTab")
-      this._page._frameManager.frameRequestedNavigation(payload.frameId);
+      this._page.frameManager.frameRequestedNavigation(payload.frameId);
   }
   _onFrameNavigatedWithinDocument(frameId, url) {
     if (this._eventBelongsToStaleFrame(frameId))
       return;
-    this._page._frameManager.frameCommittedSameDocumentNavigation(frameId, url);
+    this._page.frameManager.frameCommittedSameDocumentNavigation(frameId, url);
   }
   _onFrameDetached(frameId, reason) {
     if (this._crPage._sessions.has(frameId)) {
       return;
     }
     if (reason === "swap") {
-      const frame = this._page._frameManager.frame(frameId);
+      const frame = this._page.frameManager.frame(frameId);
       if (frame)
-        this._page._frameManager.removeChildFramesRecursively(frame);
+        this._page.frameManager.removeChildFramesRecursively(frame);
       return;
     }
-    this._page._frameManager.frameDetached(frameId);
+    this._page.frameManager.frameDetached(frameId);
   }
   _onExecutionContextCreated(contextPayload) {
-    const frame = contextPayload.auxData ? this._page._frameManager.frame(contextPayload.auxData.frameId) : null;
+    const frame = contextPayload.auxData ? this._page.frameManager.frame(contextPayload.auxData.frameId) : null;
     if (!frame || this._eventBelongsToStaleFrame(frame._id))
       return;
     const delegate = new import_crExecutionContext.CRExecutionContext(this._client, contextPayload);
     let worldName = null;
     if (contextPayload.auxData && !!contextPayload.auxData.isDefault)
       worldName = "main";
-    else if (contextPayload.name === UTILITY_WORLD_NAME)
+    else if (contextPayload.name === this._crPage.utilityWorldName)
       worldName = "utility";
     const context = new dom.FrameExecutionContext(delegate, frame, worldName);
     if (worldName)
@@ -579,13 +581,20 @@ class FrameSession {
       this._onExecutionContextDestroyed(contextId);
   }
   _onAttachedToTarget(event) {
+    if (this._bufferedAttachedToTargetEvents) {
+      this._bufferedAttachedToTargetEvents.push(event);
+      return;
+    }
     const session = this._client.createChildSession(event.sessionId);
     if (event.targetInfo.type === "iframe") {
       const targetId = event.targetInfo.targetId;
-      const frame = this._page._frameManager.frame(targetId);
+      let frame = this._page.frameManager.frame(targetId);
+      if (!frame && event.targetInfo.parentFrameId) {
+        frame = this._page.frameManager.frameAttached(targetId, event.targetInfo.parentFrameId);
+      }
       if (!frame)
         return;
-      this._page._frameManager.removeChildFramesRecursively(frame);
+      this._page.frameManager.removeChildFramesRecursively(frame);
       for (const [contextId, context] of this._contextIdToContext) {
         if (context.frame === frame)
           this._onExecutionContextDestroyed(contextId);
@@ -601,30 +610,34 @@ class FrameSession {
       return;
     }
     const url = event.targetInfo.url;
-    const worker = new import_page2.Worker(this._page, url);
-    this._page._addWorker(event.sessionId, worker);
+    const worker = new import_page.Worker(this._page, url);
+    this._page.addWorker(event.sessionId, worker);
     this._workerSessions.set(event.sessionId, session);
     session.once("Runtime.executionContextCreated", async (event2) => {
-      worker._createExecutionContext(new import_crExecutionContext.CRExecutionContext(session, event2.context));
+      worker.createExecutionContext(new import_crExecutionContext.CRExecutionContext(session, event2.context));
     });
+    if (this._crPage._browserContext._browser.majorVersion() >= 143)
+      session.on("Inspector.workerScriptLoaded", () => worker.workerScriptLoaded());
+    else
+      worker.workerScriptLoaded();
     session._sendMayFail("Runtime.enable");
-    this._crPage._networkManager.addSession(session, this._page._frameManager.frame(this._targetId) ?? void 0).catch(() => {
+    this._crPage._networkManager.addSession(session, this._page.frameManager.frame(this._targetId) ?? void 0).catch(() => {
     });
     session._sendMayFail("Runtime.runIfWaitingForDebugger");
     session._sendMayFail("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
     session.on("Target.attachedToTarget", (event2) => this._onAttachedToTarget(event2));
     session.on("Target.detachedFromTarget", (event2) => this._onDetachedFromTarget(event2));
     session.on("Runtime.consoleAPICalled", (event2) => {
-      const args = event2.args.map((o) => (0, import_crExecutionContext.createHandle)(worker._existingExecutionContext, o));
-      this._page._addConsoleMessage(event2.type, args, (0, import_crProtocolHelper.toConsoleMessageLocation)(event2.stackTrace));
+      const args = event2.args.map((o) => (0, import_crExecutionContext.createHandle)(worker.existingExecutionContext, o));
+      this._page.addConsoleMessage(worker, event2.type, args, (0, import_crProtocolHelper.toConsoleMessageLocation)(event2.stackTrace));
     });
-    session.on("Runtime.exceptionThrown", (exception) => this._page.emitOnContextOnceInitialized(import_browserContext.BrowserContext.Events.PageError, (0, import_crProtocolHelper.exceptionToError)(exception.exceptionDetails), this._page));
+    session.on("Runtime.exceptionThrown", (exception) => this._page.addPageError((0, import_crProtocolHelper.exceptionToError)(exception.exceptionDetails)));
   }
   _onDetachedFromTarget(event) {
     const workerSession = this._workerSessions.get(event.sessionId);
     if (workerSession) {
       workerSession.dispose();
-      this._page._removeWorker(event.sessionId);
+      this._page.removeWorker(event.sessionId);
       return;
     }
     const childFrameSession = this._crPage._sessions.get(event.targetId);
@@ -636,7 +649,7 @@ class FrameSession {
     }
     this._client.send("Page.enable").catch((e) => null).then(() => {
       if (!childFrameSession._swappedIn)
-        this._page._frameManager.frameDetached(event.targetId);
+        this._page.frameManager.frameDetached(event.targetId);
       childFrameSession.dispose();
     });
   }
@@ -651,33 +664,33 @@ class FrameSession {
     if (!context)
       return;
     const values = event.args.map((arg) => (0, import_crExecutionContext.createHandle)(context, arg));
-    this._page._addConsoleMessage(event.type, values, (0, import_crProtocolHelper.toConsoleMessageLocation)(event.stackTrace));
+    this._page.addConsoleMessage(null, event.type, values, (0, import_crProtocolHelper.toConsoleMessageLocation)(event.stackTrace));
   }
   async _onBindingCalled(event) {
     const pageOrError = await this._crPage._page.waitForInitializedOrError();
     if (!(pageOrError instanceof Error)) {
       const context = this._contextIdToContext.get(event.executionContextId);
       if (context)
-        await this._page._onBindingCalled(event.payload, context);
+        await this._page.onBindingCalled(event.payload, context);
     }
   }
   _onDialog(event) {
-    if (!this._page._frameManager.frame(this._targetId))
+    if (!this._page.frameManager.frame(this._targetId))
       return;
-    this._page.emitOnContext(import_browserContext.BrowserContext.Events.Dialog, new dialog.Dialog(
+    this._page.browserContext.dialogManager.dialogDidOpen(new dialog.Dialog(
       this._page,
       event.type,
       event.message,
       async (accept, promptText) => {
         if (this._isMainFrame() && event.type === "beforeunload" && !accept)
-          this._page._frameManager.frameAbortedNavigation(this._page.mainFrame()._id, "navigation cancelled by beforeunload dialog");
+          this._page.frameManager.frameAbortedNavigation(this._page.mainFrame()._id, "navigation cancelled by beforeunload dialog");
         await this._client.send("Page.handleJavaScriptDialog", { accept, promptText });
       },
       event.defaultPrompt
     ));
   }
   _handleException(exceptionDetails) {
-    this._page.emitOnContextOnceInitialized(import_browserContext.BrowserContext.Events.PageError, (0, import_crProtocolHelper.exceptionToError)(exceptionDetails), this._page);
+    this._page.addPageError((0, import_crProtocolHelper.exceptionToError)(exceptionDetails));
   }
   async _onTargetCrashed() {
     this._client._markAsCrashed();
@@ -693,13 +706,13 @@ class FrameSession {
         lineNumber: lineNumber || 0,
         columnNumber: 0
       };
-      this._page._addConsoleMessage(level, [], location, text);
+      this._page.addConsoleMessage(null, level, [], location, text);
     }
   }
   async _onFileChooserOpened(event) {
     if (!event.backendNodeId)
       return;
-    const frame = this._page._frameManager.frame(event.frameId);
+    const frame = this._page.frameManager.frame(event.frameId);
     if (!frame)
       return;
     let handle;
@@ -722,7 +735,7 @@ class FrameSession {
       });
     });
     const buffer = Buffer.from(payload.data, "base64");
-    this._page.emit(import_page2.Page.Events.ScreencastFrame, {
+    this._page.emit(import_page.Page.Events.ScreencastFrame, {
       buffer,
       frameSwapWallTime: payload.metadata.timestamp ? payload.metadata.timestamp * 1e3 : void 0,
       width: payload.metadata.deviceWidth,
@@ -731,14 +744,14 @@ class FrameSession {
   }
   async _createVideoRecorder(screencastId, options) {
     (0, import_assert.assert)(!this._screencastId);
-    const ffmpegPath = import_registry.registry.findExecutable("ffmpeg").executablePathOrDie(this._page.attribution.playwright.options.sdkLanguage);
+    const ffmpegPath = import_registry.registry.findExecutable("ffmpeg").executablePathOrDie(this._page.browserContext._browser.sdkLanguage());
     this._videoRecorder = await import_videoRecorder.VideoRecorder.launch(this._crPage._page, ffmpegPath, options);
     this._screencastId = screencastId;
   }
   async _startVideoRecording(options) {
     const screencastId = this._screencastId;
     (0, import_assert.assert)(screencastId);
-    this._page.once(import_page2.Page.Events.Close, () => this._stopVideoRecording().catch(() => {
+    this._page.once(import_page.Page.Events.Close, () => this._stopVideoRecording().catch(() => {
     }));
     const gotFirstFrame = new Promise((f) => this._client.once("Page.screencastFrame", f));
     await this._startScreencast(this._videoRecorder, {
@@ -785,7 +798,7 @@ class FrameSession {
     (0, import_assert.assert)(this._isMainFrame());
     const options = this._crPage._browserContext._options;
     const emulatedSize = this._page.emulatedSize();
-    if (emulatedSize === null)
+    if (!emulatedSize)
       return;
     const viewportSize = emulatedSize.viewport;
     const screenSize = emulatedSize.screen;
@@ -802,9 +815,7 @@ class FrameSession {
     };
     if (JSON.stringify(this._metricsOverride) === JSON.stringify(metricsOverride))
       return;
-    const promises = [
-      this._client.send("Emulation.setDeviceMetricsOverride", metricsOverride)
-    ];
+    const promises = [];
     if (!preserveWindowBoundaries && this._windowId) {
       let insets = { width: 0, height: 0 };
       if (this._crPage._browserContext._browser.options.headful) {
@@ -824,6 +835,7 @@ class FrameSession {
         height: viewportSize.height + insets.height
       }));
     }
+    promises.push(this._client.send("Emulation.setDeviceMetricsOverride", metricsOverride));
     await Promise.all(promises);
     this._metricsOverride = metricsOverride;
   }
@@ -873,16 +885,24 @@ class FrameSession {
     await this._client.send("Page.setInterceptFileChooserDialog", { enabled }).catch(() => {
     });
   }
-  async _evaluateOnNewDocument(initScript, world) {
-    const worldName = world === "utility" ? UTILITY_WORLD_NAME : void 0;
-    const { identifier } = await this._client.send("Page.addScriptToEvaluateOnNewDocument", { source: initScript.source, worldName });
-    if (!initScript.internal)
-      this._evaluateOnNewDocumentIdentifiers.push(identifier);
+  async _evaluateOnNewDocument(initScript, world, runImmediately) {
+    const worldName = world === "utility" ? this._crPage.utilityWorldName : void 0;
+    const { identifier } = await this._client.send("Page.addScriptToEvaluateOnNewDocument", { source: initScript.source, worldName, runImmediately });
+    this._initScriptIds.set(initScript, identifier);
   }
-  async _removeEvaluatesOnNewDocument() {
-    const identifiers = this._evaluateOnNewDocumentIdentifiers;
-    this._evaluateOnNewDocumentIdentifiers = [];
-    await Promise.all(identifiers.map((identifier) => this._client.send("Page.removeScriptToEvaluateOnNewDocument", { identifier })));
+  async _removeEvaluatesOnNewDocument(initScripts) {
+    const ids = [];
+    for (const script of initScripts) {
+      const id = this._initScriptIds.get(script);
+      if (id)
+        ids.push(id);
+      this._initScriptIds.delete(script);
+    }
+    await Promise.all(ids.map((identifier) => this._client.send("Page.removeScriptToEvaluateOnNewDocument", { identifier }).catch(() => {
+    })));
+  }
+  async exposePlaywrightBinding() {
+    await this._client.send("Runtime.addBinding", { name: import_page.PageBinding.kBindingName });
   }
   async _getContentFrame(handle) {
     const nodeInfo = await this._client.send("DOM.describeNode", {
@@ -890,7 +910,7 @@ class FrameSession {
     });
     if (!nodeInfo || typeof nodeInfo.node.frameId !== "string")
       return null;
-    return this._page._frameManager.frame(nodeInfo.node.frameId);
+    return this._page.frameManager.frame(nodeInfo.node.frameId);
   }
   async _getOwnerFrame(handle) {
     const documentElement = await handle.evaluateHandle((node) => {
@@ -927,7 +947,7 @@ class FrameSession {
     return { x: x + position.x, y: y + position.y, width, height };
   }
   async _framePosition() {
-    const frame = this._page._frameManager.frame(this._targetId);
+    const frame = this._page.frameManager.frame(this._targetId);
     if (!frame)
       return null;
     if (frame === this._page.mainFrame())
@@ -1007,7 +1027,7 @@ function calculateUserAgentMetadata(options) {
   const metadata = {
     mobile: !!options.isMobile,
     model: "",
-    architecture: "x64",
+    architecture: "x86",
     platform: "Windows",
     platformVersion: ""
   };

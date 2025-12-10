@@ -1,15 +1,10 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved.
  */
 
 // Import vlib.
 import * as vlib from "@vandenberghinc/vlib/frontend"
-
-// Imports.
-import "../modules//string.js"
-import "../modules//array.js"
-import "../modules//number.js"
 
 import { Utils } from "../modules/utils.js"
 import { Events } from "../modules/events.js"
@@ -21,9 +16,11 @@ import type { AnyElement } from "../ui/any_element.js"
 import { register_element } from "./register_element.js";
 import type { PseudoElement } from "../ui/pseudo.js"
 
+import type { None, ValueOrThis, BorderOpts } from "./types.js"
+import { Attachment } from "../modules/attachment.js"
+
 // Vars.
-// @todo convert to Set
-const elements_with_width_attribute = [ // elements that use the "width" etc attribute instead of the "style.width".
+const elements_with_width_attribute = new Set<String>([ // elements that use the "width" etc attribute instead of the "style.width".
     'canvas',
     'embed',
     'iframe',
@@ -31,10 +28,162 @@ const elements_with_width_attribute = [ // elements that use the "width" etc att
     'object',
     'progress',
     'video',
-];
+]);
 
-// Null / undefined alias.
-type none = undefined | null;
+// // Add some html properties since VBaseElement wants properties of them all since is is mixed in.
+// interface HTMLElement extends VElementExtensions {
+
+//     setAttribute(name: string, value: string | number | boolean): void;
+
+//     acceptCharset: any;
+//     name: any;
+//     hreflang: any;
+//     // readOnly: any;
+//     autoplay: any;
+//     maxlength: any;
+//     minlength: any;
+//     dateTime: any;
+//     srcset?: string
+//     srclang?: string;
+//     srcdoc?: string;
+//     novalidate?: boolean;
+//     isMap?: boolean;
+//     httpEquiv?: string;
+//     formAction?: string;
+//     rowspan?: number;
+//     autocomplete?: "" | "on" | "off";
+//     useMap?: string;
+
+//     // value(): string; 
+//     // value(value: string): this;
+//     // type(): string; 
+//     // type(value: string): this;
+//     // title(): string; 
+//     // title(value: string): this;
+//     // target(): string; 
+//     // target(value: string): this;
+//     // pattern(): string; 
+//     // pattern(value: string): this;
+//     // step(): string; 
+//     // step(value: string): this;
+//     // start(): number | null; 
+//     // start(value: number): this;
+//     // multiple(): boolean; 
+//     // multiple(value: boolean): this;
+//     // checked(): boolean; 
+//     // checked(value: boolean): this;
+//     // required(): boolean; 
+//     // required(value: boolean): this;
+
+//     // rows(): null | number 
+//     // rows(value: number): this;
+//     // span(): null | number 
+//     // span(value: number): this;
+
+//     // 
+
+//     // alt(): string; 
+//     // alt(value: string): this;
+//     // accept(): string; 
+//     // accept(value: string): this;
+//     // action(): string; 
+//     // action(value: string): this;
+//     // enctype(): string; 
+//     // enctype(value: string): this;
+//     // id(): string; 
+//     // id(value: string): this;
+//     // lang(): string; 
+//     // lang(value: string): this;
+//     // max(): string; 
+//     // max(value: string): this;
+//     // method(): string; 
+//     // method(value: string): this;
+//     // min(): string; 
+//     // min(value: string): this;
+//     // placeholder(): string; 
+//     // placeholder(value: string): this;
+//     // rel(): string; 
+//     // rel(value: string): this;
+//     // shape(): string; 
+//     // shape(value: string): this;
+
+//     // download(): string; 
+//     // download(value: string): this;
+//     // charset(): string;
+//     // charset(value: string): this;
+//     // cite(): string;
+//     // cite(value: string): this;
+//     // cols(): null | number 
+//     // cols(value: number): this;
+//     // colspan(): null | number 
+//     // colspan; (value: number): this;
+//     // controls(): boolean;
+//     // controls(value: boolean): this;
+//     // coords(): string;
+//     // coords(value: string): this;
+//     // data(): string;
+//     // data(value: string): this;
+//     // async(): boolean;
+//     // async(value: boolean): this;
+//     // default(): boolean;
+//     // default(value: boolean): this;
+//     // defer(): boolean;
+//     // defer(value: boolean): this;
+//     // dir(): string;
+//     // dir(value: string): this;
+//     // dirname(): string;
+//     // dirname(value: string): this;
+//     // disabled(): boolean;
+//     // disabled(value: boolean): this;
+//     // draggable(): boolean;
+//     // draggable(value: boolean): this;
+//     // for(): string;
+//     // for(value: string): this;
+//     // headers(): string;
+//     // headers(value: string): this;
+//     // high(): string;
+//     // high(value: string | number): this;
+//     // href(): string;
+//     // href(value: string): this;
+//     // kind(): string;
+//     // kind(value: string): this;
+//     // label(): string;
+//     // label(value: string): this;
+//     // loop(): boolean;
+//     // loop(value: boolean): this;
+//     // low(): string;
+//     // low(value: string | number): this;
+//     // muted(): boolean;
+//     // muted(value: boolean): this;
+//     // open(): boolean;
+//     // open(value: boolean): this;
+//     // optimum(): null | number 
+//     // optimum(value: number): this;
+//     // poster(): string;
+//     // poster(value: string): this;
+//     // preload(): string;
+//     // preload(value: string): this;
+//     // reversed(): boolean;
+//     // reversed(value: boolean): this;
+//     // sandbox(): string;
+//     // sandbox(value: string): this;
+//     // scope(): string;
+//     // scope(value: string): this;
+//     // selected(): boolean;
+//     // selected(value: boolean): this;
+//     // shape(): string;
+//     // shape(value: string): this;
+//     // span(): null | number;
+//     // span(value: number): this;
+//     // size(): null | number;
+//     // size(value: number): this;
+//     // sizes(): string; 
+//     // sizes(value: string): this;
+//     // span(): string; 
+//     // span(value: string): this;
+//     // src(): string; 
+//     // src(value: string): this;
+// }
 
 // ------------------------------------------------------------------------------------------------
 // The observers for VElement
@@ -111,30 +260,47 @@ export type undefstrnr = null | undefined | string | number;
 
 // Base element.
 // @note: this.tagName can not be used since they have different values on safari and other browsers.
-/*  @docs:
-    @nav: FrontendVElement
-    @chapter: Elements
-    @title: Base element
-    @desc: The base element of the volt frontend elements.
-*/
-// export class VElement extends (HTMLElement as {new(): VBaseElementInterface, prototype: VBaseElementInterface}) {
+/**
+ * {Base element}
+ * The base element of the volt frontend elements.
+ * @nav FrontendVElement/Elements
+ * @docs
+ */
 export abstract class VElement extends HTMLElement {
 
     // ---------------------------------------------------------
-    // Attributes.
-    // @warning do not use default values since they will be put inside the constructor, which should remain empty, define them in _init_velement() instead.
-
-    public __is_velement: boolean = true;
+    // Static attributes.
 
     static element_tag: string = ""; // must also be static.
     static default_style: Record<string, any> = {};
     static default_attributes: Record<string, any> = {};
     static default_events: Record<string, any> = {};
 
-    public rendered!: boolean;
-    public element_name!: string;
-    public base_element_name!: string;
-    public remove_focus!: HTMLElement["blur"];
+    // ---------------------------------------------------------
+    // Public attributes.
+    // @warning do not use default values since they will be put inside the constructor, which should remain empty, define them in _init_velement() instead.
+
+    /** Attachments added by the {@link on_attachment_drop} callback. */
+    attachments!: Attachment[];
+
+    /** Is rendered flag. */
+    rendered!: boolean;
+
+    /** The element name. */
+    element_name!: string;
+
+    /** The base element name @internal */
+    base_element_name!: string;
+
+    /** Remove focus method. */
+    remove_focus!: HTMLElement["blur"];
+
+    // ---------------------------------------------------------
+    // Public but internal attributes.
+    // @warning do not use default values since they will be put inside the constructor, which should remain empty, define them in _init_velement() instead.
+
+    public __is_velement: boolean = true;
+
     public _v_children!: any[];
 
     public _element_display!: string;
@@ -196,22 +362,20 @@ export abstract class VElement extends HTMLElement {
         if (!args.derived || !args.derived.element_name) {
             throw new Error("Static element attribute 'args.derived.element_name' should always be defined, create static attribute \"element_name: string\" and assign the name of the class to this attribute.")
         }
-        // if (!args.name) {
-        //     throw new Error("Attribute 'args.name' should always be defined.")
-        // }
 
         // Attributes.
         this._is_connected = false;
 
         // Defaults.
-        this.__is_velement = true;
-
+        this.attachments = [];
         this.rendered = false;
         this.element_name = args.derived.element_name;
         this.base_element_name = args.derived.element_name;
         this.remove_focus = super.blur;
+        
+        // Defaults.
         this._v_children = [];
-
+        this.__is_velement = true;
         this._element_display = "block"
         this._is_connected = false;
         this._on_append_callback = undefined;
@@ -239,15 +403,6 @@ export abstract class VElement extends HTMLElement {
         this._on_escape_callback = undefined;
         this._on_appear_callbacks = [];
         this._media_queries = {};
-
-        // Copied properties where this.getAttribtue() returns the original instead of the current.
-        // this._checked = element_checked_descriptor;
-        // this._disabled = element_disabled_descriptor;
-        // this._selected = element_selected_descriptor;
-        // this._href = element_href_descriptor;
-        // this._src = element_src_descriptor;
-        // this._id = element_id_descriptor;
-        // this._value = Object.getOwnPropertyDescriptor(super.prototype, 'value')//element_value_descriptor;
 
         // Constructed by html code.
         if (this.hasAttribute !== undefined && this.hasAttribute("created_by_html")) {
@@ -296,15 +451,7 @@ export abstract class VElement extends HTMLElement {
         if (!args.derived || !args.derived.element_name) {
             throw new Error("Static element attribute 'args.derived.element_name' should always be defined, create static attribute \"element_name: string\" and assign the name of the class to this attribute.")
         }
-        // if (!args.name) {
-        //     throw new Error("Attribute 'args.name' should always be defined.")
-        // }
-        // if (args.name == null && !args.derived.name.endsWith("Element")) {
-        //     throw new Error("Attribute 'args.name' should be defined when the derived class name does not end with 'Element'.")
-        // } else if (args.name == null) {
-        //     args.name = args.derived.name.slice(0, -7);
-        // }
-
+        
         // Set type/name, keep base type the same.
         this.element_name = args.derived.element_name;
         
@@ -367,16 +514,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Clone
-     * @desc: Creates a deep copy of the current element, including its styles and attributes. 
-     *         Optionally clones child nodes based on the provided parameter.
-     * @param:
-     *     @name: clone_children
-     *     @descr: Indicates whether to clone child nodes of the current element.
-     *     @default: true
-     * @return:
-     *     @description Returns a new instance of the element that is a clone of the current one.
+     * {Clone}
+     * Creates a deep copy of the current element, including its styles and attributes.
+     * Optionally clones child nodes based on the provided parameter.
+     * @parameter clone_children Indicates whether to clone child nodes of the current element.
+     * @returns Returns a new instance of the element that is a clone of the current one.
+     * @docs
      */
     clone(clone_children: boolean = true): this {
 
@@ -432,20 +575,14 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Pad Numeric
-     * @desc: Pads a numeric value with a specified padding unit, defaulting to "px".
-     * @param:
-     *     @name: value
-     *     @descr: The numeric value to be padded.
-     * @param:
-     *     @name: padding
-     *     @descr: The unit to pad the numeric value with.
-     *     @default: "px"
-     * @return:
-     *     @description Returns the padded value as a string.
+     * {Pad Numeric}
+     * Pads a numeric value with a specified padding unit, defaulting to "px".
+     * @parameter value The numeric value to be padded.
+     * @parameter padding The unit to pad the numeric value with.
+     * @returns Returns the padded value as a string.
+     * @docs
      */
-    pad_numeric(value: none | number | string, padding: string = "px"): string {
+    pad_numeric(value: None | number | string, padding: string = "px"): string {
         if (value == null) {
             return "";
         }
@@ -456,17 +593,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Pad Percentage
-     * @desc: Pads a numeric value with a percentage symbol. If the value is a float between 0 and 1, it is multiplied by 100 before padding.
-     * @param:
-     *     @name: value
-     *     @descr: The numeric value to pad.
-     * @param:
-     *     @name: padding
-     *     @descr: The string to pad the numeric value with, defaults to "%".
-     * @return:
-     *     @description Returns the padded percentage as a string, or the original value if it is not numeric.
+     * {Pad Percentage}
+     * Pads a numeric value with a percentage symbol. If the value is a float between 0 and 1, it is multiplied by 100 before padding.
+     * @parameter value The numeric value to pad.
+     * @parameter padding The string to pad the numeric value with, defaults to "%".
+     * @returns Returns the padded percentage as a string, or the original value if it is not numeric.
+     * @docs
      */
     pad_percentage(value: number, padding: string = "%"): string {
         if (Utils.is_float(value) && value <= 1.0) {
@@ -478,19 +610,14 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Edit Filter Wrapper
-     * @desc: Edits a filter string by replacing or removing specified types. 
+     * {Edit Filter Wrapper}
+     * Edits a filter string by replacing or removing specified types.
      * Can also append a new type if it doesn’t exist in the filter.
-     * @param:
-     *     @name: filter
-     *     @descr: The original filter string that needs to be edited.
-     *     @name: type
-     *     @descr: The type that will be targeted for replacement or removal.
-     *     @name: to
-     *     @descr: The new value to replace the existing type with, or null to remove it.
-     * @return:
-     *     @description Returns the modified filter string or null if the input filter was null.
+     * @parameter filter The original filter string that needs to be edited.
+     * @parameter type The type that will be targeted for replacement or removal.
+     * @parameter to The new value to replace the existing type with, or null to remove it.
+     * @returns Returns the modified filter string or null if the input filter was null.
+     * @docs
      */
     edit_filter_wrapper(filter: string | null, type: string, to: undefstrnr = undefined): string {
         const to_str: string = (typeof to === "number") ? to.toString() : (to ?? "");
@@ -511,18 +638,13 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Toggle Filter Wrapper
-     * @desc: Toggles a specified filter type in a string. If the type is present, it will be removed; otherwise, it will be added.
-     * @param:
-     *     @name: filter
-     *     @descr: The filter string to modify.
-     *     @name: type
-     *     @descr: The type of filter to toggle.
-     *     @name: to
-     *     @descr: The value to add if the type is not present.
-     * @return:
-     *     @description Returns the modified filter string or null if the input filter was null.
+     * {Toggle Filter Wrapper}
+     * Toggles a specified filter type in a string. If the type is present, it will be removed; otherwise, it will be added.
+     * @parameter filter The filter string to modify.
+     * @parameter type The type of filter to toggle.
+     * @parameter to The value to add if the type is not present.
+     * @returns Returns the modified filter string or null if the input filter was null.
+     * @docs
      */
     toggle_filter_wrapper(filter: string | null, type: string, to: string | null = null): string {
         if (filter == null) {
@@ -565,14 +687,11 @@ export abstract class VElement extends HTMLElement {
     // Children functions.
 
     /**
-     * @docs:
-     * @title: Append Child Elements
-     * @desc: Appends child elements to the current element. Can accept multiple child elements, including HTML nodes, functions, or strings.
-     * @param:
-     *     @name: children
-     *     @descr: The child elements to append, which can be an array of elements, a single element, or a function.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Append Child Elements}
+     * Appends child elements to the current element. Can accept multiple child elements, including HTML nodes, functions, or strings.
+     * @parameter children The child elements to append, which can be an array of elements, a single element, or a function.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     append(...children: AppendType[]): this {
         for (let i = 0; i < children.length; i++) {
@@ -634,14 +753,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: ZStack Append
-     * @desc: Appends multiple children to the ZStack element. This method can handle various types of children such as elements, functions, and text.
-     * @param:
-     *     @name: children
-     *     @descr: The children to append, which can be elements, arrays, text, or functions returning elements.
-     * @return:
-     *     @description Returns the instance of the ZStack element for chaining.
+     * {ZStack Append}
+     * Appends multiple children to the ZStack element. This method can handle various types of children such as elements, functions, and text.
+     * @parameter children The children to append, which can be elements, arrays, text, or functions returning elements.
+     * @returns Returns the instance of the ZStack element for chaining.
+     * @docs
      */
     zstack_append(...children: AppendType[]): this {
         for (let i = 0; i < children.length; i++) {
@@ -706,14 +822,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Append To Parent
-     * @desc: Appends the current element to a specified parent element and manages parent-child relationships.
-     * @param:
-     *     @name: parent
-     *     @descr: The parent element to which the current element will be appended.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Append To Parent}
+     * Appends the current element to a specified parent element and manages parent-child relationships.
+     * @parameter parent The parent element to which the current element will be appended.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     append_to(parent: any): this {
         if (this._assign_to_parent_as !== undefined) {
@@ -728,16 +841,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Append Children to Parent
-     * @desc: Appends the children of the current element to the specified parent element and executes a callback for each appended child.
-     * @param:
-     *     @name: parent
-     *     @descr: The parent element to which the children will be appended.
-     *     @name: on_append_callback
-     *     @descr: A callback function that is executed for each child when it is appended.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Append Children to Parent}
+     * Appends the children of the current element to the specified parent element and executes a callback for each appended child.
+     * @parameter parent The parent element to which the children will be appended.
+     * @parameter on_append_callback A callback function that is executed for each child when it is appended.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     append_children_to(parent: any, on_append_callback?: Function): this {
         if (isVElement(parent) && this.base_element_name === "VirtualScrollerElement") {
@@ -761,15 +870,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove Child
-     * @desc: Removes a child element from the current element. The child can be specified 
-     *        by passing a Node, an VElement, or an id string of the element to be removed.
-     * @param:
-     *     @name: child
-     *     @descr: The child to be removed from the current element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Child}
+     * Removes a child element from the current element. The child can be specified
+     * by passing a Node, an VElement, or an id string of the element to be removed.
+     * @parameter child The child to be removed from the current element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_child(child: any): this {
         if (isVElement(child) && child.element_name != null) {
@@ -788,11 +894,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove Children
-     * @desc: Removes all child elements from the current element without using innerHTML.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Children}
+     * Removes all child elements from the current element without using innerHTML.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_children(): this {
         this.inner_html("");
@@ -800,14 +905,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Child
-     * @desc: Retrieves a child element by its index. Supports negative indexing to access elements from the end of the list.
-     * @param:
-     *     @name: index
-     *     @descr: The index of the child to retrieve. Can be a positive or negative integer.
-     * @return:
-     *     @description Returns the child element at the specified index.
+     * {Child}
+     * Retrieves a child element by its index. Supports negative indexing to access elements from the end of the list.
+     * @parameter index The index of the child to retrieve. Can be a positive or negative integer.
+     * @returns Returns the child element at the specified index.
+     * @docs
      */
     child(index: number): any {
         if (index < 0) {
@@ -817,14 +919,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Get Child
-     * @desc: Retrieves a child element by its index. Supports negative indexing to access elements from the end.
-     * @param:
-     *     @name: index
-     *     @descr: The index of the child element to retrieve. Can be negative to access from the end.
-     * @return:
-     *     @description Returns the child element at the specified index, or undefined if the index is out of bounds.
+     * {Get Child}
+     * Retrieves a child element by its index. Supports negative indexing to access elements from the end.
+     * @parameter index The index of the child element to retrieve. Can be negative to access from the end.
+     * @returns Returns the child element at the specified index, or undefined if the index is out of bounds.
+     * @docs
      */
     get(index: number): any | undefined {
         if (index < 0) {
@@ -840,15 +939,11 @@ export abstract class VElement extends HTMLElement {
     // Text attribute functions.
 
     /**
-     * @docs:
-     * @title: Text
-     * @desc: Set or get the text content of the element. If no value is provided, it retrieves the current text content.
-     * @param:
-     *     @name: value
-     *     @descr: The text content to set or retrieve.
-     * @return:
-     *     @description Returns the current text content if no argument is passed, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Text}
+     * Set or get the text content of the element. If no value is provided, it retrieves the current text content.
+     * @parameter value The text content to set or retrieve.
+     * @returns Returns the current text content if no argument is passed, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     text(): string;
     text(value: string): this;
@@ -864,18 +959,12 @@ export abstract class VElement extends HTMLElement {
     // Framing functions.
 
     /**
-     * @docs:
-     * @title: Width
-     * @desc: Specify the width or height of the element. Returns the offset width or height when the param value is null.
-     * @param:
-     *     @name: value
-     *     @descr: The width value to set or get.
-     * @param:
-     *     @name: check_attribute
-     *     @descr: Indicates whether to check the element's width attribute.
-     * @return:
-     *     @description Returns the offset width when no value is provided, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Width}
+     * Specify the width or height of the element. Returns the offset width or height when the param value is null.
+     * @parameter value The width value to set or get.
+     * @parameter check_attribute Indicates whether to check the element's width attribute.
+     * @returns Returns the offset width when no value is provided, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     // @ts-ignore
     width(): string | number;
@@ -883,7 +972,7 @@ export abstract class VElement extends HTMLElement {
     width(value: string | number, check_attribute?: boolean): this;
     // @ts-ignore
     width(value?: string | number, check_attribute: boolean = true): string | number | this {
-        if (check_attribute && elements_with_width_attribute.includes((this.constructor as any).element_tag)) {
+        if (check_attribute && elements_with_width_attribute.has((this.constructor.toString() as any).element_tag)) {
             if (value == null) {
                 return this._try_parse_float(super.getAttribute("width"));
                 // return this._try_parse_float(super.width);
@@ -903,15 +992,11 @@ export abstract class VElement extends HTMLElement {
     fit_content(): this { return this.width("fit-content"); }
 
     /**
-     * @docs:
-     * @title: Fixed Width
-     * @desc: Sets the fixed width for the element and updates min and max widths accordingly.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the width, can be a number or null to get the current width.
-     * @return:
-     *     @description If no argument is passed, returns the current width as a number. If an argument is passed, returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Fixed Width}
+     * Sets the fixed width for the element and updates min and max widths accordingly.
+     * @parameter value The value to set for the width, can be a number or null to get the current width.
+     * @returns If no argument is passed, returns the current width as a number. If an argument is passed, returns the instance of the element for chaining.
+     * @docs
      */
     fixed_width(): string | number;
     fixed_width(value: string | number): this;
@@ -927,18 +1012,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Height
-     * @desc: Sets or retrieves the height of the element. It checks for attributes and styles based on the provided parameters.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for height or retrieve the current height if null.
-     * @param:
-     *     @name: check_attribute
-     *     @descr: Determines if the element's attribute should be checked.
-     * @return:
-     *     @description Returns the instance of the element for chaining when an argument is passed, otherwise returns the current height as a number.
-     * @funcs: 2
+     * {Height}
+     * Sets or retrieves the height of the element. It checks for attributes and styles based on the provided parameters.
+     * @parameter value The value to set for height or retrieve the current height if null.
+     * @parameter check_attribute Determines if the element's attribute should be checked.
+     * @returns Returns the instance of the element for chaining when an argument is passed, otherwise returns the current height as a number.
+     * @docs
      */
     // @ts-ignore
     height(): string | number;
@@ -946,7 +1025,7 @@ export abstract class VElement extends HTMLElement {
     height(value: string | number, check_attribute?: boolean): this;
     // @ts-ignore
     height(value?: string | number, check_attribute?: boolean): this | string | number {
-        if (check_attribute && elements_with_width_attribute.includes((this.constructor as any).element_tag)) {
+        if (check_attribute && elements_with_width_attribute.has((this.constructor.toString() as any).element_tag)) {
             if (value == null) {
                 return this._try_parse_float(super.getAttribute("height"));
                 // return this._try_parse_float(super.height);
@@ -963,15 +1042,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Fixed Height
-     * @desc: Sets the fixed height for the element or retrieves the current height if no value is provided.
-     * @param:
-     *     @name: value
-     *     @descr: The height value to set, which can be a number or null.
-     * @return:
-     *     @descr: When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the parsed float value of the current height.
-     * @funcs: 2
+     * {Fixed Height}
+     * Sets the fixed height for the element or retrieves the current height if no value is provided.
+     * @parameter value The height value to set, which can be a number or null.
+     * @returns When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the parsed float value of the current height.
+     * @docs
      */
     fixed_height(): string | number;
     fixed_height(value: string | number): this;
@@ -987,16 +1062,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Min height
-     * @desc: Sets the minimum height of an element. The equivalent of CSS attribute `minHeight`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Min height}
+     * Sets the minimum height of an element. The equivalent of CSS attribute `minHeight`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     min_height(): string | number;
     min_height(value: string | number): this;
@@ -1007,16 +1078,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Min Width
-     * @desc: Sets the minimum width of an element. The equivalent of CSS attribute `minWidth`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @descr: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Min Width}
+     * Sets the minimum width of an element. The equivalent of CSS attribute `minWidth`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     min_width(): string | number;
     min_width(value: string | number): this;
@@ -1027,16 +1094,13 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Width By Columns
-     * @desc: Sets the width of HStack children based on the number of columns specified. 
-     * If columns are not provided, it defaults to 1. The calculation takes into account 
+     * {Width By Columns}
+     * Sets the width of HStack children based on the number of columns specified.
+     * If columns are not provided, it defaults to 1. The calculation takes into account
      * the left and right margins of the element.
-     * @param:
-     *     @name: columns
-     *     @descr: The number of columns to set the width by.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * @parameter columns The number of columns to set the width by.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     width_by_columns(columns: number): this {
         let margin_left = this.style.marginLeft;
@@ -1055,55 +1119,50 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Offset Width
-     * @desc: Retrieves the offset width of the element.
-     * @return:
-     *     @description Returns the offset width of the element.
+     * {Offset Width}
+     * Retrieves the offset width of the element.
+     * @returns Returns the offset width of the element.
+     * @docs
      */
     offset_width(): number {
         return this.offsetWidth;
     }
 
     /**
-     * @docs:
-     * @title: Offset Height
-     * @desc: Retrieves the height of the element's offset.
-     * @return:
-     *     @description Returns the height of the element including padding and border.
+     * {Offset Height}
+     * Retrieves the height of the element's offset.
+     * @returns Returns the height of the element including padding and border.
+     * @docs
      */
     offset_height(): number {
         return this.offsetHeight;
     }
 
     /**
-     * @docs:
-     * @title: Client Width
-     * @desc: Retrieves the client width of the element.
-     * @return:
-     *     @description Returns the client width of the element.
+     * {Client Width}
+     * Retrieves the client width of the element.
+     * @returns Returns the client width of the element.
+     * @docs
      */
     client_width(): number {
         return this.clientWidth;
     }
 
     /**
-     * @docs:
-     * @title: Client Height
-     * @desc: Retrieves the height of the client area of the element.
-     * @return:
-     *     @description Returns the height of the client area in pixels.
+     * {Client Height}
+     * Retrieves the height of the client area of the element.
+     * @returns Returns the height of the client area in pixels.
+     * @docs
      */
     client_height(): number {
         return this.clientHeight;
     }
 
     /**
-     * @docs:
-     * @title: X Offset
-     * @desc: Retrieves the x offset of the element from its parent.
-     * @return:
-     *     @description Returns the x offset value of the element.
+     * {X Offset}
+     * Retrieves the x offset of the element from its parent.
+     * @returns Returns the x offset value of the element.
+     * @docs
      */
     // @ts-ignore
     x(): number {
@@ -1111,11 +1170,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Y Offset
-     * @desc: Retrieves the vertical offset of the element from the top of the document.
-     * @return:
-     *     @description Returns the vertical offset value.
+     * {Y Offset}
+     * Retrieves the vertical offset of the element from the top of the document.
+     * @returns Returns the vertical offset value.
+     * @docs
      */
     // @ts-ignore
     y(): number {
@@ -1123,17 +1181,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Frame
-     * @desc: Sets the width and height of the frame. If width or height is not provided, it does not change that dimension.
-     * @param:
-     *     @name: width
-     *     @descr: The width to set for the frame.
-     * @param:
-     *     @name: height
-     *     @descr: The height to set for the frame.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Frame}
+     * Sets the width and height of the frame. If width or height is not provided, it does not change that dimension.
+     * @parameter width The width to set for the frame.
+     * @parameter height The height to set for the frame.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     frame(width?: string | number, height?: string | number): this {
         if (width != null) {
@@ -1146,17 +1199,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Min Frame
-     * @desc: Sets the minimum width and height for the frame. If parameters are provided, it updates the respective properties.
-     * @param:
-     *     @name: width
-     *     @descr: The minimum width to set for the frame.
-     * @param:
-     *     @name: height
-     *     @descr: The minimum height to set for the frame.
-     * @return:
-     *     @descr: Returns the instance of the frame for chaining.
+     * {Min Frame}
+     * Sets the minimum width and height for the frame. If parameters are provided, it updates the respective properties.
+     * @parameter width The minimum width to set for the frame.
+     * @parameter height The minimum height to set for the frame.
+     * @returns Returns the instance of the frame for chaining.
+     * @docs
      */
     min_frame(width: string | number, height: string | number): this {
         if (width != null) {
@@ -1169,16 +1217,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Max Frame
-     * @desc: Sets the maximum width and height for the frame. If a value is provided, it updates the respective maximum dimension.
-     * @param:
-     *     @name: width
-     *     @descr: The maximum width to set for the frame.
-     *     @name: height
-     *     @descr: The maximum height to set for the frame.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Max Frame}
+     * Sets the maximum width and height for the frame. If a value is provided, it updates the respective maximum dimension.
+     * @parameter width The maximum width to set for the frame.
+     * @parameter height The maximum height to set for the frame.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     max_frame(width: string | number, height: string | number): this {
         if (width != null) {
@@ -1191,16 +1235,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Fixed Frame
-     * @desc: Sets the width and height of the element, applying padding to the values if provided.
-     * @param:
-     *     @name: width
-     *     @descr: The width to set for the element. Can be a number or null.
-     *     @name: height
-     *     @descr: The height to set for the element. Can be a number or null.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Fixed Frame}
+     * Sets the width and height of the element, applying padding to the values if provided.
+     * @parameter width The width to set for the element. Can be a number or null.
+     * @parameter height The height to set for the element. Can be a number or null.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     fixed_frame(width: string | number, height: string | number): this {
         if (width != null) {
@@ -1219,11 +1259,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Get Frame While Hidden
-     * @desc: Retrieves the dimensions of the element as it would appear if it were not hidden.
-     * @return:
-     *     @description Returns an object containing the width and height of the element.
+     * {Get Frame While Hidden}
+     * Retrieves the dimensions of the element as it would appear if it were not hidden.
+     * @returns Returns an object containing the width and height of the element.
+     * @docs
      */
     get_frame_while_hidden(): { width: number; height: number } {
         const transition = this.transition();
@@ -1302,17 +1341,13 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Padding
-     * @desc: Sets the padding of the element based on the number of provided arguments. 
-     *        It can accept 1, 2, or 4 values to set padding for different sides.
-     * @param:
-     *     @name: values
-     *     @descr: The padding values to set. Can be a single value, two values for vertical and horizontal, 
-     *              or four values for top, right, bottom, and left.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
-     * @funcs: 4
+     * {Padding}
+     * Sets the padding of the element based on the number of provided arguments.
+     * It can accept 1, 2, or 4 values to set padding for different sides.
+     * @parameter values The padding values to set. Can be a single value, two values for vertical and horizontal,
+     *                   or four values for top, right, bottom, and left.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     padding(): string;
     padding(value: undefstrnr): this;
@@ -1356,16 +1391,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Padding Bottom
-     * @desc: Sets the bottom padding of an element. The equivalent of CSS attribute `paddingBottom`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @descr: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Padding Bottom}
+     * Sets the bottom padding of an element. The equivalent of CSS attribute `paddingBottom`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     padding_bottom(): number;
     padding_bottom(value: string | number): this;
@@ -1376,16 +1407,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Padding Left
-     * @desc: Sets the left padding of an element. The equivalent of CSS attribute `paddingLeft`.
+     * {Padding Left}
+     * Sets the left padding of an element. The equivalent of CSS attribute `paddingLeft`.
      * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     padding_left(): number;
     padding_left(value: string | number): this;
@@ -1396,16 +1423,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Padding Right
-     * @desc: Sets the right padding of an element, equivalent to the CSS attribute `paddingRight`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Padding Right}
+     * Sets the right padding of an element, equivalent to the CSS attribute `paddingRight`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     padding_right(): number;
     padding_right(value: string | number): this;
@@ -1416,16 +1439,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Padding Top
-     * @desc: Sets the top padding of an element. The equivalent of CSS attribute `paddingTop`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @descr: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Padding Top}
+     * Sets the top padding of an element. The equivalent of CSS attribute `paddingTop`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     padding_top(): number;
     padding_top(value: string | number): this;
@@ -1436,15 +1455,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Margin
-     * @desc: Sets the margin of the element. Can accept 1, 2, or 4 values for different margin settings.
-     * @param:
-     *     @name: values
-     *     @descr: The values for the margin. Can be a single value, two values for vertical and horizontal margins, or four values for each side.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
-     * @funcs: 4
+     * {Margin}
+     * Sets the margin of the element. Can accept 1, 2, or 4 values for different margin settings.
+     * @parameter values The values for the margin. Can be a single value, two values for vertical and horizontal margins, or four values for each side.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     margin(): string;
     margin(value: undefstrnr): this;
@@ -1492,15 +1507,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Margin Bottom
-     * @desc: Sets the bottom margin of an element. The equivalent of CSS attribute `marginBottom`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Margin Bottom}
+     * Sets the bottom margin of an element. The equivalent of CSS attribute `marginBottom`. Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     margin_bottom(): number;
     margin_bottom(value: string | number): this;
@@ -1511,16 +1522,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Margin Left
-     * @desc: Sets the left margin of an element, equivalent to the CSS attribute `marginLeft`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Margin Left}
+     * Sets the left margin of an element, equivalent to the CSS attribute `marginLeft`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     margin_left(): number;
     margin_left(value: string | number): this;
@@ -1531,16 +1538,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Margin Right
-     * @desc: Sets the right margin of an element, equivalent to the CSS attribute `marginRight`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign to the right margin. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the instance of the element for chaining unless the parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Margin Right}
+     * Sets the right margin of an element, equivalent to the CSS attribute `marginRight`.
+     * Returns the attribute value when the parameter `value` is `null`.
+     * @parameter value The value to assign to the right margin. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the instance of the element for chaining unless the parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     margin_right(): number;
     margin_right(value: string | number): this;
@@ -1551,16 +1554,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Margin Top
-     * @desc: Sets the top margin of an element. The equivalent of CSS attribute `marginTop`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Margin Top}
+     * Sets the top margin of an element. The equivalent of CSS attribute `marginTop`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     margin_top(): number;
     margin_top(value: string | number): this;
@@ -1571,19 +1570,15 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Position
-     * @desc: Sets or retrieves the position style of the element. Can be used with 0, 1, or 4 arguments.
-     * @param:
-     *     @name: values
-     *     @descr: The values for setting the position, which can be a single value or four values for top, right, bottom, and left.
-     * @return:
-     *     @description Returns the current position if no arguments are passed, or the instance of the element for chaining when arguments are provided.
-     * @funcs: 3
+     * {Position}
+     * Sets or retrieves the position style of the element. Can be used with 0, 1, or 4 arguments.
+     * @parameter values The values for setting the position, which can be a single value or four values for top, right, bottom, and left.
+     * @returns Returns the current position if no arguments are passed, or the instance of the element for chaining when arguments are provided.
+     * @docs
      */
     position(): string | undefined;
     position(value: number | string): this;
-    position(top?: number | string | none, right?: number | string | none, bottom?: number | string | none, left?: number | string | none): this;
+    position(top?: number | string | None, right?: number | string | None, bottom?: number | string | None, left?: number | string | None): this;
     position(...values): string | undefined | this {
         if (values.length === 0) {
             return this.style.position;
@@ -1610,14 +1605,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Stretch
-     * @desc: Sets the flex property of the element to control its stretching behavior.
-     * @param:
-     *     @name: value
-     *     @descr: A boolean indicating whether the element should stretch or not.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Stretch}
+     * Sets the flex property of the element to control its stretching behavior.
+     * @parameter value A boolean indicating whether the element should stretch or not.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     stretch(value: boolean): this {
         if (value == true) {
@@ -1629,14 +1621,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Wrap
-     * @desc: Sets the wrapping behavior of an element based on the provided value.
-     * @param:
-     *     @name: value
-     *     @descr: A boolean or string indicating the wrap behavior.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Wrap}
+     * Sets the wrapping behavior of an element based on the provided value.
+     * @parameter value A boolean or string indicating the wrap behavior.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     wrap(value: boolean | string): this {
         switch ((this.constructor as any).element_tag) {
@@ -1669,14 +1658,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Z Index
-     * @desc: Sets the z-index style property of the element.
-     * @param:
-     *     @name: value
-     *     @descr: The z-index value to set for the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Z Index}
+     * Sets the z-index style property of the element.
+     * @parameter value The z-index value to set for the element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     z_index(value: number | string): this {
         this.style.zIndex = (value as any).toString();
@@ -1684,32 +1670,23 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @experimental: true
-     * @title: Side by Side
-     * @description: Set the elements side by side till a specified width.
-     * @param: 
-     *     @name: options 
-     *     @descr: Configuration options for the side by side layout.
-     *     @attr:
-     *         @name: columns
-     *         @description The amount of column elements that will be put on one row.
-     *         @name: hspacing
-     *         @description The horizontal spacing between the columns in pixels.
-     *         @name: vspacing
-     *         @description The vertical spacing between the rows in pixels.
-     *         @name: stretch
-     *         @description Stretch the leftover columns to max width.
-     *         @name: hide_dividers
-     *         @description Hide dividers when they would appear on a row.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Side by Side}
+     * Set the elements side by side till a specified width.
+     * @experimental
+     * @param options Configuration options for the side by side layout.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     side_by_side(options: {
+        /** The amount of column elements that will be put on one row. */
         columns?: number;
+        /** The horizontal spacing between the columns in pixels. */
         hspacing?: number;
+        /** The vertical spacing between the rows in pixels. */
         vspacing?: number;
+        /** Stretch the leftover columns to max width. */
         stretch?: boolean;
+        /** Hide dividers when they would appear on a row. */
         hide_dividers?: boolean;
     }): this {
         const {
@@ -1842,15 +1819,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Side By Side Basis
-     * @desc: Sets or retrieves the side by side basis for a node, which must be a floating percentage between 0.0 and 1.0.
-     * @param:
-     *     @name: basis
-     *     @descr: The basis value to set or retrieve.
-     * @return:
-     *     @description When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the already set side by side basis.
-     * @funcs: 2
+     * {Side By Side Basis}
+     * Sets or retrieves the side by side basis for a node, which must be a floating percentage between 0.0 and 1.0.
+     * @parameter basis The basis value to set or retrieve.
+     * @returns When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the already set side by side basis.
+     * @docs
      */
     side_by_side_basis(): number | undefined;
     side_by_side_basis(basis: number | false): this;
@@ -1865,22 +1838,16 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Ellipsis Overflow
-     * @desc: Configures the text overflow behavior with ellipsis. It can enable or disable ellipsis and set the number of lines.
-     * @param:
-     *     @name: to
-     *     @descr: Indicates whether to enable or disable ellipsis. If `null`, it returns the current state.
-     * @param:
-     *     @name: after_lines
-     *     @descr: The number of lines after which ellipsis should be applied. Only relevant when `to` is `true`.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Ellipsis Overflow}
+     * Configures the text overflow behavior with ellipsis. It can enable or disable ellipsis and set the number of lines.
+     * @parameter to Indicates whether to enable or disable ellipsis. If `null`, it returns the current state.
+     * @parameter after_lines The number of lines after which ellipsis should be applied. Only relevant when `to` is `true`.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     ellipsis_overflow(): boolean;
-    ellipsis_overflow(to: boolean, after_lines?: number | none): this;
-    ellipsis_overflow(to?: boolean, after_lines?: number | none): boolean | this {
+    ellipsis_overflow(to: boolean, after_lines?: number | None): this;
+    ellipsis_overflow(to?: boolean, after_lines?: number | None): boolean | this {
         if (to == null) {
             return this.style.textOverflow === "ellipsis";
         } else if (to === true) {
@@ -1909,15 +1876,11 @@ export abstract class VElement extends HTMLElement {
     // Alignment functions.
 
     /**
-     * @docs:
-     * @title: Align
-     * @desc: Sets or retrieves the alignment style of the element based on its type.
-     * @param:
-     *     @name: value
-     *     @descr: The alignment value to set or retrieve based on the element type.
-     * @return:
-     *     @description When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the currently set alignment value.
-     * @funcs: 2
+     * {Align}
+     * Sets or retrieves the alignment style of the element based on its type.
+     * @parameter value The alignment value to set or retrieve based on the element type.
+     * @returns When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the currently set alignment value.
+     * @docs
      */
     // @ts-ignore
     align(): string;
@@ -1960,48 +1923,41 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Leading
-     * @desc: Sets the alignment to the start position.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Leading}
+     * Sets the alignment to the start position.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     leading(): this {
         return this.align("start");
     }
 
     /**
-     * @docs:
-     * @title: Center Alignment
-     * @desc: Sets the alignment of the element to center.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Center Alignment}
+     * Sets the alignment of the element to center.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     center(): this {
         return this.align("center");
     }
 
     /**
-     * @docs:
-     * @title: Trailing
-     * @desc: Aligns the element to the end.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Trailing}
+     * Aligns the element to the end.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     trailing(): this {
         return this.align("end");
     }
 
     /**
-     * @docs:
-     * @title: Align Vertical
-     * @desc: Sets or retrieves the vertical alignment style of the element based on its type.
-     * @param:
-     *     @name: value
-     *     @descr: The alignment value to set or retrieve.
-     * @return:
-     *     @description Returns the instance of the element for chaining when an argument is passed. Otherwise, returns the current alignment value.
-     * @funcs: 2
+     * {Align Vertical}
+     * Sets or retrieves the vertical alignment style of the element based on its type.
+     * @parameter value The alignment value to set or retrieve.
+     * @returns Returns the instance of the element for chaining when an argument is passed. Otherwise, returns the current alignment value.
+     * @docs
      */
     align_vertical(): string;
     align_vertical(value: string): this;
@@ -2049,25 +2005,21 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Leading Vertical
-     * @desc: Sets the vertical alignment to the start position.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Leading Vertical}
+     * Sets the vertical alignment to the start position.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     leading_vertical(): this {
         return this.align_vertical("start");
     }
 
     /**
-     * @docs:
-     * @title: Center Vertical
-     * @desc: Centers the element vertically, optionally only when there is no overflow.
-     * @param:
-     *     @name: only_on_no_overflow
-     *     @descr: Determines whether to center only when there is no overflow.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Center Vertical}
+     * Centers the element vertically, optionally only when there is no overflow.
+     * @parameter only_on_no_overflow Determines whether to center only when there is no overflow.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     center_vertical(only_on_no_overflow: boolean = false): this {
         if (only_on_no_overflow) {
@@ -2092,85 +2044,73 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Trailing Vertical
-     * @desc: Sets the vertical alignment to the trailing position.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Trailing Vertical}
+     * Sets the vertical alignment to the trailing position.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     trailing_vertical(): this {
         return this.align_vertical("end");
     }
 
     /**
-     * @docs:
-     * @title: Align Text
-     * @desc: Sets the text alignment using predefined shortcuts.
-     * @param:
-     *     @name: value
-     *     @descr: The value representing the text alignment to set.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Align Text}
+     * Sets the text alignment using predefined shortcuts.
+     * @parameter value The value representing the text alignment to set.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     align_text(value: string): this {
         return this.text_align(value);
     }
 
     /**
-     * @docs:
-     * @title: Text Leading
-     * @desc: Sets the text alignment to the start position for leading text.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Text Leading}
+     * Sets the text alignment to the start position for leading text.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     text_leading(): this {
         return this.text_align("start");
     }
 
     /**
-     * @docs:
-     * @title: Text Center
-     * @desc: Sets the text alignment of the element to center.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Text Center}
+     * Sets the text alignment of the element to center.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     text_center(): this {
         return this.text_align("center");
     }
 
     /**
-     * @docs:
-     * @title: Text Trailing
-     * @desc: Sets the text alignment to 'end' for trailing text.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Text Trailing}
+     * Sets the text alignment to 'end' for trailing text.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     text_trailing(): this {
         return this.text_align("end");
     }
 
     /**
-     * @docs:
-     * @title: Align Height
-     * @desc: Aligns items by height inside a horizontal stack.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Align Height}
+     * Aligns items by height inside a horizontal stack.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     align_height(): this {
         return this.align_items("stretch");
     }
 
     /**
-     * @docs:
-     * @title: Text Wrap
-     * @desc: Set the text wrap value, equivalent to the CSS attribute `textWrap`. 
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Text Wrap}
+     * Set the text wrap value, equivalent to the CSS attribute `textWrap`.
+     * Returns the attribute value when the parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     text_wrap(): string;
     text_wrap(value: string): this;
@@ -2181,15 +2121,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Line clamp
-     * @desc: This non-standard CSS property allows you to limit the number of lines shown in a block container. When used in conjunction with `-webkit-box-orient`, it specifies the maximum number of lines to display before truncating the text. Text that exceeds this limit is cut off and typically ends with an ellipsis. This property is particularly useful for creating text overflow effects in web design where maintaining a consistent, visually manageable block of text is necessary.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
-     * @funcs: 2
+     * {Line clamp}
+     * This non-standard CSS property allows you to limit the number of lines shown in a block container. When used in conjunction with `-webkit-box-orient`, it specifies the maximum number of lines to display before truncating the text. Text that exceeds this limit is cut off and typically ends with an ellipsis. This property is particularly useful for creating text overflow effects in web design where maintaining a consistent, visually manageable block of text is necessary.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @docs
      */
     line_clamp(): string;
     line_clamp(value: string): this;
@@ -2200,15 +2136,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Box Orient
-     * @desc: This property is part of the old flexbox model and is used to define the orientation of the children in a flex container. In combination with `-webkit-line-clamp`, it's set to vertical to allow the line clamping effect on block containers. It dictates how the children of the box are laid out: horizontally or vertically. Note that `-webkit-box-orient` is specific to Webkit-based browsers and is not part of the standard CSS flexbox properties.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Box Orient}
+     * This property is part of the old flexbox model and is used to define the orientation of the children in a flex container. In combination with `-webkit-line-clamp`, it's set to vertical to allow the line clamping effect on block containers. It dictates how the children of the box are laid out: horizontally or vertically. Note that `-webkit-box-orient` is specific to Webkit-based browsers and is not part of the standard CSS flexbox properties.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     box_orient(): string;
     box_orient(value: string): this;
@@ -2222,17 +2154,12 @@ export abstract class VElement extends HTMLElement {
     // Styling functions.
 
     /**
-     * @docs:
-     * @title: Color
-     * @desc: Sets the color of text, also supports a `GradientType` element. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned. 
-     *                   When the value is `null` and the color has been set using a `GradientType`, `transparent` will be returned.
-     * @funcs: 2
+     * Sets the color of text, also supports a `GradientType` element. 
+     * Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned. 
+     *          When the value is `null` and the color has been set using a `GradientType`, `transparent` will be returned.
+     * @docs
      */
     color(): string;
     color(value: string | GradientType): this;
@@ -2254,17 +2181,6 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * @docs:
-     * @title: Border
-     * @desc: Sets the border style of the element. Can accept one to three arguments to define border properties.
-     * @param:
-     *     @name: values
-     *     @descr: The values to set the border style.
-     * @return:
-     *     @description When no arguments are passed, returns the current border style. When arguments are passed, returns the instance of the element for chaining.
-     * @funcs: 4
-     */
     // @ts-ignore
     border(): string;
     // @ts-ignore
@@ -2274,11 +2190,67 @@ export abstract class VElement extends HTMLElement {
     // @ts-ignore
     border(width: string | number, style: string, color: string): this;
     // @ts-ignore
+    border(opts: BorderOpts): this;
+    // @ts-ignore
+    /**
+     * Assigns the border color of this node, also supports a `GradientType` element. 
+     * @param value The value to assign. Leave `undefined` to retrieve the attribute's value.
+     * @returns Returns the instance for chaining unless parameter `value` is `undefined`, then the attribute's value is returned. 
+     * @docs
+     */
     border(...values: (string | number)[]): this | string {
         if (values.length === 0) {
             return this.style.border ?? "";
         } else if (values.length === 1) {
-            this.style.border = values[0] as string;
+            
+            // Set by border options.
+            if (typeof values[0] === "object" && values[0] !== null) {
+                const opts = values[0] as BorderOpts;
+                const {
+                    width = "1px",
+                    style = "solid",
+                    color = "black",
+                    radius = undefined,
+                    top = true,
+                    bottom = true,
+                    left = true,
+                    right = true,
+                } = opts;
+                // use explicit `true` since it may also be a string with specific color.
+                if (top === true && left === true && bottom === true && right === true) {
+                    this.style.border = this.pad_numeric(width) + " " + style + " " + color;
+                } else {
+                    if (top) {
+                        this.style.borderTop = this.pad_numeric(width) + " " + style + " " + (typeof top === "boolean" ? color : top);
+                    } else {
+                        this.style.borderTop = "0px";
+                    }
+                    if (bottom) {
+                        this.style.borderBottom = this.pad_numeric(width) + " " + style + " " + (typeof bottom === "boolean" ? color : bottom);
+                    } else {
+                        this.style.borderBottom = "0px";
+                    }
+                    if (left) {
+                        this.style.borderLeft = this.pad_numeric(width) + " " + style + " " + (typeof left === "boolean" ? color : left);
+                    } else {
+                        this.style.borderLeft = "0px";
+                    }
+                    if (right) {
+                        this.style.borderRight = this.pad_numeric(width) + " " + style + " " + (typeof right === "boolean" ? color : right);
+                    } else {
+                        this.style.borderRight = "0px";
+                    }
+                }
+                if (radius != null) {
+                    this.style.borderRadius = this.pad_numeric(radius);
+                }
+            }
+            
+            // Set by string.
+            else {
+                this.style.border = values[0] as string;
+            }
+
         } else if (values.length === 2) {
             this.style.border = this.pad_numeric(values[0]) + " solid " + values[1].toString();
         } else if (values.length === 3) {
@@ -2290,15 +2262,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Border Top
-     * @desc: Sets the border top style for the element. Returns the current value when no parameters are provided.
-     * @param:
-     *     @name: values
-     *     @descr: Values to set the border top, can include width, style, and color.
-     * @return:
-     *     @description Returns the current border top value if no parameters are provided; otherwise returns the instance of the element for chaining.
-     * @funcs: 4
+     * {Border Top}
+     * Sets the border top style for the element. Returns the current value when no parameters are provided.
+     * @parameter values Values to set the border top, can include width, style, and color.
+     * @returns Returns the current border top value if no parameters are provided; otherwise returns the instance of the element for chaining.
+     * @docs
      */
     border_top(): string;
     border_top(value: string | number): this;
@@ -2320,15 +2288,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Border Bottom
-     * @desc: Sets the border bottom style of the element. Returns the attribute value when no parameters are defined.
-     * @param:
-     *     @name: values
-     *     @descr: A variable number of values to set the border bottom style.
-     * @return:
-     *     @description Returns the current border bottom style when no arguments are passed, otherwise returns the instance for chaining.
-     * @funcs: 4
+     * {Border Bottom}
+     * Sets the border bottom style of the element. Returns the attribute value when no parameters are defined.
+     * @parameter values A variable number of values to set the border bottom style.
+     * @returns Returns the current border bottom style when no arguments are passed, otherwise returns the instance for chaining.
+     * @docs
      */
     border_bottom(): string;
     border_bottom(value: string): this;
@@ -2350,17 +2314,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Border Right
-     * @desc: Sets the border-right property of the element. 
-     *        Returns the current value if no parameters are provided.
-     * @param:
-     *     @name: values
-     *     @descr: The values to set for the border-right property.
-     * @return:
-     *     @description Returns the instance of the element for chaining when parameters are provided, 
-     *                  otherwise returns the current value of the border-right property.
-     * @funcs: 4
+     * {Border Right}
+     * Sets the border-right property of the element.
+     * Returns the current value if no parameters are provided.
+     * @parameter values The values to set for the border-right property.
+     * @returns Returns the instance of the element for chaining when parameters are provided, otherwise returns the current value of the border-right property.
+     * @docs
      */
     border_right(): string;
     border_right(value: string): this;
@@ -2382,15 +2341,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Border Left
-     * @desc: Sets the left border style of the element. Returns the current value if no parameters are provided.
-     * @param:
-     *     @name: values
-     *     @descr: The values to set for the border-left property.
-     * @return:
-     *     @description Returns the current value of the left border when no parameters are provided, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Border Left}
+     * Sets the left border style of the element. Returns the current value if no parameters are provided.
+     * @parameter values The values to set for the border-left property.
+     * @returns Returns the current value of the left border when no parameters are provided, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     border_left(): string;
     border_left(value: string): this;
@@ -2413,15 +2368,11 @@ export abstract class VElement extends HTMLElement {
 
 
     /**
-     * @docs:
-     * @title: Shadow
-     * @desc: Sets the box shadow of the element. Can accept either 1 or 4 arguments for different shadow styles.
-     * @param:
-     *     @name: values
-     *     @descr: The values to set the box shadow. Can be a single value or four separate values.
-     * @return:
-     *     @description Returns the current box shadow if no arguments are provided, or the instance of the element for chaining.
-     * @funcs: 2
+     * {Shadow}
+     * Sets the box shadow of the element. Can accept either 1 or 4 arguments for different shadow styles.
+     * @parameter values The values to set the box shadow. Can be a single value or four separate values.
+     * @returns Returns the current box shadow if no arguments are provided, or the instance of the element for chaining.
+     * @docs
      */
     shadow(): string;
     shadow(value: string | number): this;
@@ -2446,15 +2397,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Drop Shadow
-     * @desc: Applies a drop shadow effect to the object. Can handle 0, 1, or 4 arguments.
-     * @param:
-     *     @name: values
-     *     @descr: The values for the drop shadow effect, which can be numbers or null.
-     * @return:
-     *     @description Returns the instance of the element for chaining when arguments are provided. If no arguments are passed, it returns the current filter value.
-     * @funcs: 3
+     * {Drop Shadow}
+     * Applies a drop shadow effect to the object. Can handle 0, 1, or 4 arguments.
+     * @parameter values The values for the drop shadow effect, which can be numbers or null.
+     * @returns Returns the instance of the element for chaining when arguments are provided. If no arguments are passed, it returns the current filter value.
+     * @docs
      */
     drop_shadow(): string;
     drop_shadow(value: string | number): this;
@@ -2479,15 +2426,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Greyscale
-     * @desc: Applies a greyscale filter to the element. Returns the current filter if no value is provided.
-     * @param:
-     *     @name: value
-     *     @descr: The percentage value for greyscale. Can be a number or null.
-     * @return:
-     *     @description Returns the current filter value if no argument is passed, otherwise returns the instance for chaining.
-     * @funcs: 2
+     * {Greyscale}
+     * Applies a greyscale filter to the element. Returns the current filter if no value is provided.
+     * @parameter value The percentage value for greyscale. Can be a number or null.
+     * @returns Returns the current filter value if no argument is passed, otherwise returns the instance for chaining.
+     * @docs
      */
     greyscale(): string;
     greyscale(value: number): this;
@@ -2500,15 +2443,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Opacity
-     * @desc: Set or get the opacity of the element based on its type.
-     * @param:
-     *     @name: value
-     *     @descr: The value of the opacity to set, or null to get the current opacity.
-     * @return:
-     *     @description Returns the current opacity value if no argument is passed. When an argument is passed, it returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Opacity}
+     * Set or get the opacity of the element based on its type.
+     * @parameter value The value of the opacity to set, or null to get the current opacity.
+     * @returns Returns the current opacity value if no argument is passed. When an argument is passed, it returns the instance of the element for chaining.
+     * @docs
      */
     opacity(): string | number;
     opacity(value: string | number): this;
@@ -2531,15 +2470,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Toggle Opacity
-     * @desc: Toggles the opacity of the element between a specified value and fully opaque.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set the opacity to when toggling.
-     *     @default: 0.25
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Toggle Opacity}
+     * Toggles the opacity of the element between a specified value and fully opaque.
+     * @parameter value The value to set the opacity to when toggling.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_opacity(value: number): this {
         if (typeof this.style.opacity === "undefined" || this.style.opacity == "" || this.style.opacity == "1.0") {
@@ -2551,15 +2486,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Blur
-     * @desc: Applies a blur effect to the element using the specified value.
-     * @param:
-     *     @name: value
-     *     @descr: The amount of blur to apply, can be a number or null.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Blur}
+     * Applies a blur effect to the element using the specified value.
+     * @parameter value The amount of blur to apply, can be a number or null.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     blur(): string;
     blur(value: number): this;
@@ -2572,29 +2503,22 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Toggle Blur
-     * @desc: Toggles the blur effect on the element with a specified value.
-     * @param:
-     *     @name: value
-     *     @descr: The amount of blur to apply, defaulting to 10.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Toggle Blur}
+     * Toggles the blur effect on the element with a specified value.
+     * @parameter value The amount of blur to apply, defaulting to 10.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_blur(value: number = 10): this {
         return this.filter(this.toggle_filter_wrapper(this.style.filter, "blur", "blur(" + this.pad_numeric(value) + ") "));
     }
 
     /**
-     * @docs:
-     * @title: Background Blur
-     * @desc: Sets or retrieves the background blur effect for the element.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the blur effect, which can be a number or null.
-     * @return:
-     *     @description Returns the current blur effect if no argument is passed, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Background Blur}
+     * Sets or retrieves the background blur effect for the element.
+     * @parameter value The value to set for the blur effect, which can be a number or null.
+     * @returns Returns the current blur effect if no argument is passed, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     background_blur(): string;
     background_blur(value: number | null): this;
@@ -2607,30 +2531,22 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Toggle Background Blur
-     * @desc: Toggles the background blur effect by applying a backdrop filter.
-     * @param:
-     *     @name: value
-     *     @descr: The intensity of the blur effect to apply.
-     *     @default: 10
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Toggle Background Blur}
+     * Toggles the background blur effect by applying a backdrop filter.
+     * @parameter value The intensity of the blur effect to apply.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_background_blur(value: number = 10): this {
         return this.backdrop_filter(this.toggle_filter_wrapper(this.style.backdropFilter, "blur", "blur(" + this.pad_numeric(value) + ") "));
     }
 
     /**
-     * @docs:
-     * @title: Brightness
-     * @desc: Adjusts the brightness of an element's filter. If no value is provided, it returns the current brightness filter.
-     * @param:
-     *     @name: value
-     *     @descr: The brightness level to set, can be a number or null.
-     * @return:
-     *     @description Returns the instance of the element for chaining if a value is provided. Otherwise, returns the current brightness filter.
-     * @funcs: 2
+     * {Brightness}
+     * Adjusts the brightness of an element's filter. If no value is provided, it returns the current brightness filter.
+     * @parameter value The brightness level to set, can be a number or null.
+     * @returns Returns the instance of the element for chaining if a value is provided. Otherwise, returns the current brightness filter.
+     * @docs
      */
     brightness(): string;
     brightness(value: number): this;
@@ -2643,30 +2559,23 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Toggle Brightness
-     * @desc: Toggles the brightness of the element by applying a filter based on the provided value.
-     * @param:
-     *     @name: value
-     *     @descr: The brightness value to set, defaults to 0.5 if not provided.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Toggle Brightness}
+     * Toggles the brightness of the element by applying a filter based on the provided value.
+     * @parameter value The brightness value to set, defaults to 0.5 if not provided.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_brightness(value: number = 0.5): this {
         return this.filter(this.toggle_filter_wrapper(this.style.filter, "brightness", "brightness(" + this.pad_percentage(value, "%") + ") "));
     }
 
     /**
-     * @docs:
-     * @title: Background Brightness
-     * @desc: Adjusts the brightness of the background using a specified value. 
+     * {Background Brightness}
+     * Adjusts the brightness of the background using a specified value.
      * If no value is provided, it retrieves the current backdrop filter.
-     * @param:
-     *     @name: value
-     *     @descr: The brightness value to set, or null to get the current value.
-     * @return:
-     *     @description Returns the instance of the element for chaining when a value is provided, or the current backdrop filter value if no value is given.
-     * @funcs: 2
+     * @parameter value The brightness value to set, or null to get the current value.
+     * @returns Returns the instance of the element for chaining when a value is provided, or the current backdrop filter value if no value is given.
+     * @docs
      */
     background_brightness(): string;
     background_brightness(value: number): this;
@@ -2679,29 +2588,22 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Toggle Background Brightness
-     * @desc: Toggles the background brightness by applying a filter based on the provided value.
-     * @param:
-     *     @name: value
-     *     @descr: The brightness value to set, defaulting to 10 if not provided.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Toggle Background Brightness}
+     * Toggles the background brightness by applying a filter based on the provided value.
+     * @parameter value The brightness value to set, defaulting to 10 if not provided.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_background_brightness(value: number = 10): this {
         return this.backdrop_filter(this.toggle_filter_wrapper(this.style.backdropFilter, "brightness", "brightness(" + this.pad_percentage(value, "%") + ") "));
     }
 
     /**
-     * @docs:
-     * @title: Rotate
-     * @desc: Sets the rotation transformation for the element. When called without an argument, it retrieves the current rotation.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set as the rotation. It can be a number, string, or null.
-     * @return:
-     *     @description Returns the current rotation value as a string when no argument is passed. When an argument is provided, it returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Rotate}
+     * Sets the rotation transformation for the element. When called without an argument, it retrieves the current rotation.
+     * @parameter value The value to set as the rotation. It can be a number, string, or null.
+     * @returns Returns the current rotation value as a string when no argument is passed. When an argument is provided, it returns the instance of the element for chaining.
+     * @docs
      */
     rotate(): string;
     rotate(value: number | string): this;
@@ -2725,14 +2627,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Delay
-     * @desc: Set the delay for keyframes in the style element.
-     * @param:
-     *     @name: value
-     *     @descr: The value of the delay to set.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Delay}
+     * Set the delay for keyframes in the style element.
+     * @parameter value The value of the delay to set.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     delay(value: string | number): this {
         (this.style as any).delay = value as string;
@@ -2740,14 +2639,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Duration
-     * @desc: Sets the duration style property for the element.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the duration property.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Duration}
+     * Sets the duration style property for the element.
+     * @parameter value The value to set for the duration property.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     duration(value: string | number): this {
         (this.style as any).duration = value as string;
@@ -2755,17 +2651,13 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Background
-     * @desc: A shorthand property for all the background properties. 
-     *        The equivalent of CSS attribute `background`. 
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Background}
+     * A shorthand property for all the background properties.
+     * The equivalent of CSS attribute `background`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     background(): string;
     background(value: string): this;
@@ -2784,15 +2676,11 @@ export abstract class VElement extends HTMLElement {
 
 
     /**
-     * @docs:
-     * @title: Scale Font Size
-     * @desc: Adjusts the font size based on a scaling factor relative to the current font size.
-     * @param:
-     *     @name: scale
-     *     @descr: The scaling factor to apply to the current font size.
-     *     @default: 1.0
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Scale Font Size}
+     * Adjusts the font size based on a scaling factor relative to the current font size.
+     * @parameter scale The scaling factor to apply to the current font size.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     scale_font_size(scale: number = 1.0): this {
         const size = parseFloat(this.style.fontSize);
@@ -2810,17 +2698,11 @@ export abstract class VElement extends HTMLElement {
     // Visibility functions.
 
     /**
-     * @docs:
-     * @title: Display
-     * @desc: Sets or retrieves the display style of an HTML element. 
-     *         If no value is provided, it returns the current display style.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the display style.
-     * @return:
-     *     @descr: Returns the current display style if no argument is passed, 
-     *              otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Display}
+     * Sets or retrieves the display style of an HTML element.
+     * If no value is provided, it returns the current display style.
+     * @parameter value The value to set for the display style.
+     * @docs
      */
     display(): string;
     display(value: string): this;
@@ -2836,11 +2718,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Hide
-     * @desc: Hides the element by setting its display style to none.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Hide}
+     * Hides the element by setting its display style to none.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     hide(): this {
         this.style.display = "none";
@@ -2848,11 +2729,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Show
-     * @desc: Displays the element by setting its display style property.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Show}
+     * Displays the element by setting its display style property.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     show(): this {
         this.style.display = this._element_display;
@@ -2860,33 +2740,30 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Is Hidden
-     * @desc: Checks if the element is currently hidden based on its display style.
-     * @return:
-     *     @description Returns true if the element is hidden; otherwise, false.
+     * {Is Hidden}
+     * Checks if the element is currently hidden based on its display style.
+     * @returns Returns true if the element is hidden; otherwise, false.
+     * @docs
      */
     is_hidden(): boolean {
         return this.style.display === "none" || typeof this.style.display === "undefined";
     }
 
     /**
-     * @docs:
-     * @title: Is Visible
-     * @desc: Checks if the element is visible based on its display style.
-     * @return:
-     *     @description Returns true if the element is visible, false otherwise.
+     * {Is Visible}
+     * Checks if the element is visible based on its display style.
+     * @returns Returns true if the element is visible, false otherwise.
+     * @docs
      */
     is_visible(): boolean {
         return !(this.style.display === "none" || typeof this.style.display === "undefined");
     }
 
     /**
-     * @docs:
-     * @title: Toggle Visibility
-     * @desc: Toggles the visibility of the element by showing or hiding it based on its current state.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Toggle Visibility}
+     * Toggles the visibility of the element by showing or hiding it based on its current state.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_visibility(): this {
         if (this.is_hidden()) {
@@ -2901,15 +2778,11 @@ export abstract class VElement extends HTMLElement {
     // General attribute functions.
 
     /**
-     * @docs:
-     * @title: Inner HTML
-     * @desc: Get or set the inner HTML of an element.
-     * @param:
-     *     @name: value
-     *     @descr: The HTML content to set. If no value is provided, the current inner HTML is returned.
-     * @return:
-     *     @description Returns the current inner HTML if no argument is passed, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Inner HTML}
+     * Get or set the inner HTML of an element.
+     * @parameter value The HTML content to set. If no value is provided, the current inner HTML is returned.
+     * @returns Returns the current inner HTML if no argument is passed, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     inner_html(): string;
     inner_html(value: string): this;
@@ -2922,15 +2795,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Outer HTML
-     * @desc: Get or set the outer HTML of the element. If no argument is passed, it returns the current outer HTML.
-     * @param:
-     *     @name: value
-     *     @descr: The outer HTML to set.
-     * @return:
-     *     @description Returns the instance of the element for chaining when an argument is passed, otherwise returns the current outer HTML.
-     * @funcs: 2
+     * {Outer HTML}
+     * Get or set the outer HTML of the element. If no argument is passed, it returns the current outer HTML.
+     * @parameter value The outer HTML to set.
+     * @returns Returns the instance of the element for chaining when an argument is passed, otherwise returns the current outer HTML.
+     * @docs
      */
     outer_html(): string;
     outer_html(value: string): this;
@@ -2943,15 +2812,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Styles
-     * @desc: Retrieves the CSS attributes when no parameter is provided, or sets the styles based on the provided attributes.
-     * @param:
-     *     @name: css_attr
-     *     @descr: The CSS attributes to set. If null, returns the current styles.
-     * @return:
-     *     @description When no argument is passed, returns the current styles as an object. When attributes are set, returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Styles}
+     * Retrieves the CSS attributes when no parameter is provided, or sets the styles based on the provided attributes.
+     * @parameter css_attr The CSS attributes to set. If null, returns the current styles.
+     * @returns When no argument is passed, returns the current styles as an object. When attributes are set, returns the instance of the element for chaining.
+     * @docs
      */
     styles(): Record<string, string>;
     styles(css_attr: Record<string, any>): this;
@@ -3014,18 +2879,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Attribute
-     * @desc: Get or set a single attribute for an element. If no value is provided, it retrieves the attribute's current value.
-     * @param:
-     *     @name: key
-     *     @descr: The name of the attribute to get or set.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the attribute. If null, the current value is returned.
-     * @return:
-     *     @description Returns the current value of the attribute if no value is provided, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Attribute}
+     * Get or set a single attribute for an element. If no value is provided, it retrieves the attribute's current value.
+     * @parameter key The name of the attribute to get or set.
+     * @parameter value The value to set for the attribute. If null, the current value is returned.
+     * @returns Returns the current value of the attribute if no value is provided, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     attr(key: string): null | string;
     attr(key: string, value: string | number | null): this;
@@ -3038,14 +2897,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Attributes
-     * @desc: Sets multiple attributes for the element based on the provided dictionary.
-     * @param:
-     *     @name: html_attr
-     *     @descr: A dictionary of attributes to set on the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Attributes}
+     * Sets multiple attributes for the element based on the provided dictionary.
+     * @parameter html_attr A dictionary of attributes to set on the element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     attrs(html_attr: Record<string, string | number | boolean>): this {
         for (let i in html_attr) {
@@ -3055,20 +2911,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Event
-     * @desc: Get or set a single event associated with the element. 
-     *         If no value is provided, it retrieves the current event.
-     * @param:
-     *     @name: key
-     *     @descr: The name of the event to get or set.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the event, if provided.
-     * @return:
-     *     @description Returns the instance of the element for chaining when setting, 
-     *                  or the current value of the event when getting.
-     * @funcs: 2
+     * {Event}
+     * Get or set a single event associated with the element.
+     * If no value is provided, it retrieves the current event.
+     * @parameter key The name of the event to get or set.
+     * @parameter value The value to set for the event, if provided.
+     * @docs
      */
     event(key: string): any;
     event(key: string, value: any): this;
@@ -3081,14 +2929,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Events
-     * @desc: Sets multiple event handlers on the current element using a dictionary of events.
-     * @param:
-     *     @name: html_events
-     *     @descr: An object containing event names as keys and their corresponding handler functions as values.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Events}
+     * Sets multiple event handlers on the current element using a dictionary of events.
+     * @parameter html_events An object containing event names as keys and their corresponding handler functions as values.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     events(html_events: { [key: string]: EventListener }): this {
         for (let i in html_events) {
@@ -3098,18 +2943,13 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Class
-     * @description: 
-     *     Specifies one or more classnames for an element (refers to a class in a style sheet).
-     *     The equivalent of HTML attribute `class`.
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Class}
+     * Specifies one or more classnames for an element (refers to a class in a style sheet).
+     * The equivalent of HTML attribute `class`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     class(): string;
     class(value: string): this;
@@ -3120,14 +2960,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Toggle class
-     * @description: Toggles a class name from the class list, adding it if it's not present, or removing it if it is.
-     * @param:
-     *     @name: name
-     *     @descr: The class name to toggle.
-     * @return:
-     *     @description: Returns the instance of the element for chaining.
+     * {Toggle class}
+     * Toggles a class name from the class list, adding it if it's not present, or removing it if it is.
+     * @parameter name The class name to toggle.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_class(name: string): this {
         this.classList.toggle(name);
@@ -3135,14 +2972,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove Class
-     * @desc: Remove a class name from the class list of the element.
-     * @param:
-     *     @name: name
-     *     @descr: The class name to be removed from the class list.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Class}
+     * Remove a class name from the class list of the element.
+     * @parameter name The class name to be removed from the class list.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_class(name: string): this {
         this.classList.remove(name);
@@ -3150,11 +2984,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove all classes
-     * @desc: Remove all classes from the class list.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove all classes}
+     * Remove all classes from the class list.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_classes(): this {
         while (this.classList.length > 0) {
@@ -3164,19 +2997,13 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Hover Brightness
-     * @desc: Controls the brightness effects on hover for the element. 
+     * {Hover Brightness}
+     * Controls the brightness effects on hover for the element.
      * You can enable or disable the effect or specify brightness levels.
-     * @param:
-     *     @name: mouse_down_brightness
-     *     @descr: The brightness value when the mouse is down, or a boolean to enable/disable.
-     * @param:
-     *     @name: mouse_over_brightness
-     *     @descr: The brightness value when the mouse is over the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining when setting values, or a boolean indicating if the effect is enabled when no parameters are passed.
-     * @funcs: 3
+     * @parameter mouse_down_brightness The brightness value when the mouse is down, or a boolean to enable/disable.
+     * @parameter mouse_over_brightness The brightness value when the mouse is over the element.
+     * @returns Returns the instance of the element for chaining when setting values, or a boolean indicating if the effect is enabled when no parameters are passed.
+     * @docs
      */
     hover_brightness(): boolean;
     hover_brightness(mouse_down_brightness: boolean): this;
@@ -3303,14 +3130,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Text Width
-     * @desc: Calculates the width of the provided text or the current text content if no text is provided. This is useful for measuring text width in input elements.
-     * @param:
-     *     @name: text
-     *     @descr: The text whose width is to be measured. If null, the current text content is used.
-     * @return:
-     *     @description Returns the width of the text in pixels.
+     * {Text Width}
+     * Calculates the width of the provided text or the current text content if no text is provided. This is useful for measuring text width in input elements.
+     * @parameter text The text whose width is to be measured. If null, the current text content is used.
+     * @returns Returns the width of the text in pixels.
+     * @docs
      */
     text_width(): number;
     text_width(text: string): number;
@@ -3330,18 +3154,13 @@ export abstract class VElement extends HTMLElement {
     // Media query functions.
 
     /**
-     * @docs:
-     * @title: Media Query
-     * @desc: Creates a media query listener that triggers provided handlers based on the media query's state.
-     * @param:
-     *     @name: media_query
-     *     @descr: The media query string to evaluate.
-     *     @name: true_handler
-     *     @descr: The function to execute when the media query matches.
-     *     @name: false_handler
-     *     @descr: The function to execute when the media query does not match.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Media Query}
+     * Creates a media query listener that triggers provided handlers based on the media query's state.
+     * @parameter media_query The media query string to evaluate.
+     * @parameter true_handler The function to execute when the media query matches.
+     * @parameter false_handler The function to execute when the media query does not match.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     media(
         media_query: string,
@@ -3393,14 +3212,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove Media Query
-     * @desc: Removes a specified media query from the element's media queries.
-     * @param:
-     *     @name: media_query
-     *     @descr: The media query string to be removed.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Media Query}
+     * Removes a specified media query from the element's media queries.
+     * @parameter media_query The media query string to be removed.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_media(media_query: string): this {
         if (typeof this._media_queries === "object" && this._media_queries[media_query] !== undefined) {
@@ -3410,11 +3226,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove Media Queries
-     * @desc: Removes all media queries from the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Media Queries}
+     * Removes all media queries from the element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_medias(): this {
         if (typeof this._media_queries === "object") {
@@ -3426,11 +3241,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove All Media
-     * @desc: Removes all media queries and their associated listeners from the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove All Media}
+     * Removes all media queries and their associated listeners from the element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_all_media(): this {
         if (typeof this._media_queries === "object") {
@@ -3445,14 +3259,11 @@ export abstract class VElement extends HTMLElement {
     // Animations.
 
     /**
-     * @docs:
-     * @title: Default Animate
-     * @desc: Calls the animate function from the superclass with the provided arguments.
-     * @param:
-     *     @name: args
-     *     @descr: The arguments to pass to the superclass animate function.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Default Animate}
+     * Calls the animate function from the superclass with the provided arguments.
+     * @parameter args The arguments to pass to the superclass animate function.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     default_animate(...args: any[]): this {
         // @ts-ignore
@@ -3461,38 +3272,27 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Animate
-     * @desc: Starts a new animation with the specified keyframes and options. Automatically resets the active animation.
-     * @param:
-     *     @name: options
-     *     @descr: Configuration options for the animation including keyframes, duration, and callbacks.
-     *     @attr:
-     *         @name: keyframes
-     *         @description An array of keyframe objects to animate.
-     *         @name: delay
-     *         @description Delay before starting the animation in milliseconds.
-     *         @name: duration
-     *         @description Duration of each keyframe in milliseconds.
-     *         @name: repeat
-     *         @description Whether the animation should repeat infinitely.
-     *         @name: persistent
-     *         @description Whether to keep the last keyframe when the animation ends.
-     *         @name: on_finish
-     *         @description Callback function to execute when the animation finishes.
-     *         @name: easing
-     *         @description Easing function to use for the animation.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Animate}
+     * Starts a new animation with the specified keyframes and options. Automatically resets the active animation.
+     * @parameter options Configuration options for the animation including keyframes, duration, and callbacks.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     // @ts-ignore
     animate(options: {
+        /** An array of keyframe objects to animate. */
         keyframes: Array<any>;
+        /** Delay before starting the animation in milliseconds. */
         delay?: number;
+        /** Duration of each keyframe in milliseconds. */
         duration?: number;
+        /** Whether the animation should repeat infinitely. */
         repeat?: boolean;
+        /** Whether to keep the last keyframe when the animation ends. */
         persistent?: boolean;
+        /** Callback function to execute when the animation finishes. */
         on_finish?: ((element: any) => any) | null;
+        /** Easing function to use for the animation. */
         easing?: string;
     }): this {
         const e = this;
@@ -3613,11 +3413,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Stop Animation
-     * @desc: Stops the currently active animation by clearing the timeout.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Stop Animation}
+     * Stops the currently active animation by clearing the timeout.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     stop_animation(): this {
         clearTimeout(this._animate_timeout);
@@ -3625,52 +3424,57 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Slide Out
-     * @desc: Animates the sliding out of an element in a specified direction with optional parameters for customization.
-     * @param:
-     *     @name: options
-     *     @descr: Configuration options for the slide out animation.
-     *     @attr:
-     *         @name: direction
-     *         @description The direction of the slide animation.
-     *         @default: "top"
-     *         @name: distance
-     *         @description The distance in pixels for the slide animation.
-     *         @default: 100
-     *         @name: duration
-     *         @description The duration of the animation in milliseconds.
-     *         @default: 500
-     *         @name: opacity
-     *         @description Whether to animate the opacity of the element.
-     *         @default: true
-     *         @name: easing
-     *         @description The easing function for the animation.
-     *         @default: "ease"
-     *         @name: hide
-     *         @description Whether to hide the element after the animation completes.
-     *         @default: true
-     *         @name: remove
-     *         @description Whether to remove the element from the DOM after the animation completes.
-     *         @default: false
-     *         @name: display
-     *         @description The display property to set when showing the element again.
-     *         @default: null
-     *         @name: _slide_in
-     *         @description Indicates if the animation is a slide-in animation.
-     *         @default: false
-     * @return:
-     *     @description Returns a promise that resolves when the animation completes.
+     * {Slide Out}
+     * Animates the sliding out of an element in a specified direction with optional parameters for customization.
+     * @parameter options Configuration options for the slide out animation.
+     * @returns Returns a promise that resolves when the animation completes.
+     * @docs
      */
     async slide_out(options: {
+        /**
+         * The direction of the slide animation.
+         * @default "top"
+         */
         direction: string;
+        /**
+         * The distance in pixels for the slide animation.
+         * @default 100
+         */
         distance: number;
+        /**
+         * The duration of the animation in milliseconds.
+         * @default 500
+         */
         duration: number;
+        /**
+         * Whether to animate the opacity of the element.
+         * @default true
+         */
         opacity?: boolean;
+        /**
+         * The easing function for the animation.
+         * @default "ease"
+         */
         easing?: string;
+        /**
+         * Whether to hide the element after the animation completes.
+         * @default true
+         */
         hide?: boolean;
+        /**
+         * Whether to remove the element from the DOM after the animation completes.
+         * @default false
+         */
         remove?: boolean;
+        /**
+         * The display property to set when showing the element again.
+         * @default null
+         */
         display?: string;
+        /**
+         * Indicates if the animation is a slide-in animation.
+         * @default false
+         */
         _slide_in?: boolean;
     }): Promise<void> {
         const element = this;
@@ -3761,27 +3565,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Slide In
-     * @desc: Initiates a slide-in animation for the element with customizable parameters. 
-     * @param:
-     *     @name: options
-     *     @descr: Configuration options for the slide-in animation.
-     *     @attr:
-     *         @name: direction
-     *         @description The direction from which the element will slide in (e.g., "top", "bottom", "left", "right").
-     *         @name: distance
-     *         @description The distance in pixels the element will slide in.
-     *         @name: duration
-     *         @description The duration of the slide animation in milliseconds.
-     *         @name: opacity
-     *         @description A boolean indicating whether to animate the opacity during the slide.
-     *         @name: easing
-     *         @description The easing function to use for the animation.
-     *         @name: display
-     *         @description An optional display property to use when showing the view again.
-     * @return:
-     *     @description Returns a promise that resolves when the slide-in animation is complete.
+     * {Slide In}
+     * Initiates a slide-in animation for the element with customizable parameters.
+     * @parameter options Configuration options for the slide-in animation.
+     * @returns Returns a promise that resolves when the slide-in animation is complete.
+     * @docs
      */
     async slide_in({
         direction = "top",
@@ -3791,11 +3579,17 @@ export abstract class VElement extends HTMLElement {
         easing = "ease",
         display = undefined,
     }: {
+        /** The direction from which the element will slide in (e.g., "top", "bottom", "left", "right"). */
         direction?: string;
+        /** The distance in pixels the element will slide in. */
         distance?: number;
+        /** The duration of the slide animation in milliseconds. */
         duration?: number;
+        /** A boolean indicating whether to animate the opacity during the slide. */
         opacity?: boolean;
+        /** The easing function to use for the animation. */
         easing?: string;
+        /** An optional display property to use when showing the view again. */
         display?: string;
     }): Promise<any> {
         return this.slide_out({
@@ -3811,31 +3605,13 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Dropdown Text Animation
-     * @desc: Animates the text of a dropdown element with a specified animation effect. 
-     *         It allows for customization of distance, duration, and easing for each character.
-     * @warning: Causes undefined behaviour when called on a non text element.
-     * @param:
-     *     @name: options
-     *     @descr: An object containing animation settings.
-     *     @attr:
-     *         @name: distance
-     *         @description The distance of pixels of the drop (negative) or rise (positive).
-     *         @name: duration
-     *         @description The duration of each individual character drop animation in milliseconds.
-     *         @name: opacity_duration
-     *         @description The factor for the duration in relation to the dropdown duration, 1.0 for 100%.
-     *         @name: total_duration
-     *         @description The total duration of the character drop animation, this parameter will overwrite the `duration` parameter.
-     *         @name: delay
-     *         @description The delay in milliseconds for each character drop.
-     *         @name: start_delay
-     *         @description The start delay of the animation in milliseconds.
-     *         @name: easing
-     *         @description The animation's easing.
-     * @return:
-     *     @description Returns a promise that resolves when the animation is complete.
+     * {Dropdown Text Animation}
+     * Animates the text of a dropdown element with a specified animation effect.
+     * It allows for customization of distance, duration, and easing for each character.
+     * @warning Causes undefined behaviour when called on a non text element.
+     * @parameter options An object containing animation settings.
+     * @returns Returns a promise that resolves when the animation is complete.
+     * @docs
      */
     async dropdown_animation({
         distance = "-20px",
@@ -3846,12 +3622,19 @@ export abstract class VElement extends HTMLElement {
         start_delay = 50,
         easing = "ease-in-out",
     }: {
+        /** The distance of pixels of the drop (negative) or rise (positive). */
         distance?: string,
+        /** The duration of each individual character drop animation in milliseconds. */
         duration?: number,
+        /** The factor for the duration in relation to the dropdown duration, 1.0 for 100%. */
         opacity_duration?: number,
+        /** The total duration of the character drop animation, this parameter will overwrite the `duration` parameter. */
         total_duration?: number,
+        /** The delay in milliseconds for each character drop. */
         delay?: number,
+        /** The start delay of the animation in milliseconds. */
         start_delay?: number,
+        /** The animation's easing. */
         easing?: string,
     } = {}): Promise<void> {
         return new Promise((resolve) => {
@@ -3935,33 +3718,18 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Increment Number Animation
-     * @desc: Animate incrementing a number with optional prefix and suffix.
-     * @warning: Causes undefined behaviour when called on a non text element.
-     * @param:
-     *     @name: start
-     *     @descr: The start number for the animation.
-     * @param:
-     *     @name: end
-     *     @descr: The end number, the animation will end with the number value of `end - 1`.
-     * @param:
-     *     @name: duration
-     *     @descr: The duration of each individual number increment in milliseconds.
-     * @param:
-     *     @name: total_duration
-     *     @descr: The total duration of the entire animation, parameter `total_duration` precedes parameter `duration`.
-     * @param:
-     *     @name: delay
-     *     @descr: The delay until the animation starts in milliseconds.
-     * @param:
-     *     @name: prefix
-     *     @descr: The prefix string to prepend to the animated number.
-     * @param:
-     *     @name: suffix
-     *     @descr: The suffix string to append to the animated number.
-     * @return:
-     *     @descr: Returns a promise that resolves when the animation completes.
+     * {Increment Number Animation}
+     * Animate incrementing a number with optional prefix and suffix.
+     * @warning Causes undefined behaviour when called on a non text element.
+     * @parameter start The start number for the animation.
+     * @parameter end The end number, the animation will end with the number value of `end - 1`.
+     * @parameter duration The duration of each individual number increment in milliseconds.
+     * @parameter total_duration The total duration of the entire animation, parameter `total_duration` precedes parameter `duration`.
+     * @parameter delay The delay until the animation starts in milliseconds.
+     * @parameter prefix The prefix string to prepend to the animated number.
+     * @parameter suffix The suffix string to append to the animated number.
+     * @returns Returns a promise that resolves when the animation completes.
+     * @docs
      */
     async increment_number_animation({
         start = 0,
@@ -4039,16 +3807,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On emit
-     * @desc: Registers an event callback for the specified event ID. This allows the element to respond to events.
-     * @param:
-     *     @name: id
-     *     @descr: The unique identifier for the event to listen for.
-     *     @name: callback
-     *     @descr: The function to be executed when the event is triggered.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On emit}
+     * Registers an event callback for the specified event ID. This allows the element to respond to events.
+     * @parameter id The unique identifier for the event to listen for.
+     * @parameter callback The function to be executed when the event is triggered.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_emit(id: string, callback: (element: this, args: Record<string, any>) => any): this {
         Events.on(id, this, callback);
@@ -4056,17 +3820,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove On Event
-     * @desc: Removes an event listener for the specified event ID.
-     * @param:
-     *     @name: id
-     *     @descr: The identifier for the event to remove.
-     * @param:
-     *     @name: callback
-     *     @descr: The function that was originally registered as the event handler.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove On Event}
+     * Removes an event listener for the specified event ID.
+     * @parameter id The identifier for the event to remove.
+     * @parameter callback The function that was originally registered as the event handler.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_event(id: string, callback: (element: this, args: Record<string, any>) => any): this {
         Events.remove(id, this, callback);
@@ -4074,14 +3833,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove On Events
-     * @desc: Removes all event callbacks associated with the given ID.
-     * @param:
-     *     @name: id
-     *     @descr: The identifier for the events to be removed.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove On Events}
+     * Removes all event callbacks associated with the given ID.
+     * @parameter id The identifier for the events to be removed.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_events(id: string): this {
         Events.remove(id, this);
@@ -4089,25 +3845,20 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Timeout
-     * @desc: Sets a timeout with optional id and debounce functionality.
-     * @param:
-     *     @name: delay
-     *     @descr: The time in milliseconds to wait before executing the callback.
-     *     @name: callback
-     *     @descr: The function to execute after the timeout.
-     *     @name: options
-     *     @descr: Optional settings for the timeout behavior.
-     *     @attr:
-     *         @name: id
-     *         @description An optional identifier for the timeout.
-     *         @name: debounce
-     *         @description If true, clears the previous timeout with the same id.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Timeout}
+     * Sets a timeout with optional id and debounce functionality.
+     * @parameter delay The time in milliseconds to wait before executing the callback.
+     * @parameter callback The function to execute after the timeout.
+     * @parameter options Optional settings for the timeout behavior.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
-    timeout(delay: number, callback: ElementCallback<this>, options?: { id?: string; debounce?: boolean } | null): this {
+    timeout(delay: number, callback: ElementCallback<this>, options?: {
+        /** An optional identifier for the timeout. */
+        id?: string;
+        /** If true, clears the previous timeout with the same id. */
+        debounce?: boolean;
+    } | null): this {
         if (options != null && options.id != null) {
             if (options.debounce === true) {
                 clearTimeout(this._timeouts[options.id]);
@@ -4120,14 +3871,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Clear Timeout
-     * @desc: Clears a cached timeout by its ID. If timeouts are not initialized, they will be set up.
-     * @param:
-     *     @name: id
-     *     @descr: The ID of the timeout to clear.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Clear Timeout}
+     * Clears a cached timeout by its ID. If timeouts are not initialized, they will be set up.
+     * @parameter id The ID of the timeout to clear.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     clear_timeout(id: string | number): this {
         if (this._timeouts === undefined) {
@@ -4139,27 +3887,28 @@ export abstract class VElement extends HTMLElement {
 
     private _disabled_cursor?: string;
     /**
-     * @docs:
-     * @title: Disable Button
-     * @desc: Disables the button element, preventing user interaction.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Disable Button}
+     * Disables the button element, preventing user interaction.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     disable(): this {
-        this._disabled_cursor = this.style.cursor;
+        if (this.style.cursor !== "not-allowed") {
+            this._disabled_cursor = this.style.cursor;
+        }
         this.style.cursor = "not-allowed";
         this._is_button_disabled = true;
         return this;
     }
 
     /**
-     * @docs:
-     * @title: Enable Button
-     * @desc: Enables the button by setting the disabled state to false.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Enable Button}
+     * Enables the button by setting the disabled state to false.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     enable(): this {
+        // console.log({ disabled_cursor: this._disabled_cursor, cursor: this.style.cursor });
         if (this._disabled_cursor) {
             this.style.cursor = this._disabled_cursor;
         } else if (this.style.cursor === "not-allowed") {
@@ -4170,17 +3919,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Click
-     * @desc: Sets a click event handler for the element, allowing for optional simulated href behavior.
-     * @param:
-     *     @name: simulate_href
-     *     @descr: The simulated href to set for the element (for SEO in SPAs).
-     *     @name: callback
-     *     @descr: The function to be called when the element is clicked.
-     * @return:
-     *     @description Returns the instance of the element for chaining when an argument is passed, otherwise returns the current onclick handler.
-     * @funcs: 2
+     * {On Click}
+     * Sets a click event handler for the element, allowing for optional simulated href behavior.
+     * @parameter simulate_href The simulated href to set for the element (for SEO in SPAs).
+     * @parameter callback The function to be called when the element is clicked.
+     * @returns Returns the instance of the element for chaining when an argument is passed, otherwise returns the current onclick handler.
+     * @docs
      */
     /**
      * @warning NEVER change that this overrides the last on click callback
@@ -4231,44 +3975,36 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Click Redirect
-     * @desc: Sets up a click event that redirects to the specified URL when triggered.
-     * @param:
-     *     @name: url
-     *     @descr: The URL to redirect to when the click event occurs.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {On Click Redirect}
+     * Sets up a click event that redirects to the specified URL when triggered.
+     * @parameter url The URL to redirect to when the click event occurs.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_click_redirect(url: string): this {
         return this.on_click(url, () => Utils.redirect(url));
     }
 
     /**
-     * @docs:
-     * @title: On Scroll
-     * @description: 
-     *     Script to be run when an element's scrollbar is being scrolled.
-     *     The equivalent of HTML attribute `onscroll`. The first parameter of the callback is the `VElement` object.
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: opts_or_callback
-     *     @description: Options or callback function to assign for the scroll event.
-     *     @attr:
-     *         @name: callback
-     *         @description Function to be called on scroll.
-     *         @name: delay
-     *         @description Delay in milliseconds before executing the callback.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * {On Scroll}
+     * Script to be run when an element's scrollbar is being scrolled.
+     * The equivalent of HTML attribute `onscroll`. The first parameter of the callback is the `VElement` object.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter opts_or_callback Options or callback function to assign for the scroll event.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     on_scroll(): (EventListener | null);
     on_scroll(opts_or_callback: Function | {
+        /** Function to be called on scroll. */
         callback: (element: any, event: Event) => any,
+        /** Delay in milliseconds before executing the callback. */
         delay?: number
     }): this;
     on_scroll(opts_or_callback?: Function | {
+        /** Function to be called on scroll. */
         callback: (element: any, event: Event) => any,
+        /** Delay in milliseconds before executing the callback. */
         delay?: number
     }): this | EventListener | null {
         if (opts_or_callback == null) { return this.onscroll; }
@@ -4294,21 +4030,14 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Resize
-     * @desc: Script to be run when the browser window is being resized. 
-     *        This allows for a callback to be executed upon resizing the window.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be called when the window is resized.
-     * @param:
-     *     @name: once
-     *     @descr: If true, the callback will only be executed once after the last resize event.
-     * @param:
-     *     @name: delay
-     *     @descr: The delay in milliseconds before executing the callback.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On Resize}
+     * Script to be run when the browser window is being resized.
+     * This allows for a callback to be executed upon resizing the window.
+     * @parameter callback The function to be called when the window is resized.
+     * @parameter once If true, the callback will only be executed once after the last resize event.
+     * @parameter delay The delay in milliseconds before executing the callback.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_window_resize(): null | Function;
     on_window_resize(opts: Function | {callback?: Function, once?: boolean, delay?: number}): this;
@@ -4337,117 +4066,77 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Attachment Drop
-     * @desc: Custom on attachment drop event handling. This function sets up event listeners for drag and drop actions.
-     * @param:
-     *     @name: options
-     *     @descr: Configuration options for the drop event.
-     *     @attr:
-     *         @name: callback
-     *         @description Function to be called with the attachment details.
-     *     @attr:
-     *         @name: read
-     *         @description Indicates whether to read the file data.
-     *     @attr:
-     *         @name: compress
-     *         @description Function to compress the data, `Compression.compress` is advised.
-     *     @attr:
-     *         @name: on_start
-     *         @description Function to be called when the drag starts.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Attachment Drop}
+     * 
+     * Custom on attachment drop event handling.
+     * This function sets up event listeners for drag and drop actions.
+     * Also pushes the attachment to attribute field `attachments`.
+     * 
+     * When a directory is dropped, all files within the directory are added recursively.
+     * 
+     * @param options Configuration options for the drop event, see {@link Attachment.OnDropOpts} for more information.
+     * 
+     * @returns The instance of the element for chaining.
+     * 
+     * @docs
      */
-    on_attachment_drop(options: {
-        callback: (args: { name: string; path: string; is_dir: boolean; data: any; compressed: boolean; file: File; size: number; }) => any;
-        read?: boolean;
-        compress?: (string) => any;
-        on_start?: (event: DragEvent) => any;
-    }): this {
-        const { callback, read = true, compress = undefined, on_start = () => {} } = options;
-        this.ondragover = (event) => {
-            event.preventDefault();
-            if (event.dataTransfer) {
-                event.dataTransfer.dropEffect = "copy";
-            }
-            on_start(event);
-        };
-
-        this.ondrop = (event) => {
-            event.preventDefault();
-            const items = event.dataTransfer?.items;
-            if (Array.isArray(items)) {
-                for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    if (item.kind === 'file') {
-                        const file = item.getAsFile();
-                        if (file) {
-                            const args = {
-                                name: file.name,
-                                path: file.path,
-                                is_dir: false,
-                                data: null as null | string | Uint8Array,
-                                compressed: false,
-                                file: file,
-                                size: file.size / (1024 * 1024),
-                            };
-
-                            if (item.webkitGetAsEntry) {
-                                const entry = item.webkitGetAsEntry();
-                                if (entry && entry.isDirectory) {
-                                    args.is_dir = true;
-                                }
-                            }
-
-                            if (args.is_dir === false && read) {
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                    if (event.target) {
-                                        if (compress) {
-                                            args.data = compress(event.target.result as any as string);
-                                            args.compressed = true;
-                                        } else {
-                                            args.data = event.target?.result as any;
-                                            args.compressed = false;
-                                        }
-                                    }
-                                    callback(args);
-                                };
-                                reader.readAsText(file);
-                            } else {
-                                callback(args);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
+    on_attachment_drop(options: Attachment.OnDropOpts): this {
+        Attachment.on_drop(this, this.attachments, options);
         return this;
     }
 
     /**
-     * @docs:
-     * @title: On Appear
-     * @desc: Sets a callback to be executed when the element appears in the viewport.
-     * @param:
-     *     @name: callback_or_opts
-     *     @descr: Can be a callback function or an options object containing callback, repeat, and threshold.
-     *     @attr:
-     *         @name: callback
-     *         @description The function to call when the element appears.
-     *         @name: repeat
-     *         @description If true, the callback will be called every time the element appears.
-     *         @name: threshold
-     *         @description The intersection ratio threshold to trigger the callback.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * Add an attachment to the attachments array, if not already added.
+     * @param attachment The attachment to add.
+     * @returns The instance of the element for chaining.
+     */
+    add_attachment(attachment: Attachment): this {
+        const index = this.attachments.indexOf(attachment);
+        if (index === -1) {
+            this.attachments.push(attachment);
+        }
+        return this;
+    }
+
+    /**
+     * Remove an attachment from the attachments array.
+     * @param attachment The attachment to remove.
+     * @returns The instance of the element for chaining.
+     */
+    remove_attachment(attachment: Attachment): this {
+        const index = this.attachments.indexOf(attachment);
+        if (index > -1) {
+            this.attachments.splice(index, 1);
+        }
+        return this;
+    }
+
+    /**
+     * {On Appear}
+     * Sets a callback to be executed when the element appears in the viewport.
+     * @parameter callback_or_opts Can be a callback function or an options object containing callback, repeat, and threshold.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_appear<T = this>(callback: OnAppearCallback<T>): this;
-    on_appear<T = this>(options: { callback: OnAppearCallback<T>; repeat?: boolean, threshold?: number | null }): this;
+    on_appear<T = this>(options: {
+        /** The function to call when the element appears. */
+        callback: OnAppearCallback<T>;
+        /** If true, the callback will be called every time the element appears. */
+        repeat?: boolean,
+        /** The intersection ratio threshold to trigger the callback. */
+        threshold?: number | null;
+    }): this;
     on_appear<T = this>(callback_or_opts?: 
         OnAppearCallback<T> | 
-        { callback: OnAppearCallback<T>, repeat?: boolean; threshold?: number | null }
+        {
+            /** The function to call when the element appears. */
+            callback: OnAppearCallback<T>,
+            /** If true, the callback will be called every time the element appears. */
+            repeat?: boolean;
+            /** The intersection ratio threshold to trigger the callback. */
+            threshold?: number | null;
+        }
     ): this {
         let callback = callback_or_opts, repeat = false, threshold: number | null = null;
         if (typeof callback_or_opts === "object") {
@@ -4505,22 +4194,19 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Disappear
-     * @desc: Sets up an event listener that triggers a callback when the element disappears from the user's view.
-     * @experimental: true
-     * @param:
-     *     @name: callback_or_opts
-     *     @descr: Can be a callback function or an options object containing the callback and repeat settings.
-     *     @attr:
-     *         @name: callback
-     *         @description The function to call when the element disappears.
-     *         @name: repeat
-     *         @description Whether to repeat the observation after the callback is triggered.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On Disappear}
+     * Sets up an event listener that triggers a callback when the element disappears from the user's view.
+     * @experimental
+     * @parameter callback_or_opts Can be a callback function or an options object containing the callback and repeat settings.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
-    on_disappear<T = this>(callback_or_opts?: ((element: T) => any) | { callback?: (element: T) => any; repeat?: boolean }): this {
+    on_disappear<T = this>(callback_or_opts?: ((element: T) => any) | {
+        /** The function to call when the element disappears. */
+        callback?: (element: T) => any;
+        /** Whether to repeat the observation after the callback is triggered. */
+        repeat?: boolean;
+    }): this {
         const element = this; // Assuming 'this' is the element
         let callback: ((element: T) => any) | null = null;
         let repeat = false;
@@ -4643,14 +4329,11 @@ export abstract class VElement extends HTMLElement {
 
 
     /**
-     * @docs:
-     * @title: On Enter
-     * @desc: Sets a callback function to be executed when the Enter key is pressed on input or textarea elements.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be called when the Enter key is pressed.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On Enter}
+     * Sets a callback function to be executed when the Enter key is pressed on input or textarea elements.
+     * @parameter callback The function to be called when the Enter key is pressed.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_enter(): undefined | ElementKeyboardEvent<this>;
     on_enter(callback: ElementKeyboardEvent<this>): this;
@@ -4674,14 +4357,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Escape
-     * @desc: Sets a callback function to be triggered when the Escape key is pressed.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be called when the Escape key is pressed.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On Escape}
+     * Sets a callback function to be triggered when the Escape key is pressed.
+     * @parameter callback The function to be called when the Escape key is pressed.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_escape(): undefined | ElementKeyboardEvent<this>;
     on_escape(callback: ElementKeyboardEvent<this>): this;
@@ -4705,15 +4385,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Theme Update
-     * @desc: Manages theme update callbacks. If no callback is provided, it returns the current callbacks.
-     * @param:
-     *     @name: callback
-     *     @descr: A function to be called on theme updates or null to retrieve existing callbacks.
-     * @return:
-     *     @description Returns the instance of the element for chaining when a callback is provided, or the array of existing callbacks if null is passed.
-     * @funcs: 2
+     * {On Theme Update}
+     * Manages theme update callbacks. If no callback is provided, it returns the current callbacks.
+     * @parameter callback A function to be called on theme updates or null to retrieve existing callbacks.
+     * @returns Returns the instance of the element for chaining when a callback is provided, or the array of existing callbacks if null is passed.
+     * @docs
      */
     on_theme_update(): ThemeUpdateCallback<this>[];
     on_theme_update(callback: ThemeUpdateCallback<this>): this;
@@ -4733,14 +4409,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove on Theme Update
-     * @desc: Removes a callback from the theme update listeners.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to be removed from the listeners.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove on Theme Update}
+     * Removes a callback from the theme update listeners.
+     * @parameter callback The callback function to be removed from the listeners.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_theme_update(callback: ThemeUpdateCallback<this>): this {
         this._on_theme_updates = vlib.Array.drop(this._on_theme_updates, callback);
@@ -4748,11 +4421,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove on Theme Updates
-     * @desc: Clears the list of theme update callbacks if they exist.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove on Theme Updates}
+     * Clears the list of theme update callbacks if they exist.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_theme_updates(): this {
         this._on_theme_updates = [];
@@ -4760,15 +4432,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Render
-     * @desc: Manages callbacks that are triggered when the element is added to the body.
-     * @param:
-     *     @name: callback
-     *     @descr: A function to be called when the element is rendered. If no argument is passed, it returns the current callbacks.
-     * @return:
-     *     @description When a callback is provided, returns the instance of the element for chaining. If no callback is provided, returns the array of current callbacks.
-     * @funcs: 2
+     * {On Render}
+     * Manages callbacks that are triggered when the element is added to the body.
+     * @parameter callback A function to be called when the element is rendered. If no argument is passed, it returns the current callbacks.
+     * @returns When a callback is provided, returns the instance of the element for chaining. If no callback is provided, returns the array of current callbacks.
+     * @docs
      */
     on_render(): (ElementCallback<this>)[];
     on_render(callback: ElementCallback<this>): this;
@@ -4785,14 +4453,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove on Render
-     * @desc: Removes a callback from the on render callbacks array and stops observing if empty.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to remove from the on render callbacks.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove on Render}
+     * Removes a callback from the on render callbacks array and stops observing if empty.
+     * @parameter callback The callback function to remove from the on render callbacks.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_render(callback: ElementCallback<this>): this {
         this._on_render_callbacks = vlib.Array.drop(this._on_render_callbacks, callback);
@@ -4804,11 +4469,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove On Renders
-     * @desc: Clears the on render callbacks and stops observing the element for render events.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove On Renders}
+     * Clears the on render callbacks and stops observing the element for render events.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_renders(): this {
         this._on_render_callbacks = [];
@@ -4818,26 +4482,22 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Is Rendered
-     * @desc: Checks whether the element has been rendered or not.
-     * @return:
-     *     @description Returns true if the element has been rendered, otherwise false.
+     * {Is Rendered}
+     * Checks whether the element has been rendered or not.
+     * @returns Returns true if the element has been rendered, otherwise false.
+     * @docs
      */
     is_rendered(): boolean {
         return this.rendered;
     }
 
     /**
-     * @docs:
-     * @title: On Load
-     * @desc: Registers a callback to be executed when the entire page is fully loaded. 
-     *          Note that this event will not fire if the `window.onload` callback is overwritten.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be executed on load.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On Load}
+     * Registers a callback to be executed when the entire page is fully loaded.
+     * Note that this event will not fire if the `window.onload` callback is overwritten.
+     * @parameter callback The function to be executed on load.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_load(callback: (element: this, args: Record<string, any>) => any): this {
         Events.on("volt.on_load", this, callback);
@@ -4845,14 +4505,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove on Load
-     * @desc: Removes a callback function from the "volt.on_load" event.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be removed from the event listener.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Remove on Load}
+     * Removes a callback function from the "volt.on_load" event.
+     * @parameter callback The function to be removed from the event listener.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_load(callback: (element: this, args: Record<string, any>) => any): this {
         Events.remove("volt.on_load", this, callback);
@@ -4860,11 +4517,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove On Loads
-     * @desc: Removes the on_load event listener from the instance.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove On Loads}
+     * Removes the on_load event listener from the instance.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_loads(): this {
         Events.remove("volt.on_load", this);
@@ -4872,15 +4528,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Resize
-     * @desc: Manages callbacks for the resize event. Can retrieve existing callbacks or add new ones.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to be executed on resize events.
-     * @return:
-     *     @descr: When a callback is provided, returns the instance for chaining. Otherwise, returns the list of existing resize callbacks.
-     * @funcs: 2
+     * {On Resize}
+     * Manages callbacks for the resize event. Can retrieve existing callbacks or add new ones.
+     * @parameter callback The callback function to be executed on resize events.
+     * @returns When a callback is provided, returns the instance for chaining. Otherwise, returns the list of existing resize callbacks.
+     * @docs
      */
     on_resize(): (ElementCallback<this>)[];
     on_resize(callback: ElementCallback<this>): this;
@@ -4897,14 +4549,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove on Resize
-     * @desc: Removes a callback from the resize event listeners. If no callbacks remain, it stops observing resize events.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to remove from the resize event listeners.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove on Resize}
+     * Removes a callback from the resize event listeners. If no callbacks remain, it stops observing resize events.
+     * @parameter callback The callback function to remove from the resize event listeners.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_resize(callback: ElementCallback<this>): this {
         this._on_resize_callbacks = vlib.Array.drop(this._on_resize_callbacks, callback);
@@ -4916,14 +4565,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove on Resizes
-     * @desc: Removes all resize callbacks and stops observing resize events for this element.
-     * @param:
-     *     @name: callback
-     *     @descr: A callback function to be removed from the resize callbacks.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove on Resizes}
+     * Removes all resize callbacks and stops observing resize events for this element.
+     * @parameter callback A callback function to be removed from the resize callbacks.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_resizes(): this {
         this._on_resize_callbacks = [];
@@ -4933,21 +4579,14 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Resize Rule
-     * @desc: Adds an on resize rule event that executes callbacks based on evaluation changes during a resize event.
-     * @note: This function adds an `on_resize` callback.
-     * @param:
-     *     @name: evaluation
-     *     @descr: The function to evaluate if the statement is true, the element node is passed as the first argument.
-     * @param:
-     *     @name: on_true
-     *     @descr: The callback executed if the statement is true, the element node is passed as the first argument.
-     * @param:
-     *     @name: on_false
-     *     @descr: The callback executed if the statement is false, the element node is passed as the first argument.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {On Resize Rule}
+     * Adds an on resize rule event that executes callbacks based on evaluation changes during a resize event.
+     * @note This function adds an `on_resize` callback.
+     * @parameter evaluation The function to evaluate if the statement is true, the element node is passed as the first argument.
+     * @parameter on_true The callback executed if the statement is true, the element node is passed as the first argument.
+     * @parameter on_false The callback executed if the statement is false, the element node is passed as the first argument.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_resize_rule(
         evaluation: (element: this) => boolean,
@@ -4971,14 +4610,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Shortcut
-     * @desc: Create key shortcuts for the element. This function takes an array of shortcut objects that define the key combinations and their associated actions.
-     * @param:
-     *     @name: shortcuts
-     *     @descr: The array with shortcuts. Each shortcut object may have various attributes to define the key matching criteria and actions.
-     * @return:
-     *     @descr: This function does not return a value.
+     * {On Shortcut}
+     * Create key shortcuts for the element. This function takes an array of shortcut objects that define the key combinations and their associated actions.
+     * @parameter shortcuts The array with shortcuts. Each shortcut object may have various attributes to define the key matching criteria and actions.
+     * @returns This function does not return a value.
+     * @docs
      */
     on_shortcut(shortcuts: {
         match?: (event: KeyboardEvent, key: string, shortcut: any) => boolean;
@@ -5134,19 +4770,19 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * MOVED docs:
-     * @title: On Context Menu
-     * @desc: 
-     *     Script to be run when a context menu is triggered. This function can set or get the context menu callback.
-     * @param:
-     *     @name: callback
-     *     @descr: 
-     *         The parameter may either be a callback function, a ContextMenu object, or an Array as the ContextMenu parameter.
-     * @return:
-     *     @description Returns the `VElement` object. If `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
+    // /**
+    //  * MOVED docs:
+    //  * @title: On Context Menu
+    //  * @desc: 
+    //  *     Script to be run when a context menu is triggered. This function can set or get the context menu callback.
+    //  * @param:
+    //  *     @name: callback
+    //  *     @descr: 
+    //  *         The parameter may either be a callback function, a ContextMenu object, or an Array as the ContextMenu parameter.
+    //  * @return:
+    //  *     @description Returns the `VElement` object. If `callback` is `null`, then the attribute's value is returned.
+    //  * @funcs: 2
+    //  */
     // on_context_menu(): ContextMenuElement | Function | undefined;
     // on_context_menu(callback: Function | ContextMenuElement | any[]): this;
     // on_context_menu(callback?: Function | ContextMenuElement | any[]): this | ContextMenuElement | Function | undefined {
@@ -5181,15 +4817,11 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * @docs:
-     * @title: On Mouse Enter
-     * @desc: Sets a callback function to be called when the mouse enters the element.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be called on mouse enter.
-     * @return:
-     *     @descr: When a callback is provided, returns the instance of the element for chaining. If no callback is provided, returns the current callback.
-     * @funcs: 2
+     * {On Mouse Enter}
+     * Sets a callback function to be called when the mouse enters the element.
+     * @parameter callback The function to be called on mouse enter.
+     * @returns When a callback is provided, returns the instance of the element for chaining. If no callback is provided, returns the current callback.
+     * @docs
      */
     on_mouse_enter(): ElementMouseEvent<this>;
     on_mouse_enter(callback: ElementMouseEvent<this>): this;
@@ -5202,15 +4834,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On Mouse Leave
-     * @desc: Sets or retrieves the callback function to be called when the mouse leaves the element.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to execute when the mouse leaves the element.
-     * @return:
-     *     @description When an argument is passed this function returns the instance of the element for chaining. Otherwise, it returns the currently set callback function.
-     * @funcs: 2
+     * {On Mouse Leave}
+     * Sets or retrieves the callback function to be called when the mouse leaves the element.
+     * @parameter callback The function to execute when the mouse leaves the element.
+     * @returns When an argument is passed this function returns the instance of the element for chaining. Otherwise, it returns the currently set callback function.
+     * @docs
      */
     on_mouse_leave(): ElementMouseEvent<this>;
     on_mouse_leave(callback: ElementMouseEvent<this>): this;
@@ -5223,17 +4851,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: On mouse over and out
-     * @desc: Set callbacks for the on mouse over and mouse out events.
-     * @param:
-     *     @name: mouse_over
-     *     @descr: The mouse over callback.
-     * @param:
-     *     @name: mouse_out
-     *     @descr: The mouse out callback.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On mouse over and out}
+     * Set callbacks for the on mouse over and mouse out events.
+     * @parameter mouse_over The mouse over callback.
+     * @parameter mouse_out The mouse out callback.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_mouse_over_out(mouse_over: ElementMouseEvent<this>, mouse_out: ElementMouseEvent<this>): this {
         this.on_mouse_over(mouse_over);
@@ -5331,41 +4954,33 @@ export abstract class VElement extends HTMLElement {
     // }
 
     /**
-     * @docs:
-     * @title: First Child
-     * @desc: Retrieves the first child of the element.
-     * @return:
-     *     @description Returns the first child node of the element, or null if there are no children.
+     * {First Child}
+     * Retrieves the first child of the element.
+     * @returns Returns the first child node of the element, or null if there are no children.
+     * @docs
      */
     first_child(): Node | null {
         return this.firstChild;
     }
 
     /**
-     * @docs:
-     * @title: Last Child
-     * @desc: Retrieves the last child of the element.
-     * @return:
-     *     @description Returns the last child node of the element, or null if there are no children.
+     * {Last Child}
+     * Retrieves the last child of the element.
+     * @returns Returns the last child node of the element, or null if there are no children.
+     * @docs
      */
     last_child(): ChildNode | null {
         return this.lastChild;
     }
 
     /**
-     * @docs:
-     * @title: Iterate Children
-     * @desc: Iterates over the children of an element, executing a handler function for each child.
-     * @param:
-     *     @name: start
-     *     @descr: The starting index for iteration, or a handler function.
-     *     @name: end
-     *     @descr: The ending index for iteration.
-     *     @name: handler
-     *     @descr: The function to execute for each child.
-     * @return:
-     *     @description Returns the result of the handler function if not null, otherwise returns null.
-     * @funcs: 2
+     * {Iterate Children}
+     * Iterates over the children of an element, executing a handler function for each child.
+     * @parameter start The starting index for iteration, or a handler function.
+     * @parameter end The ending index for iteration.
+     * @parameter handler The function to execute for each child.
+     * @returns Returns the result of the handler function if not null, otherwise returns null.
+     * @docs
      */
     iterate(start: number | ((child: any, index: number) => any), end?: number, handler?: (child: any, index: number) => any): any {
         if (typeof start === "function") {
@@ -5392,19 +5007,13 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Iterate Child Nodes
-     * @desc: Iterates over the child nodes of an element, executing a handler function for each node.
-     * @param:
-     *     @name: start
-     *     @descr: The starting index for iteration, or a handler function.
-     *     @name: end
-     *     @descr: The ending index for iteration.
-     *     @name: handler
-     *     @descr: The function to execute for each child node.
-     * @return:
-     *     @description Returns the result of the handler function if not null, otherwise returns null.
-     * @funcs: 2
+     * {Iterate Child Nodes}
+     * Iterates over the child nodes of an element, executing a handler function for each node.
+     * @parameter start The starting index for iteration, or a handler function.
+     * @parameter end The ending index for iteration.
+     * @parameter handler The function to execute for each child node.
+     * @returns Returns the result of the handler function if not null, otherwise returns null.
+     * @docs
      */
     iterate_nodes(start: number | ((node: any, index: number) => any), end?: number, handler?: (node: any, index: number) => any): any {
         if (typeof start === "function") {
@@ -5431,14 +5040,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Set Default
-     * @desc: Sets the current element as the default, allowing for a specific type to be set.
-     * @param:
-     *     @name: Type
-     *     @descr: The type to set as default, defaults to VElement if null.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Set Default}
+     * Sets the current element as the default, allowing for a specific type to be set.
+     * @parameter Type The type to set as default, defaults to VElement if null.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     set_default(Type?: any): this {
         if (Type == null) {
@@ -5452,16 +5058,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Assign
-     * @desc: Assigns a function or property to the instance. This allows dynamic property assignment for elements.
-     * @param:
-     *     @name: name
-     *     @descr: The name of the property or function to assign.
-     *     @name: value
-     *     @descr: The value to assign to the property or function.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Assign}
+     * Assigns a function or property to the instance. This allows dynamic property assignment for elements.
+     * @parameter name The name of the property or function to assign.
+     * @parameter value The value to assign to the property or function.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     assign(name: string, value: any): this {
         this[name] = value;
@@ -5475,14 +5077,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Extend
-     * @desc: Extends the current instance by adding properties or functions from the provided object.
-     * @param:
-     *     @name: obj
-     *     @descr: The object containing properties or functions to add to the current instance.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Extend}
+     * Extends the current instance by adding properties or functions from the provided object.
+     * @parameter obj The object containing properties or functions to add to the current instance.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     // extend<T extends object>(props: T): this & T {
     // extend<T extends Record<string, (...args: any[]) => any>>(methods: T & ThisType<MyClass & T>): this & T {
@@ -5492,14 +5091,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Select Contents
-     * @desc: Selects the contents of the object, optionally overwriting existing selections.
-     * @param:
-     *     @name: overwrite
-     *     @descr: Indicates whether to overwrite the current selection.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Select Contents}
+     * Selects the contents of the object, optionally overwriting existing selections.
+     * @parameter overwrite Indicates whether to overwrite the current selection.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     select(overwrite: boolean = true): this {
         // @ts-ignore
@@ -5522,50 +5118,43 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Is Scrollable
-     * @desc: Determines whether the element is scrollable based on its dimensions.
-     * @return:
-     *     @description Returns true if the element's scroll height or width exceeds its client height or width, indicating it is scrollable.
+     * {Is Scrollable}
+     * Determines whether the element is scrollable based on its dimensions.
+     * @returns Returns true if the element's scroll height or width exceeds its client height or width, indicating it is scrollable.
+     * @docs
      */
     is_scrollable(): boolean {
         return this.scrollHeight > this.clientHeight || this.scrollWidth > this.clientWidth;
     }
 
     /**
-     * @docs:
-     * @title: Is Scrollable X
-     * @desc: Checks if the element is scrollable in the horizontal direction by comparing its scroll width with its client width.
-     * @return:
-     *     @description Returns true if the element is scrollable horizontally, otherwise false.
+     * {Is Scrollable X}
+     * Checks if the element is scrollable in the horizontal direction by comparing its scroll width with its client width.
+     * @returns Returns true if the element is scrollable horizontally, otherwise false.
+     * @docs
      */
     is_scrollable_x(): boolean {
         return this.scrollWidth > this.clientWidth;
     }
 
     /**
-     * @docs:
-     * @title: Is Scrollable Y
-     * @desc: Checks if the element is scrollable vertically by comparing its scroll height to its client height.
-     * @return:
-     *     @description Returns true if the element is scrollable in the Y direction, otherwise false.
+     * {Is Scrollable Y}
+     * Checks if the element is scrollable vertically by comparing its scroll height to its client height.
+     * @returns Returns true if the element is scrollable in the Y direction, otherwise false.
+     * @docs
      */
     is_scrollable_y(): boolean {
         return this.scrollHeight > this.clientHeight;
     }
 
     /**
-     * @docs:
-     * @title: Wait Till Children Rendered
-     * @desc: Waits until the element and all its children are fully rendered. 
-     * This function should only be used in the `on_render` callback. 
+     * {Wait Till Children Rendered}
+     * Waits until the element and all its children are fully rendered.
+     * This function should only be used in the `on_render` callback.
      * Note that it does not work with non-volt nodes and may not function correctly.
-     * @param:
-     *     @name: timeout
-     *     @descr: The maximum time to wait for rendering in milliseconds.
-     *     @default: 10000
-     * @return:
-     *     @description Returns a promise that resolves when all children are rendered or rejects on timeout.
+     * @parameter timeout The maximum time to wait for rendering in milliseconds.
+     * @returns Returns a promise that resolves when all children are rendered or rejects on timeout.
+     * @docs
      */
     async wait_till_children_rendered(timeout: number = 10000): Promise<void> {
         return new Promise((resolve, reject) => {
@@ -5613,17 +5202,13 @@ export abstract class VElement extends HTMLElement {
 
 
     /**
-     * @docs:
-     * @title: Add Pseudo
-     * @desc: Adds a pseudo element of a specified type to a node. 
-     *         Ensures that the pseudo element is properly initialized and styled.
-     * @param:
-     *     @name: type
-     *     @descr: The type of pseudo element to add (e.g., before, after).
-     *     @name: node
-     *     @descr: The node to which the pseudo element is added.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Add Pseudo}
+     * Adds a pseudo element of a specified type to a node.
+     * Ensures that the pseudo element is properly initialized and styled.
+     * @parameter type The type of pseudo element to add (e.g., before, after).
+     * @parameter node The node to which the pseudo element is added.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     pseudo(type: string, pseudo: PseudoElement): this {
         pseudo.apply(this, type);
@@ -5631,17 +5216,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove Pseudo
-     * @desc: Remove a pseudo element by the specified node.
-     * @param:
-     *     @name: node
-     *     @descr: The node from which the pseudo element will be removed.
-     *     @attr:
-     *         @name: pseudo_id
-     *         @description Identifier for the pseudo element to be removed.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Pseudo}
+     * Remove a pseudo element by the specified node.
+     * @parameter node The node from which the pseudo element will be removed.
+     * @parameter pseudo_id Identifier for the pseudo element to be removed.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_pseudo(type: string, pseudo: PseudoElement): this {
         pseudo.remove_from(this, type);
@@ -5649,13 +5229,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Remove Pseudos
-     * @desc: 
-     *      Removes all pseudo classes and stylesheets associated with the element. 
-     *      This function iterates through the class list and removes classes that start with "pseudo_".
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Pseudos}
+     * Removes all pseudo classes and stylesheets associated with the element.
+     * This function iterates through the class list and removes classes that start with "pseudo_".
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_pseudos(): this {
         this.classList.forEach(name => {
@@ -5667,19 +5245,13 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Add Pseudo Hover
-     * @desc: Adds a pseudo element on mouse hover. This function does not work in combination with other mouse over events.
-     * @param:
-     *     @name: type
-     *     @descr: The type of pseudo element to add.
-     *     @name: node
-     *     @descr: The node to which the pseudo element will be applied.
-     *     @name: set_defaults
-     *     @descr: A flag to set default values for the node.
-     *     @default: true
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Add Pseudo Hover}
+     * Adds a pseudo element on mouse hover. This function does not work in combination with other mouse over events.
+     * @parameter type The type of pseudo element to add.
+     * @parameter node The node to which the pseudo element will be applied.
+     * @parameter set_defaults A flag to set default values for the node.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     pseudo_on_hover(type: string, pseudo: PseudoElement, set_defaults: boolean = true): this {
         if (set_defaults) {
@@ -5701,17 +5273,11 @@ export abstract class VElement extends HTMLElement {
     // Parent functions.
 
     /**
-     * @docs:
-     * @title: Parent
-     * @desc: Get or set the parent element of the current element. 
-     *         This is particularly relevant for child elements of specific derived classes.
-     * @param:
-     *     @name: value
-     *     @descr: The parent element to set or null to retrieve the current parent.
-     * @return:
-     *     @description If a value is provided, it sets the parent and returns the instance for chaining. 
-     *                  If no value is provided, it returns the current parent element or null if not set.
-     * @funcs: 2
+     * {Parent}
+     * Get or set the parent element of the current element.
+     * This is particularly relevant for child elements of specific derived classes.
+     * @parameter value The parent element to set or null to retrieve the current parent.
+     * @docs
      */
     parent<T = undefined | VElement | HTMLElement>(): T;
     parent(value: any): this;
@@ -5727,18 +5293,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Absolute Parent
-     * @desc: Sets or gets the absolute parent of the custom element. 
-     * When called without arguments, it returns the current absolute parent; 
+     * {Absolute Parent}
+     * Sets or gets the absolute parent of the custom element.
+     * When called without arguments, it returns the current absolute parent;
      * when called with an argument, it sets the absolute parent and returns the instance for chaining.
-     * @param:
-     *     @name: value
-     *     @descr: The absolute parent to set.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining when an argument is passed; 
-     * otherwise, returns the current absolute parent.
-     * @funcs: 2
+     * @parameter value The absolute parent to set.
+     * @docs
      */
     abs_parent<T = undefined | VElement | HTMLElement>(): T;
     abs_parent(value: any): this;
@@ -5751,14 +5311,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Assign to Parent As
-     * @desc: Assigns the current element to a specified attribute of the parent element.
-     * @param:
-     *     @name: name
-     *     @descr: The name of the attribute to assign the current element to.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Assign to Parent As}
+     * Assigns the current element to a specified attribute of the parent element.
+     * @deprecated
+     * @parameter name The name of the attribute to assign the current element to.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     assign_to_parent_as(name: string): this {
         this._assign_to_parent_as = name;
@@ -5766,15 +5324,12 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Get Y Offset From Parent
-     * @desc: Calculates the vertical offset of the current node relative to a specified parent node.
-     * @param:
-     *     @name: parent
-     *     @descr: The parent node from which to calculate the offset.
-     * @return:
-     *     @description Returns the accumulated vertical offset from the current node to the parent node, or null if the parent wasn't found.
-     * @deprecated: true
+     * {Get Y Offset From Parent}
+     * Calculates the vertical offset of the current node relative to a specified parent node.
+     * @deprecated
+     * @parameter parent The parent node from which to calculate the offset.
+     * @returns Returns the accumulated vertical offset from the current node to the parent node, or null if the parent wasn't found.
+     * @docs
      */
     get_y_offset_from_parent(parent: HTMLElement): number | null {
         let offset = 0;
@@ -5805,11 +5360,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Absolute Y Offset
-     * @desc: Calculates the absolute vertical offset of the element from the top of the document.
-     * @return:
-     *     @description Returns the absolute Y offset in pixels.
+     * {Absolute Y Offset}
+     * Calculates the absolute vertical offset of the element from the top of the document.
+     * @returns Returns the absolute Y offset in pixels.
+     * @docs
      */
     absolute_y_offset(): number {
         let element: any = this;
@@ -5822,11 +5376,10 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Absolute X Offset
-     * @desc: Calculates the absolute X offset of the current element in relation to its offset parents.
-     * @return:
-     *     @description Returns the total left offset in pixels as a number.
+     * {Absolute X Offset}
+     * Calculates the absolute X offset of the current element in relation to its offset parents.
+     * @returns Returns the total left offset in pixels as a number.
+     * @docs
      */
     absolute_x_offset(): number {
         let element: any = this;
@@ -5840,14 +5393,11 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Exec
-     * @desc: Executes a provided function with the current element as its parameter.
-     * @param:
-     *     @name: callback
-     *     @descr: A function to execute with the current element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Exec}
+     * Executes a provided function with the current element as its parameter.
+     * @parameter callback A function to execute with the current element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     exec(callback: ElementCallback<this>): this {
         callback(this);
@@ -5855,31 +5405,23 @@ export abstract class VElement extends HTMLElement {
     }
 
     /**
-     * @docs:
-     * @title: Is child
-     * @desc: Check if an element is a direct child of the element or the element itself.
-     * @param:
-     *     @name: target
-     *     @descr: The target element to test.
-     * @return:
-     *     @description Returns true if the target is a direct child, otherwise false.
+     * {Is child}
+     * Check if an element is a direct child of the element or the element itself.
+     * @parameter target The target element to test.
+     * @returns Returns true if the target is a direct child, otherwise false.
+     * @docs
      */
     is_child(target: any): boolean {
         return Utils.is_child(this, target);
     }
 
     /**
-     * @docs:
-     * @title: Is Child
-     * @desc: Checks if an element is a recursively nested child of the element or the element itself.
-     * @param:
-     *     @name: target
-     *     @descr: The target element to test.
-     * @param:
-     *     @name: stop_node
-     *     @descr: A node at which to stop checking if target is a parent of the current element.
-     * @return:
-     *     @descr: Returns true if the target is a nested child, otherwise false.
+     * {Is Child}
+     * Checks if an element is a recursively nested child of the element or the element itself.
+     * @parameter target The target element to test.
+     * @parameter stop_node A node at which to stop checking if target is a parent of the current element.
+     * @returns Returns true if the target is a nested child, otherwise false.
+     * @docs
      */
     is_nested_child(target: any, stop_node: any = null): boolean {
         return Utils.is_nested_child(this, target, stop_node);
@@ -5889,11 +5431,10 @@ export abstract class VElement extends HTMLElement {
     // Cast functions.
 
     /**
-     * @docs:
-     * @title: To String
-     * @desc: Converts the current element to its string representation, setting an attribute in the process.
-     * @return:
-     *     @description Returns the outer HTML of the element as a string.
+     * {To String}
+     * Converts the current element to its string representation, setting an attribute in the process.
+     * @returns Returns the outer HTML of the element as a string.
+     * @docs
      */
     toString(): string {
         this.setAttribute("created_by_html", "true");
@@ -5903,12 +5444,7 @@ export abstract class VElement extends HTMLElement {
 
     // ---------------------------------------------------------
     // Automatically generated CSS functions. 
-    // Reference: https://www.w3schools.com/cssref/index.php. 
-
-    // ---------------------------------------------------------
-    // Automatically generated CSS functions. 
-    // Reference: https://www.w3schools.com/cssref/index.php. 
-
+    
     accent_color(): string;
     accent_color(value: string): this;
     /**
@@ -5931,7 +5467,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the alignment between the lines inside a flexible container when the items do not use all available space.
      * The equivalent of CSS attribute `alignContent`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     align_content(value?: string): string | this {
@@ -5950,7 +5486,7 @@ export abstract class VElement extends HTMLElement {
      * {Align Items}
      * Specifies the alignment for items inside a flexible container, equivalent to the CSS attribute `alignItems`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     align_items(value?: string): string | this {
@@ -5969,7 +5505,7 @@ export abstract class VElement extends HTMLElement {
      * {Align Self}
      * Specifies the alignment for selected items inside a flexible container. The equivalent of CSS attribute `alignSelf`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     align_self(value?: string): string | this {
@@ -5988,7 +5524,7 @@ export abstract class VElement extends HTMLElement {
      * {All}
      * Resets all properties (except unicode-bidi and direction). The equivalent of CSS attribute `all`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     all(value?: string): string | this {
@@ -6023,7 +5559,7 @@ export abstract class VElement extends HTMLElement {
      * {Animation Delay}
      * Specifies a delay for the start of an animation, equivalent to the CSS attribute `animationDelay`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     animation_delay(value?: string | number): string | this {
@@ -6062,7 +5598,7 @@ export abstract class VElement extends HTMLElement {
      * {Animation Duration}
      * Specifies how long an animation should take to complete one cycle. The equivalent of CSS attribute `animationDuration`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     animation_duration(value?: string | number): string | this {
@@ -6082,7 +5618,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies a style for the element when the animation is not playing, akin to the CSS `animation-fill-mode` property.
      * Use this method to set or retrieve the current fill mode value.
      * @param value The value to assign to the animation fill mode. Pass `null` to retrieve the current value.
-     * @returns ription Returns the instance of the element for chaining when a value is set. If `null` is passed, returns the current value of the animation fill mode.
+     * @returns Returns the instance of the element for chaining when a value is set. If `null` is passed, returns the current value of the animation fill mode.
      * @docs
      */
     animation_fill_mode(value?: string): string | this {
@@ -6101,7 +5637,7 @@ export abstract class VElement extends HTMLElement {
      * {Animation Iteration Count}
      * Specifies the number of times an animation should be played. The equivalent of CSS attribute `animationIterationCount`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     animation_iteration_count(value?: string | number): string | this {
@@ -6121,7 +5657,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies a name for the \@keyframes animation, equivalent to the CSS attribute `animationName`.
      * When the parameter `value` is null, it retrieves the current attribute value.
      * @param value The value to assign for the animation name. Use null to retrieve the current value.
-     * @returns ription Returns the current animation name when `value` is null, otherwise returns the instance for chaining.
+     * @returns Returns the current animation name when `value` is null, otherwise returns the instance for chaining.
      * @docs
      */
     animation_name(value?: string): string | this {
@@ -6141,7 +5677,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies whether the animation is running or paused.
      * The equivalent of CSS attribute `animationPlayState`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     animation_play_state(value?: string): string | this {
@@ -6160,7 +5696,7 @@ export abstract class VElement extends HTMLElement {
      * {Animation Timing Function}
      * Specifies the speed curve of an animation. The equivalent of CSS attribute `animationTimingFunction`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     animation_timing_function(value?: string): string | this {
@@ -6194,7 +5730,7 @@ export abstract class VElement extends HTMLElement {
      * {Backdrop Filter}
      * Defines a graphical effect to the area behind an element. The equivalent of CSS attribute `backdropFilter`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     backdrop_filter(value?: string): string | this {
@@ -6214,7 +5750,7 @@ export abstract class VElement extends HTMLElement {
      * Defines whether or not the back face of an element should be visible when facing the user.
      * The equivalent of CSS attribute `backfaceVisibility`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     backface_visibility(value?: string): string | this {
@@ -6234,7 +5770,7 @@ export abstract class VElement extends HTMLElement {
      * Sets whether a background image scrolls with the rest of the page, or is fixed.
      * The equivalent of CSS attribute `backgroundAttachment`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     background_attachment(value?: string): string | this {
@@ -6249,7 +5785,7 @@ export abstract class VElement extends HTMLElement {
      * {Background Blend Mode}
      * Specifies the blending mode of each background layer (color/image). The equivalent of CSS attribute `backgroundBlendMode`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     background_blend_mode(value?: string): string | this {
@@ -6265,7 +5801,7 @@ export abstract class VElement extends HTMLElement {
      * Defines how far the background (color or image) should extend within an element.
      * The equivalent of CSS attribute `backgroundClip`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     background_clip(value?: string): string | this {
@@ -6284,7 +5820,7 @@ export abstract class VElement extends HTMLElement {
      * {Background Color}
      * Specifies the background color of an element. The equivalent of CSS attribute `backgroundColor`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     background_color(value?: string): string | this {
@@ -6300,7 +5836,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies one or more background images for an element.
      * The equivalent of CSS attribute `backgroundImage`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     background_image(value?: string): string | this {
@@ -6334,7 +5870,7 @@ export abstract class VElement extends HTMLElement {
      * {Background Position}
      * Specifies the position of a background image, equivalent to the CSS attribute `backgroundPosition`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     background_position(value?: string): string | this {
@@ -6350,7 +5886,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the position of a background image on x-axis.
      * The equivalent of CSS attribute `backgroundPositionX`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     background_position_x(value?: string | number): string | this {
@@ -6380,7 +5916,7 @@ export abstract class VElement extends HTMLElement {
      * {Background Repeat}
      * Sets if/how a background image will be repeated. This corresponds to the CSS property `backgroundRepeat`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
      * @docs
      */
     background_repeat(value?: string): string | this {
@@ -6395,7 +5931,7 @@ export abstract class VElement extends HTMLElement {
      * {Background Size}
      * Specifies the size of the background images. The equivalent of CSS attribute `backgroundSize`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     background_size(value?: string | number): string | this {
@@ -6438,7 +5974,7 @@ export abstract class VElement extends HTMLElement {
      * A shorthand property for border-block-width, border-block-style and border-block-color.
      * The equivalent of CSS attribute `borderBlock`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_block(value?: string): this | string {
@@ -6454,7 +5990,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the color of the borders at start and end in the block direction.
      * The equivalent of CSS attribute `borderBlockColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     border_block_color(value?: string): string | this {
@@ -6469,7 +6005,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Block End Color}
      * Sets the color of the border at the end in the block direction. The equivalent of CSS attribute `borderBlockEndColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_block_end_color(value?: string): string | this {
@@ -6485,7 +6021,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the style of the border at the end in the block direction.
      * The equivalent of CSS attribute `borderBlockEndStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     border_block_end_style(value?: string): string | this {
@@ -6501,7 +6037,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the width of the border at the end in the block direction.
      * The equivalent of CSS attribute `borderBlockEndWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     border_block_end_width(value?: string | number): string | this {
@@ -6517,7 +6053,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the color of the border at the start in the block direction.
      * The equivalent of CSS attribute `borderBlockStartColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_block_start_color(value?: string): string | this {
@@ -6533,7 +6069,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the style of the border at the start in the block direction.
      * The equivalent of CSS attribute `borderBlockStartStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     border_block_start_style(value?: string): string | this {
@@ -6548,7 +6084,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Block Start Width}
      * Sets the width of the border at the start in the block direction. The equivalent of CSS attribute `borderBlockStartWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_block_start_width(value?: string | number): string | this {
@@ -6564,7 +6100,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the style of the borders at start and end in the block direction.
      * The equivalent of CSS attribute `borderBlockStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_block_style(value?: string): string | this {
@@ -6580,7 +6116,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the width of the borders at start and end in the block direction.
      * The equivalent of CSS attribute `borderBlockWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_block_width(value?: string | number): string | this {
@@ -6595,7 +6131,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Bottom Color}
      * Sets the color of the bottom border. The equivalent of CSS attribute `borderBottomColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_bottom_color(value?: string): string | this {
@@ -6627,7 +6163,7 @@ export abstract class VElement extends HTMLElement {
      * Defines the radius of the border of the bottom-right corner.
      * The equivalent of CSS attribute `borderBottomRightRadius`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     border_bottom_right_radius(value?: string | number): string | this {
@@ -6642,7 +6178,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Bottom Style}
      * Sets the style of the bottom border, equivalent to the CSS attribute `borderBottomStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_bottom_style(value?: string): string | this {
@@ -6657,7 +6193,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Bottom Width}
      * Sets the width of the bottom border. The equivalent of CSS attribute `borderBottomWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_bottom_width(value?: string | number): string | this {
@@ -6688,7 +6224,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Color}
      * Sets the color of the four borders. This is equivalent to the CSS attribute `borderColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`,
+     * @returns Returns the `VElement` object for chaining. Unless parameter `value` is `null`,
      * then the attribute's value is returned.
      * @docs
      */
@@ -6705,7 +6241,7 @@ export abstract class VElement extends HTMLElement {
      * A shorthand property for all the border-image properties.
      * The equivalent of CSS attribute `borderImage`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_image(value?: string): string | this {
@@ -6740,7 +6276,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies whether the border image should be repeated, rounded or stretched.
      * The equivalent of CSS attribute `borderImageRepeat`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_image_repeat(value?: string): string | this {
@@ -6755,7 +6291,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Image Slice}
      * Specifies how to slice the border image, equivalent to the CSS attribute `borderImageSlice`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_image_slice(value?: string | number): string | this {
@@ -6771,7 +6307,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the path to the image to be used as a border.
      * The equivalent of CSS attribute `borderImageSource`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_image_source(value?: string): string | this {
@@ -6786,7 +6322,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Image Width}
      * Specifies the width of the border image, equivalent to the CSS attribute `borderImageWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
+     * @returns Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
      * @docs
      */
     border_image_width(value?: string | number): string | this {
@@ -6818,7 +6354,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the color of the borders at start and end in the inline direction.
      * The equivalent of CSS attribute `borderInlineColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_inline_color(value?: string): string | this {
@@ -6850,7 +6386,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the style of the border at the end in the inline direction.
      * The equivalent of CSS attribute `borderInlineEndStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_inline_end_style(value?: string): string | this {
@@ -6866,7 +6402,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the width of the border at the end in the inline direction.
      * The equivalent of CSS attribute `borderInlineEndWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_inline_end_width(value?: string | number): string | this {
@@ -6881,7 +6417,7 @@ export abstract class VElement extends HTMLElement {
      * {Border inline start color}
      * Sets the color of the border at the start in the inline direction. The equivalent of CSS attribute `borderInlineStartColor`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_inline_start_color(value?: string): string | this {
@@ -6897,7 +6433,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the style of the border at the start in the inline direction.
      * The equivalent of CSS attribute `borderInlineStartStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_inline_start_style(value?: string): string | this {
@@ -6912,7 +6448,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Inline Start Width}
      * Sets the width of the border at the start in the inline direction.
      * The equivalent of CSS attribute `borderInlineStartWidth`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_inline_start_width(value?: string | number): string | this {
@@ -6928,7 +6464,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the style of the borders at start and end in the inline direction.
      * The equivalent of CSS attribute `borderInlineStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_inline_style(value?: string): string | this {
@@ -6959,7 +6495,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Left Color}
      * Sets the color of the left border. The equivalent of CSS attribute `borderLeftColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_left_color(value?: string): string | this {
@@ -6974,7 +6510,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Left Style}
      * Sets the style of the left border. The equivalent of CSS attribute `borderLeftStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_left_style(value?: string): string | this {
@@ -6989,7 +6525,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Left Width}
      * Sets the width of the left border. The equivalent of CSS attribute `borderLeftWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_left_width(value?: string | number): string | this {
@@ -7003,7 +6539,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Border radius}
      * A shorthand property for the four border-radius properties. The equivalent of CSS attribute `borderRadius`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_radius(value?: string | number): string | this {
@@ -7022,7 +6558,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Right Color}
      * Sets the color of the right border. This is equivalent to the CSS attribute `borderRightColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_right_color(value?: string): string | this {
@@ -7037,7 +6573,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Right Style}
      * Sets the style of the right border. The equivalent of CSS attribute `borderRightStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_right_style(value?: string): string | this {
@@ -7052,7 +6588,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Right Width}
      * Sets the width of the right border. The equivalent of CSS attribute `borderRightWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_right_width(value?: string | number): string | this {
@@ -7068,7 +6604,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the distance between the borders of adjacent cells.
      * The equivalent of CSS attribute `borderSpacing`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_spacing(value?: string | number): string | this {
@@ -7083,7 +6619,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Style}
      * Sets the style of the four borders. The equivalent of CSS attribute `borderStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
+     * @returns Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
      * @docs
      */
     border_style(value?: string): string | this {
@@ -7098,7 +6634,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Top Color}
      * Sets the color of the top border. The equivalent of CSS attribute `borderTopColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_top_color(value?: string): string | this {
@@ -7113,7 +6649,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Top Left Radius}
      * Defines the radius of the border of the top-left corner. The equivalent of CSS attribute `borderTopLeftRadius`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_top_left_radius(value?: string | number): string | this {
@@ -7129,7 +6665,7 @@ export abstract class VElement extends HTMLElement {
      * Defines the radius of the border of the top-right corner.
      * The equivalent of CSS attribute `borderTopRightRadius`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
+     * @returns Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
      * @docs
      */
     border_top_right_radius(value?: string | number): string | this {
@@ -7144,7 +6680,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Top Style}
      * Sets the style of the top border. The equivalent of CSS attribute `borderTopStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     border_top_style(value?: string): string | this {
@@ -7159,7 +6695,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Top Width}
      * Sets the width of the top border, equivalent to the CSS attribute `borderTopWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
+     * @returns Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
      * @docs
      */
     border_top_width(value?: string | number): string | this {
@@ -7174,7 +6710,7 @@ export abstract class VElement extends HTMLElement {
      * {Border Width}
      * Sets the width of the four borders, equivalent to the CSS attribute `borderWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless the parameter `value` is `null`,
+     * @returns Returns the `VElement` object for chaining, unless the parameter `value` is `null`,
      * then the attribute's value is returned.
      * @docs
      */
@@ -7191,7 +6727,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the elements position, from the bottom of its parent element.
      * The equivalent of CSS attribute `bottom`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     bottom(value?: string | number): string | this {
@@ -7206,7 +6742,7 @@ export abstract class VElement extends HTMLElement {
      * {Box decoration break}
      * Sets the behavior of the background and border of an element at page-break, or, for in-line elements, at line-break. The equivalent of CSS attribute `boxDecorationBreak`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
      * @docs
      */
     box_decoration_break(value?: string): string | this {
@@ -7221,7 +6757,7 @@ export abstract class VElement extends HTMLElement {
      * {Box reflect}
      * The box-reflect property is used to create a reflection of an element.
      * The equivalent of CSS attribute `boxReflect`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     box_reflect(value?: string): string | this {
@@ -7236,7 +6772,7 @@ export abstract class VElement extends HTMLElement {
      * {Box shadow}
      * Attaches one or more shadows to an element. The equivalent of CSS attribute `boxShadow`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`,
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`,
      * then the attribute's value is returned.
      * @docs
      */
@@ -7256,7 +6792,7 @@ export abstract class VElement extends HTMLElement {
      * {Box sizing}
      * Defines how the width and height of an element are calculated: should they include padding and borders, or not. The equivalent of CSS attribute `boxSizing`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     box_sizing(value?: string): string | this {
@@ -7275,7 +6811,7 @@ export abstract class VElement extends HTMLElement {
      * {Break After}
      * Specifies whether or not a page-, column-, or region-break should occur after the specified element. The equivalent of CSS attribute `breakAfter`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     break_after(value?: string): string | this {
@@ -7291,7 +6827,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies whether or not a page-, column-, or region-break should occur before the specified element.
      * The equivalent of CSS attribute `breakBefore`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     break_before(value?: string): string | this {
@@ -7305,7 +6841,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Break Inside}
      * Specifies whether or not a page-, column-, or region-break should occur inside the specified element. The equivalent of CSS attribute `breakInside`. Returns the attribute value when parameter `value` is `null`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     break_inside(value?: string): string | this {
@@ -7320,7 +6856,7 @@ export abstract class VElement extends HTMLElement {
      * {Caption Side}
      * Specifies the placement of a table caption. The equivalent of CSS attribute `captionSide`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     caption_side(value?: string): string | this {
@@ -7336,7 +6872,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the color of the cursor (caret) in inputs, textareas, or any element that is editable.
      * The equivalent of CSS attribute `caretColor`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     caret_color(value?: string): string | this {
@@ -7352,7 +6888,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies what should happen with the element that is next to a floating element.
      * The equivalent of CSS attribute `clear`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     clear(value?: string): string | this {
@@ -7366,7 +6902,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Clip}
      * Clips an absolutely positioned element. The equivalent of CSS attribute `clip`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     clip(value?: string): string | this {
@@ -7389,7 +6925,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the number of columns an element should be divided into.
      * The equivalent of CSS attribute `columnCount`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     column_count(value?: string | number): this | null | number {
@@ -7503,7 +7039,7 @@ export abstract class VElement extends HTMLElement {
      * {Column Rule Width}
      * Specifies the width of the rule between columns. This is equivalent to the CSS attribute `columnRuleWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
      * @docs
      */
     column_rule_width(value?: string | number): string | this {
@@ -7539,7 +7075,7 @@ export abstract class VElement extends HTMLElement {
      * {Column Width}
      * Specifies the column width, equivalent to the CSS attribute `columnWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     column_width(value?: string | number): string | this {
@@ -7559,7 +7095,7 @@ export abstract class VElement extends HTMLElement {
      * {Columns}
      * A shorthand property for column-width and column-count. The equivalent of CSS attribute `columns`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     columns(value?: string | number): string | this {
@@ -7592,7 +7128,7 @@ export abstract class VElement extends HTMLElement {
      * Increases or decreases the value of one or more CSS counters.
      * The equivalent of CSS attribute `counterIncrement`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     counter_increment(value?: string | number): string | this {
@@ -7607,7 +7143,7 @@ export abstract class VElement extends HTMLElement {
      * {Counter reset}
      * Creates or resets one or more CSS counters. The equivalent of CSS attribute `counterReset`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     counter_reset(value?: string): string | this {
@@ -7623,7 +7159,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the mouse cursor to be displayed when pointing over an element.
      * The equivalent of CSS attribute `cursor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     cursor(value?: string): string | this {
@@ -7638,7 +7174,7 @@ export abstract class VElement extends HTMLElement {
      * {Direction}
      * Specifies the text direction/writing direction. The equivalent of CSS attribute `direction`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     direction(value?: string): string | this {
@@ -7718,7 +7254,7 @@ export abstract class VElement extends HTMLElement {
      * {Flex Basis}
      * Specifies the initial length of a flexible item. The equivalent of CSS attribute `flexBasis`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     flex_basis(value?: string | number): string | this {
@@ -7738,7 +7274,7 @@ export abstract class VElement extends HTMLElement {
      * {Flex Direction}
      * Specifies the direction of the flexible items. This is the equivalent of the CSS attribute `flexDirection`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining. If `value` is `null`, returns the current attribute's value.
+     * @returns Returns the `VElement` object for chaining. If `value` is `null`, returns the current attribute's value.
      * @docs
      */
     flex_direction(value?: string): string | this {
@@ -7777,7 +7313,7 @@ export abstract class VElement extends HTMLElement {
      * {Flex Grow}
      * Specifies how much the item will grow relative to the rest. The equivalent of CSS attribute `flexGrow`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     flex_grow(value?: string | number): null | number | this {
@@ -7819,7 +7355,7 @@ export abstract class VElement extends HTMLElement {
      * {Flex Wrap}
      * Specifies whether the flexible items should wrap or not. The equivalent of CSS attribute `flexWrap`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     flex_wrap(value?: string): string | this {
@@ -7855,7 +7391,7 @@ export abstract class VElement extends HTMLElement {
      * A shorthand property for the font-style, font-variant, font-weight, font-size/line-height, and the font-family properties.
      * The equivalent of CSS attribute `font`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the instance of the element for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the instance of the element for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     font(value?: string): string | this {
@@ -7870,7 +7406,7 @@ export abstract class VElement extends HTMLElement {
      * {Font Family}
      * Specifies the font family for text. This is the equivalent of the CSS attribute `fontFamily`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
+     * @returns Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
      * @docs
      */
     font_family(value?: string): this | string {
@@ -7900,7 +7436,7 @@ export abstract class VElement extends HTMLElement {
      * {Font Kerning}
      * Controls the usage of the kerning information (how letters are spaced). The equivalent of CSS attribute `fontKerning`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     font_kerning(value?: string): string | this {
@@ -7931,7 +7467,7 @@ export abstract class VElement extends HTMLElement {
      * {Font size}
      * Specifies the font size of text. The equivalent of CSS attribute `fontSize`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     font_size(value?: string | number): string | this {
@@ -7946,7 +7482,7 @@ export abstract class VElement extends HTMLElement {
      * {Font Size Adjust}
      * Preserves the readability of text when font fallback occurs. The equivalent of CSS attribute `fontSizeAdjust`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     font_size_adjust(value?: string): string | this {
@@ -7962,7 +7498,7 @@ export abstract class VElement extends HTMLElement {
      * Selects a normal, condensed, or expanded face from a font family.
      * The equivalent of CSS attribute `fontStretch`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     font_stretch(value?: string): string | this {
@@ -7977,7 +7513,7 @@ export abstract class VElement extends HTMLElement {
      * {Font Style}
      * Specifies the font style for text. The equivalent of CSS attribute `fontStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     font_style(value?: string): string | this {
@@ -8007,7 +7543,7 @@ export abstract class VElement extends HTMLElement {
      * {Font Variant}
      * Specifies whether or not a text should be displayed in a small-caps font. The equivalent of CSS attribute `fontVariant`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     font_variant(value?: string): string | this {
@@ -8022,7 +7558,7 @@ export abstract class VElement extends HTMLElement {
      * {Font variant alternates}
      * Controls the usage of alternate glyphs associated to alternative names defined in \@font-feature-values.
      * The equivalent of CSS attribute `fontVariantAlternates`.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     font_variant_alternates(value?: string): string | this {
@@ -8037,7 +7573,7 @@ export abstract class VElement extends HTMLElement {
      * {Font Variant Caps}
      * Controls the usage of alternate glyphs for capital letters. The equivalent of CSS attribute `fontVariantCaps`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     font_variant_caps(value?: string): string | this {
@@ -8053,7 +7589,7 @@ export abstract class VElement extends HTMLElement {
      * Controls the usage of alternate glyphs for East Asian scripts (e.g Japanese and Chinese).
      * The equivalent of CSS attribute `fontVariantEastAsian`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     font_variant_east_asian(value?: string): string | this {
@@ -8068,7 +7604,7 @@ export abstract class VElement extends HTMLElement {
      * {Font Variant Ligatures}
      * Controls which ligatures and contextual forms are used in textual content of the elements it applies to. The equivalent of CSS attribute `fontVariantLigatures`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     font_variant_ligatures(value?: string): string | this {
@@ -8100,7 +7636,7 @@ export abstract class VElement extends HTMLElement {
      * Controls the usage of alternate glyphs of smaller size positioned as superscript or subscript regarding the baseline of the font.
      * The equivalent of CSS attribute `fontVariantPosition`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     font_variant_position(value?: string): string | this {
@@ -8115,7 +7651,7 @@ export abstract class VElement extends HTMLElement {
      * {Font Weight}
      * Specifies the weight of a font, equivalent to the CSS attribute `fontWeight`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
+     * @returns Returns the attribute's value if `value` is `null`, otherwise returns the instance for chaining.
      * @docs
      */
     font_weight(value?: string | number): string | this {
@@ -8129,7 +7665,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Gap}
      * A shorthand property for the row-gap and the column-gap properties. The equivalent of CSS attribute `gap`.
-     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     gap(value?: string | number): string | this {
@@ -8143,7 +7679,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Grid}
      * A shorthand property for the grid-template-rows, grid-template-columns, grid-template-areas, grid-auto-rows, grid-auto-columns, and the grid-auto-flow properties. The equivalent of CSS attribute `grid`. Returns the attribute value when parameter `value` is `null`.
-     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     grid(value?: string): string | this {
@@ -8174,7 +7710,7 @@ export abstract class VElement extends HTMLElement {
      * {Grid Auto Columns}
      * Specifies a default column size, equivalent to the CSS attribute `gridAutoColumns`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     grid_auto_columns(value?: string | number): string | this {
@@ -8204,7 +7740,7 @@ export abstract class VElement extends HTMLElement {
      * {Grid auto rows}
      * Specifies a default row size, equivalent to the CSS attribute `gridAutoRows`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     grid_auto_rows(value?: string | number): string | this {
@@ -8235,7 +7771,7 @@ export abstract class VElement extends HTMLElement {
      * {Grid Column End}
      * Specifies where to end the grid item. The equivalent of CSS attribute `gridColumnEnd`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     grid_column_end(value?: string | number): string | this {
@@ -8265,7 +7801,7 @@ export abstract class VElement extends HTMLElement {
      * {Grid Column Start}
      * Specifies where to start the grid item. This is the equivalent of the CSS attribute `gridColumnStart`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the current value of the grid column start when `null` is passed, otherwise returns the instance for chaining.
+     * @returns Returns the current value of the grid column start when `null` is passed, otherwise returns the instance for chaining.
      * @docs
      */
     grid_column_start(value?: string | number): string | this {
@@ -8281,7 +7817,7 @@ export abstract class VElement extends HTMLElement {
      * A shorthand property for the grid-row-gap and grid-column-gap properties.
      * The equivalent of CSS attribute `gridGap`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     grid_gap(value?: string | number): string | this {
@@ -8296,7 +7832,7 @@ export abstract class VElement extends HTMLElement {
      * {Grid Row}
      * A shorthand property for the grid-row-start and the grid-row-end properties.
      * The equivalent of CSS attribute `gridRow`.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     grid_row(value?: string): string | this {
@@ -8311,7 +7847,7 @@ export abstract class VElement extends HTMLElement {
      * {Grid Row End}
      * Specifies where to end the grid item. The equivalent of CSS attribute `gridRowEnd`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     grid_row_end(value?: string): string | this {
@@ -8326,7 +7862,7 @@ export abstract class VElement extends HTMLElement {
      * {Grid Row Gap}
      * Specifies the size of the gap between rows. The equivalent of CSS attribute `gridRowGap`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     grid_row_gap(value?: string | number): string | this {
@@ -8341,7 +7877,7 @@ export abstract class VElement extends HTMLElement {
      * {Grid Row Start}
      * Specifies where to start the grid item, equivalent to CSS attribute `gridRowStart`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     grid_row_start(value?: string | number): string | this {
@@ -8356,7 +7892,7 @@ export abstract class VElement extends HTMLElement {
      * {Grid Template}
      * A shorthand property for the grid-template-rows, grid-template-columns and grid-areas properties.
      * The equivalent of CSS attribute `gridTemplate`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     grid_template(value?: string): string | this {
@@ -8402,7 +7938,7 @@ export abstract class VElement extends HTMLElement {
      * {Grid Template Rows}
      * Specifies the size of the rows in a grid layout, equivalent to the CSS attribute `gridTemplateRows`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     grid_template_rows(value?: string | number): string | this {
@@ -8417,7 +7953,7 @@ export abstract class VElement extends HTMLElement {
      * {Hanging punctuation}
      * Specifies whether a punctuation character may be placed outside the line box. The equivalent of CSS attribute `hangingPunctuation`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     hanging_punctuation(value?: string): string | this {
@@ -8434,7 +7970,7 @@ export abstract class VElement extends HTMLElement {
     // }
 
     hyphens(): string;
-    hyphens(value: string): this | string;
+    hyphens(value: string): this;
     /**
      * {Hyphens}
      * Sets how to split words to improve the layout of paragraphs. The equivalent of CSS attribute `hyphens`.
@@ -8454,7 +7990,7 @@ export abstract class VElement extends HTMLElement {
      * {Image Rendering}
      * Specifies the type of algorithm to use for image scaling. The equivalent of CSS attribute `imageRendering`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     image_rendering(value?: string): string | this {
@@ -8470,7 +8006,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the size of an element in the inline direction.
      * The equivalent of CSS attribute `inlineSize`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     inline_size(value?: string | number): string | this {
@@ -8486,7 +8022,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance between an element and the parent element.
      * The equivalent of CSS attribute `inset`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     inset(value?: string | number): string | this {
@@ -8502,7 +8038,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance between an element and the parent element in the block direction.
      * The equivalent of CSS attribute `insetBlock`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     inset_block(value?: string | number): string | this | undefined {
@@ -8518,7 +8054,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance between the end of an element and the parent element in the block direction.
      * The equivalent of CSS attribute `insetBlockEnd`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     inset_block_end(value?: string | number): string | this {
@@ -8534,7 +8070,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance between the start of an element and the parent element in the block direction.
      * The equivalent of CSS attribute `insetBlockStart`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     inset_block_start(value?: string | number): string | this {
@@ -8550,7 +8086,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance between an element and the parent element in the inline direction.
      * The equivalent of CSS attribute `insetInline`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     inset_inline(value?: string | number): this | string {
@@ -8566,7 +8102,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance between the end of an element and the parent element in the inline direction.
      * The equivalent of CSS attribute `insetInlineEnd`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     inset_inline_end(value?: string | number): string | this {
@@ -8582,7 +8118,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance between the start of an element and the parent element in the inline direction.
      * The equivalent of CSS attribute `insetInlineStart`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     inset_inline_start(value?: string | number): this | string {
@@ -8613,7 +8149,7 @@ export abstract class VElement extends HTMLElement {
      * {Justify Content}
      * Specifies the alignment between the items inside a flexible container when the items do not use all available space. The equivalent of CSS attribute `justifyContent`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute's value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     justify_content(value?: string): string | this {
@@ -8633,7 +8169,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the alignment of grid items in the inline direction on the grid container.
      * The equivalent of the CSS attribute `justify-items`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining, unless `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     justify_items(value?: string): string | this {
@@ -8649,7 +8185,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the alignment of the grid item in the inline direction. This corresponds to the CSS attribute `justify-self`.
      * When the parameter `value` is `null`, it retrieves the current attribute value.
      * @param value The value to assign for alignment. Passing `null` retrieves the current value.
-     * @returns ription Returns the current alignment value if `value` is `null`, otherwise returns the instance for chaining.
+     * @returns Returns the current alignment value if `value` is `null`, otherwise returns the instance for chaining.
      * @docs
      */
     justify_self(value?: string): string | this {
@@ -8664,7 +8200,7 @@ export abstract class VElement extends HTMLElement {
      * {Left}
      * Specifies the left position of a positioned element. The equivalent of CSS attribute `left`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     left(value?: string | number): string | this {
@@ -8680,7 +8216,7 @@ export abstract class VElement extends HTMLElement {
      * Increases or decreases the space between characters in a text.
      * The equivalent of CSS attribute `letterSpacing`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     letter_spacing(value?: string | number): string | this {
@@ -8695,7 +8231,7 @@ export abstract class VElement extends HTMLElement {
      * {Line Break}
      * Specifies how/if to break lines. The equivalent of CSS attribute `lineBreak`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     line_break(value?: string): string | this {
@@ -8710,7 +8246,7 @@ export abstract class VElement extends HTMLElement {
      * {Line Height}
      * Sets the line height, equivalent to the CSS attribute `lineHeight`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     line_height(value?: string | number): string | this {
@@ -8724,7 +8260,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {List Style}
      * Sets all the properties for a list in one declaration. The equivalent of CSS attribute `listStyle`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     list_style(value?: string): string | this {
@@ -8739,7 +8275,7 @@ export abstract class VElement extends HTMLElement {
      * {List style image}
      * Specifies an image as the list-item marker. The equivalent of CSS attribute `listStyleImage`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     list_style_image(value?: string): string | this {
@@ -8755,7 +8291,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the position of the list-item markers (bullet points).
      * The equivalent of CSS attribute `listStylePosition`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     list_style_position(value?: string): string | this {
@@ -8786,7 +8322,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the margin in the block direction.
      * The equivalent of CSS attribute `marginBlock`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     margin_block(value?: string | number): this | string {
@@ -8802,7 +8338,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the margin at the end in the block direction.
      * The equivalent of CSS attribute `marginBlockEnd`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     margin_block_end(value?: string | number): string | this {
@@ -8818,7 +8354,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the margin at the start in the block direction.
      * The equivalent of CSS attribute `marginBlockStart`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     margin_block_start(value?: string | number): this | string {
@@ -8833,7 +8369,7 @@ export abstract class VElement extends HTMLElement {
      * {Margin Inline}
      * Specifies the margin in the inline direction. The equivalent of CSS attribute `marginInline`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     margin_inline(value?: string | number): string | this {
@@ -8848,7 +8384,7 @@ export abstract class VElement extends HTMLElement {
      * {Margin Inline End}
      * Specifies the margin at the end in the inline direction. This is the equivalent of the CSS attribute `marginInlineEnd`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     margin_inline_end(value?: string | number): string | this {
@@ -8864,7 +8400,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the margin at the start in the inline direction.
      * The equivalent of CSS attribute `marginInlineStart`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     margin_inline_start(value?: string | number): string | this {
@@ -8898,7 +8434,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Mask clip}
      * Specifies the mask area. The equivalent of CSS attribute `maskClip`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     mask_clip(value?: string): string | this {
@@ -8969,7 +8505,7 @@ export abstract class VElement extends HTMLElement {
      * {Mask origin}
      * Specifies the origin position (the mask position area) of a mask layer image. The equivalent of CSS attribute `maskOrigin`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     mask_origin(value?: string): string | this {
@@ -8985,7 +8521,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the starting position of a mask layer image (relative to the mask position area).
      * The equivalent of CSS attribute `maskPosition`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     mask_position(value?: string): string | this {
@@ -9015,7 +8551,7 @@ export abstract class VElement extends HTMLElement {
      * {Mask Size}
      * Specifies the size of a mask layer image. The equivalent of CSS attribute `maskSize`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     mask_size(value?: string | number): this | string {
@@ -9031,7 +8567,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies whether an SVG \<mask> element is treated as a luminance mask or as an alpha mask.
      * The equivalent of CSS attribute `maskType`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     mask_type(value?: string): string | this {
@@ -9061,7 +8597,7 @@ export abstract class VElement extends HTMLElement {
      * {Max Width}
      * Sets the maximum width of an element. The equivalent of CSS attribute `maxWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     max_width(value?: string | number): this | number | string {
@@ -9077,7 +8613,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the maximum size of an element in the block direction.
      * The equivalent of CSS attribute `maxBlockSize`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     max_block_size(value?: string | number): this | string {
@@ -9093,7 +8629,7 @@ export abstract class VElement extends HTMLElement {
      * Sets the maximum size of an element in the inline direction.
      * The equivalent of CSS attribute `maxInlineSize`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     max_inline_size(value?: string | number): string | number | this {
@@ -9108,7 +8644,7 @@ export abstract class VElement extends HTMLElement {
      * {Min Block Size}
      * Sets the minimum size of an element in the block direction. The equivalent of CSS attribute `minBlockSize`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     min_block_size(value?: number): this | null | number {
@@ -9123,7 +8659,7 @@ export abstract class VElement extends HTMLElement {
      * {Min Inline Size}
      * Sets the minimum size of an element in the inline direction. The equivalent of CSS attribute `minInlineSize`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     min_inline_size(value?: string | number): string | this {
@@ -9138,7 +8674,7 @@ export abstract class VElement extends HTMLElement {
      * {Mix Blend Mode}
      * Specifies how an element's content should blend with its direct parent background, equivalent to the CSS attribute `mixBlendMode`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     mix_blend_mode(value?: string): string | this {
@@ -9169,7 +8705,7 @@ export abstract class VElement extends HTMLElement {
      * {Object position}
      * Specifies the alignment of the replaced element inside its box. The equivalent of CSS attribute `objectPosition`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     object_position(value?: string): string | this {
@@ -9184,7 +8720,7 @@ export abstract class VElement extends HTMLElement {
      * {Offset}
      * Is a shorthand, and specifies how to animate an element along a path. The equivalent of CSS attribute `offset`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     offset(value?: string | number): this | string {
@@ -9199,7 +8735,7 @@ export abstract class VElement extends HTMLElement {
      * {Offset Anchor}
      * Specifies a point on an element that is fixed to the path it is animated along. The equivalent of CSS attribute `offsetAnchor`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     offset_anchor(value?: string): string | this {
@@ -9214,7 +8750,7 @@ export abstract class VElement extends HTMLElement {
      * {Offset distance}
      * Specifies the position along a path where an animated element is placed.
      * The equivalent of CSS attribute `offsetDistance`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     offset_distance(value?: string | number): string | this {
@@ -9230,7 +8766,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the path an element is animated along.
      * The equivalent of CSS attribute `offsetPath`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     offset_path(value?: string): string | this {
@@ -9246,7 +8782,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies rotation of an element as it is animated along a path.
      * The equivalent of CSS attribute `offsetRotate`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     offset_rotate(value?: string | number): string | this {
@@ -9268,7 +8804,7 @@ export abstract class VElement extends HTMLElement {
      * {Order}
      * Sets the order of the flexible item, relative to the rest. The equivalent of CSS attribute `order`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     order(value?: string | number): string | this {
@@ -9290,7 +8826,7 @@ export abstract class VElement extends HTMLElement {
      * The equivalent of CSS attribute `orphans`. Returns the attribute value when parameter
      * `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining. If `value` is `null`, the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining. If `value` is `null`, the attribute's value is returned.
      * @docs
      */
     orphans(value?: number): this | number | null {
@@ -9321,7 +8857,7 @@ export abstract class VElement extends HTMLElement {
      * {Outline Color}
      * Sets the color of an outline. This is the equivalent of the CSS attribute `outlineColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless the parameter `value` is `null`,
+     * @returns Returns the `VElement` object for chaining unless the parameter `value` is `null`,
      * in which case the attribute's value is returned.
      * @docs
      */
@@ -9337,7 +8873,7 @@ export abstract class VElement extends HTMLElement {
      * {Outline Offset}
      * Offsets an outline, and draws it beyond the border edge. The equivalent of CSS attribute `outlineOffset`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     outline_offset(value?: string | number): string | this {
@@ -9352,7 +8888,7 @@ export abstract class VElement extends HTMLElement {
      * {Outline Style}
      * Sets the style of an outline. The equivalent of CSS attribute `outlineStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     outline_style(value?: string): string | this {
@@ -9367,7 +8903,7 @@ export abstract class VElement extends HTMLElement {
      * {Outline Width}
      * Sets the width of an outline, equivalent to the CSS attribute `outlineWidth`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     outline_width(value?: string | number): string | this {
@@ -9383,7 +8919,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies what happens if content overflows an element's box.
      * The equivalent of CSS attribute `overflow`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value if `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     overflow(value?: string): string | this {
@@ -9399,7 +8935,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies whether or not content in viewable area in a scrollable container should be pushed down when new content is loaded above.
      * The equivalent of CSS attribute `overflowAnchor`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     overflow_anchor(value?: string): string | this {
@@ -9414,7 +8950,7 @@ export abstract class VElement extends HTMLElement {
      * {Overflow Wrap}
      * Specifies whether or not the browser can break lines with long words, if they overflow the container. The equivalent of CSS attribute `overflowWrap`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     overflow_wrap(value?: string): string | this {
@@ -9446,7 +8982,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies whether or not to clip the top/bottom edges of the content, if it overflows the element's content area.
      * The equivalent of CSS attribute `overflowY`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     overflow_y(value?: string): string | this {
@@ -9493,7 +9029,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies whether to have scroll chaining or overscroll affordance in the inline direction.
      * The equivalent of CSS attribute `overscrollBehaviorInline`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining. If `value` is `null`, returns the attribute's value.
+     * @returns Returns the `VElement` object for chaining. If `value` is `null`, returns the attribute's value.
      * @docs
      */
     overscroll_behavior_inline(value?: string): string | this {
@@ -9525,7 +9061,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies whether to have scroll chaining or overscroll affordance in y-directions.
      * The equivalent of CSS attribute `overscrollBehaviorY`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the `VElement` object for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the `VElement` object for chaining.
      * @docs
      */
     overscroll_behavior_y(value?: string): string | this {
@@ -9547,7 +9083,7 @@ export abstract class VElement extends HTMLElement {
      * {Padding Block}
      * Specifies the padding in the block direction. The equivalent of CSS attribute `paddingBlock`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     padding_block(value?: string | number): string | this | undefined {
@@ -9562,7 +9098,7 @@ export abstract class VElement extends HTMLElement {
      * {Padding Block End}
      * Specifies the padding at the end in the block direction. The equivalent of CSS attribute `paddingBlockEnd`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     padding_block_end(value?: string | number): string | this {
@@ -9578,7 +9114,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the padding at the start in the block direction.
      * The equivalent of CSS attribute `paddingBlockStart`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     padding_block_start(value?: string | number): string | this {
@@ -9593,7 +9129,7 @@ export abstract class VElement extends HTMLElement {
      * {Padding Inline}
      * Specifies the padding in the inline direction. The equivalent of CSS attribute `paddingInline`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     padding_inline(value?: string | number): string | this {
@@ -9609,7 +9145,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the padding at the end in the inline direction.
      * The equivalent of CSS attribute `paddingInlineEnd`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     padding_inline_end(value?: string | number): string | this {
@@ -9624,7 +9160,7 @@ export abstract class VElement extends HTMLElement {
      * {Padding Inline Start}
      * Specifies the padding at the start in the inline direction. The equivalent of CSS attribute `paddingInlineStart`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
+     * @returns Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
      * @docs
      */
     padding_inline_start(value?: string | number): string | this {
@@ -9639,7 +9175,7 @@ export abstract class VElement extends HTMLElement {
      * {Page break after}
      * Sets the page-break behavior after an element. The equivalent of CSS attribute `pageBreakAfter`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     page_break_after(value?: string): string | this {
@@ -9668,7 +9204,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Page Break Inside}
      * Sets the page-break behavior inside an element. The equivalent of CSS attribute `pageBreakInside`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     page_break_inside(value?: string): string | this {
@@ -9683,7 +9219,7 @@ export abstract class VElement extends HTMLElement {
      * {Paint Order}
      * Sets the order of how an SVG element or text is painted. The equivalent of CSS attribute `paintOrder`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     paint_order(value?: string): string | this {
@@ -9698,7 +9234,7 @@ export abstract class VElement extends HTMLElement {
      * {Perspective}
      * Gives a 3D-positioned element some perspective. The equivalent of CSS attribute `perspective`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     perspective(value?: string | number): string | this {
@@ -9718,7 +9254,7 @@ export abstract class VElement extends HTMLElement {
      * {Perspective origin}
      * Defines at which position the user is looking at the 3D-positioned element. The equivalent of CSS attribute `perspectiveOrigin`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     perspective_origin(value?: string): string | this {
@@ -9738,7 +9274,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies align-content and justify-content property values for flexbox and grid layouts.
      * The equivalent of CSS attribute `placeContent`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     place_content(value?: string): string | this {
@@ -9752,7 +9288,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Place items}
      * Specifies align-items and justify-items property values for grid layouts. The equivalent of CSS attribute `placeItems`.
-     * @returns ription Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute's value when `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     place_items(value?: string): string | this {
@@ -9768,7 +9304,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies align-self and justify-self property values for grid layouts.
      * The equivalent of CSS attribute `placeSelf`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`.
+     * @returns Returns the attribute value when parameter `value` is `null`.
      * Otherwise, returns the instance of the element for chaining.
      * @docs
      */
@@ -9784,7 +9320,7 @@ export abstract class VElement extends HTMLElement {
      * {Pointer events}
      * Defines whether or not an element reacts to pointer events, equivalent to the CSS attribute `pointerEvents`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     pointer_events(value?: string): string | this {
@@ -9836,7 +9372,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Right}
      * Specifies the right position of a positioned element. The equivalent of CSS attribute `right`. Returns the attribute value when parameter `value` is `null`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     right(value?: number | string): string | this {
@@ -9866,7 +9402,7 @@ export abstract class VElement extends HTMLElement {
      * {Scale}
      * Specifies the size of an element by scaling up or down. The equivalent of CSS attribute `scale`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scale(value?: number): this | null | number {
@@ -9898,7 +9434,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the margin between the snap position and the container.
      * The equivalent of CSS attribute `scrollMargin`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_margin(value?: string | number): string | this {
@@ -9914,7 +9450,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the margin between the snap position and the container in the block direction.
      * The equivalent of CSS attribute `scrollMarginBlock`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`, otherwise returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`, otherwise returns the instance of the element for chaining.
      * @docs
      */
     scroll_margin_block(value?: string | number): string | this {
@@ -9946,7 +9482,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the start margin between the snap position and the container in the block direction.
      * The equivalent of CSS attribute `scrollMarginBlockStart`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     scroll_margin_block_start(value?: string | number): string | this {
@@ -9962,7 +9498,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the margin between the snap position on the bottom side and the container.
      * The equivalent of CSS attribute `scrollMarginBottom`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_margin_bottom(value?: string | number): string | this {
@@ -10010,7 +9546,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the start margin between the snap position and the container in the inline direction.
      * The equivalent of CSS attribute `scrollMarginInlineStart`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_margin_inline_start(value?: string): string | this {
@@ -10026,7 +9562,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the margin between the snap position on the left side and the container.
      * The equivalent of CSS attribute `scrollMarginLeft`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_margin_left(value?: string | number): string | this {
@@ -10074,7 +9610,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance from the container to the snap position on the child elements.
      * The equivalent of CSS attribute `scrollPadding`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`,
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`,
      * then the attribute's value is returned.
      * @docs
      */
@@ -10091,7 +9627,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance in block direction from the container to the snap position on the child elements.
      * The equivalent of CSS attribute `scrollPaddingBlock`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     scroll_padding_block(value?: string | number): string | this {
@@ -10122,7 +9658,7 @@ export abstract class VElement extends HTMLElement {
      * {Scroll padding block start}
      * Specifies the distance in block direction from the start of the container to the snap position on the child elements. The equivalent of CSS attribute `scrollPaddingBlockStart`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_padding_block_start(value?: string | number): string | this {
@@ -10138,7 +9674,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance from the bottom of the container to the snap position on the child elements.
      * The equivalent of CSS attribute `scrollPaddingBottom`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_padding_bottom(value?: string | number): string | this {
@@ -10170,7 +9706,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance in inline direction from the end of the container to the snap position on the child elements.
      * The equivalent of CSS attribute `scrollPaddingInlineEnd`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_padding_inline_end(value?: string | number): string | this {
@@ -10186,7 +9722,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance in inline direction from the start of the container to the snap position on the child elements.
      * The equivalent of CSS attribute `scrollPaddingInlineStart`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_padding_inline_start(value?: string | number): this | string {
@@ -10202,7 +9738,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance from the left side of the container to the snap position on the child elements.
      * The equivalent of CSS attribute `scrollPaddingLeft`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_padding_left(value?: string | number): string | this {
@@ -10218,7 +9754,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance from the right side of the container to the snap position on the child elements.
      * The equivalent of CSS attribute `scrollPaddingRight`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_padding_right(value?: string | number): string | this {
@@ -10234,7 +9770,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the distance from the top of the container to the snap position on the child elements.
      * The equivalent of CSS attribute `scrollPaddingTop`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_padding_top(value?: string | number): string | this {
@@ -10250,7 +9786,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies where to position elements when the user stops scrolling.
      * The equivalent of CSS attribute `scrollSnapAlign`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scroll_snap_align(value?: string): string | this {
@@ -10296,7 +9832,7 @@ export abstract class VElement extends HTMLElement {
      * {Scrollbar color}
      * Specifies the color of the scrollbar of an element. The equivalent of CSS attribute `scrollbarColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     scrollbar_color(value?: string): string | this {
@@ -10311,7 +9847,7 @@ export abstract class VElement extends HTMLElement {
      * {Tab Size}
      * Specifies the width of a tab character, equivalent to the CSS attribute `tabSize`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     tab_size(value?: string | number): string | this {
@@ -10347,7 +9883,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Align}
      * Specifies the horizontal alignment of text, equivalent to the CSS `textAlign` attribute.
      * @param value The value to assign for text alignment. Leave `null` to retrieve the current attribute's value.
-     * @returns ription Returns the current value of `textAlign` if no argument is provided; otherwise returns the instance for chaining.
+     * @returns Returns the current value of `textAlign` if no argument is provided; otherwise returns the instance for chaining.
      * @docs
      */
     text_align(value?: string): string | this {
@@ -10379,7 +9915,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the combination of multiple characters into the space of a single character.
      * The equivalent of CSS attribute `textCombineUpright`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_combine_upright(value?: string): string | this {
@@ -10394,7 +9930,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Decoration}
      * Specifies the decoration added to text. The equivalent of CSS attribute `textDecoration`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_decoration(value?: string): string | this {
@@ -10409,7 +9945,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Decoration Color}
      * Specifies the color of the text-decoration. The equivalent of CSS attribute `textDecorationColor`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_decoration_color(value?: string): this | string {
@@ -10423,7 +9959,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Text Decoration Line}
      * Specifies the type of line in a text-decoration. The equivalent of CSS attribute `textDecorationLine`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_decoration_line(value?: string): string | this {
@@ -10438,7 +9974,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Decoration Style}
      * Specifies the style of the line in a text decoration, equivalent to the CSS attribute `textDecorationStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_decoration_style(value?: string): string | this {
@@ -10453,7 +9989,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Decoration Thickness}
      * Specifies the thickness of the decoration line. The equivalent of CSS attribute `textDecorationThickness`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_decoration_thickness(value?: string | number): string | this {
@@ -10468,7 +10004,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Emphasis}
      * Applies emphasis marks to text, equivalent to the CSS attribute `textEmphasis`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_emphasis(value?: string): string | this {
@@ -10483,7 +10019,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Indent}
      * Specifies the indentation of the first line in a text-block, equivalent to the CSS `textIndent` property.
      * Retrieves the attribute value when the parameter `value` is `null`.
-     * @returns ription Returns the instance of the element for chaining when a value is set. If `null` is passed, returns the current text indent value.
+     * @returns Returns the instance of the element for chaining when a value is set. If `null` is passed, returns the current text indent value.
      * @docs
      */
     text_indent(value?: string | number): string | this {
@@ -10498,7 +10034,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Justify}
      * Specifies the justification method used when text-align is "justify". The equivalent of CSS attribute `textJustify`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_justify(value?: string): string | this {
@@ -10513,7 +10049,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Orientation}
      * Defines the orientation of characters in a line, equivalent to the CSS attribute `textOrientation`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_orientation(value?: string): string | this {
@@ -10528,7 +10064,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Overflow}
      * Specifies what should happen when text overflows the containing element. The equivalent of CSS attribute `textOverflow`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_overflow(value?: string): string | this {
@@ -10543,7 +10079,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Shadow}
      * Adds shadow to text. The equivalent of CSS attribute `textShadow`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_shadow(value?: string): string | this {
@@ -10558,7 +10094,7 @@ export abstract class VElement extends HTMLElement {
      * {Text Transform}
      * Controls the capitalization of text. The equivalent of CSS attribute `textTransform`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_transform(value?: string): string | this {
@@ -10574,7 +10110,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the position of the underline which is set using the text-decoration property.
      * The equivalent of CSS attribute `textUnderlinePosition`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     text_underline_position(value?: string): string | this {
@@ -10589,7 +10125,7 @@ export abstract class VElement extends HTMLElement {
      * {Top}
      * Specifies the top position of a positioned element. The equivalent of CSS attribute `top`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     top(value?: string | number): string | this {
@@ -10604,7 +10140,7 @@ export abstract class VElement extends HTMLElement {
      * {Transform}
      * Applies a 2D or 3D transformation to an element. The equivalent of CSS attribute `transform`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     transform(value?: string): string | this {
@@ -10623,7 +10159,7 @@ export abstract class VElement extends HTMLElement {
      * {Transform Origin}
      * Allows you to change the position on transformed elements. The equivalent of CSS attribute `transformOrigin`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     transform_origin(value?: string): string | this {
@@ -10643,7 +10179,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies how nested elements are rendered in 3D space.
      * The equivalent of CSS attribute `transformStyle`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     transform_style(value?: string): string | this {
@@ -10681,7 +10217,7 @@ export abstract class VElement extends HTMLElement {
      * {Transition Delay}
      * Specifies when the transition effect will start. This corresponds to the CSS attribute `transitionDelay`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     transition_delay(value?: string | number): string | this {
@@ -10702,7 +10238,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies how many seconds or milliseconds a transition effect takes to complete.
      * The equivalent of CSS attribute `transitionDuration`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     transition_duration(value?: string | number): string | this | undefined {
@@ -10723,7 +10259,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the name of the CSS property the transition effect is for.
      * The equivalent of CSS attribute `transitionProperty`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     transition_property(value?: string): string | this {
@@ -10743,7 +10279,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the speed curve of the transition effect.
      * The equivalent of CSS attribute `transitionTimingFunction`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the instance of the element for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     transition_timing_function(value?: string): string | this {
@@ -10781,7 +10317,7 @@ export abstract class VElement extends HTMLElement {
      * Used together with the direction property to set or return whether the text should be overridden to support multiple languages in the same document.
      * The equivalent of CSS attribute `unicodeBidi`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     unicode_bidi(value?: string): string | this {
@@ -10823,7 +10359,7 @@ export abstract class VElement extends HTMLElement {
      * {Visibility}
      * Specifies whether or not an element is visible. The equivalent of CSS attribute `visibility`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     visibility(value?: string): string | this {
@@ -10838,7 +10374,7 @@ export abstract class VElement extends HTMLElement {
      * {White space}
      * Specifies how white-space inside an element is handled. The equivalent of CSS attribute `whiteSpace`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     white_space(value?: string): string | this {
@@ -10877,7 +10413,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies how words should break when reaching the end of a line.
      * The equivalent of CSS attribute `wordBreak`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     word_break(value?: string): string | this {
@@ -10892,7 +10428,7 @@ export abstract class VElement extends HTMLElement {
      * {Word spacing}
      * Increases or decreases the space between words in a text. The equivalent of CSS attribute `wordSpacing`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     word_spacing(value?: string | number): string | this {
@@ -10907,7 +10443,7 @@ export abstract class VElement extends HTMLElement {
      * {Word wrap}
      * Allows long, unbreakable words to be broken and wrap to the next line. The equivalent of CSS attribute `wordWrap`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     word_wrap(value?: string): string | this {
@@ -10922,7 +10458,7 @@ export abstract class VElement extends HTMLElement {
      * {Writing mode}
      * Specifies whether lines of text are laid out horizontally or vertically. The equivalent of CSS attribute `writingMode`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     writing_mode(value?: string): string | this {
@@ -10941,7 +10477,7 @@ export abstract class VElement extends HTMLElement {
      * {Focusable}
      * Sets or gets the focusable state of the element based on the `tabindex` attribute.
      * @param value Boolean value to set focusable state or null to get current state.
-     * @returns ription When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the current focusable state.
+     * @returns When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the current focusable state.
      * @docs
      */
     focusable(value?: boolean | null): boolean | this {
@@ -10977,7 +10513,7 @@ export abstract class VElement extends HTMLElement {
      * {Readonly}
      * Specifies that the element is read-only, equivalent to the HTML attribute `readonly`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     readonly(value?: boolean): boolean | this {
@@ -11000,7 +10536,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Download}
      * Specifies that the target will be downloaded when a user clicks on the hyperlink. The equivalent of HTML attribute `download`.
-     * @returns ription Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
+     * @returns Returns the attribute value when parameter `value` is `null`. Otherwise, returns the instance of the element for chaining.
      * @docs
      */
     download(value?: string): string | this {
@@ -11031,7 +10567,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the character encodings that are to be used for the form submission.
      * The equivalent of HTML attribute `accept_charset`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     accept_charset(value?: string): string | this {
@@ -11063,7 +10599,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies that the script is executed asynchronously (only for external scripts).
      * The equivalent of HTML attribute `async`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     async(value?: boolean): boolean | this {
@@ -11079,7 +10615,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies whether the \<form> or the \<input> element should have autocomplete enabled.
      * The equivalent of HTML attribute `autocomplete`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     auto_complete(value?: "" | "on" | "off"): "" | "on" | "off" | this {
@@ -11111,7 +10647,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies that the audio/video will start playing as soon as it is ready.
      * The equivalent of HTML attribute `autoplay`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     auto_play(value?: boolean): this | boolean {
@@ -11126,7 +10662,7 @@ export abstract class VElement extends HTMLElement {
      * {Charset}
      * Specifies the character encoding, equivalent to the HTML attribute `charset`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     charset(value?: string): this | string {
@@ -11182,7 +10718,7 @@ export abstract class VElement extends HTMLElement {
      * {Cols}
      * Specifies the visible width of a text area, equivalent to the HTML attribute `cols`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     cols(value?: number): this | null | number {
@@ -11197,7 +10733,7 @@ export abstract class VElement extends HTMLElement {
      * {Colspan}
      * Specifies the number of columns a table cell should span. The equivalent of HTML attribute `colspan`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     colspan(value?: number): this | null | number {
@@ -11207,18 +10743,18 @@ export abstract class VElement extends HTMLElement {
     }
 
     // @duplicate
-    /**
-        * docs:
-        * @title: Content
-        * @desc: Retrieves or sets the value associated with the http-equiv or name attribute. 
-        *        When `value` is `null`, the current attribute value is returned. 
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @descr: Returns the current attribute value if `value` is `null`, otherwise returns the instance for chaining.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: Content
+    //     * @desc: Retrieves or sets the value associated with the http-equiv or name attribute. 
+    //     *        When `value` is `null`, the current attribute value is returned. 
+    //     * @param:
+    //     *     @name: value
+    //     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+    //     * @return:
+    //     *     @descr: Returns the current attribute value if `value` is `null`, otherwise returns the instance for chaining.
+    //     * @funcs: 2
+    //     */
     // content(): string;
     // content(value: string | number): this;
     // content(value?: string | number): string | this {
@@ -11249,7 +10785,7 @@ export abstract class VElement extends HTMLElement {
      * {Controls}
      * Specifies that audio/video controls should be displayed (such as a play/pause button etc). The equivalent of HTML attribute `controls`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     controls(value?: boolean): this | boolean {
@@ -11264,7 +10800,7 @@ export abstract class VElement extends HTMLElement {
      * {Coords}
      * Specifies the coordinates of the area, equivalent to the HTML attribute `coords`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
+     * @returns Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
      * @docs
      */
     coords(value?: string): string | this {
@@ -11280,7 +10816,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the URL of the resource to be used by the object.
      * The equivalent of HTML attribute `data`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     data(value?: string | number): this | string {
@@ -11326,7 +10862,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies that the script is executed when the page has finished parsing (only for external scripts).
      * The equivalent of HTML attribute `defer`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     defer(value?: boolean): this | boolean {
@@ -11375,7 +10911,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies that the specified element/group of elements should be disabled.
      * The equivalent of HTML attribute `disabled`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     disabled(value?: boolean): boolean | this {
@@ -11392,7 +10928,7 @@ export abstract class VElement extends HTMLElement {
      * {Draggable}
      * Specifies whether an element is draggable or not. The equivalent of HTML attribute `draggable`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     // @ts-ignore
@@ -11442,7 +10978,7 @@ export abstract class VElement extends HTMLElement {
      * {Form}
      * Specifies the name of the form the element belongs to. The equivalent of HTML attribute `form`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object when a value is set. If `null`, returns the attribute's value.
+     * @returns Returns the `VElement` object when a value is set. If `null`, returns the attribute's value.
      * @docs
      */
     // @ts-ignore
@@ -11463,7 +10999,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies where to send the form-data when a form is submitted. Only for type="submit".
      * The equivalent of HTML attribute `formaction`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     form_action(value?: string): string | this {
@@ -11479,7 +11015,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies one or more headers cells a cell is related to.
      * The equivalent of HTML attribute `headers`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     headers(value?: string): this | string {
@@ -11507,7 +11043,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {High}
      * Specifies the range that is considered to be a high value. The equivalent of HTML attribute `high`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     high(value?: string | number): string | this {
@@ -11522,7 +11058,7 @@ export abstract class VElement extends HTMLElement {
      * {Href}
      * Specifies the URL of the page the link goes to. The equivalent of HTML attribute `href`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     href(value?: string): string | this {
@@ -11541,7 +11077,7 @@ export abstract class VElement extends HTMLElement {
      * {Href lang}
      * Specifies the language of the linked document. The equivalent of HTML attribute `hreflang`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     href_lang(value?: string): string | this {
@@ -11557,7 +11093,7 @@ export abstract class VElement extends HTMLElement {
      * Provides an HTTP header for the information/value of the content attribute.
      * The equivalent of HTML attribute `http_equiv`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     http_equiv(value?: string): this | string {
@@ -11593,7 +11129,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Is Map}
      * Specifies an image as a server-side image map. The equivalent of HTML attribute `ismap`.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     is_map(value?: boolean): boolean | this {
@@ -11608,7 +11144,7 @@ export abstract class VElement extends HTMLElement {
      * {Kind}
      * Specifies the kind of text track. The equivalent of HTML attribute `kind`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     kind(value?: string): string | this {
@@ -11623,7 +11159,7 @@ export abstract class VElement extends HTMLElement {
      * {Label}
      * Specifies the title of the text track, equivalent to the HTML attribute `label`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     label(value?: string): string | this {
@@ -11636,7 +11172,7 @@ export abstract class VElement extends HTMLElement {
      * {Lang}
      * Specifies the language of the element's content, equivalent to the HTML attribute `lang`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     // @ts-ignore
@@ -11676,7 +11212,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies that the audio/video will start over again, every time it is finished.
      * The equivalent of HTML attribute `loop`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     loop(value?: boolean): this | boolean {
@@ -11706,7 +11242,7 @@ export abstract class VElement extends HTMLElement {
      * {Max}
      * Specifies the maximum value, equivalent to the HTML attribute `max`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
      * @docs
      */
     max(value?: string): string | this {
@@ -11721,7 +11257,7 @@ export abstract class VElement extends HTMLElement {
      * {Max Length}
      * Specifies the maximum number of characters allowed in an element. The equivalent of HTML attribute `maxlength`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     max_length(value?: number): this | null | number {
@@ -11743,7 +11279,7 @@ export abstract class VElement extends HTMLElement {
      * {Method}
      * Specifies the HTTP method to use when sending form-data. The equivalent of HTML attribute `method`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     method(value?: string): this | string {
@@ -11752,17 +11288,17 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
-    /**
-     * {Min}
-     * Specifies a minimum value, equivalent to the HTML attribute `min`.
-     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @docs
-     */
     // @ts-ignore
     min(): string;
     // @ts-ignore
     min(value: string): this;
+    /**
+     * {Min}
+     * Specifies a minimum value, equivalent to the HTML attribute `min`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
+     */
     // @ts-ignore
     min(value?: string): string | this {
         if (value == null) { return this.getAttribute("min") ?? ""; }
@@ -11830,7 +11366,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies that the details should be visible (open) to the user.
      * The equivalent of HTML attribute `open`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     open(value?: boolean): boolean | this {
@@ -11845,7 +11381,7 @@ export abstract class VElement extends HTMLElement {
      * {Optimum}
      * Specifies what value is the optimal value for the gauge. The equivalent of HTML attribute `optimum`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     optimum(value?: number): this | null | number {
@@ -11877,7 +11413,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies a short hint that describes the expected value of the element.
      * The equivalent of HTML attribute `placeholder`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     placeholder(value?: string): string | this {
@@ -11893,7 +11429,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies an image to be shown while the video is downloading, or until the user hits the play button.
      * The equivalent of HTML attribute `poster`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     poster(value?: string): string | this {
@@ -11971,7 +11507,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the visible number of lines in a text area.
      * The equivalent of HTML attribute `rows`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     rows(value?: number): null | number | this {
@@ -11986,7 +11522,7 @@ export abstract class VElement extends HTMLElement {
      * {Row Span}
      * Specifies the number of rows a table cell should span.
      * The equivalent of HTML attribute `rowspan`.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`,
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`,
      * then the attribute's value is returned.
      * @docs
      */
@@ -12033,7 +11569,7 @@ export abstract class VElement extends HTMLElement {
      * {Selected}
      * Specifies that an option should be pre-selected when the page loads. The equivalent of HTML attribute `selected`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     selected(value?: boolean): boolean | this {
@@ -12051,7 +11587,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Shape}
      * Specifies the shape of the area. The equivalent of HTML attribute `shape`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     shape(value?: string): string | this {
@@ -12081,7 +11617,7 @@ export abstract class VElement extends HTMLElement {
     /**
      * {Sizes}
      * Specifies the size of the linked resource. The equivalent of HTML attribute `sizes`.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     sizes(value?: string): string | this {
@@ -12090,6 +11626,10 @@ export abstract class VElement extends HTMLElement {
         return this;
     }
 
+    // @ts-ignore
+    span(): null | number;
+    // @ts-ignore
+    span(value: number): this;
     /**
      * {Span}
      * Specifies the number of columns to span. The equivalent of HTML attribute `span`.
@@ -12097,11 +11637,6 @@ export abstract class VElement extends HTMLElement {
      * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
-    // @ts-ignore
-    span(): null | number;
-    // @ts-ignore
-    span(value: number): this;
-    // @ts-ignore
     span(value?: number): this | null | number {
         if (value == null) { return this._try_parse_float(super.getAttribute("span"), null); }
         this.setAttribute("span", value);
@@ -12128,7 +11663,7 @@ export abstract class VElement extends HTMLElement {
      * {Src}
      * Specifies the URL of the media file, equivalent to the HTML attribute `src`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     // @ts-ignore
@@ -12140,7 +11675,7 @@ export abstract class VElement extends HTMLElement {
         // if (value == null) { return this._src.get.call(this) ?? ""; }
         // this._src.set.call(this, value);
         if (value == null) { return this.getAttribute("src") ?? ""; }
-        console.log("Set aspect ratio?", set_aspect_ratio, "from src", value)
+        // console.log("Set aspect ratio?", set_aspect_ratio, "from src", value)
         if (set_aspect_ratio) {
             const aspect_ratio = Statics.aspect_ratio(value);
             if (aspect_ratio != null) {
@@ -12161,7 +11696,7 @@ export abstract class VElement extends HTMLElement {
      * {Src doc}
      * Specifies the HTML content of the page to show in the \<iframe>. The equivalent of HTML attribute `srcdoc`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     src_doc(value?: string): string | this {
@@ -12192,7 +11727,7 @@ export abstract class VElement extends HTMLElement {
      * Specifies the URL of the image to use in different situations.
      * The equivalent of HTML attribute `srcset`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     rrsrc_set(value?: string): this | string {
@@ -12207,7 +11742,7 @@ export abstract class VElement extends HTMLElement {
      * {Start}
      * Specifies the start value of an ordered list. The equivalent of HTML attribute `start`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     start(value?: number): number | null | this {
@@ -12222,7 +11757,7 @@ export abstract class VElement extends HTMLElement {
      * {Step}
      * Specifies the legal number intervals for an input field. The equivalent of HTML attribute `step`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     step(value?: string): this | string {
@@ -12244,7 +11779,7 @@ export abstract class VElement extends HTMLElement {
      * {Tab index}
      * Specifies the tabbing order of an element, equivalent to the HTML attribute `tabindex`. Returns the attribute value when parameter `value` is `null`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
      * @docs
      */
     tab_index(value?: number): this | null | number {
@@ -12297,7 +11832,7 @@ export abstract class VElement extends HTMLElement {
      * {Type}
      * Specifies the type of element, equivalent to the HTML attribute `type`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     type(value?: string): string | this {
@@ -12312,7 +11847,7 @@ export abstract class VElement extends HTMLElement {
      * {Use Map}
      * Specifies an image as a client-side image map, equivalent to the HTML attribute `usemap`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     use_map(value?: string): string | this {
@@ -12327,33 +11862,33 @@ export abstract class VElement extends HTMLElement {
      * {Value}
      * Specifies the value of the element, equivalent to the HTML attribute `value`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     value(value?: string): string | this {
         /**
-            * @warning
-            * The actual implementation of for inputs is overriden
-            * in {@link VInputElement.value} and {@link VTextAreaElement.value}, so this method is not used in those classes.
-            * Otherwise the `value` attribute cant be retrieved correctly.
-            */
+        * @warning
+        * The actual implementation of for inputs is overriden
+        * in {@link VInputElement.value} and {@link VTextAreaElement.value}, so this method is not used in those classes.
+        * Otherwise the `value` attribute cant be retrieved correctly.
+        */
         if (value == null) return this.getAttribute("value") ?? "";
         this.setAttribute("value", value);
         return this;
     }
 
-    /**
-        * docs:
-        * @title: On after print
-        * @desc: Script to be run after the document is printed. The equivalent of HTML attribute `onafterprint`. 
-        *        The first parameter of the callback is the `VElement` object. 
-        * @param:
-        *     @name: callback
-        *     @descr: The callback function to execute after printing. It receives the `VElement` object and the event.
-        * @return:
-        *     @description Returns the `VElement` object unless the parameter `callback` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On after print
+    //     * @desc: Script to be run after the document is printed. The equivalent of HTML attribute `onafterprint`. 
+    //     *        The first parameter of the callback is the `VElement` object. 
+    //     * @param:
+    //     *     @name: callback
+    //     *     @descr: The callback function to execute after printing. It receives the `VElement` object and the event.
+    //     * @return:
+    //     *     @description Returns the `VElement` object unless the parameter `callback` is `null`, then the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_after_print(): Function | undefined;
     // on_after_print(callback: (element: VElement, event:  Event) => any): this;
     // on_after_print(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -12363,17 +11898,17 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-        * docs:
-        * @title: On before print
-        * @desc: Script to be run before the document is printed. The equivalent of HTML attribute `onbeforeprint`.
-        * @param:
-        *     @name: callback
-        *     @descr: The function to be executed before printing, receiving the `VElement` object as the first parameter.
-        * @return:
-        *     @description Returns the instance of the element for chaining unless parameter `callback` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On before print
+    //     * @desc: Script to be run before the document is printed. The equivalent of HTML attribute `onbeforeprint`.
+    //     * @param:
+    //     *     @name: callback
+    //     *     @descr: The function to be executed before printing, receiving the `VElement` object as the first parameter.
+    //     * @return:
+    //     *     @description Returns the instance of the element for chaining unless parameter `callback` is `null`, then the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_before_print(): Function | undefined;
     // on_before_print(callback: (element: VElement, event:  Event) => any): this;
     // on_before_print(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -12383,19 +11918,19 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-        * docs:
-        * @title: On Before Unload
-        * @desc: Script to be run when the document is about to be unloaded. 
-        *        This is the equivalent of the HTML attribute `onbeforeunload`. 
-        *        The first parameter of the callback is the `VElement` object.
-        * @param:
-        *     @name: callback
-        *     @descr: The callback function to execute before unloading the document.
-        * @return:
-        *     @descr: Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On Before Unload
+    //     * @desc: Script to be run when the document is about to be unloaded. 
+    //     *        This is the equivalent of the HTML attribute `onbeforeunload`. 
+    //     *        The first parameter of the callback is the `VElement` object.
+    //     * @param:
+    //     *     @name: callback
+    //     *     @descr: The callback function to execute before unloading the document.
+    //     * @return:
+    //     *     @descr: Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_before_unload(): Function | undefined;
     // on_before_unload(callback: (element: VElement, event:  Event) => any): this;
     // on_before_unload(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -12405,22 +11940,22 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-        * docs:
-        * @title: On hash change
-        * @desc: 
-        *     Script to be run when there has been changes to the anchor part of a URL.
-        *     The equivalent of HTML attribute `onhashchange`.
-        *     
-        *     The first parameter of the callback is the `VElement` object.
-        *     
-        * @param:
-        *     @name: callback
-        *     @descr: The callback function to execute on hash change.
-        * @return:
-        *     @description Returns the `VElement` object for chaining. If parameter `value` is `null`, the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On hash change
+    //     * @desc: 
+    //     *     Script to be run when there has been changes to the anchor part of a URL.
+    //     *     The equivalent of HTML attribute `onhashchange`.
+    //     *     
+    //     *     The first parameter of the callback is the `VElement` object.
+    //     *     
+    //     * @param:
+    //     *     @name: callback
+    //     *     @descr: The callback function to execute on hash change.
+    //     * @return:
+    //     *     @description Returns the `VElement` object for chaining. If parameter `value` is `null`, the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_hash_change(): Function | undefined;
     // on_hash_change(callback: (element: VElement, event:  Event) => any): this;
     // on_hash_change(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -12452,22 +11987,22 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-        * docs:
-        * @title: On message
-        * @desc: 
-        *     Script to be run when the message is triggered.
-        *     The equivalent of HTML attribute `onmessage`.
-        *     
-        *     The first parameter of the callback is the `VElement` object.
-        *     
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On message
+    //     * @desc: 
+    //     *     Script to be run when the message is triggered.
+    //     *     The equivalent of HTML attribute `onmessage`.
+    //     *     
+    //     *     The first parameter of the callback is the `VElement` object.
+    //     *     
+    //     * @param:
+    //     *     @name: value
+    //     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+    //     * @return:
+    //     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_message(): Function | undefined;
     // on_message(callback: (element: VElement, event:  Event) => any): this;
     // on_message(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -12477,18 +12012,18 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-        * docs:
-        * @title: On Offline
-        * @desc: Script to be run when the browser starts to work offline. The equivalent of HTML attribute `onoffline`. 
-        *        The first parameter of the callback is the `VElement` object. 
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On Offline
+    //     * @desc: Script to be run when the browser starts to work offline. The equivalent of HTML attribute `onoffline`. 
+    //     *        The first parameter of the callback is the `VElement` object. 
+    //     * @param:
+    //     *     @name: value
+    //     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+    //     * @return:
+    //     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_offline(): Function | undefined;
     // on_offline(callback: (element: VElement, event:  Event) => any): this;
     // on_offline(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -12498,19 +12033,19 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-        * docs:
-        * @title: On online
-        * @desc: Script to be run when the browser starts to work online. 
-        *        The equivalent of HTML attribute `ononline`. 
-        *        The first parameter of the callback is the `VElement` object.
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On online
+    //     * @desc: Script to be run when the browser starts to work online. 
+    //     *        The equivalent of HTML attribute `ononline`. 
+    //     *        The first parameter of the callback is the `VElement` object.
+    //     * @param:
+    //     *     @name: value
+    //     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+    //     * @return:
+    //     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_online(): Function | undefined;
     // on_online(callback: (element: VElement, event:  Event) => any): this;
     // on_online(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -12520,19 +12055,19 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-        * docs:
-        * @title: On page hide
-        * @desc: 
-        *     Script to be run when a user navigates away from a page.
-        *     The equivalent of HTML attribute `onpagehide`.
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On page hide
+    //     * @desc: 
+    //     *     Script to be run when a user navigates away from a page.
+    //     *     The equivalent of HTML attribute `onpagehide`.
+    //     * @param:
+    //     *     @name: value
+    //     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+    //     * @return:
+    //     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_page_hide(): Function | undefined;
     // on_page_hide(callback: (element: VElement, event:  Event) => any): this;
     // on_page_hide(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -12542,20 +12077,20 @@ export abstract class VElement extends HTMLElement {
     //  return this;
     // }
 
-    /**
-        * docs:
-        * @title: On page show
-        * @desc: 
-        *     Script to be run when a user navigates to a page.
-        *     The equivalent of HTML attribute `onpageshow`.
-        *     The first parameter of the callback is the `VElement` object.
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On page show
+    //     * @desc: 
+    //     *     Script to be run when a user navigates to a page.
+    //     *     The equivalent of HTML attribute `onpageshow`.
+    //     *     The first parameter of the callback is the `VElement` object.
+    //     * @param:
+    //     *     @name: value
+    //     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
+    //     * @return:
+    //     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_page_show(): Function | undefined;
     // on_page_show(callback: ElementEvent<this>): this;
     // on_page_show(callback?: ElementEvent<this>): this | Function | undefined {
@@ -12565,18 +12100,18 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-        * docs:
-        * @title: On Popstate
-        * @desc: Script to be run when the window's history changes. The equivalent of HTML attribute `onpopstate`. 
-        *        The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
-        * @param:
-        *     @name: callback
-        *     @descr: The callback function to execute on popstate event.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On Popstate
+    //     * @desc: Script to be run when the window's history changes. The equivalent of HTML attribute `onpopstate`. 
+    //     *        The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
+    //     * @param:
+    //     *     @name: callback
+    //     *     @descr: The callback function to execute on popstate event.
+    //     * @return:
+    //     *     @description Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_popstate(): Function | undefined;
     // on_popstate(callback: (element: VElement, event: PopStateEvent) => any): this;
     // on_popstate(callback?: (element: VElement, event: PopStateEvent) => any): this | Function | undefined {
@@ -12586,19 +12121,19 @@ export abstract class VElement extends HTMLElement {
     //     return this;
     // }
 
-    /**
-        * docs:
-        * @title: On Storage
-        * @desc: Script to be run when a Web Storage area is updated. 
-        *        The equivalent of HTML attribute `onstorage`. 
-        *        The first parameter of the callback is the `VElement` object.
-        * @param:
-        *     @name: callback
-        *     @descr: The function to be executed when storage is updated.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
+    // /**
+    //     * docs:
+    //     * @title: On Storage
+    //     * @desc: Script to be run when a Web Storage area is updated. 
+    //     *        The equivalent of HTML attribute `onstorage`. 
+    //     *        The first parameter of the callback is the `VElement` object.
+    //     * @param:
+    //     *     @name: callback
+    //     *     @descr: The function to be executed when storage is updated.
+    //     * @return:
+    //     *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+    //     * @funcs: 2
+    //     */
     // on_storage(): Function | undefined;
     // on_storage(callback: (element: VElement, event:  Event) => any): this;
     // on_storage(callback?: (element: VElement, event:  Event) => any): this | Function | undefined {
@@ -12618,7 +12153,7 @@ export abstract class VElement extends HTMLElement {
      * Fires the moment that the element loses focus, similar to the HTML attribute `onblur`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The function to call when the element loses focus.
-     * @returns ription Returns the `VElement` object unless the parameter `callback` is `null`,
+     * @returns Returns the `VElement` object unless the parameter `callback` is `null`,
      * then the attribute's value is returned.
      * @docs
      */
@@ -12635,7 +12170,7 @@ export abstract class VElement extends HTMLElement {
      * {On Change}
      * Fires the moment when the value of the element is changed. The equivalent of HTML attribute `onchange`. Returns the attribute value when parameter `value` is `null`.
      * @param callback The function to call when the value changes, receiving the `VElement` object and the event as parameters.
-     * @returns ription Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onchange` value.
+     * @returns Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onchange` value.
      * @docs
      */
     on_change(callback?: ElementEvent<this>): this | Function | undefined {
@@ -12652,7 +12187,7 @@ export abstract class VElement extends HTMLElement {
      * Fires the moment when the element gets focus. This is the equivalent of the HTML attribute `onfocus`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The function to be called when the element gets focus.
-     * @returns ription Returns the `VElement` object unless the parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object unless the parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_focus(callback?: ElementEvent<this>): this | Function | undefined {
@@ -12669,7 +12204,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when an element gets user input.
      * The equivalent of HTML attribute `oninput`.
      * @param callback The function to call when user input is detected.
-     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if the parameter is `null`.
+     * @returns Returns the `VElement` object for chaining, or the attribute's value if the parameter is `null`.
      * @docs
      */
     on_input(callback?: ElementEvent<this>): this | ElementEvent<this> | undefined {
@@ -12702,7 +12237,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when an element is invalid. The equivalent of HTML attribute `oninvalid`.
      * The first parameter of the callback is the `VElement` object.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_invalid(callback?: ElementEvent<this>): this | Function | undefined {
@@ -12719,7 +12254,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when the Reset button in a form is clicked. The equivalent of HTML attribute `onreset`.
      * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
      * @param callback The function to call when the Reset button is clicked.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_reset(callback?: ElementEvent<this>): this | Function | undefined {
@@ -12738,7 +12273,7 @@ export abstract class VElement extends HTMLElement {
      * {On Select}
      * Fires after some text has been selected in an element. The equivalent of HTML attribute `onselect`. Returns the attribute value when parameter `value` is `null`.
      * @param callback The callback function to execute when text is selected. It receives the `VElement` object as the first parameter.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_select(callback?: ElementEvent<this>): this | Function | undefined {
@@ -12755,7 +12290,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when a form is submitted, similar to the HTML attribute `onsubmit`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The callback function to execute on form submission.
-     * @returns ription Returns the instance of the element for chaining. If `callback` is null, returns the current `onsubmit` attribute value.
+     * @returns Returns the instance of the element for chaining. If `callback` is null, returns the current `onsubmit` attribute value.
      * @docs
      */
     on_submit(callback?: ElementEvent<this>): this | Function | undefined {
@@ -12772,7 +12307,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when a user is pressing a key. The equivalent of HTML attribute `onkeydown`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The callback function to execute when the key is pressed.
-     * @returns ription Returns the `VElement` object for chaining. If the parameter `callback` is `null`, the current attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining. If the parameter `callback` is `null`, the current attribute's value is returned.
      * @docs
      */
     on_key_down(callback?: ElementKeyboardEvent<this>): this | Function | undefined {
@@ -12789,7 +12324,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when a user presses a key, similar to the HTML `onkeypress` attribute.
      * The first parameter of the callback is the `VElement` object, allowing for dynamic handling of key events.
      * @param callback The function to call when a key is pressed. Receives the `VElement` and event as parameters.
-     * @returns ription Returns the `VElement` object for chaining. If `callback` is `null`, the current attribute value is returned.
+     * @returns Returns the `VElement` object for chaining. If `callback` is `null`, the current attribute value is returned.
      * @docs
      */
     on_key_press(callback?: ElementKeyboardEvent<this>): this | Function | undefined {
@@ -12807,7 +12342,7 @@ export abstract class VElement extends HTMLElement {
      * The first parameter of the callback is the `VElement` object.
      * @param callback The function to call when the key is released.
      * Leave `null` to retrieve the current attribute's value.
-     * @returns ription Returns the `VElement` object for chaining, unless `callback` is `null`,
+     * @returns Returns the `VElement` object for chaining, unless `callback` is `null`,
      * in which case the current attribute's value is returned.
      * @docs
      */
@@ -12825,7 +12360,7 @@ export abstract class VElement extends HTMLElement {
      * Fires on a mouse double-click on the element. The equivalent of HTML attribute `ondblclick`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The function to execute on double-click. Receives the `VElement` and the event as parameters.
-     * @returns ription Returns the `VElement` object for chaining. If `callback` is null, returns the current attribute value.
+     * @returns Returns the `VElement` object for chaining. If `callback` is null, returns the current attribute value.
      * @docs
      */
     on_dbl_click(callback?: ElementMouseEvent<this>): this | Function | undefined {
@@ -12842,7 +12377,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when a mouse button is pressed down on an element. The equivalent of HTML attribute `onmousedown`.
      * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
      * @param callback The function to execute when the mouse button is pressed down.
-     * @returns ription Returns the `VElement` object for chaining. If the parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining. If the parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_mouse_down(callback?: ElementMouseEvent<this>): this | Function | undefined {
@@ -12859,7 +12394,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when the mouse pointer is moving while it is over an element.
      * The equivalent of HTML attribute `onmousemove`. Invokes the callback with the element and event.
      * @param callback The function to call when the mouse moves over the element.
-     * @returns ription Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the event is returned.
+     * @returns Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the event is returned.
      * @docs
      */
     on_mouse_move(callback?: ElementMouseEvent<this>): this | Function | undefined {
@@ -12876,7 +12411,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when the mouse pointer moves out of an element. The equivalent of HTML attribute `onmouseout`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The callback function to execute when the mouse moves out.
-     * @returns ription Returns the `VElement` object for chaining, or the attribute's value if the callback is `null`.
+     * @returns Returns the `VElement` object for chaining, or the attribute's value if the callback is `null`.
      * @docs
      */
     on_mouse_out(callback?: ElementMouseEvent<this>): this | Function | undefined {
@@ -12896,7 +12431,7 @@ export abstract class VElement extends HTMLElement {
      * {On Mouse Over}
      * Fires when the mouse pointer moves over an element, similar to the HTML `onmouseover` attribute.
      * @param callback The callback function to execute when the mouse is over the element.
-     * @returns ription Returns the instance of the element for chaining. If `callback` is null, returns the current `onmouseover` attribute value.
+     * @returns Returns the instance of the element for chaining. If `callback` is null, returns the current `onmouseover` attribute value.
      * @docs
      */
     on_mouse_over(callback?: ElementMouseEvent<this>): this | Function | undefined {
@@ -12917,7 +12452,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when a mouse button is released over an element. The equivalent of HTML attribute `onmouseup`.
      * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
      * @param callback The callback function to execute when the mouse button is released.
-     * @returns ription Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onmouseup` value.
+     * @returns Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onmouseup` value.
      * @docs
      */
     on_mouse_up(callback?: ElementMouseEvent<this>): this | Function | undefined {
@@ -12937,7 +12472,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when the mouse wheel rolls up or down over an element. The equivalent of HTML attribute `onwheel`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The callback function to execute on wheel event.
-     * @returns ription Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_wheel(callback?: (element: this, event: WheelEvent) => any): this | Function | undefined {
@@ -12954,7 +12489,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when an element is dragged. The equivalent of HTML attribute `ondrag`.
      * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
      * @param callback The callback function to execute when the element is dragged.
-     * @returns ription Returns the instance of the element for chaining unless the parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the instance of the element for chaining unless the parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_drag(callback?: ElementDragEvent<this>): this | Function | undefined {
@@ -12971,7 +12506,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run at the end of a drag operation. The equivalent of HTML attribute `ondragend`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The callback function to execute at the end of the drag operation.
-     * @returns ription Returns the `VElement` object unless the parameter `value` is `null`, in which case the attribute's value is returned.
+     * @returns Returns the `VElement` object unless the parameter `value` is `null`, in which case the attribute's value is returned.
      * @docs
      */
     on_drag_end(callback?: ElementDragEvent<this>): this | Function | undefined {
@@ -12989,7 +12524,7 @@ export abstract class VElement extends HTMLElement {
      * The equivalent of HTML attribute `ondragenter`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The function to execute when the drag enters the target.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_drag_enter(callback?: ElementDragEvent<this>): this | Function | undefined {
@@ -13007,7 +12542,7 @@ export abstract class VElement extends HTMLElement {
      * The equivalent of HTML attribute `ondragleave`.
      * The first parameter of the callback is the `VElement` object.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_drag_leave(callback?: ElementDragEvent<this>): this | Function | undefined {
@@ -13024,7 +12559,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when an element is being dragged over a valid drop target.
      * The equivalent of HTML attribute `ondragover`.
      * @param callback The function to execute when the drag over event occurs.
-     * @returns ription Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_drag_over(callback?: ElementDragEvent<this>): this | Function | undefined {
@@ -13041,7 +12576,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run at the start of a drag operation. The equivalent of HTML attribute `ondragstart`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The function to call when the drag starts.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_drag_start(callback?: ElementDragEvent<this>): this | Function | undefined {
@@ -13082,7 +12617,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when the user copies the content of an element. The equivalent of HTML attribute `oncopy`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The function to be called when the copy event occurs.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_copy(callback?: ElementEvent<this>): this | Function | undefined {
@@ -13099,7 +12634,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when the user cuts the content of an element, equivalent to the HTML attribute `oncut`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The function to call when the cut event occurs.
-     * @returns ription Returns the `VElement` object unless the parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object unless the parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_cut(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13116,7 +12651,7 @@ export abstract class VElement extends HTMLElement {
      * Fires when the user pastes some content in an element. The equivalent of HTML attribute `onpaste`.
      * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
      * @param callback The function to call when the paste event occurs.
-     * @returns ription Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onpaste` attribute value.
+     * @returns Returns the `VElement` object for chaining. If `callback` is `null`, returns the current `onpaste` attribute value.
      * @docs
      */
     on_paste(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13133,7 +12668,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run on abort, equivalent to the HTML attribute `onabort`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The callback function to execute on abort event.
-     * @returns ription Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_abort(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13150,7 +12685,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when a file is ready to start playing (when it has buffered enough to begin).
      * The equivalent of HTML attribute `oncanplay`.
      * @param callback The callback function to execute when the event occurs.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_canplay(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13185,7 +12720,7 @@ export abstract class VElement extends HTMLElement {
      * The equivalent of HTML attribute `oncuechange`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The function to call when the cue changes.
-     * @returns ription Returns the instance of the element for chaining.
+     * @returns Returns the instance of the element for chaining.
      * Unless the parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
@@ -13203,7 +12738,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when the length of the media changes. The equivalent of HTML attribute `ondurationchange`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback The callback function to execute on duration change.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_duration_change(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13237,7 +12772,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when the media has reach the end (a useful event for messages like "thanks for listening").
      * The equivalent of HTML attribute `onended`.
      * @param callback The function to call when the media ends. Leave `null` to retrieve the current callback.
-     * @returns ription Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the current callback function is returned.
+     * @returns Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the current callback function is returned.
      * @docs
      */
     on_ended(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13254,7 +12789,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when an error occurs while loading the file, similar to HTML's `onerror` attribute.
      * The first parameter of the callback is the `VElement` object. Returns the attribute value if `value` is `null`.
      * @param callback The callback function to execute on error. It receives the `VElement` object and the error event.
-     * @returns ription Returns the instance of the element for chaining, unless `callback` is `null`, then the current `onerror` attribute value is returned.
+     * @returns Returns the instance of the element for chaining, unless `callback` is `null`, then the current `onerror` attribute value is returned.
      * @docs
      */
     on_error(callback?: (element: this, error: string | Event) => any): undefined | Function | this {
@@ -13270,7 +12805,7 @@ export abstract class VElement extends HTMLElement {
      * {On Loaded Data}
      * Script to be run when media data is loaded. The equivalent of HTML attribute `onloadeddata`.
      * @param callback The callback function that receives the `VElement` object and the event.
-     * @returns ription Returns the `VElement` object unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_loaded_data(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13288,7 +12823,7 @@ export abstract class VElement extends HTMLElement {
      * The equivalent of HTML attribute `onloadedmetadata`.
      * The first parameter of the callback is the `VElement` object.
      * @param callback A function to be executed when metadata is loaded.
-     * @returns ription Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_loaded_metadata(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13306,7 +12841,7 @@ export abstract class VElement extends HTMLElement {
      * The equivalent of HTML attribute `onloadstart`.
      * The first parameter of the callback is the `VElement` object.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_load_start(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13322,7 +12857,7 @@ export abstract class VElement extends HTMLElement {
      * {On Pause}
      * Script to be run when the media is paused either by the user or programmatically. The equivalent of HTML attribute `onpause`.
      * @param callback The callback function to execute when the media is paused. Leave `null` to retrieve the current attribute's value.
-     * @returns ription Returns the instance of the element for chaining unless the parameter is `null`, then the current attribute's value is returned.
+     * @returns Returns the instance of the element for chaining unless the parameter is `null`, then the current attribute's value is returned.
      * @docs
      */
     on_pause(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13339,7 +12874,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when the media is ready to start playing. The equivalent of HTML attribute `onplay`.
      * The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
      * @param callback The function to be executed when the media starts playing.
-     * @returns ription Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_play(callback?: ElementEvent<this>): undefined | Function | this {
@@ -13355,7 +12890,7 @@ export abstract class VElement extends HTMLElement {
      * {On Playing}
      * Script to be run when the media actually has started playing. This is the equivalent of the HTML attribute `onplaying`.
      * @param callback The function to execute when the media starts playing. It receives the `VElement` object as the first parameter.
-     * @returns ription Returns the instance of the element for chaining. If `null` is passed, it returns the current `onplaying` callback.
+     * @returns Returns the instance of the element for chaining. If `null` is passed, it returns the current `onplaying` callback.
      * @docs
      */
     on_playing(callback?: (element: this, time: any) => any): this | Function | undefined {
@@ -13372,7 +12907,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when the browser is in the process of getting the media data.
      * The equivalent of HTML attribute `onprogress`. Returns the attribute value when parameter `value` is `null`.
      * @param callback The function to be executed when the media data is being loaded.
-     * @returns ription Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_progress(callback?: ElementEvent<this>): this | Function | undefined {
@@ -13389,7 +12924,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run each time the playback rate changes (like when a user switches to a slow motion or fast forward mode).
      * The equivalent of HTML attribute `onratechange`. Returns the attribute value when parameter `value` is `null`.
      * @param callback The callback function to execute on rate change.
-     * @returns ription Returns the `VElement` object unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_rate_change(callback?: ElementEvent<this>): undefined | this | Function {
@@ -13406,7 +12941,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when the seeking attribute is set to false indicating that seeking has ended.
      * The equivalent of HTML attribute `onseeked`.
      * @param callback The callback function to execute when seeking ends.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_seeked(callback?: (element: this, time: any) => any): this | Function | undefined {
@@ -13423,7 +12958,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run when the seeking attribute is set to true indicating that seeking is active.
      * The equivalent of HTML attribute `onseeking`.
      * @param callback The callback function to execute when seeking occurs.
-     * @returns ription Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the instance of the element for chaining. Unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_seeking(callback?: (element: this, time: any) => any): this | Function | undefined {
@@ -13455,7 +12990,7 @@ export abstract class VElement extends HTMLElement {
      * {On Suspend}
      * Script to be run when fetching the media data is stopped before it is completely loaded for whatever reason. The equivalent of HTML attribute `onsuspend`.
      * @param callback The function to be executed when the suspend event occurs. The first parameter of the callback is the `VElement` object.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_suspend(callback?: Function): this | Function | undefined {
@@ -13471,7 +13006,7 @@ export abstract class VElement extends HTMLElement {
      * {On Time Update}
      * Script to be run when the playing position has changed (like when the user fast forwards to a different point in the media). The equivalent of HTML attribute `ontimeupdate`.
      * @param callback The callback function to execute when the time updates. The first parameter of the callback is the `VElement` object.
-     * @returns ription Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_time_update(callback?: ElementEvent<this>): this | Function | undefined {
@@ -13488,7 +13023,7 @@ export abstract class VElement extends HTMLElement {
      * Script to be run each time the volume is changed which includes setting the volume to "mute".
      * The equivalent of HTML attribute `onvolumechange`. The first parameter of the callback is the `VElement` object.
      * @param callback The callback function to execute on volume change.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_volume_change(callback?: ElementEvent<this>): this | Function | undefined {
@@ -13504,7 +13039,7 @@ export abstract class VElement extends HTMLElement {
      * {On Waiting}
      * Script to be run when the media has paused but is expected to resume (like when the media pauses to buffer more data). The equivalent of HTML attribute `onwaiting`.
      * @param callback The callback function to execute when the media is waiting.
-     * @returns ription Returns the `VElement` object unless parameter `callback` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object unless parameter `callback` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_waiting(callback?: (element: this, time: any) => any): this | Function | undefined {
@@ -13522,7 +13057,7 @@ export abstract class VElement extends HTMLElement {
      * The equivalent of HTML attribute `ontoggle`.
      * The first parameter of the callback is the `VElement` object.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     on_toggle(callback?: ElementEvent<this>): this | Function | undefined {
@@ -14099,13 +13634,13 @@ export class VInputElement extends (HTMLInputElement as unknown as VElementBaseS
      * @returns Returns the `VElement` object for chaining unless `value` is `null`, then the attribute's value is returned.
      */
     value(value?: string): string | this {
-        // @ts-ignore
+        // // @ts-ignore
         // if (value == null) return super.value ?? "";
-        // @ts-ignore
+        // // @ts-ignore
         // super.value = value;
         // if (value == null) return this.getAttribute("value") ?? "";
         // this.setAttribute("value", value);
-        if (value == null) return VInputElement.value_property.get.call(this) ?? "";
+        if (value == null) return (VInputElement as any).value_property!.get!.call(this) ?? "";
         VInputElement.value_property!.set!.call(this, value); // throws an error when used on non input element but that is fine.
         return this;
     }

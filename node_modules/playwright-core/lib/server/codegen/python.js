@@ -83,6 +83,8 @@ class PythonLanguageGenerator {
         const optionsString = formatOptions(options, false);
         return `${subject}.${this._asLocator(action.selector)}.${method}(${optionsString})`;
       }
+      case "hover":
+        return `${subject}.${this._asLocator(action.selector)}.hover(${formatOptions({ position: action.position }, false)})`;
       case "check":
         return `${subject}.${this._asLocator(action.selector)}.check()`;
       case "uncheck":
@@ -111,7 +113,7 @@ class PythonLanguageGenerator {
         return `expect(${subject}.${this._asLocator(action.selector)}).${assertion};`;
       }
       case "assertSnapshot":
-        return `expect(${subject}.${this._asLocator(action.selector)}).to_match_aria_snapshot(${quote(action.snapshot)})`;
+        return `expect(${subject}.${this._asLocator(action.selector)}).to_match_aria_snapshot(${quote(action.ariaSnapshot)})`;
     }
   }
   _asLocator(selector) {

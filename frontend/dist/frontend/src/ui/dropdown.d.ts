@@ -1,6 +1,10 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementBaseSignature } from "../elements/module.js";
-import { HStackElement, AnchorHStackElement } from "./stack";
-import { ImageMaskElement } from "./image";
+import { HStackElement, AnchorHStackElement } from "./stack.js";
+import { ImageMaskElement } from "./image.js";
 import { AnyElement } from "./any_element.js";
 /**
  * Callback invoked with the dropdown element instance.

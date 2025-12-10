@@ -1,11 +1,11 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
 import { Elements, VElementBaseSignature, VElement } from "../elements/module.js"
-import { VStackElement, VStack, HStack, HStackElement } from "./stack"
+import { VStackElement, VStack, HStack, HStackElement } from "./stack.js"
 
 export namespace SliderElement {
     export type OnChangeCallback<This> = (element: This, value: number) => void;

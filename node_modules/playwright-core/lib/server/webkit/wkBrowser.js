@@ -39,8 +39,9 @@ var network = __toESM(require("../network"));
 var import_wkConnection = require("./wkConnection");
 var import_wkPage = require("./wkPage");
 var import_errors = require("../errors");
-const DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15";
-const BROWSER_VERSION = "18.4";
+var import_webkit = require("./webkit");
+const BROWSER_VERSION = "26.0";
+const DEFAULT_USER_AGENT = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${BROWSER_VERSION} Safari/605.1.15`;
 class WKBrowser extends import_browser.Browser {
   constructor(parent, transport, options) {
     super(parent, options);
@@ -87,7 +88,7 @@ class WKBrowser extends import_browser.Browser {
     const createOptions = proxy ? {
       // Enable socks5 hostname resolution on Windows.
       // See https://github.com/microsoft/playwright/issues/20451
-      proxyServer: process.platform === "win32" ? proxy.server.replace(/^socks5:\/\//, "socks5h://") : proxy.server,
+      proxyServer: process.platform === "win32" && this.attribution.browser?.options.channel !== "webkit-wsl" ? proxy.server.replace(/^socks5:\/\//, "socks5h://") : proxy.server,
       proxyBypassList: proxy.bypass
     } : void 0;
     const { browserContextId } = await this._browserSession.send("Playwright.createContext", createOptions);
@@ -110,7 +111,10 @@ class WKBrowser extends import_browser.Browser {
     const page = this._wkPages.get(payload.pageProxyId);
     if (!page)
       return;
-    page._page._frameManager.frameAbortedNavigation(payload.frameId, "Download is starting");
+    let frameId = payload.frameId;
+    if (!page._page.frameManager.frame(frameId))
+      frameId = page._page.mainFrame()._id;
+    page._page.frameManager.frameAbortedNavigation(frameId, "Download is starting");
     let originPage = page._page.initializedOrUndefined();
     if (!originPage) {
       page._firstNonInitialNavigationCommittedReject(new Error("Starting new page download"));
@@ -152,8 +156,8 @@ class WKBrowser extends import_browser.Browser {
     const wkPage = this._wkPages.get(pageProxyId);
     if (!wkPage)
       return;
-    wkPage.didClose();
     this._wkPages.delete(pageProxyId);
+    wkPage.didClose();
   }
   _onPageProxyMessageReceived(event) {
     const wkPage = this._wkPages.get(event.pageProxyId);
@@ -189,7 +193,7 @@ class WKBrowserContext extends import_browserContext.BrowserContext {
     const promises = [super._initialize()];
     promises.push(this._browser._browserSession.send("Playwright.setDownloadBehavior", {
       behavior: this._options.acceptDownloads === "accept" ? "allow" : "deny",
-      downloadPath: this._browser.options.downloadsPath,
+      downloadPath: this._browser.options.channel === "webkit-wsl" ? await (0, import_webkit.translatePathToWSL)(this._browser.options.downloadsPath) : this._browser.options.downloadsPath,
       browserContextId
     }));
     if (this._options.ignoreHTTPSErrors || this._options.internalIgnoreHTTPSErrors)
@@ -199,7 +203,7 @@ class WKBrowserContext extends import_browserContext.BrowserContext {
     if (this._options.geolocation)
       promises.push(this.setGeolocation(this._options.geolocation));
     if (this._options.offline)
-      promises.push(this.setOffline(this._options.offline));
+      promises.push(this.doUpdateOffline());
     if (this._options.httpCredentials)
       promises.push(this.setHTTPCredentials(this._options.httpCredentials));
     await Promise.all(promises);
@@ -211,35 +215,52 @@ class WKBrowserContext extends import_browserContext.BrowserContext {
     return this._wkPages().map((wkPage) => wkPage._page);
   }
   async doCreateNewPage() {
-    (0, import_browserContext.assertBrowserContextIsNotOwned)(this);
     const { pageProxyId } = await this._browser._browserSession.send("Playwright.createPage", { browserContextId: this._browserContextId });
     return this._browser._wkPages.get(pageProxyId)._page;
   }
   async doGetCookies(urls) {
     const { cookies } = await this._browser._browserSession.send("Playwright.getAllCookies", { browserContextId: this._browserContextId });
     return network.filterCookies(cookies.map((c) => {
-      const copy = { ...c };
-      copy.expires = c.expires === -1 ? -1 : c.expires / 1e3;
-      delete copy.session;
+      const { name, value, domain, path, expires, httpOnly, secure, sameSite } = c;
+      const copy = {
+        name,
+        value,
+        domain,
+        path,
+        expires: expires === -1 ? -1 : expires / 1e3,
+        httpOnly,
+        secure,
+        sameSite
+      };
       return copy;
     }), urls);
   }
   async addCookies(cookies) {
-    const cc = network.rewriteCookies(cookies).map((c) => ({
-      ...c,
-      session: c.expires === -1 || c.expires === void 0,
-      expires: c.expires && c.expires !== -1 ? c.expires * 1e3 : c.expires
-    }));
+    const cc = network.rewriteCookies(cookies).map((c) => {
+      const { name, value, domain, path, expires, httpOnly, secure, sameSite } = c;
+      const copy = {
+        name,
+        value,
+        domain,
+        path,
+        expires: expires && expires !== -1 ? expires * 1e3 : expires,
+        httpOnly,
+        secure,
+        sameSite,
+        session: expires === -1 || expires === void 0
+      };
+      return copy;
+    });
     await this._browser._browserSession.send("Playwright.setCookies", { cookies: cc, browserContextId: this._browserContextId });
   }
   async doClearCookies() {
     await this._browser._browserSession.send("Playwright.deleteAllCookies", { browserContextId: this._browserContextId });
   }
   async doGrantPermissions(origin, permissions) {
-    await Promise.all(this.pages().map((page) => page._delegate._grantPermissions(origin, permissions)));
+    await Promise.all(this.pages().map((page) => page.delegate._grantPermissions(origin, permissions)));
   }
   async doClearPermissions() {
-    await Promise.all(this.pages().map((page) => page._delegate._clearPermissions()));
+    await Promise.all(this.pages().map((page) => page.delegate._clearPermissions()));
   }
   async setGeolocation(geolocation) {
     (0, import_browserContext.verifyGeolocation)(geolocation);
@@ -247,37 +268,43 @@ class WKBrowserContext extends import_browserContext.BrowserContext {
     const payload = geolocation ? { ...geolocation, timestamp: Date.now() } : void 0;
     await this._browser._browserSession.send("Playwright.setGeolocationOverride", { browserContextId: this._browserContextId, geolocation: payload });
   }
-  async setExtraHTTPHeaders(headers) {
-    this._options.extraHTTPHeaders = headers;
+  async doUpdateExtraHTTPHeaders() {
     for (const page of this.pages())
-      await page._delegate.updateExtraHTTPHeaders();
+      await page.delegate.updateExtraHTTPHeaders();
   }
   async setUserAgent(userAgent) {
     this._options.userAgent = userAgent;
     for (const page of this.pages())
-      await page._delegate.updateUserAgent();
+      await page.delegate.updateUserAgent();
   }
-  async setOffline(offline) {
-    this._options.offline = offline;
+  async doUpdateOffline() {
     for (const page of this.pages())
-      await page._delegate.updateOffline();
+      await page.delegate.updateOffline();
   }
   async doSetHTTPCredentials(httpCredentials) {
     this._options.httpCredentials = httpCredentials;
     for (const page of this.pages())
-      await page._delegate.updateHttpCredentials();
+      await page.delegate.updateHttpCredentials();
   }
   async doAddInitScript(initScript) {
     for (const page of this.pages())
-      await page._delegate._updateBootstrapScript();
+      await page.delegate._updateBootstrapScript();
   }
-  async doRemoveNonInternalInitScripts() {
+  async doRemoveInitScripts(initScripts) {
     for (const page of this.pages())
-      await page._delegate._updateBootstrapScript();
+      await page.delegate._updateBootstrapScript();
   }
   async doUpdateRequestInterception() {
     for (const page of this.pages())
-      await page._delegate.updateRequestInterception();
+      await page.delegate.updateRequestInterception();
+  }
+  async doUpdateDefaultViewport() {
+  }
+  async doUpdateDefaultEmulatedMedia() {
+  }
+  async doExposePlaywrightBinding() {
+    for (const page of this.pages())
+      await page.delegate.exposePlaywrightBinding();
   }
   onClosePersistent() {
   }

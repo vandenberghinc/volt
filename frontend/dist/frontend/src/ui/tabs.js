@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -39,10 +39,10 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
 // Imports.
 import { Elements } from "../elements/module.js";
 import { Schema } from "@vandenberghinc/vlib/frontend";
-import { VStack, VStackElement, HStack, ZStack } from "./stack";
-import { ForEach } from "./for_each";
-import { Text } from "./text";
-import { Divider } from "./divider";
+import { VStack, VStackElement, HStack, ZStack } from "./stack.js";
+import { ForEach } from "./for_each.js";
+import { Text } from "./text.js";
+import { Divider } from "./divider.js";
 /**
  * Create a tabs element with content that will be presented when the tab is selected.
  * @nav Frontend/Elements

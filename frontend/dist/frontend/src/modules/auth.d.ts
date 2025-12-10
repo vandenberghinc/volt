@@ -1,12 +1,16 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import type { Users as UsersBackend } from "../../../backend/src/users.js";
-import { Utils } from "./utils.js";
+import { Request } from "./request.js";
 export declare namespace Auth {
     /**
      * Make a sign in request.
      * @param payload The request payload.
      * @docs
      */
-    function sign_in(payload: UsersBackend.Endpoints.SignIn.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.SignIn.Result>;
+    function sign_in(payload: UsersBackend.Endpoints.SignIn["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.SignIn>;
     /**
      * Make a sign up request.
      *
@@ -18,23 +22,23 @@ export declare namespace Auth {
      * @param payload The request payload.
      * @docs
      */
-    function sign_up(payload: UsersBackend.Endpoints.SignUp.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.SignUp.Result>;
+    function sign_up(payload: UsersBackend.Endpoints.SignUp["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.SignUp>;
     /**
      * Make a sign out request.
      * @docs
      */
-    function sign_out(): Utils.RequestResultPromise<UsersBackend.Endpoints.SignOut.Result>;
+    function sign_out(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.SignOut>;
     /**
      * Make a send 2FA request.
      * @param payload The request payload.
      * @docs
      */
-    function send_2fa(payload: UsersBackend.Endpoints.Send2FA.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.Send2FA.Result>;
+    function send_2fa(payload: UsersBackend.Endpoints.Send2FA["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.Send2FA>;
     /**
      * Make a forgot password request.
      * @param payload The request payload.
      * @docs
      */
-    function forgot_password(payload: UsersBackend.Endpoints.ForgotPassword.Params): Utils.RequestResultPromise<UsersBackend.Endpoints.ForgotPassword.Result>;
+    function forgot_password(payload: UsersBackend.Endpoints.ForgotPassword["payload"]): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.ForgotPassword>;
 }
 export { Auth as auth };

@@ -256,9 +256,11 @@ function frameSnapshotStreamer(snapshotStreamer, removeNoScript) {
         this._readingStyleSheet = false;
       }
     }
-    captureSnapshot() {
+    captureSnapshot(needsReset) {
       const timestamp = performance.now();
       const snapshotNumber = ++this._lastSnapshotNumber;
+      if (needsReset)
+        this.reset();
       let nodeCounter = 0;
       let shadowDomNesting = 0;
       let headNesting = 0;

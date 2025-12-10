@@ -1,11 +1,11 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
 import type { Users as UsersBackend } from "../../../backend/src/users.js";
-import { Utils } from "./utils.js"
+import { Request, request } from "./request.js";
 
 // Namespace.
 export namespace Auth {
@@ -16,11 +16,11 @@ export namespace Auth {
      * @docs
      */
     export function sign_in(
-        payload: UsersBackend.Endpoints.SignIn.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.SignIn.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.SignIn["payload"]
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.SignIn> {
+        return request<UsersBackend.Endpoints.SignIn>({
             method: "POST",
-            url: "/volt/auth/signin",
+            url: "/volt/api/v1/auth/signin",
             data: payload,
         });
     }
@@ -37,11 +37,11 @@ export namespace Auth {
      * @docs
      */
     export function sign_up(
-        payload: UsersBackend.Endpoints.SignUp.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.SignUp.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.SignUp["payload"]
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.SignUp> {
+        return request<UsersBackend.Endpoints.SignUp>({
             method: "POST",
-            url: "/volt/auth/signup",
+            url: "/volt/api/v1/auth/signup",
             data: payload,
         });
     }
@@ -50,10 +50,10 @@ export namespace Auth {
      * Make a sign out request.
      * @docs
      */
-    export function sign_out(): Utils.RequestResultPromise<UsersBackend.Endpoints.SignOut.Result> {
-        return Utils.request({
+    export function sign_out(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.SignOut> {
+        return request<UsersBackend.Endpoints.SignOut>({
             method: "POST",
-            url: "/volt/auth/signout",
+            url: "/volt/api/v1/auth/signout",
         });
     }
 
@@ -63,11 +63,11 @@ export namespace Auth {
      * @docs
      */
     export function send_2fa(
-        payload: UsersBackend.Endpoints.Send2FA.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.Send2FA.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.Send2FA["payload"]
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.Send2FA> {
+        return request<UsersBackend.Endpoints.Send2FA>({
             method: "POST",
-            url: "/volt/auth/2fa",
+            url: "/volt/api/v1/auth/2fa",
             data: payload,
         });
     }
@@ -78,11 +78,11 @@ export namespace Auth {
      * @docs
      */
     export function forgot_password(
-        payload: UsersBackend.Endpoints.ForgotPassword.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.ForgotPassword.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.ForgotPassword["payload"]
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.ForgotPassword> {
+        return request<UsersBackend.Endpoints.ForgotPassword>({
             method: "POST",
-            url: "/volt/auth/forgot_password",
+            url: "/volt/api/v1/auth/forgot_password",
             data: payload,
         });
     }

@@ -1,112 +1,21 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh.
  */
 
 // ---------------------------------------------------------
 // Imports.
 
-import * as libcrypto from "crypto";
 import * as vlib from "@vandenberghinc/vlib";
-import { Status } from "./status.js";
-import type { Stream } from "./stream.js";
 
 // ---------------------------------------------------------
 // Utils.
 
-/**
- * The base class for internal and external errors.
- */
-class BaseError extends Error {
-    public type: string;
-    public status: number;
-    public data?: any[] | Record<string, any>;
-    public invalid_fields: Record<string, string>;
-    constructor({ type = "APIError", message, status, data, invalid_fields, cause }: {
-        type?: string,
-        message: string,
-        status?: number,
-        data?: any,
-        invalid_fields?: Record<string, string>,
-        cause?: unknown
-    }) {
-        super(message);
-        this.name = "APIError";
-        this.type = type;
-        this.status = status ?? Status.internal_server_error;
-        this.data = data;
-        this.invalid_fields = invalid_fields ?? {};
-        this.cause = cause;
-    }
-    serve(stream: Stream) {
-        stream.error({
-            status: this.status ?? Status.internal_server_error, 
-            headers: {"Content-Type": "application/json"},
-            message: this.message, 
-            type: this.type,
-            invalid_fields: this.invalid_fields,
-        });
-        return this;
-    }
-}
-
-/**
- * Thrown external errors are presented to the user.
- */
-export class ExternalError extends BaseError {
-    constructor(args: ConstructorParameters<typeof BaseError>[0]) {
-        args.type ??= "ExternalError";
-        super(args);
-    }
-    serve(stream: Stream) {
-        stream.error({
-            status: this.status ?? Status.internal_server_error,
-            headers: { "Content-Type": "application/json" },
-            message: this.message,
-            type: this.type,
-            invalid_fields: this.invalid_fields,
-        });
-        return this;
-    }
-}
-
-/**
- * Thrown internal errors are not presented to the user, isntead an internal server error message is shown.
- */
-export class InternalError extends BaseError {
-    constructor(args: ConstructorParameters<typeof BaseError>[0]) {
-        args.type ??= "InternalError";
-        super(args);
-    }
-    serve(stream: Stream) {
-        stream.error({
-            status: Status.internal_server_error,
-            headers: { "Content-Type": "application/json" },
-            message: "Internal Server Error",
-            type: "InternalServerError",
-        });
-        return this;
-    }
-}
-
-// Define interface with overloads
-interface UtilsInt {
-    "APIError": typeof ExternalError;  // Replace with actual type
-    
-    fill_templates(data: string, templates: Record<string, any>, curly_style?: boolean): string;
-    get_currency_symbol(currency: string): string | null;
-    get_compiled_cache(domain: string, method: string, endpoint: string): { cache_path: any, cache_hash: any, cache_data: any };
-    set_compiled_cache(path: any, data: string, hash: string): void;
-}
-
 // Implementation
-export const Utils: UtilsInt = {
-
-    // An error that may be shown to the frontend user.
-    "APIError": ExternalError,
+export namespace Utils {
 
     // Fill templates {{TEMPLATE}}
-    fill_templates(data: string, templates: Record<string, any>, curly_style: boolean = true): string {
+    export function fill_templates(data: string, templates: Record<string, any>, curly_style: boolean = true): string {
         if (templates == null) { return data; }
         const keys = Object.keys(templates);
 
@@ -158,10 +67,10 @@ export const Utils: UtilsInt = {
 
         // Response.
         return data;
-    },
+    }
 
     // Utils.
-    get_currency_symbol(currency: string): string | null {
+    export function get_currency_symbol(currency: string): string | null {
         switch (currency.toLowerCase()) {
             case "aed": return "د.إ";
             case "afn": return "Af";
@@ -319,10 +228,10 @@ export const Utils: UtilsInt = {
             case "zmw": return "ZK";
         }
         return null;
-    },
+    }
 
     // Try a compiled js cache using the /tmp/
-    get_compiled_cache(domain: string, method: string, endpoint: string) {
+    export function get_compiled_cache(domain: string, method: string, endpoint: string) {
         const cache_path = new vlib.Path(`/tmp/${domain.replaceAll("/", "")}:${method}:${endpoint.replaceAll("/", "_")}`);
         let cache_data, cache_hash;
         if (cache_path.exists()) {
@@ -330,13 +239,12 @@ export const Utils: UtilsInt = {
             cache_hash = new vlib.Path(cache_path.str() + '.hash').load_sync();
         }
         return {cache_path, cache_hash, cache_data};
-    },
+    }
     // @todo
-    set_compiled_cache(path: any, data: string, hash: string): void {
+    export function set_compiled_cache(path: vlib.Path, data: string, hash: string): void {
         path.save_sync(data);
         new vlib.Path(path.str() + '.hash').save_sync(hash);
-    },
+    }
 
 }
 export { Utils as utils }; // lowercase export for compatibility
-export default Utils;

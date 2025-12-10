@@ -1,4 +1,8 @@
-import { VStackElement } from "./stack";
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
+import { VStackElement } from "./stack.js";
 export declare namespace SwitchElement {
     type OnChangeCallback<This> = (element: This, enabled: boolean) => void;
 }

@@ -1,10 +1,12 @@
-import "../modules//string.js";
-import "../modules//array.js";
-import "../modules//number.js";
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved.
+ */
 import { GradientType } from "../types/gradient.js";
 import type { AnyElement } from "../ui/any_element.js";
 import type { PseudoElement } from "../ui/pseudo.js";
-type none = undefined | null;
+import type { None, BorderOpts } from "./types.js";
+import { Attachment } from "../modules/attachment.js";
 declare global {
     export interface VElementExtensions {
     }
@@ -33,16 +35,28 @@ export type OnAppearCallback<This> = (element: This, options: {
     scroll_direction: string;
 }) => any;
 export type undefstrnr = null | undefined | string | number;
+/**
+ * {Base element}
+ * The base element of the volt frontend elements.
+ * @nav FrontendVElement/Elements
+ * @docs
+ */
 export declare abstract class VElement extends HTMLElement {
-    __is_velement: boolean;
     static element_tag: string;
     static default_style: Record<string, any>;
     static default_attributes: Record<string, any>;
     static default_events: Record<string, any>;
+    /** Attachments added by the {@link on_attachment_drop} callback. */
+    attachments: Attachment[];
+    /** Is rendered flag. */
     rendered: boolean;
+    /** The element name. */
     element_name: string;
+    /** The base element name @internal */
     base_element_name: string;
+    /** Remove focus method. */
     remove_focus: HTMLElement["blur"];
+    __is_velement: boolean;
     _v_children: any[];
     _element_display: string;
     _is_connected: boolean;
@@ -89,391 +103,283 @@ export declare abstract class VElement extends HTMLElement {
     connectedCallback(): void;
     static is(type: any): type is VElement;
     /**
-     * @docs:
-     * @title: Clone
-     * @desc: Creates a deep copy of the current element, including its styles and attributes.
-     *         Optionally clones child nodes based on the provided parameter.
-     * @param:
-     *     @name: clone_children
-     *     @descr: Indicates whether to clone child nodes of the current element.
-     *     @default: true
-     * @return:
-     *     @description Returns a new instance of the element that is a clone of the current one.
+     * {Clone}
+     * Creates a deep copy of the current element, including its styles and attributes.
+     * Optionally clones child nodes based on the provided parameter.
+     * @parameter clone_children Indicates whether to clone child nodes of the current element.
+     * @returns Returns a new instance of the element that is a clone of the current one.
+     * @docs
      */
     clone(clone_children?: boolean): this;
     /**
-     * @docs:
-     * @title: Pad Numeric
-     * @desc: Pads a numeric value with a specified padding unit, defaulting to "px".
-     * @param:
-     *     @name: value
-     *     @descr: The numeric value to be padded.
-     * @param:
-     *     @name: padding
-     *     @descr: The unit to pad the numeric value with.
-     *     @default: "px"
-     * @return:
-     *     @description Returns the padded value as a string.
+     * {Pad Numeric}
+     * Pads a numeric value with a specified padding unit, defaulting to "px".
+     * @parameter value The numeric value to be padded.
+     * @parameter padding The unit to pad the numeric value with.
+     * @returns Returns the padded value as a string.
+     * @docs
      */
-    pad_numeric(value: none | number | string, padding?: string): string;
+    pad_numeric(value: None | number | string, padding?: string): string;
     /**
-     * @docs:
-     * @title: Pad Percentage
-     * @desc: Pads a numeric value with a percentage symbol. If the value is a float between 0 and 1, it is multiplied by 100 before padding.
-     * @param:
-     *     @name: value
-     *     @descr: The numeric value to pad.
-     * @param:
-     *     @name: padding
-     *     @descr: The string to pad the numeric value with, defaults to "%".
-     * @return:
-     *     @description Returns the padded percentage as a string, or the original value if it is not numeric.
+     * {Pad Percentage}
+     * Pads a numeric value with a percentage symbol. If the value is a float between 0 and 1, it is multiplied by 100 before padding.
+     * @parameter value The numeric value to pad.
+     * @parameter padding The string to pad the numeric value with, defaults to "%".
+     * @returns Returns the padded percentage as a string, or the original value if it is not numeric.
+     * @docs
      */
     pad_percentage(value: number, padding?: string): string;
     /**
-     * @docs:
-     * @title: Edit Filter Wrapper
-     * @desc: Edits a filter string by replacing or removing specified types.
+     * {Edit Filter Wrapper}
+     * Edits a filter string by replacing or removing specified types.
      * Can also append a new type if it doesn’t exist in the filter.
-     * @param:
-     *     @name: filter
-     *     @descr: The original filter string that needs to be edited.
-     *     @name: type
-     *     @descr: The type that will be targeted for replacement or removal.
-     *     @name: to
-     *     @descr: The new value to replace the existing type with, or null to remove it.
-     * @return:
-     *     @description Returns the modified filter string or null if the input filter was null.
+     * @parameter filter The original filter string that needs to be edited.
+     * @parameter type The type that will be targeted for replacement or removal.
+     * @parameter to The new value to replace the existing type with, or null to remove it.
+     * @returns Returns the modified filter string or null if the input filter was null.
+     * @docs
      */
     edit_filter_wrapper(filter: string | null, type: string, to?: undefstrnr): string;
     /**
-     * @docs:
-     * @title: Toggle Filter Wrapper
-     * @desc: Toggles a specified filter type in a string. If the type is present, it will be removed; otherwise, it will be added.
-     * @param:
-     *     @name: filter
-     *     @descr: The filter string to modify.
-     *     @name: type
-     *     @descr: The type of filter to toggle.
-     *     @name: to
-     *     @descr: The value to add if the type is not present.
-     * @return:
-     *     @description Returns the modified filter string or null if the input filter was null.
+     * {Toggle Filter Wrapper}
+     * Toggles a specified filter type in a string. If the type is present, it will be removed; otherwise, it will be added.
+     * @parameter filter The filter string to modify.
+     * @parameter type The type of filter to toggle.
+     * @parameter to The value to add if the type is not present.
+     * @returns Returns the modified filter string or null if the input filter was null.
+     * @docs
      */
     toggle_filter_wrapper(filter: string | null, type: string, to?: string | null): string;
     _convert_px_to_number_type(value: any, def?: number | null): any;
     _try_parse_float(value: any, def?: number | null): any;
     _try_parse_boolean(value: any): boolean;
     /**
-     * @docs:
-     * @title: Append Child Elements
-     * @desc: Appends child elements to the current element. Can accept multiple child elements, including HTML nodes, functions, or strings.
-     * @param:
-     *     @name: children
-     *     @descr: The child elements to append, which can be an array of elements, a single element, or a function.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Append Child Elements}
+     * Appends child elements to the current element. Can accept multiple child elements, including HTML nodes, functions, or strings.
+     * @parameter children The child elements to append, which can be an array of elements, a single element, or a function.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     append(...children: AppendType[]): this;
     /**
-     * @docs:
-     * @title: ZStack Append
-     * @desc: Appends multiple children to the ZStack element. This method can handle various types of children such as elements, functions, and text.
-     * @param:
-     *     @name: children
-     *     @descr: The children to append, which can be elements, arrays, text, or functions returning elements.
-     * @return:
-     *     @description Returns the instance of the ZStack element for chaining.
+     * {ZStack Append}
+     * Appends multiple children to the ZStack element. This method can handle various types of children such as elements, functions, and text.
+     * @parameter children The children to append, which can be elements, arrays, text, or functions returning elements.
+     * @returns Returns the instance of the ZStack element for chaining.
+     * @docs
      */
     zstack_append(...children: AppendType[]): this;
     /**
-     * @docs:
-     * @title: Append To Parent
-     * @desc: Appends the current element to a specified parent element and manages parent-child relationships.
-     * @param:
-     *     @name: parent
-     *     @descr: The parent element to which the current element will be appended.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Append To Parent}
+     * Appends the current element to a specified parent element and manages parent-child relationships.
+     * @parameter parent The parent element to which the current element will be appended.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     append_to(parent: any): this;
     /**
-     * @docs:
-     * @title: Append Children to Parent
-     * @desc: Appends the children of the current element to the specified parent element and executes a callback for each appended child.
-     * @param:
-     *     @name: parent
-     *     @descr: The parent element to which the children will be appended.
-     *     @name: on_append_callback
-     *     @descr: A callback function that is executed for each child when it is appended.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Append Children to Parent}
+     * Appends the children of the current element to the specified parent element and executes a callback for each appended child.
+     * @parameter parent The parent element to which the children will be appended.
+     * @parameter on_append_callback A callback function that is executed for each child when it is appended.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     append_children_to(parent: any, on_append_callback?: Function): this;
     /**
-     * @docs:
-     * @title: Remove Child
-     * @desc: Removes a child element from the current element. The child can be specified
-     *        by passing a Node, an VElement, or an id string of the element to be removed.
-     * @param:
-     *     @name: child
-     *     @descr: The child to be removed from the current element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Child}
+     * Removes a child element from the current element. The child can be specified
+     * by passing a Node, an VElement, or an id string of the element to be removed.
+     * @parameter child The child to be removed from the current element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_child(child: any): this;
     /**
-     * @docs:
-     * @title: Remove Children
-     * @desc: Removes all child elements from the current element without using innerHTML.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Children}
+     * Removes all child elements from the current element without using innerHTML.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_children(): this;
     /**
-     * @docs:
-     * @title: Child
-     * @desc: Retrieves a child element by its index. Supports negative indexing to access elements from the end of the list.
-     * @param:
-     *     @name: index
-     *     @descr: The index of the child to retrieve. Can be a positive or negative integer.
-     * @return:
-     *     @description Returns the child element at the specified index.
+     * {Child}
+     * Retrieves a child element by its index. Supports negative indexing to access elements from the end of the list.
+     * @parameter index The index of the child to retrieve. Can be a positive or negative integer.
+     * @returns Returns the child element at the specified index.
+     * @docs
      */
     child(index: number): any;
     /**
-     * @docs:
-     * @title: Get Child
-     * @desc: Retrieves a child element by its index. Supports negative indexing to access elements from the end.
-     * @param:
-     *     @name: index
-     *     @descr: The index of the child element to retrieve. Can be negative to access from the end.
-     * @return:
-     *     @description Returns the child element at the specified index, or undefined if the index is out of bounds.
+     * {Get Child}
+     * Retrieves a child element by its index. Supports negative indexing to access elements from the end.
+     * @parameter index The index of the child element to retrieve. Can be negative to access from the end.
+     * @returns Returns the child element at the specified index, or undefined if the index is out of bounds.
+     * @docs
      */
     get(index: number): any | undefined;
     /**
-     * @docs:
-     * @title: Text
-     * @desc: Set or get the text content of the element. If no value is provided, it retrieves the current text content.
-     * @param:
-     *     @name: value
-     *     @descr: The text content to set or retrieve.
-     * @return:
-     *     @description Returns the current text content if no argument is passed, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Text}
+     * Set or get the text content of the element. If no value is provided, it retrieves the current text content.
+     * @parameter value The text content to set or retrieve.
+     * @returns Returns the current text content if no argument is passed, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     text(): string;
     text(value: string): this;
     /**
-     * @docs:
-     * @title: Width
-     * @desc: Specify the width or height of the element. Returns the offset width or height when the param value is null.
-     * @param:
-     *     @name: value
-     *     @descr: The width value to set or get.
-     * @param:
-     *     @name: check_attribute
-     *     @descr: Indicates whether to check the element's width attribute.
-     * @return:
-     *     @description Returns the offset width when no value is provided, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Width}
+     * Specify the width or height of the element. Returns the offset width or height when the param value is null.
+     * @parameter value The width value to set or get.
+     * @parameter check_attribute Indicates whether to check the element's width attribute.
+     * @returns Returns the offset width when no value is provided, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     width(): string | number;
     width(value: string | number, check_attribute?: boolean): this;
     /** Simple wrapper for .width("fit-content") */
     fit_content(): this;
     /**
-     * @docs:
-     * @title: Fixed Width
-     * @desc: Sets the fixed width for the element and updates min and max widths accordingly.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the width, can be a number or null to get the current width.
-     * @return:
-     *     @description If no argument is passed, returns the current width as a number. If an argument is passed, returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Fixed Width}
+     * Sets the fixed width for the element and updates min and max widths accordingly.
+     * @parameter value The value to set for the width, can be a number or null to get the current width.
+     * @returns If no argument is passed, returns the current width as a number. If an argument is passed, returns the instance of the element for chaining.
+     * @docs
      */
     fixed_width(): string | number;
     fixed_width(value: string | number): this;
     /**
-     * @docs:
-     * @title: Height
-     * @desc: Sets or retrieves the height of the element. It checks for attributes and styles based on the provided parameters.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for height or retrieve the current height if null.
-     * @param:
-     *     @name: check_attribute
-     *     @descr: Determines if the element's attribute should be checked.
-     * @return:
-     *     @description Returns the instance of the element for chaining when an argument is passed, otherwise returns the current height as a number.
-     * @funcs: 2
+     * {Height}
+     * Sets or retrieves the height of the element. It checks for attributes and styles based on the provided parameters.
+     * @parameter value The value to set for height or retrieve the current height if null.
+     * @parameter check_attribute Determines if the element's attribute should be checked.
+     * @returns Returns the instance of the element for chaining when an argument is passed, otherwise returns the current height as a number.
+     * @docs
      */
     height(): string | number;
     height(value: string | number, check_attribute?: boolean): this;
     /**
-     * @docs:
-     * @title: Fixed Height
-     * @desc: Sets the fixed height for the element or retrieves the current height if no value is provided.
-     * @param:
-     *     @name: value
-     *     @descr: The height value to set, which can be a number or null.
-     * @return:
-     *     @descr: When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the parsed float value of the current height.
-     * @funcs: 2
+     * {Fixed Height}
+     * Sets the fixed height for the element or retrieves the current height if no value is provided.
+     * @parameter value The height value to set, which can be a number or null.
+     * @returns When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the parsed float value of the current height.
+     * @docs
      */
     fixed_height(): string | number;
     fixed_height(value: string | number): this;
     /**
-     * @docs:
-     * @title: Min height
-     * @desc: Sets the minimum height of an element. The equivalent of CSS attribute `minHeight`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Min height}
+     * Sets the minimum height of an element. The equivalent of CSS attribute `minHeight`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     min_height(): string | number;
     min_height(value: string | number): this;
     /**
-     * @docs:
-     * @title: Min Width
-     * @desc: Sets the minimum width of an element. The equivalent of CSS attribute `minWidth`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @descr: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Min Width}
+     * Sets the minimum width of an element. The equivalent of CSS attribute `minWidth`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     min_width(): string | number;
     min_width(value: string | number): this;
     /**
-     * @docs:
-     * @title: Width By Columns
-     * @desc: Sets the width of HStack children based on the number of columns specified.
+     * {Width By Columns}
+     * Sets the width of HStack children based on the number of columns specified.
      * If columns are not provided, it defaults to 1. The calculation takes into account
      * the left and right margins of the element.
-     * @param:
-     *     @name: columns
-     *     @descr: The number of columns to set the width by.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * @parameter columns The number of columns to set the width by.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     width_by_columns(columns: number): this;
     /**
-     * @docs:
-     * @title: Offset Width
-     * @desc: Retrieves the offset width of the element.
-     * @return:
-     *     @description Returns the offset width of the element.
+     * {Offset Width}
+     * Retrieves the offset width of the element.
+     * @returns Returns the offset width of the element.
+     * @docs
      */
     offset_width(): number;
     /**
-     * @docs:
-     * @title: Offset Height
-     * @desc: Retrieves the height of the element's offset.
-     * @return:
-     *     @description Returns the height of the element including padding and border.
+     * {Offset Height}
+     * Retrieves the height of the element's offset.
+     * @returns Returns the height of the element including padding and border.
+     * @docs
      */
     offset_height(): number;
     /**
-     * @docs:
-     * @title: Client Width
-     * @desc: Retrieves the client width of the element.
-     * @return:
-     *     @description Returns the client width of the element.
+     * {Client Width}
+     * Retrieves the client width of the element.
+     * @returns Returns the client width of the element.
+     * @docs
      */
     client_width(): number;
     /**
-     * @docs:
-     * @title: Client Height
-     * @desc: Retrieves the height of the client area of the element.
-     * @return:
-     *     @description Returns the height of the client area in pixels.
+     * {Client Height}
+     * Retrieves the height of the client area of the element.
+     * @returns Returns the height of the client area in pixels.
+     * @docs
      */
     client_height(): number;
     /**
-     * @docs:
-     * @title: X Offset
-     * @desc: Retrieves the x offset of the element from its parent.
-     * @return:
-     *     @description Returns the x offset value of the element.
+     * {X Offset}
+     * Retrieves the x offset of the element from its parent.
+     * @returns Returns the x offset value of the element.
+     * @docs
      */
     x(): number;
     /**
-     * @docs:
-     * @title: Y Offset
-     * @desc: Retrieves the vertical offset of the element from the top of the document.
-     * @return:
-     *     @description Returns the vertical offset value.
+     * {Y Offset}
+     * Retrieves the vertical offset of the element from the top of the document.
+     * @returns Returns the vertical offset value.
+     * @docs
      */
     y(): number;
     /**
-     * @docs:
-     * @title: Frame
-     * @desc: Sets the width and height of the frame. If width or height is not provided, it does not change that dimension.
-     * @param:
-     *     @name: width
-     *     @descr: The width to set for the frame.
-     * @param:
-     *     @name: height
-     *     @descr: The height to set for the frame.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Frame}
+     * Sets the width and height of the frame. If width or height is not provided, it does not change that dimension.
+     * @parameter width The width to set for the frame.
+     * @parameter height The height to set for the frame.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     frame(width?: string | number, height?: string | number): this;
     /**
-     * @docs:
-     * @title: Min Frame
-     * @desc: Sets the minimum width and height for the frame. If parameters are provided, it updates the respective properties.
-     * @param:
-     *     @name: width
-     *     @descr: The minimum width to set for the frame.
-     * @param:
-     *     @name: height
-     *     @descr: The minimum height to set for the frame.
-     * @return:
-     *     @descr: Returns the instance of the frame for chaining.
+     * {Min Frame}
+     * Sets the minimum width and height for the frame. If parameters are provided, it updates the respective properties.
+     * @parameter width The minimum width to set for the frame.
+     * @parameter height The minimum height to set for the frame.
+     * @returns Returns the instance of the frame for chaining.
+     * @docs
      */
     min_frame(width: string | number, height: string | number): this;
     /**
-     * @docs:
-     * @title: Max Frame
-     * @desc: Sets the maximum width and height for the frame. If a value is provided, it updates the respective maximum dimension.
-     * @param:
-     *     @name: width
-     *     @descr: The maximum width to set for the frame.
-     *     @name: height
-     *     @descr: The maximum height to set for the frame.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Max Frame}
+     * Sets the maximum width and height for the frame. If a value is provided, it updates the respective maximum dimension.
+     * @parameter width The maximum width to set for the frame.
+     * @parameter height The maximum height to set for the frame.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     max_frame(width: string | number, height: string | number): this;
     /**
-     * @docs:
-     * @title: Fixed Frame
-     * @desc: Sets the width and height of the element, applying padding to the values if provided.
-     * @param:
-     *     @name: width
-     *     @descr: The width to set for the element. Can be a number or null.
-     *     @name: height
-     *     @descr: The height to set for the element. Can be a number or null.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Fixed Frame}
+     * Sets the width and height of the element, applying padding to the values if provided.
+     * @parameter width The width to set for the element. Can be a number or null.
+     * @parameter height The height to set for the element. Can be a number or null.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     fixed_frame(width: string | number, height: string | number): this;
     /**
-     * @docs:
-     * @title: Get Frame While Hidden
-     * @desc: Retrieves the dimensions of the element as it would appear if it were not hidden.
-     * @return:
-     *     @description Returns an object containing the width and height of the element.
+     * {Get Frame While Hidden}
+     * Retrieves the dimensions of the element as it would appear if it were not hidden.
+     * @returns Returns an object containing the width and height of the element.
+     * @docs
      */
     get_frame_while_hidden(): {
         width: number;
@@ -488,944 +394,677 @@ export declare abstract class VElement extends HTMLElement {
     /** Set circle border radius */
     circle(): this;
     /**
-     * @docs:
-     * @title: Padding
-     * @desc: Sets the padding of the element based on the number of provided arguments.
-     *        It can accept 1, 2, or 4 values to set padding for different sides.
-     * @param:
-     *     @name: values
-     *     @descr: The padding values to set. Can be a single value, two values for vertical and horizontal,
-     *              or four values for top, right, bottom, and left.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
-     * @funcs: 4
+     * {Padding}
+     * Sets the padding of the element based on the number of provided arguments.
+     * It can accept 1, 2, or 4 values to set padding for different sides.
+     * @parameter values The padding values to set. Can be a single value, two values for vertical and horizontal,
+     *                   or four values for top, right, bottom, and left.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     padding(): string;
     padding(value: undefstrnr): this;
     padding(top_bottom: undefstrnr, left_right: undefstrnr): this;
     padding(top: undefstrnr, right: undefstrnr, bottom: undefstrnr, left: undefstrnr): this;
     /**
-     * @docs:
-     * @title: Padding Bottom
-     * @desc: Sets the bottom padding of an element. The equivalent of CSS attribute `paddingBottom`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @descr: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Padding Bottom}
+     * Sets the bottom padding of an element. The equivalent of CSS attribute `paddingBottom`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     padding_bottom(): number;
     padding_bottom(value: string | number): this;
     /**
-     * @docs:
-     * @title: Padding Left
-     * @desc: Sets the left padding of an element. The equivalent of CSS attribute `paddingLeft`.
+     * {Padding Left}
+     * Sets the left padding of an element. The equivalent of CSS attribute `paddingLeft`.
      * Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     padding_left(): number;
     padding_left(value: string | number): this;
     /**
-     * @docs:
-     * @title: Padding Right
-     * @desc: Sets the right padding of an element, equivalent to the CSS attribute `paddingRight`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Padding Right}
+     * Sets the right padding of an element, equivalent to the CSS attribute `paddingRight`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining, unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     padding_right(): number;
     padding_right(value: string | number): this;
     /**
-     * @docs:
-     * @title: Padding Top
-     * @desc: Sets the top padding of an element. The equivalent of CSS attribute `paddingTop`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @descr: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Padding Top}
+     * Sets the top padding of an element. The equivalent of CSS attribute `paddingTop`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     padding_top(): number;
     padding_top(value: string | number): this;
     /**
-     * @docs:
-     * @title: Margin
-     * @desc: Sets the margin of the element. Can accept 1, 2, or 4 values for different margin settings.
-     * @param:
-     *     @name: values
-     *     @descr: The values for the margin. Can be a single value, two values for vertical and horizontal margins, or four values for each side.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
-     * @funcs: 4
+     * {Margin}
+     * Sets the margin of the element. Can accept 1, 2, or 4 values for different margin settings.
+     * @parameter values The values for the margin. Can be a single value, two values for vertical and horizontal margins, or four values for each side.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     margin(): string;
     margin(value: undefstrnr): this;
     margin(top_bottom: undefstrnr, left_right: undefstrnr): this;
     margin(top: undefstrnr, right: undefstrnr, bottom: undefstrnr, left: undefstrnr): this;
     /**
-     * @docs:
-     * @title: Margin Bottom
-     * @desc: Sets the bottom margin of an element. The equivalent of CSS attribute `marginBottom`. Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Margin Bottom}
+     * Sets the bottom margin of an element. The equivalent of CSS attribute `marginBottom`. Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     margin_bottom(): number;
     margin_bottom(value: string | number): this;
     /**
-     * @docs:
-     * @title: Margin Left
-     * @desc: Sets the left margin of an element, equivalent to the CSS attribute `marginLeft`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Margin Left}
+     * Sets the left margin of an element, equivalent to the CSS attribute `marginLeft`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     margin_left(): number;
     margin_left(value: string | number): this;
     /**
-     * @docs:
-     * @title: Margin Right
-     * @desc: Sets the right margin of an element, equivalent to the CSS attribute `marginRight`.
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign to the right margin. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the instance of the element for chaining unless the parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Margin Right}
+     * Sets the right margin of an element, equivalent to the CSS attribute `marginRight`.
+     * Returns the attribute value when the parameter `value` is `null`.
+     * @parameter value The value to assign to the right margin. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the instance of the element for chaining unless the parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     margin_right(): number;
     margin_right(value: string | number): this;
     /**
-     * @docs:
-     * @title: Margin Top
-     * @desc: Sets the top margin of an element. The equivalent of CSS attribute `marginTop`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Margin Top}
+     * Sets the top margin of an element. The equivalent of CSS attribute `marginTop`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     margin_top(): number;
     margin_top(value: string | number): this;
     /**
-     * @docs:
-     * @title: Position
-     * @desc: Sets or retrieves the position style of the element. Can be used with 0, 1, or 4 arguments.
-     * @param:
-     *     @name: values
-     *     @descr: The values for setting the position, which can be a single value or four values for top, right, bottom, and left.
-     * @return:
-     *     @description Returns the current position if no arguments are passed, or the instance of the element for chaining when arguments are provided.
-     * @funcs: 3
+     * {Position}
+     * Sets or retrieves the position style of the element. Can be used with 0, 1, or 4 arguments.
+     * @parameter values The values for setting the position, which can be a single value or four values for top, right, bottom, and left.
+     * @returns Returns the current position if no arguments are passed, or the instance of the element for chaining when arguments are provided.
+     * @docs
      */
     position(): string | undefined;
     position(value: number | string): this;
-    position(top?: number | string | none, right?: number | string | none, bottom?: number | string | none, left?: number | string | none): this;
+    position(top?: number | string | None, right?: number | string | None, bottom?: number | string | None, left?: number | string | None): this;
     /**
-     * @docs:
-     * @title: Stretch
-     * @desc: Sets the flex property of the element to control its stretching behavior.
-     * @param:
-     *     @name: value
-     *     @descr: A boolean indicating whether the element should stretch or not.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Stretch}
+     * Sets the flex property of the element to control its stretching behavior.
+     * @parameter value A boolean indicating whether the element should stretch or not.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     stretch(value: boolean): this;
     /**
-     * @docs:
-     * @title: Wrap
-     * @desc: Sets the wrapping behavior of an element based on the provided value.
-     * @param:
-     *     @name: value
-     *     @descr: A boolean or string indicating the wrap behavior.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Wrap}
+     * Sets the wrapping behavior of an element based on the provided value.
+     * @parameter value A boolean or string indicating the wrap behavior.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     wrap(value: boolean | string): this;
     /**
-     * @docs:
-     * @title: Z Index
-     * @desc: Sets the z-index style property of the element.
-     * @param:
-     *     @name: value
-     *     @descr: The z-index value to set for the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Z Index}
+     * Sets the z-index style property of the element.
+     * @parameter value The z-index value to set for the element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     z_index(value: number | string): this;
     /**
-     * @docs:
-     * @experimental: true
-     * @title: Side by Side
-     * @description: Set the elements side by side till a specified width.
-     * @param:
-     *     @name: options
-     *     @descr: Configuration options for the side by side layout.
-     *     @attr:
-     *         @name: columns
-     *         @description The amount of column elements that will be put on one row.
-     *         @name: hspacing
-     *         @description The horizontal spacing between the columns in pixels.
-     *         @name: vspacing
-     *         @description The vertical spacing between the rows in pixels.
-     *         @name: stretch
-     *         @description Stretch the leftover columns to max width.
-     *         @name: hide_dividers
-     *         @description Hide dividers when they would appear on a row.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Side by Side}
+     * Set the elements side by side till a specified width.
+     * @experimental
+     * @param options Configuration options for the side by side layout.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     side_by_side(options: {
+        /** The amount of column elements that will be put on one row. */
         columns?: number;
+        /** The horizontal spacing between the columns in pixels. */
         hspacing?: number;
+        /** The vertical spacing between the rows in pixels. */
         vspacing?: number;
+        /** Stretch the leftover columns to max width. */
         stretch?: boolean;
+        /** Hide dividers when they would appear on a row. */
         hide_dividers?: boolean;
     }): this;
     /**
-     * @docs:
-     * @title: Side By Side Basis
-     * @desc: Sets or retrieves the side by side basis for a node, which must be a floating percentage between 0.0 and 1.0.
-     * @param:
-     *     @name: basis
-     *     @descr: The basis value to set or retrieve.
-     * @return:
-     *     @description When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the already set side by side basis.
-     * @funcs: 2
+     * {Side By Side Basis}
+     * Sets or retrieves the side by side basis for a node, which must be a floating percentage between 0.0 and 1.0.
+     * @parameter basis The basis value to set or retrieve.
+     * @returns When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the already set side by side basis.
+     * @docs
      */
     side_by_side_basis(): number | undefined;
     side_by_side_basis(basis: number | false): this;
     /**
-     * @docs:
-     * @title: Ellipsis Overflow
-     * @desc: Configures the text overflow behavior with ellipsis. It can enable or disable ellipsis and set the number of lines.
-     * @param:
-     *     @name: to
-     *     @descr: Indicates whether to enable or disable ellipsis. If `null`, it returns the current state.
-     * @param:
-     *     @name: after_lines
-     *     @descr: The number of lines after which ellipsis should be applied. Only relevant when `to` is `true`.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Ellipsis Overflow}
+     * Configures the text overflow behavior with ellipsis. It can enable or disable ellipsis and set the number of lines.
+     * @parameter to Indicates whether to enable or disable ellipsis. If `null`, it returns the current state.
+     * @parameter after_lines The number of lines after which ellipsis should be applied. Only relevant when `to` is `true`.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     ellipsis_overflow(): boolean;
-    ellipsis_overflow(to: boolean, after_lines?: number | none): this;
+    ellipsis_overflow(to: boolean, after_lines?: number | None): this;
     /**
-     * @docs:
-     * @title: Align
-     * @desc: Sets or retrieves the alignment style of the element based on its type.
-     * @param:
-     *     @name: value
-     *     @descr: The alignment value to set or retrieve based on the element type.
-     * @return:
-     *     @description When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the currently set alignment value.
-     * @funcs: 2
+     * {Align}
+     * Sets or retrieves the alignment style of the element based on its type.
+     * @parameter value The alignment value to set or retrieve based on the element type.
+     * @returns When an argument is passed, this function returns the instance of the element for chaining. Otherwise, it returns the currently set alignment value.
+     * @docs
      */
     align(): string;
     align(value: string): this;
     /**
-     * @docs:
-     * @title: Leading
-     * @desc: Sets the alignment to the start position.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Leading}
+     * Sets the alignment to the start position.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     leading(): this;
     /**
-     * @docs:
-     * @title: Center Alignment
-     * @desc: Sets the alignment of the element to center.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Center Alignment}
+     * Sets the alignment of the element to center.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     center(): this;
     /**
-     * @docs:
-     * @title: Trailing
-     * @desc: Aligns the element to the end.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Trailing}
+     * Aligns the element to the end.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     trailing(): this;
     /**
-     * @docs:
-     * @title: Align Vertical
-     * @desc: Sets or retrieves the vertical alignment style of the element based on its type.
-     * @param:
-     *     @name: value
-     *     @descr: The alignment value to set or retrieve.
-     * @return:
-     *     @description Returns the instance of the element for chaining when an argument is passed. Otherwise, returns the current alignment value.
-     * @funcs: 2
+     * {Align Vertical}
+     * Sets or retrieves the vertical alignment style of the element based on its type.
+     * @parameter value The alignment value to set or retrieve.
+     * @returns Returns the instance of the element for chaining when an argument is passed. Otherwise, returns the current alignment value.
+     * @docs
      */
     align_vertical(): string;
     align_vertical(value: string): this;
     /**
-     * @docs:
-     * @title: Leading Vertical
-     * @desc: Sets the vertical alignment to the start position.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Leading Vertical}
+     * Sets the vertical alignment to the start position.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     leading_vertical(): this;
     /**
-     * @docs:
-     * @title: Center Vertical
-     * @desc: Centers the element vertically, optionally only when there is no overflow.
-     * @param:
-     *     @name: only_on_no_overflow
-     *     @descr: Determines whether to center only when there is no overflow.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Center Vertical}
+     * Centers the element vertically, optionally only when there is no overflow.
+     * @parameter only_on_no_overflow Determines whether to center only when there is no overflow.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     center_vertical(only_on_no_overflow?: boolean): this;
     /**
-     * @docs:
-     * @title: Trailing Vertical
-     * @desc: Sets the vertical alignment to the trailing position.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Trailing Vertical}
+     * Sets the vertical alignment to the trailing position.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     trailing_vertical(): this;
     /**
-     * @docs:
-     * @title: Align Text
-     * @desc: Sets the text alignment using predefined shortcuts.
-     * @param:
-     *     @name: value
-     *     @descr: The value representing the text alignment to set.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Align Text}
+     * Sets the text alignment using predefined shortcuts.
+     * @parameter value The value representing the text alignment to set.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     align_text(value: string): this;
     /**
-     * @docs:
-     * @title: Text Leading
-     * @desc: Sets the text alignment to the start position for leading text.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Text Leading}
+     * Sets the text alignment to the start position for leading text.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     text_leading(): this;
     /**
-     * @docs:
-     * @title: Text Center
-     * @desc: Sets the text alignment of the element to center.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Text Center}
+     * Sets the text alignment of the element to center.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     text_center(): this;
     /**
-     * @docs:
-     * @title: Text Trailing
-     * @desc: Sets the text alignment to 'end' for trailing text.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Text Trailing}
+     * Sets the text alignment to 'end' for trailing text.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     text_trailing(): this;
     /**
-     * @docs:
-     * @title: Align Height
-     * @desc: Aligns items by height inside a horizontal stack.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Align Height}
+     * Aligns items by height inside a horizontal stack.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     align_height(): this;
     /**
-     * @docs:
-     * @title: Text Wrap
-     * @desc: Set the text wrap value, equivalent to the CSS attribute `textWrap`.
-     *        Returns the attribute value when the parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Text Wrap}
+     * Set the text wrap value, equivalent to the CSS attribute `textWrap`.
+     * Returns the attribute value when the parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     text_wrap(): string;
     text_wrap(value: string): this;
     /**
-     * @docs:
-     * @title: Line clamp
-     * @desc: This non-standard CSS property allows you to limit the number of lines shown in a block container. When used in conjunction with `-webkit-box-orient`, it specifies the maximum number of lines to display before truncating the text. Text that exceeds this limit is cut off and typically ends with an ellipsis. This property is particularly useful for creating text overflow effects in web design where maintaining a consistent, visually manageable block of text is necessary.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
-     * @funcs: 2
+     * {Line clamp}
+     * This non-standard CSS property allows you to limit the number of lines shown in a block container. When used in conjunction with `-webkit-box-orient`, it specifies the maximum number of lines to display before truncating the text. Text that exceeds this limit is cut off and typically ends with an ellipsis. This property is particularly useful for creating text overflow effects in web design where maintaining a consistent, visually manageable block of text is necessary.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, in which case the attribute's value is returned.
+     * @docs
      */
     line_clamp(): string;
     line_clamp(value: string): this;
     /**
-     * @docs:
-     * @title: Box Orient
-     * @desc: This property is part of the old flexbox model and is used to define the orientation of the children in a flex container. In combination with `-webkit-line-clamp`, it's set to vertical to allow the line clamping effect on block containers. It dictates how the children of the box are laid out: horizontally or vertically. Note that `-webkit-box-orient` is specific to Webkit-based browsers and is not part of the standard CSS flexbox properties.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Box Orient}
+     * This property is part of the old flexbox model and is used to define the orientation of the children in a flex container. In combination with `-webkit-line-clamp`, it's set to vertical to allow the line clamping effect on block containers. It dictates how the children of the box are laid out: horizontally or vertically. Note that `-webkit-box-orient` is specific to Webkit-based browsers and is not part of the standard CSS flexbox properties.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     box_orient(): string;
     box_orient(value: string): this;
     /**
-     * @docs:
-     * @title: Color
-     * @desc: Sets the color of text, also supports a `GradientType` element.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     *                   When the value is `null` and the color has been set using a `GradientType`, `transparent` will be returned.
-     * @funcs: 2
+     * Sets the color of text, also supports a `GradientType` element.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     *          When the value is `null` and the color has been set using a `GradientType`, `transparent` will be returned.
+     * @docs
      */
     color(): string;
     color(value: string | GradientType): this;
-    /**
-     * @docs:
-     * @title: Border
-     * @desc: Sets the border style of the element. Can accept one to three arguments to define border properties.
-     * @param:
-     *     @name: values
-     *     @descr: The values to set the border style.
-     * @return:
-     *     @description When no arguments are passed, returns the current border style. When arguments are passed, returns the instance of the element for chaining.
-     * @funcs: 4
-     */
     border(): string;
     border(value: string): this;
     border(width: string | number, color: string): this;
     border(width: string | number, style: string, color: string): this;
+    border(opts: BorderOpts): this;
     /**
-     * @docs:
-     * @title: Border Top
-     * @desc: Sets the border top style for the element. Returns the current value when no parameters are provided.
-     * @param:
-     *     @name: values
-     *     @descr: Values to set the border top, can include width, style, and color.
-     * @return:
-     *     @description Returns the current border top value if no parameters are provided; otherwise returns the instance of the element for chaining.
-     * @funcs: 4
+     * {Border Top}
+     * Sets the border top style for the element. Returns the current value when no parameters are provided.
+     * @parameter values Values to set the border top, can include width, style, and color.
+     * @returns Returns the current border top value if no parameters are provided; otherwise returns the instance of the element for chaining.
+     * @docs
      */
     border_top(): string;
     border_top(value: string | number): this;
     border_top(width: string | number, color: string): this;
     border_top(width: string | number, style: string, color: string): this;
     /**
-     * @docs:
-     * @title: Border Bottom
-     * @desc: Sets the border bottom style of the element. Returns the attribute value when no parameters are defined.
-     * @param:
-     *     @name: values
-     *     @descr: A variable number of values to set the border bottom style.
-     * @return:
-     *     @description Returns the current border bottom style when no arguments are passed, otherwise returns the instance for chaining.
-     * @funcs: 4
+     * {Border Bottom}
+     * Sets the border bottom style of the element. Returns the attribute value when no parameters are defined.
+     * @parameter values A variable number of values to set the border bottom style.
+     * @returns Returns the current border bottom style when no arguments are passed, otherwise returns the instance for chaining.
+     * @docs
      */
     border_bottom(): string;
     border_bottom(value: string): this;
     border_bottom(width: string | number, color: string): this;
     border_bottom(width: string | number, style: string, color: string): this;
     /**
-     * @docs:
-     * @title: Border Right
-     * @desc: Sets the border-right property of the element.
-     *        Returns the current value if no parameters are provided.
-     * @param:
-     *     @name: values
-     *     @descr: The values to set for the border-right property.
-     * @return:
-     *     @description Returns the instance of the element for chaining when parameters are provided,
-     *                  otherwise returns the current value of the border-right property.
-     * @funcs: 4
+     * {Border Right}
+     * Sets the border-right property of the element.
+     * Returns the current value if no parameters are provided.
+     * @parameter values The values to set for the border-right property.
+     * @returns Returns the instance of the element for chaining when parameters are provided, otherwise returns the current value of the border-right property.
+     * @docs
      */
     border_right(): string;
     border_right(value: string): this;
     border_right(width: string | number, color: string): this;
     border_right(width: string | number, style: string, color: string): this;
     /**
-     * @docs:
-     * @title: Border Left
-     * @desc: Sets the left border style of the element. Returns the current value if no parameters are provided.
-     * @param:
-     *     @name: values
-     *     @descr: The values to set for the border-left property.
-     * @return:
-     *     @description Returns the current value of the left border when no parameters are provided, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Border Left}
+     * Sets the left border style of the element. Returns the current value if no parameters are provided.
+     * @parameter values The values to set for the border-left property.
+     * @returns Returns the current value of the left border when no parameters are provided, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     border_left(): string;
     border_left(value: string): this;
     border_left(width: string | number, color: string): this;
     border_left(width: string | number, style: string, color: string): this;
     /**
-     * @docs:
-     * @title: Shadow
-     * @desc: Sets the box shadow of the element. Can accept either 1 or 4 arguments for different shadow styles.
-     * @param:
-     *     @name: values
-     *     @descr: The values to set the box shadow. Can be a single value or four separate values.
-     * @return:
-     *     @description Returns the current box shadow if no arguments are provided, or the instance of the element for chaining.
-     * @funcs: 2
+     * {Shadow}
+     * Sets the box shadow of the element. Can accept either 1 or 4 arguments for different shadow styles.
+     * @parameter values The values to set the box shadow. Can be a single value or four separate values.
+     * @returns Returns the current box shadow if no arguments are provided, or the instance of the element for chaining.
+     * @docs
      */
     shadow(): string;
     shadow(value: string | number): this;
     shadow(value1: string | number, value2: string | number, value3: string | number, value4: string | string): this;
     /**
-     * @docs:
-     * @title: Drop Shadow
-     * @desc: Applies a drop shadow effect to the object. Can handle 0, 1, or 4 arguments.
-     * @param:
-     *     @name: values
-     *     @descr: The values for the drop shadow effect, which can be numbers or null.
-     * @return:
-     *     @description Returns the instance of the element for chaining when arguments are provided. If no arguments are passed, it returns the current filter value.
-     * @funcs: 3
+     * {Drop Shadow}
+     * Applies a drop shadow effect to the object. Can handle 0, 1, or 4 arguments.
+     * @parameter values The values for the drop shadow effect, which can be numbers or null.
+     * @returns Returns the instance of the element for chaining when arguments are provided. If no arguments are passed, it returns the current filter value.
+     * @docs
      */
     drop_shadow(): string;
     drop_shadow(value: string | number): this;
     drop_shadow(value1: string | number, value2: string | number, value3: string | number, value4: string): this;
     /**
-     * @docs:
-     * @title: Greyscale
-     * @desc: Applies a greyscale filter to the element. Returns the current filter if no value is provided.
-     * @param:
-     *     @name: value
-     *     @descr: The percentage value for greyscale. Can be a number or null.
-     * @return:
-     *     @description Returns the current filter value if no argument is passed, otherwise returns the instance for chaining.
-     * @funcs: 2
+     * {Greyscale}
+     * Applies a greyscale filter to the element. Returns the current filter if no value is provided.
+     * @parameter value The percentage value for greyscale. Can be a number or null.
+     * @returns Returns the current filter value if no argument is passed, otherwise returns the instance for chaining.
+     * @docs
      */
     greyscale(): string;
     greyscale(value: number): this;
     /**
-     * @docs:
-     * @title: Opacity
-     * @desc: Set or get the opacity of the element based on its type.
-     * @param:
-     *     @name: value
-     *     @descr: The value of the opacity to set, or null to get the current opacity.
-     * @return:
-     *     @description Returns the current opacity value if no argument is passed. When an argument is passed, it returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Opacity}
+     * Set or get the opacity of the element based on its type.
+     * @parameter value The value of the opacity to set, or null to get the current opacity.
+     * @returns Returns the current opacity value if no argument is passed. When an argument is passed, it returns the instance of the element for chaining.
+     * @docs
      */
     opacity(): string | number;
     opacity(value: string | number): this;
     /**
-     * @docs:
-     * @title: Toggle Opacity
-     * @desc: Toggles the opacity of the element between a specified value and fully opaque.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set the opacity to when toggling.
-     *     @default: 0.25
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Toggle Opacity}
+     * Toggles the opacity of the element between a specified value and fully opaque.
+     * @parameter value The value to set the opacity to when toggling.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_opacity(value: number): this;
     /**
-     * @docs:
-     * @title: Blur
-     * @desc: Applies a blur effect to the element using the specified value.
-     * @param:
-     *     @name: value
-     *     @descr: The amount of blur to apply, can be a number or null.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Blur}
+     * Applies a blur effect to the element using the specified value.
+     * @parameter value The amount of blur to apply, can be a number or null.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     blur(): string;
     blur(value: number): this;
     /**
-     * @docs:
-     * @title: Toggle Blur
-     * @desc: Toggles the blur effect on the element with a specified value.
-     * @param:
-     *     @name: value
-     *     @descr: The amount of blur to apply, defaulting to 10.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Toggle Blur}
+     * Toggles the blur effect on the element with a specified value.
+     * @parameter value The amount of blur to apply, defaulting to 10.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_blur(value?: number): this;
     /**
-     * @docs:
-     * @title: Background Blur
-     * @desc: Sets or retrieves the background blur effect for the element.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the blur effect, which can be a number or null.
-     * @return:
-     *     @description Returns the current blur effect if no argument is passed, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Background Blur}
+     * Sets or retrieves the background blur effect for the element.
+     * @parameter value The value to set for the blur effect, which can be a number or null.
+     * @returns Returns the current blur effect if no argument is passed, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     background_blur(): string;
     background_blur(value: number | null): this;
     /**
-     * @docs:
-     * @title: Toggle Background Blur
-     * @desc: Toggles the background blur effect by applying a backdrop filter.
-     * @param:
-     *     @name: value
-     *     @descr: The intensity of the blur effect to apply.
-     *     @default: 10
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Toggle Background Blur}
+     * Toggles the background blur effect by applying a backdrop filter.
+     * @parameter value The intensity of the blur effect to apply.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_background_blur(value?: number): this;
     /**
-     * @docs:
-     * @title: Brightness
-     * @desc: Adjusts the brightness of an element's filter. If no value is provided, it returns the current brightness filter.
-     * @param:
-     *     @name: value
-     *     @descr: The brightness level to set, can be a number or null.
-     * @return:
-     *     @description Returns the instance of the element for chaining if a value is provided. Otherwise, returns the current brightness filter.
-     * @funcs: 2
+     * {Brightness}
+     * Adjusts the brightness of an element's filter. If no value is provided, it returns the current brightness filter.
+     * @parameter value The brightness level to set, can be a number or null.
+     * @returns Returns the instance of the element for chaining if a value is provided. Otherwise, returns the current brightness filter.
+     * @docs
      */
     brightness(): string;
     brightness(value: number): this;
     /**
-     * @docs:
-     * @title: Toggle Brightness
-     * @desc: Toggles the brightness of the element by applying a filter based on the provided value.
-     * @param:
-     *     @name: value
-     *     @descr: The brightness value to set, defaults to 0.5 if not provided.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Toggle Brightness}
+     * Toggles the brightness of the element by applying a filter based on the provided value.
+     * @parameter value The brightness value to set, defaults to 0.5 if not provided.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_brightness(value?: number): this;
     /**
-     * @docs:
-     * @title: Background Brightness
-     * @desc: Adjusts the brightness of the background using a specified value.
+     * {Background Brightness}
+     * Adjusts the brightness of the background using a specified value.
      * If no value is provided, it retrieves the current backdrop filter.
-     * @param:
-     *     @name: value
-     *     @descr: The brightness value to set, or null to get the current value.
-     * @return:
-     *     @description Returns the instance of the element for chaining when a value is provided, or the current backdrop filter value if no value is given.
-     * @funcs: 2
+     * @parameter value The brightness value to set, or null to get the current value.
+     * @returns Returns the instance of the element for chaining when a value is provided, or the current backdrop filter value if no value is given.
+     * @docs
      */
     background_brightness(): string;
     background_brightness(value: number): this;
     /**
-     * @docs:
-     * @title: Toggle Background Brightness
-     * @desc: Toggles the background brightness by applying a filter based on the provided value.
-     * @param:
-     *     @name: value
-     *     @descr: The brightness value to set, defaulting to 10 if not provided.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Toggle Background Brightness}
+     * Toggles the background brightness by applying a filter based on the provided value.
+     * @parameter value The brightness value to set, defaulting to 10 if not provided.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_background_brightness(value?: number): this;
     /**
-     * @docs:
-     * @title: Rotate
-     * @desc: Sets the rotation transformation for the element. When called without an argument, it retrieves the current rotation.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set as the rotation. It can be a number, string, or null.
-     * @return:
-     *     @description Returns the current rotation value as a string when no argument is passed. When an argument is provided, it returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Rotate}
+     * Sets the rotation transformation for the element. When called without an argument, it retrieves the current rotation.
+     * @parameter value The value to set as the rotation. It can be a number, string, or null.
+     * @returns Returns the current rotation value as a string when no argument is passed. When an argument is provided, it returns the instance of the element for chaining.
+     * @docs
      */
     rotate(): string;
     rotate(value: number | string): this;
     /**
-     * @docs:
-     * @title: Delay
-     * @desc: Set the delay for keyframes in the style element.
-     * @param:
-     *     @name: value
-     *     @descr: The value of the delay to set.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Delay}
+     * Set the delay for keyframes in the style element.
+     * @parameter value The value of the delay to set.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     delay(value: string | number): this;
     /**
-     * @docs:
-     * @title: Duration
-     * @desc: Sets the duration style property for the element.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the duration property.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Duration}
+     * Sets the duration style property for the element.
+     * @parameter value The value to set for the duration property.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     duration(value: string | number): this;
     /**
-     * @docs:
-     * @title: Background
-     * @desc: A shorthand property for all the background properties.
-     *        The equivalent of CSS attribute `background`.
-     *        Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Background}
+     * A shorthand property for all the background properties.
+     * The equivalent of CSS attribute `background`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     background(): string;
     background(value: string): this;
     /**
-     * @docs:
-     * @title: Scale Font Size
-     * @desc: Adjusts the font size based on a scaling factor relative to the current font size.
-     * @param:
-     *     @name: scale
-     *     @descr: The scaling factor to apply to the current font size.
-     *     @default: 1.0
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Scale Font Size}
+     * Adjusts the font size based on a scaling factor relative to the current font size.
+     * @parameter scale The scaling factor to apply to the current font size.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     scale_font_size(scale?: number): this;
     font_size_ratio(scale?: number): this;
     /**
-     * @docs:
-     * @title: Display
-     * @desc: Sets or retrieves the display style of an HTML element.
-     *         If no value is provided, it returns the current display style.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the display style.
-     * @return:
-     *     @descr: Returns the current display style if no argument is passed,
-     *              otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Display}
+     * Sets or retrieves the display style of an HTML element.
+     * If no value is provided, it returns the current display style.
+     * @parameter value The value to set for the display style.
+     * @docs
      */
     display(): string;
     display(value: string): this;
     /**
-     * @docs:
-     * @title: Hide
-     * @desc: Hides the element by setting its display style to none.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Hide}
+     * Hides the element by setting its display style to none.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     hide(): this;
     /**
-     * @docs:
-     * @title: Show
-     * @desc: Displays the element by setting its display style property.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Show}
+     * Displays the element by setting its display style property.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     show(): this;
     /**
-     * @docs:
-     * @title: Is Hidden
-     * @desc: Checks if the element is currently hidden based on its display style.
-     * @return:
-     *     @description Returns true if the element is hidden; otherwise, false.
+     * {Is Hidden}
+     * Checks if the element is currently hidden based on its display style.
+     * @returns Returns true if the element is hidden; otherwise, false.
+     * @docs
      */
     is_hidden(): boolean;
     /**
-     * @docs:
-     * @title: Is Visible
-     * @desc: Checks if the element is visible based on its display style.
-     * @return:
-     *     @description Returns true if the element is visible, false otherwise.
+     * {Is Visible}
+     * Checks if the element is visible based on its display style.
+     * @returns Returns true if the element is visible, false otherwise.
+     * @docs
      */
     is_visible(): boolean;
     /**
-     * @docs:
-     * @title: Toggle Visibility
-     * @desc: Toggles the visibility of the element by showing or hiding it based on its current state.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Toggle Visibility}
+     * Toggles the visibility of the element by showing or hiding it based on its current state.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_visibility(): this;
     /**
-     * @docs:
-     * @title: Inner HTML
-     * @desc: Get or set the inner HTML of an element.
-     * @param:
-     *     @name: value
-     *     @descr: The HTML content to set. If no value is provided, the current inner HTML is returned.
-     * @return:
-     *     @description Returns the current inner HTML if no argument is passed, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Inner HTML}
+     * Get or set the inner HTML of an element.
+     * @parameter value The HTML content to set. If no value is provided, the current inner HTML is returned.
+     * @returns Returns the current inner HTML if no argument is passed, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     inner_html(): string;
     inner_html(value: string): this;
     /**
-     * @docs:
-     * @title: Outer HTML
-     * @desc: Get or set the outer HTML of the element. If no argument is passed, it returns the current outer HTML.
-     * @param:
-     *     @name: value
-     *     @descr: The outer HTML to set.
-     * @return:
-     *     @description Returns the instance of the element for chaining when an argument is passed, otherwise returns the current outer HTML.
-     * @funcs: 2
+     * {Outer HTML}
+     * Get or set the outer HTML of the element. If no argument is passed, it returns the current outer HTML.
+     * @parameter value The outer HTML to set.
+     * @returns Returns the instance of the element for chaining when an argument is passed, otherwise returns the current outer HTML.
+     * @docs
      */
     outer_html(): string;
     outer_html(value: string): this;
     /**
-     * @docs:
-     * @title: Styles
-     * @desc: Retrieves the CSS attributes when no parameter is provided, or sets the styles based on the provided attributes.
-     * @param:
-     *     @name: css_attr
-     *     @descr: The CSS attributes to set. If null, returns the current styles.
-     * @return:
-     *     @description When no argument is passed, returns the current styles as an object. When attributes are set, returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Styles}
+     * Retrieves the CSS attributes when no parameter is provided, or sets the styles based on the provided attributes.
+     * @parameter css_attr The CSS attributes to set. If null, returns the current styles.
+     * @returns When no argument is passed, returns the current styles as an object. When attributes are set, returns the instance of the element for chaining.
+     * @docs
      */
     styles(): Record<string, string>;
     styles(css_attr: Record<string, any>): this;
     /**
-     * @docs:
-     * @title: Attribute
-     * @desc: Get or set a single attribute for an element. If no value is provided, it retrieves the attribute's current value.
-     * @param:
-     *     @name: key
-     *     @descr: The name of the attribute to get or set.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the attribute. If null, the current value is returned.
-     * @return:
-     *     @description Returns the current value of the attribute if no value is provided, otherwise returns the instance of the element for chaining.
-     * @funcs: 2
+     * {Attribute}
+     * Get or set a single attribute for an element. If no value is provided, it retrieves the attribute's current value.
+     * @parameter key The name of the attribute to get or set.
+     * @parameter value The value to set for the attribute. If null, the current value is returned.
+     * @returns Returns the current value of the attribute if no value is provided, otherwise returns the instance of the element for chaining.
+     * @docs
      */
     attr(key: string): null | string;
     attr(key: string, value: string | number | null): this;
     /**
-     * @docs:
-     * @title: Attributes
-     * @desc: Sets multiple attributes for the element based on the provided dictionary.
-     * @param:
-     *     @name: html_attr
-     *     @descr: A dictionary of attributes to set on the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Attributes}
+     * Sets multiple attributes for the element based on the provided dictionary.
+     * @parameter html_attr A dictionary of attributes to set on the element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     attrs(html_attr: Record<string, string | number | boolean>): this;
     /**
-     * @docs:
-     * @title: Event
-     * @desc: Get or set a single event associated with the element.
-     *         If no value is provided, it retrieves the current event.
-     * @param:
-     *     @name: key
-     *     @descr: The name of the event to get or set.
-     * @param:
-     *     @name: value
-     *     @descr: The value to set for the event, if provided.
-     * @return:
-     *     @description Returns the instance of the element for chaining when setting,
-     *                  or the current value of the event when getting.
-     * @funcs: 2
+     * {Event}
+     * Get or set a single event associated with the element.
+     * If no value is provided, it retrieves the current event.
+     * @parameter key The name of the event to get or set.
+     * @parameter value The value to set for the event, if provided.
+     * @docs
      */
     event(key: string): any;
     event(key: string, value: any): this;
     /**
-     * @docs:
-     * @title: Events
-     * @desc: Sets multiple event handlers on the current element using a dictionary of events.
-     * @param:
-     *     @name: html_events
-     *     @descr: An object containing event names as keys and their corresponding handler functions as values.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Events}
+     * Sets multiple event handlers on the current element using a dictionary of events.
+     * @parameter html_events An object containing event names as keys and their corresponding handler functions as values.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     events(html_events: {
         [key: string]: EventListener;
     }): this;
     /**
-     * @docs:
-     * @title: Class
-     * @description:
-     *     Specifies one or more classnames for an element (refers to a class in a style sheet).
-     *     The equivalent of HTML attribute `class`.
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: value
-     *     @description: The value to assign. Leave `null` to retrieve the attribute's value.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @funcs: 2
+     * {Class}
+     * Specifies one or more classnames for an element (refers to a class in a style sheet).
+     * The equivalent of HTML attribute `class`.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     class(): string;
     class(value: string): this;
     /**
-     * @docs:
-     * @title: Toggle class
-     * @description: Toggles a class name from the class list, adding it if it's not present, or removing it if it is.
-     * @param:
-     *     @name: name
-     *     @descr: The class name to toggle.
-     * @return:
-     *     @description: Returns the instance of the element for chaining.
+     * {Toggle class}
+     * Toggles a class name from the class list, adding it if it's not present, or removing it if it is.
+     * @parameter name The class name to toggle.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     toggle_class(name: string): this;
     /**
-     * @docs:
-     * @title: Remove Class
-     * @desc: Remove a class name from the class list of the element.
-     * @param:
-     *     @name: name
-     *     @descr: The class name to be removed from the class list.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Class}
+     * Remove a class name from the class list of the element.
+     * @parameter name The class name to be removed from the class list.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_class(name: string): this;
     /**
-     * @docs:
-     * @title: Remove all classes
-     * @desc: Remove all classes from the class list.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove all classes}
+     * Remove all classes from the class list.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_classes(): this;
     /**
-     * @docs:
-     * @title: Hover Brightness
-     * @desc: Controls the brightness effects on hover for the element.
+     * {Hover Brightness}
+     * Controls the brightness effects on hover for the element.
      * You can enable or disable the effect or specify brightness levels.
-     * @param:
-     *     @name: mouse_down_brightness
-     *     @descr: The brightness value when the mouse is down, or a boolean to enable/disable.
-     * @param:
-     *     @name: mouse_over_brightness
-     *     @descr: The brightness value when the mouse is over the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining when setting values, or a boolean indicating if the effect is enabled when no parameters are passed.
-     * @funcs: 3
+     * @parameter mouse_down_brightness The brightness value when the mouse is down, or a boolean to enable/disable.
+     * @parameter mouse_over_brightness The brightness value when the mouse is over the element.
+     * @returns Returns the instance of the element for chaining when setting values, or a boolean indicating if the effect is enabled when no parameters are passed.
+     * @docs
      */
     hover_brightness(): boolean;
     hover_brightness(mouse_down_brightness: boolean): this;
@@ -1454,256 +1093,197 @@ export declare abstract class VElement extends HTMLElement {
         easing?: string;
     }[]): this;
     /**
-     * @docs:
-     * @title: Text Width
-     * @desc: Calculates the width of the provided text or the current text content if no text is provided. This is useful for measuring text width in input elements.
-     * @param:
-     *     @name: text
-     *     @descr: The text whose width is to be measured. If null, the current text content is used.
-     * @return:
-     *     @description Returns the width of the text in pixels.
+     * {Text Width}
+     * Calculates the width of the provided text or the current text content if no text is provided. This is useful for measuring text width in input elements.
+     * @parameter text The text whose width is to be measured. If null, the current text content is used.
+     * @returns Returns the width of the text in pixels.
+     * @docs
      */
     text_width(): number;
     text_width(text: string): number;
     /**
-     * @docs:
-     * @title: Media Query
-     * @desc: Creates a media query listener that triggers provided handlers based on the media query's state.
-     * @param:
-     *     @name: media_query
-     *     @descr: The media query string to evaluate.
-     *     @name: true_handler
-     *     @descr: The function to execute when the media query matches.
-     *     @name: false_handler
-     *     @descr: The function to execute when the media query does not match.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Media Query}
+     * Creates a media query listener that triggers provided handlers based on the media query's state.
+     * @parameter media_query The media query string to evaluate.
+     * @parameter true_handler The function to execute when the media query matches.
+     * @parameter false_handler The function to execute when the media query does not match.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     media(media_query: string, true_handler?: ElementCallback<this>, false_handler?: ElementCallback<this>): this;
     /**
-     * @docs:
-     * @title: Remove Media Query
-     * @desc: Removes a specified media query from the element's media queries.
-     * @param:
-     *     @name: media_query
-     *     @descr: The media query string to be removed.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Media Query}
+     * Removes a specified media query from the element's media queries.
+     * @parameter media_query The media query string to be removed.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_media(media_query: string): this;
     /**
-     * @docs:
-     * @title: Remove Media Queries
-     * @desc: Removes all media queries from the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Media Queries}
+     * Removes all media queries from the element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_medias(): this;
     /**
-     * @docs:
-     * @title: Remove All Media
-     * @desc: Removes all media queries and their associated listeners from the element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove All Media}
+     * Removes all media queries and their associated listeners from the element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_all_media(): this;
     /**
-     * @docs:
-     * @title: Default Animate
-     * @desc: Calls the animate function from the superclass with the provided arguments.
-     * @param:
-     *     @name: args
-     *     @descr: The arguments to pass to the superclass animate function.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Default Animate}
+     * Calls the animate function from the superclass with the provided arguments.
+     * @parameter args The arguments to pass to the superclass animate function.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     default_animate(...args: any[]): this;
     /**
-     * @docs:
-     * @title: Animate
-     * @desc: Starts a new animation with the specified keyframes and options. Automatically resets the active animation.
-     * @param:
-     *     @name: options
-     *     @descr: Configuration options for the animation including keyframes, duration, and callbacks.
-     *     @attr:
-     *         @name: keyframes
-     *         @description An array of keyframe objects to animate.
-     *         @name: delay
-     *         @description Delay before starting the animation in milliseconds.
-     *         @name: duration
-     *         @description Duration of each keyframe in milliseconds.
-     *         @name: repeat
-     *         @description Whether the animation should repeat infinitely.
-     *         @name: persistent
-     *         @description Whether to keep the last keyframe when the animation ends.
-     *         @name: on_finish
-     *         @description Callback function to execute when the animation finishes.
-     *         @name: easing
-     *         @description Easing function to use for the animation.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Animate}
+     * Starts a new animation with the specified keyframes and options. Automatically resets the active animation.
+     * @parameter options Configuration options for the animation including keyframes, duration, and callbacks.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     animate(options: {
+        /** An array of keyframe objects to animate. */
         keyframes: Array<any>;
+        /** Delay before starting the animation in milliseconds. */
         delay?: number;
+        /** Duration of each keyframe in milliseconds. */
         duration?: number;
+        /** Whether the animation should repeat infinitely. */
         repeat?: boolean;
+        /** Whether to keep the last keyframe when the animation ends. */
         persistent?: boolean;
+        /** Callback function to execute when the animation finishes. */
         on_finish?: ((element: any) => any) | null;
+        /** Easing function to use for the animation. */
         easing?: string;
     }): this;
     /**
-     * @docs:
-     * @title: Stop Animation
-     * @desc: Stops the currently active animation by clearing the timeout.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Stop Animation}
+     * Stops the currently active animation by clearing the timeout.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     stop_animation(): this;
     /**
-     * @docs:
-     * @title: Slide Out
-     * @desc: Animates the sliding out of an element in a specified direction with optional parameters for customization.
-     * @param:
-     *     @name: options
-     *     @descr: Configuration options for the slide out animation.
-     *     @attr:
-     *         @name: direction
-     *         @description The direction of the slide animation.
-     *         @default: "top"
-     *         @name: distance
-     *         @description The distance in pixels for the slide animation.
-     *         @default: 100
-     *         @name: duration
-     *         @description The duration of the animation in milliseconds.
-     *         @default: 500
-     *         @name: opacity
-     *         @description Whether to animate the opacity of the element.
-     *         @default: true
-     *         @name: easing
-     *         @description The easing function for the animation.
-     *         @default: "ease"
-     *         @name: hide
-     *         @description Whether to hide the element after the animation completes.
-     *         @default: true
-     *         @name: remove
-     *         @description Whether to remove the element from the DOM after the animation completes.
-     *         @default: false
-     *         @name: display
-     *         @description The display property to set when showing the element again.
-     *         @default: null
-     *         @name: _slide_in
-     *         @description Indicates if the animation is a slide-in animation.
-     *         @default: false
-     * @return:
-     *     @description Returns a promise that resolves when the animation completes.
+     * {Slide Out}
+     * Animates the sliding out of an element in a specified direction with optional parameters for customization.
+     * @parameter options Configuration options for the slide out animation.
+     * @returns Returns a promise that resolves when the animation completes.
+     * @docs
      */
     slide_out(options: {
+        /**
+         * The direction of the slide animation.
+         * @default "top"
+         */
         direction: string;
+        /**
+         * The distance in pixels for the slide animation.
+         * @default 100
+         */
         distance: number;
+        /**
+         * The duration of the animation in milliseconds.
+         * @default 500
+         */
         duration: number;
+        /**
+         * Whether to animate the opacity of the element.
+         * @default true
+         */
         opacity?: boolean;
+        /**
+         * The easing function for the animation.
+         * @default "ease"
+         */
         easing?: string;
+        /**
+         * Whether to hide the element after the animation completes.
+         * @default true
+         */
         hide?: boolean;
+        /**
+         * Whether to remove the element from the DOM after the animation completes.
+         * @default false
+         */
         remove?: boolean;
+        /**
+         * The display property to set when showing the element again.
+         * @default null
+         */
         display?: string;
+        /**
+         * Indicates if the animation is a slide-in animation.
+         * @default false
+         */
         _slide_in?: boolean;
     }): Promise<void>;
     /**
-     * @docs:
-     * @title: Slide In
-     * @desc: Initiates a slide-in animation for the element with customizable parameters.
-     * @param:
-     *     @name: options
-     *     @descr: Configuration options for the slide-in animation.
-     *     @attr:
-     *         @name: direction
-     *         @description The direction from which the element will slide in (e.g., "top", "bottom", "left", "right").
-     *         @name: distance
-     *         @description The distance in pixels the element will slide in.
-     *         @name: duration
-     *         @description The duration of the slide animation in milliseconds.
-     *         @name: opacity
-     *         @description A boolean indicating whether to animate the opacity during the slide.
-     *         @name: easing
-     *         @description The easing function to use for the animation.
-     *         @name: display
-     *         @description An optional display property to use when showing the view again.
-     * @return:
-     *     @description Returns a promise that resolves when the slide-in animation is complete.
+     * {Slide In}
+     * Initiates a slide-in animation for the element with customizable parameters.
+     * @parameter options Configuration options for the slide-in animation.
+     * @returns Returns a promise that resolves when the slide-in animation is complete.
+     * @docs
      */
     slide_in({ direction, distance, duration, opacity, easing, display, }: {
+        /** The direction from which the element will slide in (e.g., "top", "bottom", "left", "right"). */
         direction?: string;
+        /** The distance in pixels the element will slide in. */
         distance?: number;
+        /** The duration of the slide animation in milliseconds. */
         duration?: number;
+        /** A boolean indicating whether to animate the opacity during the slide. */
         opacity?: boolean;
+        /** The easing function to use for the animation. */
         easing?: string;
+        /** An optional display property to use when showing the view again. */
         display?: string;
     }): Promise<any>;
     /**
-     * @docs:
-     * @title: Dropdown Text Animation
-     * @desc: Animates the text of a dropdown element with a specified animation effect.
-     *         It allows for customization of distance, duration, and easing for each character.
-     * @warning: Causes undefined behaviour when called on a non text element.
-     * @param:
-     *     @name: options
-     *     @descr: An object containing animation settings.
-     *     @attr:
-     *         @name: distance
-     *         @description The distance of pixels of the drop (negative) or rise (positive).
-     *         @name: duration
-     *         @description The duration of each individual character drop animation in milliseconds.
-     *         @name: opacity_duration
-     *         @description The factor for the duration in relation to the dropdown duration, 1.0 for 100%.
-     *         @name: total_duration
-     *         @description The total duration of the character drop animation, this parameter will overwrite the `duration` parameter.
-     *         @name: delay
-     *         @description The delay in milliseconds for each character drop.
-     *         @name: start_delay
-     *         @description The start delay of the animation in milliseconds.
-     *         @name: easing
-     *         @description The animation's easing.
-     * @return:
-     *     @description Returns a promise that resolves when the animation is complete.
+     * {Dropdown Text Animation}
+     * Animates the text of a dropdown element with a specified animation effect.
+     * It allows for customization of distance, duration, and easing for each character.
+     * @warning Causes undefined behaviour when called on a non text element.
+     * @parameter options An object containing animation settings.
+     * @returns Returns a promise that resolves when the animation is complete.
+     * @docs
      */
     dropdown_animation({ distance, duration, opacity_duration, total_duration, delay, start_delay, easing, }?: {
+        /** The distance of pixels of the drop (negative) or rise (positive). */
         distance?: string;
+        /** The duration of each individual character drop animation in milliseconds. */
         duration?: number;
+        /** The factor for the duration in relation to the dropdown duration, 1.0 for 100%. */
         opacity_duration?: number;
+        /** The total duration of the character drop animation, this parameter will overwrite the `duration` parameter. */
         total_duration?: number;
+        /** The delay in milliseconds for each character drop. */
         delay?: number;
+        /** The start delay of the animation in milliseconds. */
         start_delay?: number;
+        /** The animation's easing. */
         easing?: string;
     }): Promise<void>;
     /**
-     * @docs:
-     * @title: Increment Number Animation
-     * @desc: Animate incrementing a number with optional prefix and suffix.
-     * @warning: Causes undefined behaviour when called on a non text element.
-     * @param:
-     *     @name: start
-     *     @descr: The start number for the animation.
-     * @param:
-     *     @name: end
-     *     @descr: The end number, the animation will end with the number value of `end - 1`.
-     * @param:
-     *     @name: duration
-     *     @descr: The duration of each individual number increment in milliseconds.
-     * @param:
-     *     @name: total_duration
-     *     @descr: The total duration of the entire animation, parameter `total_duration` precedes parameter `duration`.
-     * @param:
-     *     @name: delay
-     *     @descr: The delay until the animation starts in milliseconds.
-     * @param:
-     *     @name: prefix
-     *     @descr: The prefix string to prepend to the animated number.
-     * @param:
-     *     @name: suffix
-     *     @descr: The suffix string to append to the animated number.
-     * @return:
-     *     @descr: Returns a promise that resolves when the animation completes.
+     * {Increment Number Animation}
+     * Animate incrementing a number with optional prefix and suffix.
+     * @warning Causes undefined behaviour when called on a non text element.
+     * @parameter start The start number for the animation.
+     * @parameter end The end number, the animation will end with the number value of `end - 1`.
+     * @parameter duration The duration of each individual number increment in milliseconds.
+     * @parameter total_duration The total duration of the entire animation, parameter `total_duration` precedes parameter `duration`.
+     * @parameter delay The delay until the animation starts in milliseconds.
+     * @parameter prefix The prefix string to prepend to the animated number.
+     * @parameter suffix The suffix string to append to the animated number.
+     * @returns Returns a promise that resolves when the animation completes.
+     * @docs
      */
     increment_number_animation({ start, end, duration, total_duration, delay, prefix, suffix, }?: {
         start?: number;
@@ -1721,106 +1301,76 @@ export declare abstract class VElement extends HTMLElement {
     on(type: keyof HTMLElementEventMap, callback: (element: this, event: HTMLElementEventMap[keyof HTMLElementEventMap]) => any, options?: boolean | AddEventListenerOptions): this;
     on_event_listener<K extends keyof HTMLElementEventMap>(type: K, callback: (element: this, event: HTMLElementEventMap[K]) => any, options?: boolean | AddEventListenerOptions): this;
     /**
-     * @docs:
-     * @title: On emit
-     * @desc: Registers an event callback for the specified event ID. This allows the element to respond to events.
-     * @param:
-     *     @name: id
-     *     @descr: The unique identifier for the event to listen for.
-     *     @name: callback
-     *     @descr: The function to be executed when the event is triggered.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On emit}
+     * Registers an event callback for the specified event ID. This allows the element to respond to events.
+     * @parameter id The unique identifier for the event to listen for.
+     * @parameter callback The function to be executed when the event is triggered.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_emit(id: string, callback: (element: this, args: Record<string, any>) => any): this;
     /**
-     * @docs:
-     * @title: Remove On Event
-     * @desc: Removes an event listener for the specified event ID.
-     * @param:
-     *     @name: id
-     *     @descr: The identifier for the event to remove.
-     * @param:
-     *     @name: callback
-     *     @descr: The function that was originally registered as the event handler.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove On Event}
+     * Removes an event listener for the specified event ID.
+     * @parameter id The identifier for the event to remove.
+     * @parameter callback The function that was originally registered as the event handler.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_event(id: string, callback: (element: this, args: Record<string, any>) => any): this;
     /**
-     * @docs:
-     * @title: Remove On Events
-     * @desc: Removes all event callbacks associated with the given ID.
-     * @param:
-     *     @name: id
-     *     @descr: The identifier for the events to be removed.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove On Events}
+     * Removes all event callbacks associated with the given ID.
+     * @parameter id The identifier for the events to be removed.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_events(id: string): this;
     /**
-     * @docs:
-     * @title: Timeout
-     * @desc: Sets a timeout with optional id and debounce functionality.
-     * @param:
-     *     @name: delay
-     *     @descr: The time in milliseconds to wait before executing the callback.
-     *     @name: callback
-     *     @descr: The function to execute after the timeout.
-     *     @name: options
-     *     @descr: Optional settings for the timeout behavior.
-     *     @attr:
-     *         @name: id
-     *         @description An optional identifier for the timeout.
-     *         @name: debounce
-     *         @description If true, clears the previous timeout with the same id.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Timeout}
+     * Sets a timeout with optional id and debounce functionality.
+     * @parameter delay The time in milliseconds to wait before executing the callback.
+     * @parameter callback The function to execute after the timeout.
+     * @parameter options Optional settings for the timeout behavior.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     timeout(delay: number, callback: ElementCallback<this>, options?: {
+        /** An optional identifier for the timeout. */
         id?: string;
+        /** If true, clears the previous timeout with the same id. */
         debounce?: boolean;
     } | null): this;
     /**
-     * @docs:
-     * @title: Clear Timeout
-     * @desc: Clears a cached timeout by its ID. If timeouts are not initialized, they will be set up.
-     * @param:
-     *     @name: id
-     *     @descr: The ID of the timeout to clear.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Clear Timeout}
+     * Clears a cached timeout by its ID. If timeouts are not initialized, they will be set up.
+     * @parameter id The ID of the timeout to clear.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     clear_timeout(id: string | number): this;
     private _disabled_cursor?;
     /**
-     * @docs:
-     * @title: Disable Button
-     * @desc: Disables the button element, preventing user interaction.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Disable Button}
+     * Disables the button element, preventing user interaction.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     disable(): this;
     /**
-     * @docs:
-     * @title: Enable Button
-     * @desc: Enables the button by setting the disabled state to false.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Enable Button}
+     * Enables the button by setting the disabled state to false.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     enable(): this;
     /**
-     * @docs:
-     * @title: On Click
-     * @desc: Sets a click event handler for the element, allowing for optional simulated href behavior.
-     * @param:
-     *     @name: simulate_href
-     *     @descr: The simulated href to set for the element (for SEO in SPAs).
-     *     @name: callback
-     *     @descr: The function to be called when the element is clicked.
-     * @return:
-     *     @description Returns the instance of the element for chaining when an argument is passed, otherwise returns the current onclick handler.
-     * @funcs: 2
+     * {On Click}
+     * Sets a click event handler for the element, allowing for optional simulated href behavior.
+     * @parameter simulate_href The simulated href to set for the element (for SEO in SPAs).
+     * @parameter callback The function to be called when the element is clicked.
+     * @returns Returns the instance of the element for chaining when an argument is passed, otherwise returns the current onclick handler.
+     * @docs
      */
     /**
      * @warning NEVER change that this overrides the last on click callback
@@ -1831,55 +1381,38 @@ export declare abstract class VElement extends HTMLElement {
     on_click(simulate_href: string | null, callback: Function): this;
     on_click(callback?: Function): this;
     /**
-     * @docs:
-     * @title: On Click Redirect
-     * @desc: Sets up a click event that redirects to the specified URL when triggered.
-     * @param:
-     *     @name: url
-     *     @descr: The URL to redirect to when the click event occurs.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {On Click Redirect}
+     * Sets up a click event that redirects to the specified URL when triggered.
+     * @parameter url The URL to redirect to when the click event occurs.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_click_redirect(url: string): this;
     /**
-     * @docs:
-     * @title: On Scroll
-     * @description:
-     *     Script to be run when an element's scrollbar is being scrolled.
-     *     The equivalent of HTML attribute `onscroll`. The first parameter of the callback is the `VElement` object.
-     *     Returns the attribute value when parameter `value` is `null`.
-     * @param:
-     *     @name: opts_or_callback
-     *     @description: Options or callback function to assign for the scroll event.
-     *     @attr:
-     *         @name: callback
-     *         @description Function to be called on scroll.
-     *         @name: delay
-     *         @description Delay in milliseconds before executing the callback.
-     * @return:
-     *     @description: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * {On Scroll}
+     * Script to be run when an element's scrollbar is being scrolled.
+     * The equivalent of HTML attribute `onscroll`. The first parameter of the callback is the `VElement` object.
+     * Returns the attribute value when parameter `value` is `null`.
+     * @parameter opts_or_callback Options or callback function to assign for the scroll event.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @docs
      */
     on_scroll(): (EventListener | null);
     on_scroll(opts_or_callback: Function | {
+        /** Function to be called on scroll. */
         callback: (element: any, event: Event) => any;
+        /** Delay in milliseconds before executing the callback. */
         delay?: number;
     }): this;
     /**
-     * @docs:
-     * @title: On Resize
-     * @desc: Script to be run when the browser window is being resized.
-     *        This allows for a callback to be executed upon resizing the window.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be called when the window is resized.
-     * @param:
-     *     @name: once
-     *     @descr: If true, the callback will only be executed once after the last resize event.
-     * @param:
-     *     @name: delay
-     *     @descr: The delay in milliseconds before executing the callback.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On Resize}
+     * Script to be run when the browser window is being resized.
+     * This allows for a callback to be executed upon resizing the window.
+     * @parameter callback The function to be called when the window is resized.
+     * @parameter once If true, the callback will only be executed once after the last resize event.
+     * @parameter delay The delay in milliseconds before executing the callback.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_window_resize(): null | Function;
     on_window_resize(opts: Function | {
@@ -1888,273 +1421,202 @@ export declare abstract class VElement extends HTMLElement {
         delay?: number;
     }): this;
     /**
-     * @docs:
-     * @title: Attachment Drop
-     * @desc: Custom on attachment drop event handling. This function sets up event listeners for drag and drop actions.
-     * @param:
-     *     @name: options
-     *     @descr: Configuration options for the drop event.
-     *     @attr:
-     *         @name: callback
-     *         @description Function to be called with the attachment details.
-     *     @attr:
-     *         @name: read
-     *         @description Indicates whether to read the file data.
-     *     @attr:
-     *         @name: compress
-     *         @description Function to compress the data, `Compression.compress` is advised.
-     *     @attr:
-     *         @name: on_start
-     *         @description Function to be called when the drag starts.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Attachment Drop}
+     *
+     * Custom on attachment drop event handling.
+     * This function sets up event listeners for drag and drop actions.
+     * Also pushes the attachment to attribute field `attachments`.
+     *
+     * When a directory is dropped, all files within the directory are added recursively.
+     *
+     * @param options Configuration options for the drop event, see {@link Attachment.OnDropOpts} for more information.
+     *
+     * @returns The instance of the element for chaining.
+     *
+     * @docs
      */
-    on_attachment_drop(options: {
-        callback: (args: {
-            name: string;
-            path: string;
-            is_dir: boolean;
-            data: any;
-            compressed: boolean;
-            file: File;
-            size: number;
-        }) => any;
-        read?: boolean;
-        compress?: (string: any) => any;
-        on_start?: (event: DragEvent) => any;
-    }): this;
+    on_attachment_drop(options: Attachment.OnDropOpts): this;
     /**
-     * @docs:
-     * @title: On Appear
-     * @desc: Sets a callback to be executed when the element appears in the viewport.
-     * @param:
-     *     @name: callback_or_opts
-     *     @descr: Can be a callback function or an options object containing callback, repeat, and threshold.
-     *     @attr:
-     *         @name: callback
-     *         @description The function to call when the element appears.
-     *         @name: repeat
-     *         @description If true, the callback will be called every time the element appears.
-     *         @name: threshold
-     *         @description The intersection ratio threshold to trigger the callback.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * Add an attachment to the attachments array, if not already added.
+     * @param attachment The attachment to add.
+     * @returns The instance of the element for chaining.
+     */
+    add_attachment(attachment: Attachment): this;
+    /**
+     * Remove an attachment from the attachments array.
+     * @param attachment The attachment to remove.
+     * @returns The instance of the element for chaining.
+     */
+    remove_attachment(attachment: Attachment): this;
+    /**
+     * {On Appear}
+     * Sets a callback to be executed when the element appears in the viewport.
+     * @parameter callback_or_opts Can be a callback function or an options object containing callback, repeat, and threshold.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_appear<T = this>(callback: OnAppearCallback<T>): this;
     on_appear<T = this>(options: {
+        /** The function to call when the element appears. */
         callback: OnAppearCallback<T>;
+        /** If true, the callback will be called every time the element appears. */
         repeat?: boolean;
+        /** The intersection ratio threshold to trigger the callback. */
         threshold?: number | null;
     }): this;
     /**
-     * @docs:
-     * @title: On Disappear
-     * @desc: Sets up an event listener that triggers a callback when the element disappears from the user's view.
-     * @experimental: true
-     * @param:
-     *     @name: callback_or_opts
-     *     @descr: Can be a callback function or an options object containing the callback and repeat settings.
-     *     @attr:
-     *         @name: callback
-     *         @description The function to call when the element disappears.
-     *         @name: repeat
-     *         @description Whether to repeat the observation after the callback is triggered.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On Disappear}
+     * Sets up an event listener that triggers a callback when the element disappears from the user's view.
+     * @experimental
+     * @parameter callback_or_opts Can be a callback function or an options object containing the callback and repeat settings.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_disappear<T = this>(callback_or_opts?: ((element: T) => any) | {
+        /** The function to call when the element disappears. */
         callback?: (element: T) => any;
+        /** Whether to repeat the observation after the callback is triggered. */
         repeat?: boolean;
     }): this;
     /**
-     * @docs:
-     * @title: On Enter
-     * @desc: Sets a callback function to be executed when the Enter key is pressed on input or textarea elements.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be called when the Enter key is pressed.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On Enter}
+     * Sets a callback function to be executed when the Enter key is pressed on input or textarea elements.
+     * @parameter callback The function to be called when the Enter key is pressed.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_enter(): undefined | ElementKeyboardEvent<this>;
     on_enter(callback: ElementKeyboardEvent<this>): this;
     /**
-     * @docs:
-     * @title: On Escape
-     * @desc: Sets a callback function to be triggered when the Escape key is pressed.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be called when the Escape key is pressed.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On Escape}
+     * Sets a callback function to be triggered when the Escape key is pressed.
+     * @parameter callback The function to be called when the Escape key is pressed.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_escape(): undefined | ElementKeyboardEvent<this>;
     on_escape(callback: ElementKeyboardEvent<this>): this;
     /**
-     * @docs:
-     * @title: On Theme Update
-     * @desc: Manages theme update callbacks. If no callback is provided, it returns the current callbacks.
-     * @param:
-     *     @name: callback
-     *     @descr: A function to be called on theme updates or null to retrieve existing callbacks.
-     * @return:
-     *     @description Returns the instance of the element for chaining when a callback is provided, or the array of existing callbacks if null is passed.
-     * @funcs: 2
+     * {On Theme Update}
+     * Manages theme update callbacks. If no callback is provided, it returns the current callbacks.
+     * @parameter callback A function to be called on theme updates or null to retrieve existing callbacks.
+     * @returns Returns the instance of the element for chaining when a callback is provided, or the array of existing callbacks if null is passed.
+     * @docs
      */
     on_theme_update(): ThemeUpdateCallback<this>[];
     on_theme_update(callback: ThemeUpdateCallback<this>): this;
     /**
-     * @docs:
-     * @title: Remove on Theme Update
-     * @desc: Removes a callback from the theme update listeners.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to be removed from the listeners.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove on Theme Update}
+     * Removes a callback from the theme update listeners.
+     * @parameter callback The callback function to be removed from the listeners.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_theme_update(callback: ThemeUpdateCallback<this>): this;
     /**
-     * @docs:
-     * @title: Remove on Theme Updates
-     * @desc: Clears the list of theme update callbacks if they exist.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove on Theme Updates}
+     * Clears the list of theme update callbacks if they exist.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_theme_updates(): this;
     /**
-     * @docs:
-     * @title: On Render
-     * @desc: Manages callbacks that are triggered when the element is added to the body.
-     * @param:
-     *     @name: callback
-     *     @descr: A function to be called when the element is rendered. If no argument is passed, it returns the current callbacks.
-     * @return:
-     *     @description When a callback is provided, returns the instance of the element for chaining. If no callback is provided, returns the array of current callbacks.
-     * @funcs: 2
+     * {On Render}
+     * Manages callbacks that are triggered when the element is added to the body.
+     * @parameter callback A function to be called when the element is rendered. If no argument is passed, it returns the current callbacks.
+     * @returns When a callback is provided, returns the instance of the element for chaining. If no callback is provided, returns the array of current callbacks.
+     * @docs
      */
     on_render(): (ElementCallback<this>)[];
     on_render(callback: ElementCallback<this>): this;
     /**
-     * @docs:
-     * @title: Remove on Render
-     * @desc: Removes a callback from the on render callbacks array and stops observing if empty.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to remove from the on render callbacks.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove on Render}
+     * Removes a callback from the on render callbacks array and stops observing if empty.
+     * @parameter callback The callback function to remove from the on render callbacks.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_render(callback: ElementCallback<this>): this;
     /**
-     * @docs:
-     * @title: Remove On Renders
-     * @desc: Clears the on render callbacks and stops observing the element for render events.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove On Renders}
+     * Clears the on render callbacks and stops observing the element for render events.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_renders(): this;
     /**
-     * @docs:
-     * @title: Is Rendered
-     * @desc: Checks whether the element has been rendered or not.
-     * @return:
-     *     @description Returns true if the element has been rendered, otherwise false.
+     * {Is Rendered}
+     * Checks whether the element has been rendered or not.
+     * @returns Returns true if the element has been rendered, otherwise false.
+     * @docs
      */
     is_rendered(): boolean;
     /**
-     * @docs:
-     * @title: On Load
-     * @desc: Registers a callback to be executed when the entire page is fully loaded.
-     *          Note that this event will not fire if the `window.onload` callback is overwritten.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be executed on load.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On Load}
+     * Registers a callback to be executed when the entire page is fully loaded.
+     * Note that this event will not fire if the `window.onload` callback is overwritten.
+     * @parameter callback The function to be executed on load.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_load(callback: (element: this, args: Record<string, any>) => any): this;
     /**
-     * @docs:
-     * @title: Remove on Load
-     * @desc: Removes a callback function from the "volt.on_load" event.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be removed from the event listener.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Remove on Load}
+     * Removes a callback function from the "volt.on_load" event.
+     * @parameter callback The function to be removed from the event listener.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_load(callback: (element: this, args: Record<string, any>) => any): this;
     /**
-     * @docs:
-     * @title: Remove On Loads
-     * @desc: Removes the on_load event listener from the instance.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove On Loads}
+     * Removes the on_load event listener from the instance.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_loads(): this;
     /**
-     * @docs:
-     * @title: On Resize
-     * @desc: Manages callbacks for the resize event. Can retrieve existing callbacks or add new ones.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to be executed on resize events.
-     * @return:
-     *     @descr: When a callback is provided, returns the instance for chaining. Otherwise, returns the list of existing resize callbacks.
-     * @funcs: 2
+     * {On Resize}
+     * Manages callbacks for the resize event. Can retrieve existing callbacks or add new ones.
+     * @parameter callback The callback function to be executed on resize events.
+     * @returns When a callback is provided, returns the instance for chaining. Otherwise, returns the list of existing resize callbacks.
+     * @docs
      */
     on_resize(): (ElementCallback<this>)[];
     on_resize(callback: ElementCallback<this>): this;
     /**
-     * @docs:
-     * @title: Remove on Resize
-     * @desc: Removes a callback from the resize event listeners. If no callbacks remain, it stops observing resize events.
-     * @param:
-     *     @name: callback
-     *     @descr: The callback function to remove from the resize event listeners.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove on Resize}
+     * Removes a callback from the resize event listeners. If no callbacks remain, it stops observing resize events.
+     * @parameter callback The callback function to remove from the resize event listeners.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_resize(callback: ElementCallback<this>): this;
     /**
-     * @docs:
-     * @title: Remove on Resizes
-     * @desc: Removes all resize callbacks and stops observing resize events for this element.
-     * @param:
-     *     @name: callback
-     *     @descr: A callback function to be removed from the resize callbacks.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove on Resizes}
+     * Removes all resize callbacks and stops observing resize events for this element.
+     * @parameter callback A callback function to be removed from the resize callbacks.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_on_resizes(): this;
     /**
-     * @docs:
-     * @title: On Resize Rule
-     * @desc: Adds an on resize rule event that executes callbacks based on evaluation changes during a resize event.
-     * @note: This function adds an `on_resize` callback.
-     * @param:
-     *     @name: evaluation
-     *     @descr: The function to evaluate if the statement is true, the element node is passed as the first argument.
-     * @param:
-     *     @name: on_true
-     *     @descr: The callback executed if the statement is true, the element node is passed as the first argument.
-     * @param:
-     *     @name: on_false
-     *     @descr: The callback executed if the statement is false, the element node is passed as the first argument.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {On Resize Rule}
+     * Adds an on resize rule event that executes callbacks based on evaluation changes during a resize event.
+     * @note This function adds an `on_resize` callback.
+     * @parameter evaluation The function to evaluate if the statement is true, the element node is passed as the first argument.
+     * @parameter on_true The callback executed if the statement is true, the element node is passed as the first argument.
+     * @parameter on_false The callback executed if the statement is false, the element node is passed as the first argument.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_resize_rule(evaluation: (element: this) => boolean, on_true?: ElementCallback<this>, on_false?: ElementCallback<this>): this;
     /**
-     * @docs:
-     * @title: On Shortcut
-     * @desc: Create key shortcuts for the element. This function takes an array of shortcut objects that define the key combinations and their associated actions.
-     * @param:
-     *     @name: shortcuts
-     *     @descr: The array with shortcuts. Each shortcut object may have various attributes to define the key matching criteria and actions.
-     * @return:
-     *     @descr: This function does not return a value.
+     * {On Shortcut}
+     * Create key shortcuts for the element. This function takes an array of shortcut objects that define the key combinations and their associated actions.
+     * @parameter shortcuts The array with shortcuts. Each shortcut object may have various attributes to define the key matching criteria and actions.
+     * @returns This function does not return a value.
+     * @docs
      */
     on_shortcut(shortcuts?: {
         match?: (event: KeyboardEvent, key: string, shortcut: any) => boolean;
@@ -2171,356 +1633,248 @@ export declare abstract class VElement extends HTMLElement {
         callback: (element: any, event: KeyboardEvent) => any;
     }[]): this;
     /**
-     * MOVED docs:
-     * @title: On Context Menu
-     * @desc:
-     *     Script to be run when a context menu is triggered. This function can set or get the context menu callback.
-     * @param:
-     *     @name: callback
-     *     @descr:
-     *         The parameter may either be a callback function, a ContextMenu object, or an Array as the ContextMenu parameter.
-     * @return:
-     *     @description Returns the `VElement` object. If `callback` is `null`, then the attribute's value is returned.
-     * @funcs: 2
-     */
-    /**
-     * @docs:
-     * @title: On Mouse Enter
-     * @desc: Sets a callback function to be called when the mouse enters the element.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to be called on mouse enter.
-     * @return:
-     *     @descr: When a callback is provided, returns the instance of the element for chaining. If no callback is provided, returns the current callback.
-     * @funcs: 2
+     * {On Mouse Enter}
+     * Sets a callback function to be called when the mouse enters the element.
+     * @parameter callback The function to be called on mouse enter.
+     * @returns When a callback is provided, returns the instance of the element for chaining. If no callback is provided, returns the current callback.
+     * @docs
      */
     on_mouse_enter(): ElementMouseEvent<this>;
     on_mouse_enter(callback: ElementMouseEvent<this>): this;
     /**
-     * @docs:
-     * @title: On Mouse Leave
-     * @desc: Sets or retrieves the callback function to be called when the mouse leaves the element.
-     * @param:
-     *     @name: callback
-     *     @descr: The function to execute when the mouse leaves the element.
-     * @return:
-     *     @description When an argument is passed this function returns the instance of the element for chaining. Otherwise, it returns the currently set callback function.
-     * @funcs: 2
+     * {On Mouse Leave}
+     * Sets or retrieves the callback function to be called when the mouse leaves the element.
+     * @parameter callback The function to execute when the mouse leaves the element.
+     * @returns When an argument is passed this function returns the instance of the element for chaining. Otherwise, it returns the currently set callback function.
+     * @docs
      */
     on_mouse_leave(): ElementMouseEvent<this>;
     on_mouse_leave(callback: ElementMouseEvent<this>): this;
     /**
-     * @docs:
-     * @title: On mouse over and out
-     * @desc: Set callbacks for the on mouse over and mouse out events.
-     * @param:
-     *     @name: mouse_over
-     *     @descr: The mouse over callback.
-     * @param:
-     *     @name: mouse_out
-     *     @descr: The mouse out callback.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {On mouse over and out}
+     * Set callbacks for the on mouse over and mouse out events.
+     * @parameter mouse_over The mouse over callback.
+     * @parameter mouse_out The mouse out callback.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     on_mouse_over_out(mouse_over: ElementMouseEvent<this>, mouse_out: ElementMouseEvent<this>): this;
     /**
-     * @docs:
-     * @title: First Child
-     * @desc: Retrieves the first child of the element.
-     * @return:
-     *     @description Returns the first child node of the element, or null if there are no children.
+     * {First Child}
+     * Retrieves the first child of the element.
+     * @returns Returns the first child node of the element, or null if there are no children.
+     * @docs
      */
     first_child(): Node | null;
     /**
-     * @docs:
-     * @title: Last Child
-     * @desc: Retrieves the last child of the element.
-     * @return:
-     *     @description Returns the last child node of the element, or null if there are no children.
+     * {Last Child}
+     * Retrieves the last child of the element.
+     * @returns Returns the last child node of the element, or null if there are no children.
+     * @docs
      */
     last_child(): ChildNode | null;
     /**
-     * @docs:
-     * @title: Iterate Children
-     * @desc: Iterates over the children of an element, executing a handler function for each child.
-     * @param:
-     *     @name: start
-     *     @descr: The starting index for iteration, or a handler function.
-     *     @name: end
-     *     @descr: The ending index for iteration.
-     *     @name: handler
-     *     @descr: The function to execute for each child.
-     * @return:
-     *     @description Returns the result of the handler function if not null, otherwise returns null.
-     * @funcs: 2
+     * {Iterate Children}
+     * Iterates over the children of an element, executing a handler function for each child.
+     * @parameter start The starting index for iteration, or a handler function.
+     * @parameter end The ending index for iteration.
+     * @parameter handler The function to execute for each child.
+     * @returns Returns the result of the handler function if not null, otherwise returns null.
+     * @docs
      */
     iterate(start: number | ((child: any, index: number) => any), end?: number, handler?: (child: any, index: number) => any): any;
     /**
-     * @docs:
-     * @title: Iterate Child Nodes
-     * @desc: Iterates over the child nodes of an element, executing a handler function for each node.
-     * @param:
-     *     @name: start
-     *     @descr: The starting index for iteration, or a handler function.
-     *     @name: end
-     *     @descr: The ending index for iteration.
-     *     @name: handler
-     *     @descr: The function to execute for each child node.
-     * @return:
-     *     @description Returns the result of the handler function if not null, otherwise returns null.
-     * @funcs: 2
+     * {Iterate Child Nodes}
+     * Iterates over the child nodes of an element, executing a handler function for each node.
+     * @parameter start The starting index for iteration, or a handler function.
+     * @parameter end The ending index for iteration.
+     * @parameter handler The function to execute for each child node.
+     * @returns Returns the result of the handler function if not null, otherwise returns null.
+     * @docs
      */
     iterate_nodes(start: number | ((node: any, index: number) => any), end?: number, handler?: (node: any, index: number) => any): any;
     /**
-     * @docs:
-     * @title: Set Default
-     * @desc: Sets the current element as the default, allowing for a specific type to be set.
-     * @param:
-     *     @name: Type
-     *     @descr: The type to set as default, defaults to VElement if null.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Set Default}
+     * Sets the current element as the default, allowing for a specific type to be set.
+     * @parameter Type The type to set as default, defaults to VElement if null.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     set_default(Type?: any): this;
     /**
-     * @docs:
-     * @title: Assign
-     * @desc: Assigns a function or property to the instance. This allows dynamic property assignment for elements.
-     * @param:
-     *     @name: name
-     *     @descr: The name of the property or function to assign.
-     *     @name: value
-     *     @descr: The value to assign to the property or function.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Assign}
+     * Assigns a function or property to the instance. This allows dynamic property assignment for elements.
+     * @parameter name The name of the property or function to assign.
+     * @parameter value The value to assign to the property or function.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     assign(name: string, value: any): this;
     /**
-     * @docs:
-     * @title: Extend
-     * @desc: Extends the current instance by adding properties or functions from the provided object.
-     * @param:
-     *     @name: obj
-     *     @descr: The object containing properties or functions to add to the current instance.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Extend}
+     * Extends the current instance by adding properties or functions from the provided object.
+     * @parameter obj The object containing properties or functions to add to the current instance.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     extend<T extends Record<string, any>>(props: T & ThisType<this & T>): this & T;
     /**
-     * @docs:
-     * @title: Select Contents
-     * @desc: Selects the contents of the object, optionally overwriting existing selections.
-     * @param:
-     *     @name: overwrite
-     *     @descr: Indicates whether to overwrite the current selection.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Select Contents}
+     * Selects the contents of the object, optionally overwriting existing selections.
+     * @parameter overwrite Indicates whether to overwrite the current selection.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     select(overwrite?: boolean): this;
     /**
-     * @docs:
-     * @title: Is Scrollable
-     * @desc: Determines whether the element is scrollable based on its dimensions.
-     * @return:
-     *     @description Returns true if the element's scroll height or width exceeds its client height or width, indicating it is scrollable.
+     * {Is Scrollable}
+     * Determines whether the element is scrollable based on its dimensions.
+     * @returns Returns true if the element's scroll height or width exceeds its client height or width, indicating it is scrollable.
+     * @docs
      */
     is_scrollable(): boolean;
     /**
-     * @docs:
-     * @title: Is Scrollable X
-     * @desc: Checks if the element is scrollable in the horizontal direction by comparing its scroll width with its client width.
-     * @return:
-     *     @description Returns true if the element is scrollable horizontally, otherwise false.
+     * {Is Scrollable X}
+     * Checks if the element is scrollable in the horizontal direction by comparing its scroll width with its client width.
+     * @returns Returns true if the element is scrollable horizontally, otherwise false.
+     * @docs
      */
     is_scrollable_x(): boolean;
     /**
-     * @docs:
-     * @title: Is Scrollable Y
-     * @desc: Checks if the element is scrollable vertically by comparing its scroll height to its client height.
-     * @return:
-     *     @description Returns true if the element is scrollable in the Y direction, otherwise false.
+     * {Is Scrollable Y}
+     * Checks if the element is scrollable vertically by comparing its scroll height to its client height.
+     * @returns Returns true if the element is scrollable in the Y direction, otherwise false.
+     * @docs
      */
     is_scrollable_y(): boolean;
     /**
-     * @docs:
-     * @title: Wait Till Children Rendered
-     * @desc: Waits until the element and all its children are fully rendered.
+     * {Wait Till Children Rendered}
+     * Waits until the element and all its children are fully rendered.
      * This function should only be used in the `on_render` callback.
      * Note that it does not work with non-volt nodes and may not function correctly.
-     * @param:
-     *     @name: timeout
-     *     @descr: The maximum time to wait for rendering in milliseconds.
-     *     @default: 10000
-     * @return:
-     *     @description Returns a promise that resolves when all children are rendered or rejects on timeout.
+     * @parameter timeout The maximum time to wait for rendering in milliseconds.
+     * @returns Returns a promise that resolves when all children are rendered or rejects on timeout.
+     * @docs
      */
     wait_till_children_rendered(timeout?: number): Promise<void>;
     /**
-     * @docs:
-     * @title: Add Pseudo
-     * @desc: Adds a pseudo element of a specified type to a node.
-     *         Ensures that the pseudo element is properly initialized and styled.
-     * @param:
-     *     @name: type
-     *     @descr: The type of pseudo element to add (e.g., before, after).
-     *     @name: node
-     *     @descr: The node to which the pseudo element is added.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Add Pseudo}
+     * Adds a pseudo element of a specified type to a node.
+     * Ensures that the pseudo element is properly initialized and styled.
+     * @parameter type The type of pseudo element to add (e.g., before, after).
+     * @parameter node The node to which the pseudo element is added.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     pseudo(type: string, pseudo: PseudoElement): this;
     /**
-     * @docs:
-     * @title: Remove Pseudo
-     * @desc: Remove a pseudo element by the specified node.
-     * @param:
-     *     @name: node
-     *     @descr: The node from which the pseudo element will be removed.
-     *     @attr:
-     *         @name: pseudo_id
-     *         @description Identifier for the pseudo element to be removed.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Pseudo}
+     * Remove a pseudo element by the specified node.
+     * @parameter node The node from which the pseudo element will be removed.
+     * @parameter pseudo_id Identifier for the pseudo element to be removed.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_pseudo(type: string, pseudo: PseudoElement): this;
     /**
-     * @docs:
-     * @title: Remove Pseudos
-     * @desc:
-     *      Removes all pseudo classes and stylesheets associated with the element.
-     *      This function iterates through the class list and removes classes that start with "pseudo_".
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Remove Pseudos}
+     * Removes all pseudo classes and stylesheets associated with the element.
+     * This function iterates through the class list and removes classes that start with "pseudo_".
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     remove_pseudos(): this;
     /**
-     * @docs:
-     * @title: Add Pseudo Hover
-     * @desc: Adds a pseudo element on mouse hover. This function does not work in combination with other mouse over events.
-     * @param:
-     *     @name: type
-     *     @descr: The type of pseudo element to add.
-     *     @name: node
-     *     @descr: The node to which the pseudo element will be applied.
-     *     @name: set_defaults
-     *     @descr: A flag to set default values for the node.
-     *     @default: true
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Add Pseudo Hover}
+     * Adds a pseudo element on mouse hover. This function does not work in combination with other mouse over events.
+     * @parameter type The type of pseudo element to add.
+     * @parameter node The node to which the pseudo element will be applied.
+     * @parameter set_defaults A flag to set default values for the node.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     pseudo_on_hover(type: string, pseudo: PseudoElement, set_defaults?: boolean): this;
     /**
-     * @docs:
-     * @title: Parent
-     * @desc: Get or set the parent element of the current element.
-     *         This is particularly relevant for child elements of specific derived classes.
-     * @param:
-     *     @name: value
-     *     @descr: The parent element to set or null to retrieve the current parent.
-     * @return:
-     *     @description If a value is provided, it sets the parent and returns the instance for chaining.
-     *                  If no value is provided, it returns the current parent element or null if not set.
-     * @funcs: 2
+     * {Parent}
+     * Get or set the parent element of the current element.
+     * This is particularly relevant for child elements of specific derived classes.
+     * @parameter value The parent element to set or null to retrieve the current parent.
+     * @docs
      */
     parent<T = undefined | VElement | HTMLElement>(): T;
     parent(value: any): this;
     /**
-     * @docs:
-     * @title: Absolute Parent
-     * @desc: Sets or gets the absolute parent of the custom element.
+     * {Absolute Parent}
+     * Sets or gets the absolute parent of the custom element.
      * When called without arguments, it returns the current absolute parent;
      * when called with an argument, it sets the absolute parent and returns the instance for chaining.
-     * @param:
-     *     @name: value
-     *     @descr: The absolute parent to set.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining when an argument is passed;
-     * otherwise, returns the current absolute parent.
-     * @funcs: 2
+     * @parameter value The absolute parent to set.
+     * @docs
      */
     abs_parent<T = undefined | VElement | HTMLElement>(): T;
     abs_parent(value: any): this;
     /**
-     * @docs:
-     * @title: Assign to Parent As
-     * @desc: Assigns the current element to a specified attribute of the parent element.
-     * @param:
-     *     @name: name
-     *     @descr: The name of the attribute to assign the current element to.
-     * @return:
-     *     @descr: Returns the instance of the element for chaining.
+     * {Assign to Parent As}
+     * Assigns the current element to a specified attribute of the parent element.
+     * @deprecated
+     * @parameter name The name of the attribute to assign the current element to.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     assign_to_parent_as(name: string): this;
     /**
-     * @docs:
-     * @title: Get Y Offset From Parent
-     * @desc: Calculates the vertical offset of the current node relative to a specified parent node.
-     * @param:
-     *     @name: parent
-     *     @descr: The parent node from which to calculate the offset.
-     * @return:
-     *     @description Returns the accumulated vertical offset from the current node to the parent node, or null if the parent wasn't found.
-     * @deprecated: true
+     * {Get Y Offset From Parent}
+     * Calculates the vertical offset of the current node relative to a specified parent node.
+     * @deprecated
+     * @parameter parent The parent node from which to calculate the offset.
+     * @returns Returns the accumulated vertical offset from the current node to the parent node, or null if the parent wasn't found.
+     * @docs
      */
     get_y_offset_from_parent(parent: HTMLElement): number | null;
     /**
-     * @docs:
-     * @title: Absolute Y Offset
-     * @desc: Calculates the absolute vertical offset of the element from the top of the document.
-     * @return:
-     *     @description Returns the absolute Y offset in pixels.
+     * {Absolute Y Offset}
+     * Calculates the absolute vertical offset of the element from the top of the document.
+     * @returns Returns the absolute Y offset in pixels.
+     * @docs
      */
     absolute_y_offset(): number;
     /**
-     * @docs:
-     * @title: Absolute X Offset
-     * @desc: Calculates the absolute X offset of the current element in relation to its offset parents.
-     * @return:
-     *     @description Returns the total left offset in pixels as a number.
+     * {Absolute X Offset}
+     * Calculates the absolute X offset of the current element in relation to its offset parents.
+     * @returns Returns the total left offset in pixels as a number.
+     * @docs
      */
     absolute_x_offset(): number;
     /**
-     * @docs:
-     * @title: Exec
-     * @desc: Executes a provided function with the current element as its parameter.
-     * @param:
-     *     @name: callback
-     *     @descr: A function to execute with the current element.
-     * @return:
-     *     @description Returns the instance of the element for chaining.
+     * {Exec}
+     * Executes a provided function with the current element as its parameter.
+     * @parameter callback A function to execute with the current element.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
      */
     exec(callback: ElementCallback<this>): this;
     /**
-     * @docs:
-     * @title: Is child
-     * @desc: Check if an element is a direct child of the element or the element itself.
-     * @param:
-     *     @name: target
-     *     @descr: The target element to test.
-     * @return:
-     *     @description Returns true if the target is a direct child, otherwise false.
+     * {Is child}
+     * Check if an element is a direct child of the element or the element itself.
+     * @parameter target The target element to test.
+     * @returns Returns true if the target is a direct child, otherwise false.
+     * @docs
      */
     is_child(target: any): boolean;
     /**
-     * @docs:
-     * @title: Is Child
-     * @desc: Checks if an element is a recursively nested child of the element or the element itself.
-     * @param:
-     *     @name: target
-     *     @descr: The target element to test.
-     * @param:
-     *     @name: stop_node
-     *     @descr: A node at which to stop checking if target is a parent of the current element.
-     * @return:
-     *     @descr: Returns true if the target is a nested child, otherwise false.
+     * {Is Child}
+     * Checks if an element is a recursively nested child of the element or the element itself.
+     * @parameter target The target element to test.
+     * @parameter stop_node A node at which to stop checking if target is a parent of the current element.
+     * @returns Returns true if the target is a nested child, otherwise false.
+     * @docs
      */
     is_nested_child(target: any, stop_node?: any): boolean;
     /**
-     * @docs:
-     * @title: To String
-     * @desc: Converts the current element to its string representation, setting an attribute in the process.
-     * @return:
-     *     @description Returns the outer HTML of the element as a string.
+     * {To String}
+     * Converts the current element to its string representation, setting an attribute in the process.
+     * @returns Returns the outer HTML of the element as a string.
+     * @docs
      */
     toString(): string;
     accent_color(): string;
@@ -2828,7 +2182,7 @@ export declare abstract class VElement extends HTMLElement {
     hanging_punctuation(): string;
     hanging_punctuation(value: string): this;
     hyphens(): string;
-    hyphens(value: string): this | string;
+    hyphens(value: string): this;
     image_rendering(): string;
     image_rendering(value: string): this;
     inline_size(): string;
@@ -3182,18 +2536,6 @@ export declare abstract class VElement extends HTMLElement {
     cols(value: number): this;
     colspan(): null | number;
     colspan(value: number): this;
-    /**
-        * docs:
-        * @title: Content
-        * @desc: Retrieves or sets the value associated with the http-equiv or name attribute.
-        *        When `value` is `null`, the current attribute value is returned.
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @descr: Returns the current attribute value if `value` is `null`, otherwise returns the instance for chaining.
-        * @funcs: 2
-        */
     content_editable(): boolean;
     content_editable(value: boolean): this;
     controls(): boolean;
@@ -3225,7 +2567,7 @@ export declare abstract class VElement extends HTMLElement {
      * {Draggable}
      * Specifies whether an element is draggable or not. The equivalent of HTML attribute `draggable`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     draggable(): boolean;
@@ -3238,7 +2580,7 @@ export declare abstract class VElement extends HTMLElement {
      * {Form}
      * Specifies the name of the form the element belongs to. The equivalent of HTML attribute `form`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object when a value is set. If `null`, returns the attribute's value.
+     * @returns Returns the `VElement` object when a value is set. If `null`, returns the attribute's value.
      * @docs
      */
     form_action(): string;
@@ -3272,7 +2614,7 @@ export declare abstract class VElement extends HTMLElement {
      * {Lang}
      * Specifies the language of the element's content, equivalent to the HTML attribute `lang`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     lang(): string;
@@ -3295,13 +2637,6 @@ export declare abstract class VElement extends HTMLElement {
     max_length(value: number): this;
     method(): string;
     method(value: string): this;
-    /**
-     * {Min}
-     * Specifies a minimum value, equivalent to the HTML attribute `min`.
-     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
-     * @docs
-     */
     min(): string;
     min(value: string): this;
     multiple(): boolean;
@@ -3344,13 +2679,6 @@ export declare abstract class VElement extends HTMLElement {
     size(value: number): this;
     sizes(): string;
     sizes(value: string): this;
-    /**
-     * {Span}
-     * Specifies the number of columns to span. The equivalent of HTML attribute `span`.
-     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns r: Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-     * @docs
-     */
     span(): null | number;
     span(value: number): this;
     spell_check(): boolean;
@@ -3359,7 +2687,7 @@ export declare abstract class VElement extends HTMLElement {
      * {Src}
      * Specifies the URL of the media file, equivalent to the HTML attribute `src`.
      * @param value The value to assign. Leave `null` to retrieve the attribute's value.
-     * @returns ription Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
+     * @returns Returns the `VElement` object for chaining unless parameter `value` is `null`, then the attribute's value is returned.
      * @docs
      */
     src(): string;
@@ -3401,151 +2729,6 @@ export declare abstract class VElement extends HTMLElement {
     use_map(value: string): this;
     value(): string;
     value(value: string): this;
-    /**
-        * docs:
-        * @title: On after print
-        * @desc: Script to be run after the document is printed. The equivalent of HTML attribute `onafterprint`.
-        *        The first parameter of the callback is the `VElement` object.
-        * @param:
-        *     @name: callback
-        *     @descr: The callback function to execute after printing. It receives the `VElement` object and the event.
-        * @return:
-        *     @description Returns the `VElement` object unless the parameter `callback` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
-    /**
-        * docs:
-        * @title: On before print
-        * @desc: Script to be run before the document is printed. The equivalent of HTML attribute `onbeforeprint`.
-        * @param:
-        *     @name: callback
-        *     @descr: The function to be executed before printing, receiving the `VElement` object as the first parameter.
-        * @return:
-        *     @description Returns the instance of the element for chaining unless parameter `callback` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
-    /**
-        * docs:
-        * @title: On Before Unload
-        * @desc: Script to be run when the document is about to be unloaded.
-        *        This is the equivalent of the HTML attribute `onbeforeunload`.
-        *        The first parameter of the callback is the `VElement` object.
-        * @param:
-        *     @name: callback
-        *     @descr: The callback function to execute before unloading the document.
-        * @return:
-        *     @descr: Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
-    /**
-        * docs:
-        * @title: On hash change
-        * @desc:
-        *     Script to be run when there has been changes to the anchor part of a URL.
-        *     The equivalent of HTML attribute `onhashchange`.
-        *
-        *     The first parameter of the callback is the `VElement` object.
-        *
-        * @param:
-        *     @name: callback
-        *     @descr: The callback function to execute on hash change.
-        * @return:
-        *     @description Returns the `VElement` object for chaining. If parameter `value` is `null`, the attribute's value is returned.
-        * @funcs: 2
-        */
-    /**
-        * docs:
-        * @title: On message
-        * @desc:
-        *     Script to be run when the message is triggered.
-        *     The equivalent of HTML attribute `onmessage`.
-        *
-        *     The first parameter of the callback is the `VElement` object.
-        *
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
-    /**
-        * docs:
-        * @title: On Offline
-        * @desc: Script to be run when the browser starts to work offline. The equivalent of HTML attribute `onoffline`.
-        *        The first parameter of the callback is the `VElement` object.
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
-    /**
-        * docs:
-        * @title: On online
-        * @desc: Script to be run when the browser starts to work online.
-        *        The equivalent of HTML attribute `ononline`.
-        *        The first parameter of the callback is the `VElement` object.
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
-    /**
-        * docs:
-        * @title: On page hide
-        * @desc:
-        *     Script to be run when a user navigates away from a page.
-        *     The equivalent of HTML attribute `onpagehide`.
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
-    /**
-        * docs:
-        * @title: On page show
-        * @desc:
-        *     Script to be run when a user navigates to a page.
-        *     The equivalent of HTML attribute `onpageshow`.
-        *     The first parameter of the callback is the `VElement` object.
-        * @param:
-        *     @name: value
-        *     @descr: The value to assign. Leave `null` to retrieve the attribute's value.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
-    /**
-        * docs:
-        * @title: On Popstate
-        * @desc: Script to be run when the window's history changes. The equivalent of HTML attribute `onpopstate`.
-        *        The first parameter of the callback is the `VElement` object. Returns the attribute value when parameter `value` is `null`.
-        * @param:
-        *     @name: callback
-        *     @descr: The callback function to execute on popstate event.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `callback` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
-    /**
-        * docs:
-        * @title: On Storage
-        * @desc: Script to be run when a Web Storage area is updated.
-        *        The equivalent of HTML attribute `onstorage`.
-        *        The first parameter of the callback is the `VElement` object.
-        * @param:
-        *     @name: callback
-        *     @descr: The function to be executed when storage is updated.
-        * @return:
-        *     @description Returns the `VElement` object. Unless parameter `value` is `null`, then the attribute's value is returned.
-        * @funcs: 2
-        */
     on_blur(): Function | undefined;
     on_blur(callback: ElementEvent<this>): this;
     on_change(): Function | undefined;

@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
@@ -13,7 +13,7 @@ export class FrameNodes extends Array<VElement> {
 	}
 }
 
-type OnSet = (mode: string, nodes: FrameNodes) => any
+type OnSet<Mode extends string> = (mode: Mode, nodes: FrameNodes) => any
 
 /**
  * Frame modes used to switch easily between frame nodes.
@@ -23,15 +23,15 @@ type OnSet = (mode: string, nodes: FrameNodes) => any
  * Afterwards the mode can be set using `MyMode.set("my_mode")`.
  * @docs
  */
-export class FrameModes {
+export class FrameModes<Mode extends string = string> {
 
 	// Attributes.
-	public modes: Record<string, FrameNodes> = {};
-	public active?: string;
-	public _on_set?: OnSet;
+    public modes: Record<Mode, FrameNodes> = {} as any;
+    public active?: Mode;
+	public _on_set?: OnSet<Mode>;
 
 	// Provide mode names as args: `sign_in, sign_up`.
-	constructor(...modes: string[]) {
+    constructor(...modes: Mode[]) {
 		for (const mode of modes) {
 			if (this.active == null) {
 				this.active = mode;
@@ -41,7 +41,7 @@ export class FrameModes {
 	}
 
 	// Get.
-	get(mode: string) : FrameNodes {
+	get(mode: Mode) : FrameNodes {
 		const nodes = this.modes[mode];
 		if (nodes === undefined) {
 			throw new Error(`Requested mode "${mode}" does not exist.`);
@@ -50,7 +50,7 @@ export class FrameModes {
 	}
 
 	// Set mode.
-	set(mode: string) : this {
+    set(mode: Mode) : this {
 		this.active = mode;
 		for (const m of Object.keys(this.modes)) {
 			if (m === mode) {
@@ -64,23 +64,23 @@ export class FrameModes {
 			}
 		}
 		if (this._on_set !== undefined) {
-			this._on_set(mode, this[mode]);
+			this._on_set(mode, this.modes[mode]);
 		}
 		return this;	
 	}
-	switch(mode: string) : this { return this.set(mode); }
+	switch(mode: Mode) : this { return this.set(mode); }
 
 	// On switch.
-	on_set() : undefined | OnSet;
-	on_set(callback: OnSet) : this;
-	on_set(callback?: OnSet) : this | undefined | OnSet {
+	on_set() : undefined | OnSet<Mode>;
+	on_set(callback: OnSet<Mode>) : this;
+	on_set(callback?: OnSet<Mode>) : this | undefined | OnSet<Mode> {
 		if (callback == null) { return this._on_set; }
 		this._on_set = callback;
 		return this;
 	}
-	on_switch() : undefined | OnSet;
-	on_switch(callback: OnSet) : this;
-	on_switch(callback?: OnSet) : this | undefined | OnSet {
+	on_switch() : undefined | OnSet<Mode>;
+	on_switch(callback: OnSet<Mode>) : this;
+	on_switch(callback?: OnSet<Mode>) : this | undefined | OnSet<Mode> {
 		if (callback == null) { return this._on_set; }
 		this._on_set = callback;
 		return this;
@@ -91,7 +91,7 @@ export class FrameModes {
 declare global {
 	interface VElementExtensions {
 	    frame_mode(frame_mode: FrameNodes): this;
-		frame_mode(frame_modes: FrameModes, mode_name: string): this;
+		frame_mode<Mode extends string>(frame_modes: FrameModes<Mode>, mode_name: Mode): this;
 	}
 }
 Elements.extend({
@@ -120,7 +120,7 @@ Elements.extend({
 
 
 // @test
-// import { Form } from "./form"
+// import { Form } from "./form.js"
 // Form()
 // 	.frame_mode(FrameModes("test"), "test")
 // 	.on_submit(((e) => {}) as any)

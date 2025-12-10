@@ -3,8 +3,6 @@
  * and provides a `.match()` method which returns true/false and populates `.params` on success.
  */
 
-import Utils from "./utils.js";
-
 export class Route {
     public readonly method: string;
     public readonly endpoint: string | RegExp;
@@ -112,7 +110,11 @@ export class Route {
             }
             const keys = Object.keys(result);
             for (const k of keys) {
-                result[k] = decodeURIComponent(result[k]);
+                if (result[k] == null) {
+                    result[k] = undefined;
+                } else {
+                    result[k] = decodeURIComponent(result[k]);
+                }
             }
             return result;
         }
@@ -202,6 +204,7 @@ export class Route {
                 this.params.forEach((k, i) => {
                     out[k.name] = m[i + 1];
                 });
+                console.log("OUT:", out)
                 return out;
             },
         };
@@ -222,7 +225,7 @@ export class Route {
         return src;
     }
 
-    // Clean an endpoint url.
+    /** Clean an endpoint url. */
     static clean_endpoint(endpoint: RegExp): RegExp;
     static clean_endpoint(endpoint: string): string;
     static clean_endpoint(endpoint: string | RegExp): string | RegExp {

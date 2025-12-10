@@ -27,14 +27,15 @@ var import_recorder = require("./recorder");
 var import_utils = require("../utils");
 var import_ariaSnapshot = require("../utils/isomorphic/ariaSnapshot");
 var import_utilsBundle = require("../utilsBundle");
-var import_recorderApp = require("./recorder/recorderApp");
 var import_locatorParser = require("../utils/isomorphic/locatorParser");
-const internalMetadata = (0, import_instrumentation.serverSideCallMetadata)();
+var import_language = require("./codegen/language");
+var import_recorderUtils = require("./recorder/recorderUtils");
+var import_javascript = require("./codegen/javascript");
 class DebugController extends import_instrumentation.SdkObject {
   constructor(playwright) {
     super({ attribution: { isInternalPlaywright: true }, instrumentation: (0, import_instrumentation.createInstrumentation)() }, void 0, "DebugController");
     this._sdkLanguage = "javascript";
-    this._codegenId = "playwright-test";
+    this._generateAutoExpect = false;
     this._playwright = playwright;
   }
   static {
@@ -47,7 +48,6 @@ class DebugController extends import_instrumentation.SdkObject {
     };
   }
   initialize(codegenId, sdkLanguage) {
-    this._codegenId = codegenId;
     this._sdkLanguage = sdkLanguage;
   }
   dispose() {
@@ -66,73 +66,56 @@ class DebugController extends import_instrumentation.SdkObject {
       this._trackHierarchyListener = void 0;
     }
   }
-  async resetForReuse() {
-    const contexts = /* @__PURE__ */ new Set();
-    for (const page of this._playwright.allPages())
-      contexts.add(page.context());
-    for (const context of contexts)
-      await context.resetForReuse(internalMetadata, null);
-  }
-  async navigate(url) {
-    for (const p of this._playwright.allPages())
-      await p.mainFrame().goto(internalMetadata, url);
-  }
-  async setRecorderMode(params) {
-    await this._closeBrowsersWithoutPages();
+  async setRecorderMode(progress, params) {
+    await progress.race(this._closeBrowsersWithoutPages());
+    this._generateAutoExpect = !!params.generateAutoExpect;
     if (params.mode === "none") {
-      for (const recorder of await this._allRecorders()) {
+      for (const recorder of await progress.race(this._allRecorders())) {
         recorder.hideHighlightedSelector();
         recorder.setMode("none");
       }
       return;
     }
     if (!this._playwright.allBrowsers().length)
-      await this._playwright.chromium.launch(internalMetadata, { headless: !!process.env.PW_DEBUG_CONTROLLER_HEADLESS });
+      await this._playwright.chromium.launch(progress, { headless: !!process.env.PW_DEBUG_CONTROLLER_HEADLESS });
     const pages = this._playwright.allPages();
     if (!pages.length) {
       const [browser] = this._playwright.allBrowsers();
-      const { context } = await browser.newContextForReuse({}, internalMetadata);
-      await context.newPage(internalMetadata);
+      const context = await browser.newContextForReuse(progress, {});
+      await context.newPage(progress);
     }
     if (params.testIdAttributeName) {
       for (const page of this._playwright.allPages())
-        page.context().selectors().setTestIdAttributeName(params.testIdAttributeName);
+        page.browserContext.selectors().setTestIdAttributeName(params.testIdAttributeName);
     }
-    for (const recorder of await this._allRecorders()) {
+    for (const recorder of await progress.race(this._allRecorders())) {
       recorder.hideHighlightedSelector();
-      if (params.mode !== "inspecting")
-        recorder.setOutput(this._codegenId, params.file);
       recorder.setMode(params.mode);
     }
   }
-  async highlight(params) {
+  async highlight(progress, params) {
     if (params.selector)
       (0, import_locatorParser.unsafeLocatorOrSelectorAsSelector)(this._sdkLanguage, params.selector, "data-testid");
     const ariaTemplate = params.ariaTemplate ? (0, import_ariaSnapshot.parseAriaSnapshotUnsafe)(import_utilsBundle.yaml, params.ariaTemplate) : void 0;
-    for (const recorder of await this._allRecorders()) {
+    for (const recorder of await progress.race(this._allRecorders())) {
       if (ariaTemplate)
         recorder.setHighlightedAriaTemplate(ariaTemplate);
       else if (params.selector)
-        recorder.setHighlightedSelector(this._sdkLanguage, params.selector);
+        recorder.setHighlightedSelector(params.selector);
     }
   }
-  async hideHighlight() {
-    for (const recorder of await this._allRecorders())
+  async hideHighlight(progress) {
+    for (const recorder of await progress.race(this._allRecorders()))
       recorder.hideHighlightedSelector();
-    await this._playwright.hideHighlight();
+    await Promise.all(this._playwright.allPages().map((p) => p.hideHighlight().catch(() => {
+    })));
   }
-  allBrowsers() {
-    return [...this._playwright.allBrowsers()];
-  }
-  async resume() {
-    for (const recorder of await this._allRecorders())
+  async resume(progress) {
+    for (const recorder of await progress.race(this._allRecorders()))
       recorder.resume();
   }
-  async kill() {
+  kill() {
     (0, import_processLauncher.gracefullyProcessExitDoNotHang)(0);
-  }
-  async closeAllBrowsers() {
-    await Promise.all(this.allBrowsers().map((browser) => browser.close({ reason: "Close all browsers requested" })));
   }
   _emitSnapshot(initial) {
     const pageCount = this._playwright.allPages().length;
@@ -143,9 +126,12 @@ class DebugController extends import_instrumentation.SdkObject {
   async _allRecorders() {
     const contexts = /* @__PURE__ */ new Set();
     for (const page of this._playwright.allPages())
-      contexts.add(page.context());
-    const result = await Promise.all([...contexts].map((c) => import_recorder.Recorder.showInspector(c, { omitCallTracking: true }, () => Promise.resolve(new InspectingRecorderApp(this)))));
-    return result.filter(Boolean);
+      contexts.add(page.browserContext);
+    const recorders = await Promise.all([...contexts].map((c) => import_recorder.Recorder.forContext(c, { omitCallTracking: true })));
+    const nonNullRecorders = recorders.filter(Boolean);
+    for (const recorder of recorders)
+      wireListeners(recorder, this);
+    return nonNullRecorders;
   }
   async _closeBrowsersWithoutPages() {
     for (const browser of this._playwright.allBrowsers()) {
@@ -158,26 +144,46 @@ class DebugController extends import_instrumentation.SdkObject {
     }
   }
 }
-class InspectingRecorderApp extends import_recorderApp.EmptyRecorderApp {
-  constructor(debugController) {
-    super();
-    this._debugController = debugController;
-  }
-  async elementPicked(elementInfo) {
-    const locator = (0, import_utils.asLocator)(this._debugController._sdkLanguage, elementInfo.selector);
-    this._debugController.emit(DebugController.Events.InspectRequested, { selector: elementInfo.selector, locator, ariaSnapshot: elementInfo.ariaSnapshot });
-  }
-  async setSources(sources) {
-    const source = sources.find((s) => s.id === this._debugController._codegenId);
-    const { text, header, footer, actions } = source || { text: "" };
-    this._debugController.emit(DebugController.Events.SourceChanged, { text, header, footer, actions });
-  }
-  async setPaused(paused) {
-    this._debugController.emit(DebugController.Events.Paused, { paused });
-  }
-  async setMode(mode) {
-    this._debugController.emit(DebugController.Events.SetModeRequested, { mode });
-  }
+const wiredSymbol = Symbol("wired");
+function wireListeners(recorder, debugController) {
+  if (recorder[wiredSymbol])
+    return;
+  recorder[wiredSymbol] = true;
+  const actions = [];
+  const languageGenerator = new import_javascript.JavaScriptLanguageGenerator(
+    /* isPlaywrightTest */
+    true
+  );
+  const actionsChanged = () => {
+    const aa = (0, import_recorderUtils.collapseActions)(actions);
+    const { header, footer, text, actionTexts } = (0, import_language.generateCode)(aa, languageGenerator, {
+      browserName: "chromium",
+      launchOptions: {},
+      contextOptions: {},
+      generateAutoExpect: debugController._generateAutoExpect
+    });
+    debugController.emit(DebugController.Events.SourceChanged, { text, header, footer, actions: actionTexts });
+  };
+  recorder.on(import_recorder.RecorderEvent.ElementPicked, (elementInfo) => {
+    const locator = (0, import_utils.asLocator)(debugController._sdkLanguage, elementInfo.selector);
+    debugController.emit(DebugController.Events.InspectRequested, { selector: elementInfo.selector, locator, ariaSnapshot: elementInfo.ariaSnapshot });
+  });
+  recorder.on(import_recorder.RecorderEvent.PausedStateChanged, (paused) => {
+    debugController.emit(DebugController.Events.Paused, { paused });
+  });
+  recorder.on(import_recorder.RecorderEvent.ModeChanged, (mode) => {
+    debugController.emit(DebugController.Events.SetModeRequested, { mode });
+  });
+  recorder.on(import_recorder.RecorderEvent.ActionAdded, (action) => {
+    actions.push(action);
+    actionsChanged();
+  });
+  recorder.on(import_recorder.RecorderEvent.SignalAdded, (signal) => {
+    const lastAction = actions.findLast((a) => a.frame.pageGuid === signal.frame.pageGuid);
+    if (lastAction)
+      lastAction.action.signals.push(signal.signal);
+    actionsChanged();
+  });
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

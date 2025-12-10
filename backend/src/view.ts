@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // ---------------------------------------------------------
@@ -9,13 +9,16 @@
 import * as vlib from "@vandenberghinc/vlib";
 import * as vts from "@vandenberghinc/vlib/vts";
 import * as vhighlight from "@vandenberghinc/vhighlight";
-import { utils } from "./utils.js";
+import zlib from 'zlib';    
 import { Meta } from "./meta.js";
 import { Route } from './route.js';
 import { Frontend } from './frontend.js';
 import { Endpoint } from "./endpoint.js";
 import { Server } from "./server.js";
 import { SplashScreen } from "./splash_screen.js";
+import Stream from "./stream.js";
+import * as crypto from "crypto";
+import { Utils } from "./utils.js";
 
 const { debug } = vlib;
 
@@ -131,14 +134,45 @@ export class View {
     _src?: string;
     _embedded_sources: Array<string>;
     is_js_ts_view: boolean;
-    html?: string | Buffer;
+    private _html?: string;
     raw_html?: string | Buffer;
-    _bundle: any;
+    _bundle?: vts.BundleResult;
     payments?: string | undefined;
     // vhighlight?: string | undefined;
     min_device_width?: number;
     server?: Server;
     endpoint?: Endpoint;
+
+    /**
+     * Clone this view, used to create a modified copy of the current view.
+     * @note
+     * The following attributes are not deep copied, but just referenced:
+     * - `callback`
+     * - `params`
+     * - `data`
+     * @param override Override specific endpoint options, note that this will be shallow merged.
+     */
+    clone(this: View, override?: Partial<View.Opts>): View {
+        return new View({
+            ...vlib.Object.deep_copy({
+                source: this.source,
+                callback: this.callback,
+                includes: this.includes,
+                links: this.links,
+                templates: this.templates,
+                jquery: this.jquery,
+                lang: this.lang,
+                body_style: this.body_style,
+                tree_shaking: this.tree_shaking,
+                mangle: this.mangle,
+                min_device_width: this.min_device_width,
+                _src: this._src,
+            }),
+            meta: this.meta.copy(),
+            splash_screen: this.splash_screen?.clone(),
+            ...override,
+        });
+    }
 
     // Constructor.
     constructor({
@@ -213,16 +247,22 @@ export class View {
         this.includes = vlib.Array.drop_duplicates(this.includes);
 
         // Attributes.
-        this.html = undefined;
+        this._html = undefined;
         this._bundle = undefined;
     }
 
     // Initialize.
-    _initialize(server: Server, endpoint: Endpoint): void {
+    initialize(server: Server, endpoint: Endpoint): void {
         if (server === undefined) { throw Error("Invalid usage, define parameter \"server\"."); }
         if (endpoint === undefined) { throw Error("Invalid usage, define parameter \"endpoint\"."); }
         this.server = server;
         this.endpoint = endpoint;
+    }
+
+    /** Production initialization. */
+    async production_initialize(): Promise<void> {
+        await this.ensure_bundle();
+        await this._build_html();
     }
 
     // Bundle the compiled typescript / javascript dynamically on demand to optimize server startup for development purposes.
@@ -249,9 +289,6 @@ export class View {
         // Set options based on inputs.
         this.payments = this._bundle.inputs.find((path: string) => path.endsWith("/modules/paddle.js"));
         // this.vhighlight = this.bundle.inputs.find((path: string) => path.endsWith("/vhighlight.js"));
-
-        // Rebuild html.
-        await this._build_html();
     }
 
     /** Ensure the view is bundled when required. */
@@ -263,6 +300,16 @@ export class View {
 
     /** Create an error HTML file when errors are encountered during the bundle process. */
     private async _build_bundle_err_html(): Promise<void> {
+
+        // Dont show in production.
+        if (this.server?.production) {
+            throw new Error("Encountered an error while bundling in production.");
+        }
+        
+        // A nonce identifier.
+        const nonce_identifier = "{{__VOLT_NONCE__}}";
+
+        // Inspect bundle.
         const bundle = await vts.inspect_bundle({
             include: this.source_path ? [this.source_path?.str()] : [],
             output: vlib.Path.tmp().join(`${this.endpoint?.route.method}_${this.source_path!.str().replace(/\//g, "_")}.js`), // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
@@ -288,17 +335,28 @@ export class View {
         );
 
         if (this.server?.production) {
-            this.html = `
+            this._html = `
                 <!DOCTYPE html>
                 <html lang='${this.lang}'>
                 <head>
                     <meta charset="UTF-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <title>Bundling Error</title>
+                    <style nonce="${nonce_identifier}">
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 2rem; background: #f5f5f5;
+                        }
+                        h1 {
+                            color: #d32f2f; margin-top: 0;
+                        }
+                        #error-container {
+                            max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        }
+                    </style>
                 </head>
-                <body style='font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 2rem; background: #f5f5f5;'>
-                    <div style='max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
-                        <h1 style='color: #d32f2f; margin-top: 0;'>Bundling Error</h1>
+                <body>
+                    <div id="error-container">
+                        <h1>Bundling Error</h1>
                         <p>An error occurred while processing your request. Please contact support if this issue persists.</p>
                     </div>
                 </body>
@@ -308,14 +366,14 @@ export class View {
             // Development mode - show full debug info
             const formatted_import_chains = bundle.format_import_chains();
             const formatted_errors = bundle.format_errors();
-            this.html = `
+            this._html = `
                 <!DOCTYPE html>
                 <html lang='${this.lang}'>
                 <head>
                     <meta charset="UTF-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <title>Bundling Error - ${escape_html(this.source || 'Unknown')}</title>
-                    <style>
+                    <style nonce="${nonce_identifier}">
                         body {
                             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                             margin: 0;
@@ -383,11 +441,17 @@ export class View {
                 </html>
                 `.dedent(false);
         }
+
+        this.html_nonce_split = this._html.split(nonce_identifier);
     }
 
 
     // Build html.
-    async _build_html(): Promise<void> {
+    private async _build_html(): Promise<void> {
+
+        // A nonce identifier.
+        const nonce_identifier = "{{__VOLT_NONCE__}}";
+        
         // Server & endpoint.
         if (this.server == null || this.endpoint == null) { throw Error("View has not been initialized with \"View._initialize()\" yet."); }
 
@@ -395,26 +459,27 @@ export class View {
         if (this.is_js_ts_view && !this._bundle) {
             await this._dynamic_bundle();
         }
-        if (this._bundle.errors.length > 0) {
+        if (this._bundle != null && this._bundle.errors.length > 0) {
             return this._build_bundle_err_html();
         }
 
         // Vars.
         const line_break = this.server.production ? "\n" : "\n";
         const has_bundle = this._bundle != null && typeof this._bundle === "object";
+        // console.log("Bundle:", this._bundle)
 
         // Initialize html.
-        this.html = "";
+        this._html = "";
 
         // Doctype.
-        this.html += `<!DOCTYPE html><html style='min-width:100%;min-height:100%;' lang='${this.lang}'>${line_break}`;
+        this._html += `<!DOCTYPE html><html lang='${this.lang}'>${line_break}`;
         
         // Headers.
-        this.html += `<head>${line_break}`;
+        this._html += `<head>${line_break}`;
         
         // Meta.
         if (this.meta) {
-            this.html += this.meta.build_html(this.server.full_domain) + line_break;
+            this._html += this.meta.build_html(this.server.full_domain) + line_break;
         }
 
         // this.html = "Hello World!";
@@ -422,6 +487,12 @@ export class View {
 
         // ------------------------------------------------------------------------------------------
         // Stylesheets & links.
+        
+        // Default stylesheet to avoid inline `style=""`.
+        this._html += `<style nonce="${nonce_identifier}">` +
+            `html { min-width:100%;min-height:100%; }` +
+            `body { width:100vw;height:100vh;margin:0;padding:0;${this.body_style ?? ""} }` +
+            `</style>${line_break}`;
 
         // Embed stylesheet.
         const embed_stylesheet = (url: undefined | string, embed?: string): boolean => {
@@ -442,7 +513,7 @@ export class View {
                 }
             }
             if (embed) {
-                this.html += `<style>${line_break}${embed}${line_break}</style>${line_break}`;
+                this._html += `<style nonce="${nonce_identifier}">${line_break}${embed}${line_break}</style>${line_break}`;
                 if (url) { this._embedded_sources.push(url); }
                 return true;
             }
@@ -473,8 +544,8 @@ export class View {
 
         // Add custom stylesheet for minimum device width on smaller screens.
         if (this.min_device_width != null) {
-            this.html += `
-                <script>
+            this._html += `
+                <script nonce="${nonce_identifier}">
                 let has_min_width = false;
                 const viewport = document.querySelector('meta[name="viewport"]');
                 function set_min_width() {
@@ -501,7 +572,7 @@ export class View {
             `.dedent();
         }
 
-        // this.html += `<script>
+        // this.html += `<script nonce="${nonce_identifier}">
         
         // // This version prevents the infinite loop
         // let resizeTimeout;
@@ -541,7 +612,7 @@ export class View {
         // Custom links.
         this.links.forEach((url: string | Record<string, any>) => {
             if (typeof url === "string") {
-                this.html += `<link rel="stylesheet" href="${url}">`;
+                this._html += `<link rel="stylesheet" href="${url}">`;
             } else if (typeof url === "object") {
 
                 // Embed content.
@@ -555,13 +626,13 @@ export class View {
                     if (url.async) {
                         include_link_async(url);
                     } else {
-                        this.html += "<link";
+                        this._html += "<link";
                         Object.keys(url).forEach((key) => {
                             if (key !== "embed") {
-                                this.html += ` ${key}="${url[key]}"`;
+                                this._html += ` ${key}="${url[key]}"`;
                             }
                         })
-                        this.html += ">" + line_break;
+                        this._html += ">" + line_break;
                     }
                 }
             } else {
@@ -571,23 +642,21 @@ export class View {
 
         // Add include links script.
         if (include_links_script) {
-            this.html += `<script>${line_break}${include_links_script}${line_break}</script>${line_break}`;
+            this._html += `<script nonce="${nonce_identifier}">${line_break}${include_links_script}${line_break}</script>${line_break}`;
         }
         
         // End headers.
-        this.html += "</head>" + line_break;
+        this._html += "</head>" + line_break;
 
         // ------------------------------------------------------------------------------------------
         // Body.
 
         // Body.
-        this.html +=  "<body id='body' style='width:100vw;height:100vh;margin:0;padding:0;";
-        if (this.body_style != null) { this.html += this.body_style}
-        this.html += "'>" + line_break;
+        this._html +=  "<body id='body'>";
 
         // Create splash screen.
         if (this.splash_screen != null) {
-            this.html += this.splash_screen.html + line_break;
+            this._html += this.splash_screen.html + line_break;
         }
 
         // ------------------------------------------------------------------------------------------
@@ -611,9 +680,9 @@ export class View {
 
                 // Dont embed code.
                 if (embed.content_type === "application/javascript") {
-                    this.html += `<script>${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
+                    this._html += `<script nonce="${nonce_identifier}">${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
                 } else {
-                    this.html += `<script type='${embed.content_type}'>${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
+                    this._html += `<script nonce="${nonce_identifier}" type='${embed.content_type}'>${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
                 }
                 this._embedded_sources.push(url);
                 return true;
@@ -627,7 +696,7 @@ export class View {
         // 3rd party js includes.
         if (this.jquery) {
             // Keep first since it needs to be included before volt.
-            this.html += "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js'></script>" + line_break;
+            this._html += `<script nonce="${nonce_identifier}" src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js'></script>${line_break}`;
         }
         if (this.server.google_tag !== undefined) {
             // this.html += `<script async src="https://www.googletagmanager.com/gtag/js?id=${this._server.google_tag}" onload='volt.google._initialize()'></script>`;
@@ -637,16 +706,16 @@ export class View {
         // Primary volt includes do not add them to cached_code since they need to be included before any other includes.
         // Otherwise when including several files, most of them embedded and one not, then the not embedded will not have access to volt.
         // Since volt is 
-        // embed_script("/volt/volt.js", false);
+        // embed_script("/volt/api/v1/volt.js", false);
 
         // Add volt static aspect ratios.
         // @todo volt.static
-        this.html += `<script>${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this.server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
+        this._html += `<script nonce="${nonce_identifier}">${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this.server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
 
         // Embed other scripts.
         if (this.server.payments) {
             if (this.server.payments.type === "paddle") {
-                // embed_script("/volt/payments/paddle.js", false); // no longer required due to auto imports.
+                // embed_script("/volt/api/v1/payments/paddle.js", false); // no longer required due to auto imports.
                 if (this.payments) {
                     include_js_script += `__volt_incl_js("https://cdn.paddle.com/paddle/v2/paddle.js");${line_break}`;
                 }
@@ -654,7 +723,7 @@ export class View {
         }
 
         // Add the include js script.
-        this.html += `<script>${line_break}${include_js_script.trimEnd()}${line_break}</script>${line_break}`
+        this._html += `<script nonce="${nonce_identifier}">${line_break}${include_js_script.trimEnd()}${line_break}</script>${line_break}`
 
         // Additional js includes.
         this.includes.forEach((url: string | Record<string, any>) => {
@@ -664,16 +733,16 @@ export class View {
             // Include.
             else {
                 if (typeof url === "string") {
-                    this.html += `<script src='${url}'></script>${line_break}`;
+                    this._html += `<script nonce="${nonce_identifier}" src='${url}'></script>${line_break}`;
                 }
                 else if (typeof url === "object") {
-                    this.html += "<script";
+                    this._html += `<script nonce="${nonce_identifier}"`;
                     Object.keys(url).forEach((key) => {
                         if (key !== "embed") {
-                            this.html += ` ${key}="${url[key]}"`;
+                            this._html += ` ${key}="${url[key]}"`;
                         }
                     })
-                    this.html += "></script>" + line_break;
+                    this._html += "></script>" + line_break;
                 }
                 else {
                     throw Error("Invalid type for a js include, the valid value types are \"string\" and \"object\".");
@@ -682,13 +751,13 @@ export class View {
         })
 
         // Add direct source code.
-        if (has_bundle && typeof this._bundle.code === "string") {
-            this.html += `<script type='module'>${line_break}${this._bundle.code}${line_break}</script>${line_break}`;
+        if (has_bundle && this._bundle != null && typeof this._bundle.code === "string") {
+            this._html += `<script nonce="${nonce_identifier}" type='module'>${line_break}${this._bundle.code}${line_break}</script>${line_break}`;
         }
 
         // Include the source.
         else if (typeof this.source === "string") {
-            this.html += `<script>${line_break}${await new vlib.Path(this.source).load()}${line_break}</script>${line_break}`;
+            this._html += `<script nonce="${nonce_identifier}">${line_break}${await new vlib.Path(this.source).load()}${line_break}</script>${line_break}`;
         }
 
         // JS code.
@@ -724,26 +793,115 @@ export class View {
             // }
 
             // Add.
-            this.html += `<script>${line_break}(${code})()${line_break}</script>${line_break}`
+            this._html += `<script nonce="${nonce_identifier}">${line_break}(${code})()${line_break}</script>${line_break}`
             // cached_code += `;(${code})();`;
         }
 
         // Close body.
-        this.html += "</body>" + line_break;
+        this._html += "</body>" + line_break;
         
         // End.
-        this.html +=  "</html>" + line_break;
+        this._html +=  "</html>" + line_break;
+
+        // Split by nonce.
+        this.html_nonce_split = this._html.split(nonce_identifier);
+
+        // console.log("Built HTML for endpoint", this.endpoint?.route?.endpoint_str + "\n" +this.html.slice(0, 25_000) + (this.html.length > 25_000 ? "..." : ""));
+    }
+
+    /** Retrieve the content length of the built html. */
+    async content_length(): Promise<number> {
+
+        // Create nonce.
+        const nonce = crypto.randomBytes(16).toString('base64');
+        
+        // Build html if needed.
+        if (!this._html) {
+            await this._build_html();
+        }
+
+        // Create html.
+        let html: string | Buffer = this.html_nonce_split!.join(nonce);
+
+        // Return.
+        return html.length;
+    }
+
+    /** Retrieve the HTML. */
+    async html(opts?: {
+        /** Compress content. */
+        compress?: boolean;
+        /** Add new templates, overriding the default `View` templates. */
+        templates?: Record<string, any>;
+    }): Promise<{
+        html: string | Buffer;
+        content_length: number;
+        nonce: string;
+    }> {
+
+        // Create nonce.
+        const nonce = crypto.randomBytes(16).toString('base64');
+
+        // Build html if needed.
+        if (!this._html) {
+            await this._build_html();
+        }
+
+        // Create html.
+        let html: string | Buffer = this.html_nonce_split!.join(nonce);
+
+        // Apply templates.
+        const templates = { ...this.templates, ...opts?.templates ?? {} };
+        if (Object.keys(templates).length) {
+            html = Utils.fill_templates(html, templates, true /** curly style */);
+        }
+
+        // Content length.
+        const content_length = Buffer.byteLength(html, 'utf-8');
+
+        // Compress.
+        if (opts?.compress) {
+            html = zlib.gzipSync(html, { level: zlib.constants.Z_BEST_COMPRESSION });
+        }
+
+        // Return.
+        return {
+            html,
+            content_length,
+            nonce,
+        }
     }
     
     // Serve a client.
-    _serve(stream: any, status_code: number = 200): void {
-        debug(2, this.endpoint?.route?.id, ": Serving HTML ", this.html?.slice(0, 50), "...");
+    async _serve(stream: Stream, status_code: number = 200, opts?: {
+        /** Compress. */
+        compress?: boolean;
+        /** Add new templates, overriding the default `View` templates. */
+        templates?: Record<string, any>;
+    }): Promise<void> {
+        debug(2, this.endpoint?.route?.id, ": Serving HTML ", this._html?.slice(0, 50), "...");
+
+        // Create html.
+        const html = await this.html(opts);
+        
+        // Compute content length on view & when not defined.
+        stream.set_header("Content-Length", html.content_length.toString());
+
+        // Set nonce.
+        const csp = stream.get_header("Content-Security-Policy");
+        if (typeof csp === "string") {
+            const new_csp = csp.replace(/(script-src|style-src)([^;]*)/g, (_, g1, g2) => `${g1}${g2} 'nonce-${html.nonce}'`)
+            stream.set_header("Content-Security-Policy", new_csp);
+        }
+
+        // Generate a nonce here and use it both in the CSP header and the inline script.
         stream.send({
             status: status_code, 
             headers: { "Content-Type": "text/html" }, 
-            body: this.html,
+            data: html.html,
         });
     }
+    private html_nonce_split?: string[];
 }
 export namespace View {
     export type Opts = ConstructorParameters<typeof View>[0];

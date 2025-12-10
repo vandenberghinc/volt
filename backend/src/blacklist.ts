@@ -1,9 +1,10 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 import * as vlib from "@vandenberghinc/vlib";
+import { Server } from "./server.js";
 
 // ---------------------------------------------------------
 // Blacklist.
@@ -15,10 +16,8 @@ export class Blacklist {
 
     constructor({
     	api_key, // honey pot api key
-		_server,
 	}: {
         api_key: string,
-        _server: any,
     }) {
 
 		// Checks.

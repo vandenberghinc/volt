@@ -81,6 +81,8 @@ class JavaScriptLanguageGenerator {
         const optionsString = formatOptions(options, false);
         return `await ${subject}.${this._asLocator(action.selector)}.${method}(${optionsString});`;
       }
+      case "hover":
+        return `await ${subject}.${this._asLocator(action.selector)}.hover(${formatOptions({ position: action.position }, false)});`;
       case "check":
         return `await ${subject}.${this._asLocator(action.selector)}.check();`;
       case "uncheck":
@@ -110,7 +112,7 @@ class JavaScriptLanguageGenerator {
       }
       case "assertSnapshot": {
         const commentIfNeeded = this._isTest ? "" : "// ";
-        return `${commentIfNeeded}await expect(${subject}.${this._asLocator(action.selector)}).toMatchAriaSnapshot(${quoteMultiline(action.snapshot, `${commentIfNeeded}  `)});`;
+        return `${commentIfNeeded}await expect(${subject}.${this._asLocator(action.selector)}).toMatchAriaSnapshot(${quoteMultiline(action.ariaSnapshot, `${commentIfNeeded}  `)});`;
       }
     }
   }
@@ -166,7 +168,7 @@ ${useText ? "\ntest.use(" + useText + ");\n" : ""}
   }
 }
 function formatOptions(value, hasArguments) {
-  const keys = Object.keys(value);
+  const keys = Object.keys(value).filter((key) => value[key] !== void 0);
   if (!keys.length)
     return "";
   return (hasArguments ? ", " : "") + formatObject(value);

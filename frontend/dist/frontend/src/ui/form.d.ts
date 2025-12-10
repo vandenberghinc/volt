@@ -1,7 +1,11 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementBaseSignature, VElement, AppendType } from "../elements/module.js";
 import { CheckBoxElement } from "./checkbox.js";
 import { ExtendedInputElement, ExtendedSelectElement } from "./input.js";
-export type OnSubmit<This> = (element: This, data: Record<string, any>) => any;
+export type OnSubmit<This> = (element: This, data: Record<string, string | boolean>) => any;
 export type OnSubmitError<This> = (element: This, error: Error) => any;
 declare const FormElement_base: VElementBaseSignature;
 export declare class FormElement extends FormElement_base {
@@ -11,7 +15,7 @@ export declare class FormElement extends FormElement_base {
     _on_submit_error?: OnSubmitError<this>;
     _on_append_callback: (child: any) => void;
     constructor(...children: AppendType[]);
-    data(): Record<string, any>;
+    data(): Record<string, string | boolean>;
     submit(): Promise<this>;
     button<T = undefined | HTMLElement | VElement>(): T;
     button(element_or_id: VElement | string): this;

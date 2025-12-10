@@ -1,4 +1,3 @@
-/* Dummy tsconfig file for vscode. */
 {
     "compilerOptions": {
         "target": "ES2022",
@@ -18,10 +17,10 @@
         "skipLibCheck": true,
         "paths": {},
         "outDir": "./dist",
+        "rootDir": "../",
     },
     "include": [
         "src/**/*",
-        "src/ui/**/*",
     ],
     "exclude": [
         "node_modules",

@@ -1,16 +1,17 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
 import { Utils } from "./utils.js"
 import { Cookies } from "./cookies"
 
-import {
+import type {
     User as UserBackend,
     Users as UsersBackend,
 } from "../../../backend/src/users.js"
+import { Request, request } from "./request.js";
 
 // User module.
 export namespace User {
@@ -110,12 +111,10 @@ export namespace User {
      * @return Returns a promise with the authenticated user's object or a request error on a failed request.
      * @docs
      */
-    export async function get(): Promise<Utils.RequestResult<
-        UsersBackend.Endpoints.GetUser.Result
-    >> {
-        return Utils.request({
+    export async function get(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.GetUser> {
+        return request<UsersBackend.Endpoints.GetUser>({
             method: "GET",
-            url: "/volt/user",
+            url: "/volt/api/v1/user",
         });
     }
 
@@ -127,11 +126,11 @@ export namespace User {
      * @docs
      */
     export async function update(
-        payload: UsersBackend.Endpoints.UpdateUser.Params,
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.UpdateUser.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.UpdateUser["payload"],
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.UpdateUser> {
+        return request<UsersBackend.Endpoints.UpdateUser>({
             method: "POST",
-            url: "/volt/user",
+            url: "/volt/api/v1/user",
             data: payload,
         });
     }
@@ -144,11 +143,11 @@ export namespace User {
      * @docs
      */
     export async function activate(
-        payload: UsersBackend.Endpoints.ActivateUser.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.ActivateUser.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.ActivateUser["payload"]
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.ActivateUser> {
+        return request<UsersBackend.Endpoints.ActivateUser>({
             method: "POST",
-            url: "/volt/auth/activate",
+            url: "/volt/api/v1/auth/activate",
             data: payload,
         });
     }
@@ -161,11 +160,11 @@ export namespace User {
      * @docs
      */
     export async function change_password(
-        payload: UsersBackend.Endpoints.ChangePassword.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.ChangePassword.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.ChangePassword["payload"]
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.ChangePassword> {
+        return request<UsersBackend.Endpoints.ChangePassword>({
             method: "POST",
-            url: "/volt/user/change_password",
+            url: "/volt/api/v1/user/change_password",
             data: payload,
         });
     }
@@ -177,10 +176,10 @@ export namespace User {
      * @return Returns a promise with a successful update response or a request error on a failed request.
      * @docs
      */
-    export async function delete_account(): Utils.RequestResultPromise<UsersBackend.Endpoints.DeleteUser.Result> {
-        return Utils.request({
+    export async function delete_account(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.DeleteUser> {
+        return request<UsersBackend.Endpoints.DeleteUser>({
             method: "DELETE",
-            url: "/volt/user",
+            url: "/volt/api/v1/user",
         });
     }
 
@@ -191,10 +190,10 @@ export namespace User {
      * @return Returns a promise with a successful update response with the newly generated API key as an attribute or a request error on a failed request.
      * @docs
      */
-    export async function generate_api_key(): Utils.RequestResultPromise<UsersBackend.Endpoints.GenerateAPIKey.Result> {
-        return Utils.request({
+    export async function generate_api_key(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.GenerateAPIKey> {
+        return request<UsersBackend.Endpoints.GenerateAPIKey>({
             method: "POST",
-            url: "/volt/user/api_key",
+            url: "/volt/api/v1/user/api_key",
         });
     }
 
@@ -203,10 +202,10 @@ export namespace User {
      * @nav Frontend/User
      * @docs
      */
-    export async function has_api_key(): Utils.RequestResultPromise<UsersBackend.Endpoints.HasAPIKey.Result> {
-        return Utils.request({
+    export async function has_api_key(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.HasAPIKey> {
+        return request<UsersBackend.Endpoints.HasAPIKey>({
             method: "GET",
-            url: "/volt/user/has_api_key",
+            url: "/volt/api/v1/user/has_api_key",
         });
     }
 
@@ -217,10 +216,10 @@ export namespace User {
      * @return Returns a promise with a successful update response or a request error on a failed request.
      * @docs
      */
-    export async function revoke_api_key(): Utils.RequestResultPromise<UsersBackend.Endpoints.RevokeAPIKey.Result> {
-        return Utils.request({
+    export async function revoke_api_key(): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.RevokeAPIKey> {
+        return request<UsersBackend.Endpoints.RevokeAPIKey>({
             method: "DELETE",
-            url: "/volt/user/api_key",
+            url: "/volt/api/v1/user/api_key",
         });
     }
 
@@ -234,11 +233,11 @@ export namespace User {
      * @docs
      */
     export async function load_data(
-        payload: UsersBackend.Endpoints.LoadUserData.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.LoadUserData.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.LoadUserData["payload"]
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.LoadUserData> {
+        return request<UsersBackend.Endpoints.LoadUserData>({
             method: "GET",
-            url: "/volt/user/data",
+            url: "/volt/api/v1/user/data",
             data: payload,
         });
     }
@@ -251,11 +250,11 @@ export namespace User {
      * @docs
      */
     export async function set_data(
-        payload: UsersBackend.Endpoints.SetUserData.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.SetUserData.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.SetUserData["payload"]
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.SetUserData> {
+        return request<UsersBackend.Endpoints.SetUserData>({
             method: "POST",
-            url: "/volt/user/data",
+            url: "/volt/api/v1/user/data",
             data: payload,
         });
     }
@@ -265,11 +264,11 @@ export namespace User {
      * @nav Frontend/User
      */
     export async function delete_data(
-        payload: UsersBackend.Endpoints.DeleteUserData.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.DeleteUserData.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.DeleteUserData["payload"]
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.DeleteUserData> {
+        return request<UsersBackend.Endpoints.DeleteUserData>({
             method: "DELETE",
-            url: "/volt/user/data",
+            url: "/volt/api/v1/user/data",
             data: payload,
         });
     }
@@ -284,11 +283,11 @@ export namespace User {
      * @docs
      */
     export async function load_protected_data(
-        payload: UsersBackend.Endpoints.LoadProtectedUserData.Params
-    ): Utils.RequestResultPromise<UsersBackend.Endpoints.LoadProtectedUserData.Result> {
-        return Utils.request({
+        payload: UsersBackend.Endpoints.LoadProtectedUserData["payload"]
+    ): Request.ResultPromiseFromInfo<UsersBackend.Endpoints.LoadProtectedUserData> {
+        return request<UsersBackend.Endpoints.LoadProtectedUserData>({
             method: "GET",
-            url: "/volt/user/data/protected",
+            url: "/volt/api/v1/user/data/protected",
             data: payload,
         });
     }

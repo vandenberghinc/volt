@@ -85,6 +85,8 @@ class HarTracer {
         import_eventsHelper.eventsHelper.addEventListener(this._context, import_browserContext.BrowserContext.Events.RequestFulfilled, (request) => this._onRequestFulfilled(request)),
         import_eventsHelper.eventsHelper.addEventListener(this._context, import_browserContext.BrowserContext.Events.RequestContinued, (request) => this._onRequestContinued(request))
       );
+      for (const page of this._context.pages())
+        this._createPageEntryIfNeeded(page);
     }
   }
   _shouldIncludeEntryWithUrl(urlString) {
@@ -163,7 +165,7 @@ class HarTracer {
   _onAPIRequest(event) {
     if (!this._shouldIncludeEntryWithUrl(event.url.toString()))
       return;
-    const harEntry = createHarEntry(event.method, event.url, void 0, this._options);
+    const harEntry = createHarEntry(void 0, event.method, event.url, void 0, this._options);
     harEntry._apiRequest = true;
     if (!this._options.omitCookies)
       harEntry.request.cookies = event.cookies;
@@ -225,9 +227,7 @@ class HarTracer {
     if (!url)
       return;
     const pageEntry = this._createPageEntryIfNeeded(page);
-    const harEntry = createHarEntry(request.method(), url, request.frame()?.guid, this._options);
-    if (pageEntry)
-      harEntry.pageref = pageEntry.id;
+    const harEntry = createHarEntry(pageEntry?.id, request.method(), url, request.frame()?.guid, this._options);
     this._recordRequestHeadersAndCookies(harEntry, request.headers());
     harEntry.request.postData = this._postDataForRequest(request, this._options.content);
     if (!this._options.omitSizes)
@@ -250,7 +250,7 @@ class HarTracer {
     harEntry.request.headers = headers;
   }
   _recordRequestOverrides(harEntry, request) {
-    if (!request._hasOverrides() || !this._options.recordRequestOverrides)
+    if (!request.overrides() || !this._options.recordRequestOverrides)
       return;
     harEntry.request.method = request.method();
     harEntry.request.url = request.url();
@@ -390,7 +390,7 @@ class HarTracer {
       status: response.status(),
       statusText: response.statusText(),
       httpVersion: response.httpVersion(),
-      // These are bad values that will be overwritten bellow.
+      // These are bad values that will be overwritten below.
       cookies: [],
       headers: [],
       content: {
@@ -520,10 +520,9 @@ class HarTracer {
     return result;
   }
 }
-function createHarEntry(method, url, frameref, options) {
+function createHarEntry(pageRef, method, url, frameref, options) {
   const harEntry = {
-    _frameref: options.includeTraceInfo ? frameref : void 0,
-    _monotonicTime: options.includeTraceInfo ? (0, import_utils.monotonicTime)() : void 0,
+    pageref: pageRef,
     startedDateTime: (/* @__PURE__ */ new Date()).toISOString(),
     time: -1,
     request: {
@@ -556,7 +555,9 @@ function createHarEntry(method, url, frameref, options) {
       send: -1,
       wait: -1,
       receive: -1
-    }
+    },
+    _frameref: options.includeTraceInfo ? frameref : void 0,
+    _monotonicTime: options.includeTraceInfo ? (0, import_utils.monotonicTime)() : void 0
   };
   return harEntry;
 }

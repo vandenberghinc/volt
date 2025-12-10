@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 // Imports.
 import { Elements } from "../elements/module.js";
@@ -56,7 +56,7 @@ export class FrameModes {
             }
         }
         if (this._on_set !== undefined) {
-            this._on_set(mode, this[mode]);
+            this._on_set(mode, this.modes[mode]);
         }
         return this;
     }
@@ -99,7 +99,7 @@ Elements.extend({
     }
 });
 // @test
-// import { Form } from "./form"
+// import { Form } from "./form.js"
 // Form()
 // 	.frame_mode(FrameModes("test"), "test")
 // 	.on_submit(((e) => {}) as any)

@@ -53,7 +53,8 @@ export class QuotaManager {
             name: opts.collection.name,
             ttl: opts.collection.ttl,
             indexes: [
-                { keys: { uid: 1, id: 1 }, unique: true }
+                { key: "id", unique: true, forced: true },
+                { key: "uid", forced: true },
             ],
             unique: true,
             persist_transformed_on_load: "replace",
@@ -299,7 +300,7 @@ export class QuotaManager {
         >;
 
         // Validate quota identity + config
-        const val_err = QuotaManager.Document.Opts.validate(quota);
+        const val_err = QuotaManager.Document.Opts.validate(quota, this.collection);
         if (val_err) {
             const err = new InvalidUsageError({
                 message: `Invalid quota: ${val_err}`,
@@ -405,6 +406,11 @@ export class QuotaManager {
         );
     }
 
+    /** Delete all quotas for a user. */
+    async delete_by_user({ uid }: { uid: string }): Promise<void> {
+        await this.collection.delete_many({ uid }, { retry: 25 });
+    }
+
     // ----------------------------------------------------------------
     // Quota limiting.
     // ----------------------------------------------------------------
@@ -472,7 +478,7 @@ export class QuotaManager {
                 ...upsert,
                 ...query,
             }
-            const val_err = QuotaManager.Document.Opts.validate(record);
+            const val_err = QuotaManager.Document.Opts.validate(record, this.collection);
             if (val_err) {
                 return {
                     success: false,
@@ -1170,13 +1176,13 @@ export class QuotaManager {
                 }
                 results.push(result);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             await transaction.abort();
             SystemError.create_detach({
                 owner: "volt.QuotaManager",
                 collection: this.system_error?.collection,
                 logger: this.system_error?.logger,
-                message: `Transaction failed: ${error && typeof error === "object" && error.message ? error.message : error}`,
+                message: `Transaction failed: ${error instanceof Error ? error.message : String(error)}`,
                 details: {
                     failed_query: active_limit.query,
                     is_transaction: true,
@@ -1186,20 +1192,20 @@ export class QuotaManager {
                 success: false,
                 status: "system_error",
                 failed_query: active_limit.query,
-                error: `Transaction failed: ${error && typeof error === "object" && error.message ? error.message : error}`,
+                error: `Transaction failed: ${error instanceof Error ? error.message : String(error)}`,
             };
         }
         
         // Commit with error handling; abort on failure to preserve atomicity.
         try {
             await transaction.commit();
-        } catch (error: any) {
+        } catch (error: unknown) {
             await transaction.abort();
             SystemError.create_detach({
                 owner: "volt.QuotaManager",
                 collection: this.system_error?.collection,
                 logger: this.system_error?.logger,
-                message: `Transaction commit failed: ${error && typeof error === "object" && error.message ? error.message : error}`,
+                message: `Transaction commit failed: ${error instanceof Error ? error.message : String(error)}`,
                 details: {
                     failed_query: active_limit.query,
                     is_transaction: true,
@@ -1209,7 +1215,7 @@ export class QuotaManager {
                 success: false,
                 status: "system_error",
                 failed_query: active_limit.query,
-                error: `Transaction commit failed: ${error && typeof error === "object" && error.message ? error.message : error}`,
+                error: `Transaction commit failed: ${error instanceof Error ? error.message : String(error)}`,
             };
         }
 
@@ -1248,6 +1254,8 @@ export namespace QuotaManager {
          * Ensure the chosen collection name is unique for this quota manager when using multiple quota managers.
          * Since there is only a single configurable `id` index field per quota.
          * Therefore using multiple purpose specific quota managers is required.
+         * @warning
+         * The {@link Quota.interval} may not exceed the `ttl` duration, if passed.
          */
         collection: Pick<
             Collection.Opts<QuotaManager.Document>,
@@ -1323,6 +1331,7 @@ export namespace QuotaManager {
         /**
          * The time interval in SECONDS for the quota; when this interval has passed the usage will be reset.
          * Recommended to be an integer number of seconds.
+         * @note This may not exceed the collections `ttl` duration, if set.
          */
         interval: number;
         /**
@@ -1357,13 +1366,16 @@ export namespace QuotaManager {
              * Validate {@link Quota.Opts} at runtime.
              * @returns An error message if the quota is invalid, or undefined if it is valid.
              */
-            export function validate(quota: Quota.Opts): string | undefined {
+            export function validate(quota: Quota.Opts, collection: Collection<QuotaManager.Document>): string | undefined {
                 // Validate quota fields
                 if (quota.max <= 0 || !Number.isFinite(quota.max)) {
-                    return `Invalid max value: ${quota.max}. Must be positive and finite.`;
+                    return `Invalid quota 'max': ${quota.max}. Must be positive and finite.`;
                 }
                 if (quota.interval <= 0 || !Number.isFinite(quota.interval)) {
-                    return `Invalid interval value: ${quota.interval}. Must be positive and finite.`;
+                    return `Invalid quota 'interval': ${quota.interval}. Must be positive and finite.`;
+                }
+                else if (collection.ttl != null && quota.interval * 1000 >= collection.ttl) {
+                    return `Invalid quota 'interval': ${quota.interval}. Must be less than the collection TTL of ${Math.ceil(collection.ttl / 1000)} seconds.`;
                 }
             }
         }
@@ -1420,10 +1432,10 @@ export namespace QuotaManager {
              * Validate {@link Document.Opts} at runtime.
              * @returns An error message if the quota is invalid, or undefined if it is valid.
              */
-            export function validate(quota: QuotaManager.Document.Opts): string | undefined {
+            export function validate(quota: QuotaManager.Document.Opts, collection: Collection<QuotaManager.Document>): string | undefined {
                 let e: string | undefined;
                 if ((e = Query.validate(quota))) return e;
-                if ((e = Quota.Opts.validate(quota))) return e;
+                if ((e = Quota.Opts.validate(quota, collection))) return e;
             }
 
         }

@@ -34,7 +34,6 @@ __export(browserContext_exports, {
 });
 module.exports = __toCommonJS(browserContext_exports);
 var import_artifact = require("./artifact");
-var import_browser = require("./browser");
 var import_cdpSession = require("./cdpSession");
 var import_channelOwner = require("./channelOwner");
 var import_clientHelper = require("./clientHelper");
@@ -64,32 +63,25 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
     this._pages = /* @__PURE__ */ new Set();
     this._routes = [];
     this._webSocketRoutes = [];
+    // Browser is null for browser contexts created outside of normal browser, e.g. android or electron.
     this._browser = null;
     this._bindings = /* @__PURE__ */ new Map();
-    this._options = {};
-    this._backgroundPages = /* @__PURE__ */ new Set();
+    this._forReuse = false;
     this._serviceWorkers = /* @__PURE__ */ new Set();
     this._harRecorders = /* @__PURE__ */ new Map();
-    this._closeWasCalled = false;
+    this._closingStatus = "none";
     this._harRouters = [];
+    this._options = initializer.options;
     this._timeoutSettings = new import_timeoutSettings.TimeoutSettings(this._platform);
-    if (parent instanceof import_browser.Browser)
-      this._browser = parent;
-    this._browser?._contexts.add(this);
-    this._isChromium = this._browser?._name === "chromium";
     this.tracing = import_tracing.Tracing.from(initializer.tracing);
     this.request = import_fetch.APIRequestContext.from(initializer.requestContext);
+    this.request._timeoutSettings = this._timeoutSettings;
     this.clock = new import_clock.Clock(this);
     this._channel.on("bindingCall", ({ binding }) => this._onBinding(import_page.BindingCall.from(binding)));
     this._channel.on("close", () => this._onClose());
     this._channel.on("page", ({ page }) => this._onPage(import_page.Page.from(page)));
     this._channel.on("route", ({ route }) => this._onRoute(network.Route.from(route)));
     this._channel.on("webSocketRoute", ({ webSocketRoute }) => this._onWebSocketRoute(network.WebSocketRoute.from(webSocketRoute)));
-    this._channel.on("backgroundPage", ({ page }) => {
-      const backgroundPage = import_page.Page.from(page);
-      this._backgroundPages.add(backgroundPage);
-      this.emit(import_events.Events.BrowserContext.BackgroundPage, backgroundPage);
-    });
     this._channel.on("serviceWorker", ({ worker }) => {
       const serviceWorker = import_worker.Worker.from(worker);
       serviceWorker._context = this;
@@ -97,11 +89,19 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
       this.emit(import_events.Events.BrowserContext.ServiceWorker, serviceWorker);
     });
     this._channel.on("console", (event) => {
-      const consoleMessage = new import_consoleMessage.ConsoleMessage(this._platform, event);
+      const worker = import_worker.Worker.fromNullable(event.worker);
+      const page = import_page.Page.fromNullable(event.page);
+      const consoleMessage = new import_consoleMessage.ConsoleMessage(this._platform, event, page, worker);
+      worker?.emit(import_events.Events.Worker.Console, consoleMessage);
+      page?.emit(import_events.Events.Page.Console, consoleMessage);
+      if (worker && this._serviceWorkers.has(worker)) {
+        const scope = this._serviceWorkerScope(worker);
+        for (const page2 of this._pages) {
+          if (scope && page2.url().startsWith(scope))
+            page2.emit(import_events.Events.Page.Console, consoleMessage);
+        }
+      }
       this.emit(import_events.Events.BrowserContext.Console, consoleMessage);
-      const page = consoleMessage.page();
-      if (page)
-        page.emit(import_events.Events.Page.Console, consoleMessage);
     });
     this._channel.on("pageError", ({ error, page }) => {
       const pageObject = import_page.Page.from(page);
@@ -129,6 +129,14 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
     this._channel.on("requestFailed", ({ request, failureText, responseEndTiming, page }) => this._onRequestFailed(network.Request.from(request), responseEndTiming, failureText, import_page.Page.fromNullable(page)));
     this._channel.on("requestFinished", (params) => this._onRequestFinished(params));
     this._channel.on("response", ({ response, page }) => this._onResponse(network.Response.from(response), import_page.Page.fromNullable(page)));
+    this._channel.on("recorderEvent", ({ event, data, page, code }) => {
+      if (event === "actionAdded")
+        this._onRecorderEventSink?.actionAdded?.(import_page.Page.from(page), data, code);
+      else if (event === "actionUpdated")
+        this._onRecorderEventSink?.actionUpdated?.(import_page.Page.from(page), data, code);
+      else if (event === "signalAdded")
+        this._onRecorderEventSink?.signalAdded?.(import_page.Page.from(page), data);
+    });
     this._closedPromise = new Promise((f) => this.once(import_events.Events.BrowserContext.Close, f));
     this._setEventToSubscriptionMapping(/* @__PURE__ */ new Map([
       [import_events.Events.BrowserContext.Console, "console"],
@@ -145,11 +153,15 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
   static fromNullable(context) {
     return context ? BrowserContext.from(context) : null;
   }
-  _setOptions(contextOptions, browserOptions) {
-    this._options = contextOptions;
-    if (this._options.recordHar)
-      this._harRecorders.set("", { path: this._options.recordHar.path, content: this._options.recordHar.content });
-    this.tracing._tracesDir = browserOptions.tracesDir;
+  async _initializeHarFromOptions(recordHar) {
+    if (!recordHar)
+      return;
+    const defaultContent = recordHar.path.endsWith(".zip") ? "attach" : "embed";
+    await this._recordIntoHAR(recordHar.path, null, {
+      url: recordHar.urlFilter,
+      updateContent: recordHar.content ?? (recordHar.omitContent ? "omit" : defaultContent),
+      updateMode: recordHar.mode ?? "full"
+    });
   }
   _onPage(page) {
     this._pages.add(page);
@@ -191,7 +203,7 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
     const page = route.request()._safePage();
     const routeHandlers = this._routes.slice();
     for (const routeHandler of routeHandlers) {
-      if (page?._closeWasCalled || this._closeWasCalled)
+      if (page?._closeWasCalled || this._closingStatus !== "none")
         return;
       if (!routeHandler.matches(route.request().url()))
         continue;
@@ -202,7 +214,7 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
         this._routes.splice(index, 1);
       const handled = await routeHandler.handle(route);
       if (!this._routes.length)
-        this._wrapApiCall(() => this._updateInterceptionPatterns(), true).catch(() => {
+        this._updateInterceptionPatterns({ internal: true }).catch(() => {
         });
       if (handled)
         return;
@@ -226,19 +238,21 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
       return;
     await bindingCall.call(func);
   }
+  _serviceWorkerScope(serviceWorker) {
+    try {
+      let url = new URL(".", serviceWorker.url()).href;
+      if (!url.endsWith("/"))
+        url += "/";
+      return url;
+    } catch {
+      return null;
+    }
+  }
   setDefaultNavigationTimeout(timeout) {
     this._timeoutSettings.setDefaultNavigationTimeout(timeout);
-    this._wrapApiCall(async () => {
-      await this._channel.setDefaultNavigationTimeoutNoReply({ timeout });
-    }, true).catch(() => {
-    });
   }
   setDefaultTimeout(timeout) {
     this._timeoutSettings.setDefaultTimeout(timeout);
-    this._wrapApiCall(async () => {
-      await this._channel.setDefaultTimeoutNoReply({ timeout });
-    }, true).catch(() => {
-    });
   }
   browser() {
     return this._browser;
@@ -308,21 +322,23 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
   }
   async route(url, handler, options = {}) {
     this._routes.unshift(new network.RouteHandler(this._platform, this._options.baseURL, url, handler, options.times));
-    await this._updateInterceptionPatterns();
+    await this._updateInterceptionPatterns({ title: "Route requests" });
   }
   async routeWebSocket(url, handler) {
     this._webSocketRoutes.unshift(new network.WebSocketRouteHandler(this._options.baseURL, url, handler));
-    await this._updateWebSocketInterceptionPatterns();
+    await this._updateWebSocketInterceptionPatterns({ title: "Route WebSockets" });
   }
   async _recordIntoHAR(har, page, options = {}) {
     const { harId } = await this._channel.harStart({
       page: page?._channel,
-      options: prepareRecordHarOptions({
-        path: har,
+      options: {
+        zip: har.endsWith(".zip"),
         content: options.updateContent ?? "attach",
-        mode: options.updateMode ?? "minimal",
-        urlFilter: options.url
-      })
+        urlGlob: (0, import_rtti.isString)(options.url) ? options.url : void 0,
+        urlRegexSource: (0, import_rtti.isRegExp)(options.url) ? options.url.source : void 0,
+        urlRegexFlags: (0, import_rtti.isRegExp)(options.url) ? options.url.flags : void 0,
+        mode: options.updateMode ?? "minimal"
+      }
     });
     this._harRecorders.set(harId, { path: har, content: options.updateContent ?? "attach" });
   }
@@ -359,19 +375,19 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
   }
   async _unrouteInternal(removed, remaining, behavior) {
     this._routes = remaining;
-    await this._updateInterceptionPatterns();
-    if (!behavior || behavior === "default")
-      return;
-    const promises = removed.map((routeHandler) => routeHandler.stop(behavior));
-    await Promise.all(promises);
+    if (behavior && behavior !== "default") {
+      const promises = removed.map((routeHandler) => routeHandler.stop(behavior));
+      await Promise.all(promises);
+    }
+    await this._updateInterceptionPatterns({ title: "Unroute requests" });
   }
-  async _updateInterceptionPatterns() {
+  async _updateInterceptionPatterns(options) {
     const patterns = network.RouteHandler.prepareInterceptionPatterns(this._routes);
-    await this._channel.setNetworkInterceptionPatterns({ patterns });
+    await this._wrapApiCall(() => this._channel.setNetworkInterceptionPatterns({ patterns }), options);
   }
-  async _updateWebSocketInterceptionPatterns() {
+  async _updateWebSocketInterceptionPatterns(options) {
     const patterns = network.WebSocketRouteHandler.prepareInterceptionPatterns(this._webSocketRoutes);
-    await this._channel.setWebSocketInterceptionPatterns({ patterns });
+    await this._wrapApiCall(() => this._channel.setWebSocketInterceptionPatterns({ patterns }), options);
   }
   _effectiveCloseReason() {
     return this._closeReason || this._browser?._closeReason;
@@ -398,7 +414,7 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
     return state;
   }
   backgroundPages() {
-    return [...this._backgroundPages];
+    return [];
   }
   serviceWorkers() {
     return [...this._serviceWorkers];
@@ -410,9 +426,10 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
     return import_cdpSession.CDPSession.from(result.session);
   }
   _onClose() {
-    if (this._browser)
-      this._browser._contexts.delete(this);
-    this._browserType?._contexts?.delete(this);
+    this._closingStatus = "closed";
+    this._browser?._contexts.delete(this);
+    this._browser?._browserType._contexts.delete(this);
+    this._browser?._browserType._playwright.selectors._contextsForSelectors.delete(this);
     this._disposeHarRouters();
     this.tracing._resetStackCounter();
     this.emit(import_events.Events.BrowserContext.Close, this);
@@ -421,15 +438,13 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
     await this.close();
   }
   async close(options = {}) {
-    if (this._closeWasCalled)
+    if (this._closingStatus !== "none")
       return;
     this._closeReason = options.reason;
-    this._closeWasCalled = true;
+    this._closingStatus = "closing";
+    await this.request.dispose(options);
+    await this._instrumentation.runBeforeCloseBrowserContext(this);
     await this._wrapApiCall(async () => {
-      await this.request.dispose(options);
-    }, true);
-    await this._wrapApiCall(async () => {
-      await this._browserType?._willCloseContext(this);
       for (const [harId, harParams] of this._harRecorders) {
         const har = await this._channel.harExport({ harId });
         const artifact = import_artifact.Artifact.from(har.artifact);
@@ -446,36 +461,30 @@ class BrowserContext extends import_channelOwner.ChannelOwner {
         }
         await artifact.delete();
       }
-    }, true);
+    }, { internal: true });
     await this._channel.close(options);
     await this._closedPromise;
   }
-  async _enableRecorder(params) {
+  async _enableRecorder(params, eventSink) {
+    if (eventSink)
+      this._onRecorderEventSink = eventSink;
     await this._channel.enableRecorder(params);
   }
+  async _disableRecorder() {
+    this._onRecorderEventSink = void 0;
+    await this._channel.disableRecorder();
+  }
 }
-async function prepareStorageState(platform, options) {
-  if (typeof options.storageState !== "string")
-    return options.storageState;
+async function prepareStorageState(platform, storageState) {
+  if (typeof storageState !== "string")
+    return storageState;
   try {
-    return JSON.parse(await platform.fs().promises.readFile(options.storageState, "utf8"));
+    return JSON.parse(await platform.fs().promises.readFile(storageState, "utf8"));
   } catch (e) {
-    (0, import_stackTrace.rewriteErrorMessage)(e, `Error reading storage state from ${options.storageState}:
+    (0, import_stackTrace.rewriteErrorMessage)(e, `Error reading storage state from ${storageState}:
 ` + e.message);
     throw e;
   }
-}
-function prepareRecordHarOptions(options) {
-  if (!options)
-    return;
-  return {
-    path: options.path,
-    content: options.content || (options.omitContent ? "omit" : void 0),
-    urlGlob: (0, import_rtti.isString)(options.urlFilter) ? options.urlFilter : void 0,
-    urlRegexSource: (0, import_rtti.isRegExp)(options.urlFilter) ? options.urlFilter.source : void 0,
-    urlRegexFlags: (0, import_rtti.isRegExp)(options.urlFilter) ? options.urlFilter.flags : void 0,
-    mode: options.mode
-  };
 }
 async function prepareBrowserContextParams(platform, options) {
   if (options.videoSize && !options.videosPath)
@@ -487,9 +496,8 @@ async function prepareBrowserContextParams(platform, options) {
     viewport: options.viewport === null ? void 0 : options.viewport,
     noDefaultViewport: options.viewport === null,
     extraHTTPHeaders: options.extraHTTPHeaders ? (0, import_headers.headersObjectToArray)(options.extraHTTPHeaders) : void 0,
-    storageState: await prepareStorageState(platform, options),
+    storageState: options.storageState ? await prepareStorageState(platform, options.storageState) : void 0,
     serviceWorkers: options.serviceWorkers,
-    recordHar: prepareRecordHarOptions(options.recordHar),
     colorScheme: options.colorScheme === null ? "no-override" : options.colorScheme,
     reducedMotion: options.reducedMotion === null ? "no-override" : options.reducedMotion,
     forcedColors: options.forcedColors === null ? "no-override" : options.forcedColors,

@@ -1,6 +1,10 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementBaseSignature } from "../elements/module.js";
-import { VStackElement, HStackElement } from "./stack";
-import { DividerElement } from "./divider";
+import { VStackElement, HStackElement } from "./stack.js";
+import { DividerElement } from "./divider.js";
 /**
  * Options for a single step's content in the Steps element.
  * @property content The step nodes/children.

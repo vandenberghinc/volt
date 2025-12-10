@@ -1,3 +1,4 @@
+// @ts-nocheck
 /*
  * @author: Daan van den Bergh
  * @copyright: © 2022 - 2024 Daan van den Bergh.
@@ -6,23 +7,24 @@
 // Imports.
 import { Utils } from "./utils.js";
 import { User } from "./user.js";
-import { HStack, HStackElement, NullHStack, VStack, VStackElement, } from "../ui/stack"
-import { Text } from "../ui/text"
-import { Title } from "../ui/title"
-import { ForEach } from "../ui/for_each"
-import { Image, ImageMask } from "../ui/image"
-import { RingLoader } from "../ui/loaders"
-import { BorderButton } from "../ui/border_button"
-import { LoaderButton, LoaderButtonElement } from "../ui/loader_button"
-import { Divider } from "../ui/divider"
-import { Input, ExtendedSelect, ExtendedInput, ExtendedInputElement, ExtendedSelectElement } from "../ui/input"
-import { Spacer } from "../ui/spacer"
-import { Form, FormElement } from "../ui/form"
-import { YesNoPopupElement, YesNoPopup } from "../ui/popup"
+import { HStack, HStackElement, VStack, VStackElement, } from "../ui/stack.js"
+import { Text } from "../ui/text.js"
+import { Title } from "../ui/title.js"
+import { ForEach } from "../ui/for_each.js"
+import { Image, ImageMask } from "../ui/image.js"
+import { RingLoader } from "../ui/loaders.js"
+import { BorderButton } from "../ui/border_button.js"
+import { LoaderButton, LoaderButtonElement } from "../ui/loader_button.js"
+import { Divider } from "../ui/divider.js"
+import { Input, ExtendedSelect, ExtendedInput, ExtendedInputElement, ExtendedSelectElement } from "../ui/input.js"
+import { Spacer } from "../ui/spacer.js"
+import { Form, FormElement } from "../ui/form.js"
+import { YesNoPopupElement, YesNoPopup } from "../ui/popup.js"
 import { Span } from "../ui/span.js";
 import { VElement } from "../elements/module.js";
 
-import { Paddle as PaddleBackend, Payment as PaymentBackend, Product } from "../../../backend/src/payments/paddle.js";
+import type { Paddle as PaddleBackend, Payment as PaymentBackend, Product } from "../../../backend/src/payments/paddle.js";
+import { Request, request } from "./request.js";
 
 // Declare global variables or external libraries if necessary.
 // @todo import paddle here not using scripts
@@ -428,12 +430,12 @@ export namespace Payments {
             if (_sign_in_redirect != null && !User.is_authenticated()) {
                 Utils.redirect(_sign_in_redirect);
             }
-            const payload: PaddleBackend.Endpoints.InitPayment.Params = {
+            const payload: PaddleBackend.Endpoints.InitPayment["payload"] = {
                 items: Cart.items,
             }
-            const response = await Utils.request({
+            const response = await request<PaddleBackend.Endpoints.InitPayment>({
                 method: "POST",
-                url: "/volt/payments/init",
+                url: "/volt/api/v1/payments/init",
                 data: payload,
             });
             if (response.error) {
@@ -580,7 +582,7 @@ export namespace Payments {
 
         // The previous step button.
         _prev_step_button = HStack(
-            ImageMask("/volt_static/payments/arrow.long.webp")
+            ImageMask("/volt/assets/payments/arrow.long.webp")
                 .frame(15, 15)
                 .mask_color(_style.fg_1)
                 .transition_mask("background 300ms ease-in-out")
@@ -965,7 +967,7 @@ export namespace Payments {
                                 .white_space("pre")
                                 .line_height("1.4em")
                                 .center(),
-                            ImageMask("/volt_static/payments/shopping_cart.webp")
+                            ImageMask("/volt/assets/payments/shopping_cart.webp")
                                 .frame(35, 35)
                                 .margin_top(20)
                                 .mask_color(style.theme_fg),
@@ -1098,7 +1100,7 @@ export namespace Payments {
                                             .padding(0)
                                             .flex_shrink(0),
                                         quantity_input,
-                                        ImageMask("/volt_static/payments/minus.webp")
+                                        ImageMask("/volt/assets/payments/minus.webp")
                                             .frame(20, 20)
                                             .padding(5)
                                             .margin_right(5)
@@ -1121,7 +1123,7 @@ export namespace Payments {
                                                     this.refresh();
                                                 }
                                             }),
-                                        ImageMask("/volt_static/payments/plus.webp")
+                                        ImageMask("/volt/assets/payments/plus.webp")
                                             .frame(20, 20)
                                             .padding(5)
                                             .margin_right(5)
@@ -1139,7 +1141,7 @@ export namespace Payments {
                                                 await Cart.add(item.product.id, 1);
                                                 this.refresh();
                                             }),
-                                        ImageMask("/volt_static/payments/trash.webp")
+                                        ImageMask("/volt/assets/payments/trash.webp")
                                             .frame(20, 20)
                                             .padding(5)
                                             .margin_right(5)
@@ -1238,7 +1240,7 @@ export namespace Payments {
                 const refundable_res = await Payments.get_refundable_payments({
                     days: _days_refundable,
                 });
-                let refundable: PaddleBackend.Endpoints.GetRefundablePayments.Result = [];
+                let refundable: PaddleBackend.Endpoints.GetRefundablePayments["result"] = [];
                 if (refundable_res.error) {
                     const e = new Error(refundable_res.error.message);
                     console.error(e);
@@ -1253,7 +1255,7 @@ export namespace Payments {
                         is_refundable: true,
                     });
                 const refunding_res = await Payments.get_refunding_payments();
-                let refunding: PaddleBackend.Endpoints.GetRefundingPayments.Result = [];
+                let refunding: PaddleBackend.Endpoints.GetRefundingPayments["result"] = [];
                 if (refunding_res.error) {
                     const e = new Error(refunding_res.error.message);
                     console.error(e);
@@ -1269,7 +1271,7 @@ export namespace Payments {
                         is_refunding: true,
                     });
                 const refunded_res = await Payments.get_refunded_payments();
-                let refunded: PaddleBackend.Endpoints.GetRefundedPayments.Result = [];
+                let refunded: PaddleBackend.Endpoints.GetRefundedPayments["result"] = [];
                 if (refunded_res.error) {
                     const e = new Error(refunded_res.error.message);
                     console.error(e);
@@ -1426,7 +1428,7 @@ export namespace Payments {
                                     .white_space("pre")
                                     .line_height("1.4em")
                                     .center(),
-                                Image("/volt_static/payments/check.webp")
+                                Image("/volt/assets/payments/check.webp")
                                     .frame(30, 30)
                                     .margin_top(15)
                                     .assign_to_parent_as("success_image_e"),
@@ -1543,7 +1545,7 @@ export namespace Payments {
                                                         text: `You are about to request a refund for payment <span style='border-radius: 7px; background: ${style.bg_1}; padding: 1px 4px; font-size: 0.9em;'>${payment.id}</span>, do you wish to proceed?`,
                                                         no: "No",
                                                         yes: "Yes",
-                                                        image: "/volt_static/payments/error.webp",
+                                                        image: "/volt/assets/payments/error.webp",
                                                         blur: 5,
                                                         animation_duration: 300,
                                                         on_yes: async () => {
@@ -1623,7 +1625,7 @@ export namespace Payments {
                                             .background(style.theme_fg)
                                             .margin(0, 5, 0, 0)
                                             .update(),
-                                        !container.is_refunded ? null : Image("/volt_static/payments/check.webp")
+                                        !container.is_refunded ? null : Image("/volt/assets/payments/check.webp")
                                             .frame(20, 20)
                                             .margin(0, 5, 0, 0),
                                     )
@@ -1684,7 +1686,7 @@ export namespace Payments {
                 .background(_style.bg)
                 .color(_style.fg)
                 .font_size(_style.font_size)
-                .missing_color(_style.missing_fg)
+                .error_color(_style.missing_fg)
                 .focus_color(_style.theme_fg)
                 .border_color(_style.divider_bg)
                 .border_radius(_style.border_radius)
@@ -2051,14 +2053,14 @@ export namespace Payments {
                 .white_space("pre")
                 .line_height("1.4em")
                 .center(),
-            ImageMask("/volt_static/payments/error.webp")
+            ImageMask("/volt/assets/payments/error.webp")
                 .hide()
                 .frame(40, 40)
                 .padding(5)
                 .mask_color(_style.missing_fg)
                 .margin_top(15)
                 .assign_to_parent_as("error_image_e"),
-            Image("/volt_static/payments/party.webp")
+            Image("/volt/assets/payments/party.webp")
                 .hide()
                 .frame(40, 40)
                 .margin_top(15)
@@ -2081,7 +2083,7 @@ export namespace Payments {
              */
             set_error(this: any, message: string = "The payment has failed, please check your information and try again.\n If the problem persists, contact support for assistance.") {
                 this.loader_e.hide();
-                this.error_image_e.src("/volt_static/payments/error.webp");
+                this.error_image_e.src("/volt/assets/payments/error.webp");
                 this.error_image_e.show();
                 this.success_image_e.hide();
                 this.title_e.text("Error");
@@ -2093,7 +2095,7 @@ export namespace Payments {
              */
             set_cancelled(this: any, message: string = "The payment has been cancelled.") {
                 this.loader_e.hide();
-                this.error_image_e.src("/volt_static/payments/cancelled.webp");
+                this.error_image_e.src("/volt/assets/payments/cancelled.webp");
                 this.error_image_e.show();
                 this.success_image_e.hide();
                 this.title_e.text("Cancelled");
@@ -2388,16 +2390,12 @@ export namespace Payments {
     // Get the currency symbol for a product currency.
     // Returns `null` when the currency is not supported.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Currency Symbol
-     * @description: Get the currency symbol for a product currency.
-     * @type: string | null
-     * @return: Returns the currency symbol when the currency is supported, otherwise `null`
-     * @param:
-     *   @name: currency
-     *   @description: The currency from the product object.
+     * {Get Currency Symbol}
+     * Get the currency symbol for a product currency.
+     * @nav Frontend/Payments
+     * @parameter currency The currency from the product object.
+     * @returns Returns the currency symbol when the currency is supported, otherwise `null`
+     * @docs
      */
     export function get_currency_symbol(currency: string): string | null {
         switch (currency.toLowerCase()) {
@@ -2560,40 +2558,32 @@ export namespace Payments {
 
     // Fetch the payment products.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Payment Products
-     * @description: Get the backend defined payment products asynchronously.
-     * @type: array[object]
-     * @return: Returns the backend defined payment products.
+     * {Payment Products}
+     * Get the backend defined payment products asynchronously.
+     * @nav Frontend/Payments
+     * @returns Returns the backend defined payment products.
+     * @docs
      */
-    export function get_products(): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetProducts.Result> {
+    export function get_products(): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetProducts> {
         if (_products !== undefined) {
             return _products;
         }
-        return Utils.request({
+        return request<PaddleBackend.Endpoints.GetProducts>({
             method: "GET",
-            url: "/volt/payments/products",
+            url: "/volt/api/v1/payments/products",
         });
     }
 
     // Fetch a payment product by id.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Payment Product
-     * @description: Get the backend defined payment product by id asynchronously.
-     * @type: object
-     * @return: Returns the backend defined payment product.
-     * @param:
-     *   @name: id
-     *   @required: true
-     *   @type: string
-     *   @desc: The id of the payment product.
+     * {Get Payment Product}
+     * Get the backend defined payment product by id asynchronously.
+     * @nav Frontend/Payments
+     * @parameter id The id of the payment product.
+     * @returns Returns the backend defined payment product.
+     * @docs
      */
-    export async function get_product(id: string): Utils.RequestResultPromise<Product> {
+    export async function get_product(id: string): Request.ResultPromise<Product> {
         // APPLY_NEW_RESPONSE
         const products = await get_products();
         if (products.error) return products;
@@ -2629,236 +2619,170 @@ export namespace Payments {
 
     // Fetch a payment object by id.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Payment.
-     * @desc: Get a payment by id.
-     * @param:
-     *   @name: id
-     *   @required: true
-     *   @type: string
-     *   @desc: The id of the payment.
+     * {Get Payment}
+     * Get a payment by id.
+     * @nav Frontend/Payments
+     * @parameter id The id of the payment.
+     * @docs
      */
     export function get_payment(
-        payload: PaddleBackend.Endpoints.GetPayment.Params
-    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetPayment.Result> {
-        return Utils.request({
+        payload: PaddleBackend.Endpoints.GetPayment["payload"]
+    ): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetPayment> {
+        return request<PaddleBackend.Endpoints.GetPayment>({
             method: "GET",
-            url: "/volt/payments/payment",
+            url: "/volt/api/v1/payments/payment",
             data: payload,
         });
     }
 
     // Get all payments.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Refunded Payments.
-     * @desc:
-     *   Get all payments of the authenticated user
-     *
-     *   All failed payments are no longer stored in the database.
-     * @param:
-     *   @name: days
-     *   @type: number
-     *   @desc: Retrieve payments from the last amount of days.
-     * @param:
-     *   @name: limit
-     *   @type: number
-     *   @desc: Limit the amount of response payment objects.
-     * @param:
-     *   @name: status
-     *   @type: string
-     *   @desc: Filter the payments by status. Be aware that the line items of a payment also have a status with possible values of `open`, `cancelled`, `refunding` or `refunded.`
-     *   @enum:
-     *     @value: "open"
-     *     @desc: Payments that are still open and unpaid.
-     *   @enum:
-     *     @value: "paid"
-     *     @desc: Payments that are paid.
+     * {Get Refunded Payments}
+     * Get all payments of the authenticated user
+     * 
+     * All failed payments are no longer stored in the database.
+     * @nav Frontend/Payments
+     * @parameter days Retrieve payments from the last amount of days.
+     * @parameter limit Limit the amount of response payment objects.
+     * @parameter status Filter the payments by status. Be aware that the line items of a payment also have a status with possible values of `open`, `cancelled`, `refunding` or `refunded.`
+     * @docs
      */
     export function get_payments(
-        payload: PaddleBackend.Endpoints.GetPayments.Params
-    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetPayments.Result> {
-        return Utils.request({
+        payload: PaddleBackend.Endpoints.GetPayments["payload"]
+    ): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetPayments> {
+        return request<PaddleBackend.Endpoints.GetPayments>({
             method: "GET",
-            url: "/volt/payments/payments",
+            url: "/volt/api/v1/payments/payments",
             data: payload
         });
     }
 
     // Get refundable payments.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Refundable Payments.
-     * @desc: Get all payments that are refundable for the authenticated user.
-     * @param:
-     *   @name: days
-     *   @type: number
-     *   @desc: Retrieve payments from the last amount of days.
-     * @param:
-     *   @name: limit
-     *   @type: number
-     *   @desc: Limit the amount of response payment objects.
+     * {Get Refundable Payments}
+     * Get all payments that are refundable for the authenticated user.
+     * @nav Frontend/Payments
+     * @parameter days Retrieve payments from the last amount of days.
+     * @parameter limit Limit the amount of response payment objects.
+     * @docs
      */
     export function get_refundable_payments(
-        payload?: PaddleBackend.Endpoints.GetRefundablePayments.Params
-    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetRefundablePayments.Result> {
-        return Utils.request({
+        payload?: PaddleBackend.Endpoints.GetRefundablePayments["payload"]
+    ): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetRefundablePayments> {
+        return request<PaddleBackend.Endpoints.GetRefundablePayments>({
             method: "GET",
-            url: "/volt/payments/payments/refundable",
+            url: "/volt/api/v1/payments/payments/refundable",
             data: payload
         });
     }
 
     // Get refunded payments.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Refunded Payments.
-     * @desc: Get all successfully refunded payments of the authenticated user.
-     * @param:
-     *   @name: days
-     *   @type: number
-     *   @desc: Retrieve payments from the last amount of days.
-     * @param:
-     *   @name: limit
-     *   @type: number
-     *   @desc: Limit the amount of response payment objects.
+     * {Get Refunded Payments}
+     * Get all successfully refunded payments of the authenticated user.
+     * @nav Frontend/Payments
+     * @parameter days Retrieve payments from the last amount of days.
+     * @parameter limit Limit the amount of response payment objects.
+     * @docs
      */
     export function get_refunded_payments(
-        payload?: PaddleBackend.Endpoints.GetRefundedPayments.Params
-    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetRefundedPayments.Result> {
-        return Utils.request({
+        payload?: PaddleBackend.Endpoints.GetRefundedPayments["payload"]
+    ): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetRefundedPayments> {
+        return request<PaddleBackend.Endpoints.GetRefundedPayments>({
             method: "GET",
-            url: "/volt/payments/payments/refunded",
+            url: "/volt/api/v1/payments/payments/refunded",
             data: payload
         });
     }
 
     // Get refunding payments.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get Refunding Payments.
-     * @desc: Get all payments that are currently in the refunding process of the authenticated user.
-     * @param:
-     *   @name: days
-     *   @type: number
-     *   @desc: Retrieve payments from the last amount of days.
-     * @param:
-     *   @name: limit
-     *   @type: number
-     *   @desc: Limit the amount of response payment objects.
+     * {Get Refunding Payments}
+     * Get all payments that are currently in the refunding process of the authenticated user.
+     * @nav Frontend/Payments
+     * @parameter days Retrieve payments from the last amount of days.
+     * @parameter limit Limit the amount of response payment objects.
+     * @docs
      */
     export function get_refunding_payments(
-        payload?: PaddleBackend.Endpoints.GetRefundingPayments.Params
-    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetRefundingPayments.Result> {
-        return Utils.request({
+        payload?: PaddleBackend.Endpoints.GetRefundingPayments["payload"]
+    ): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetRefundingPayments> {
+        return request<PaddleBackend.Endpoints.GetRefundingPayments>({
             method: "GET",
-            url: "/volt/payments/payments/refunding",
+            url: "/volt/api/v1/payments/payments/refunding",
             data: payload
         });
     }
 
     // Create refund.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Refund Payment.
-     * @desc: Refund a payment based on the payment id for the authenticated user.
-     * @warning: Refunding a subscription will also cancel all other subscriptions that were created by the same payment request.
-     * @param:
-     *   @name: payment
-     *   @required: true
-     *   @type: number | string
-     *   @desc: The id of the payment object or the payment object itself.
-     * @param:
-     *   @name: line_items
-     *   @required: true
-     *   @type: array[object]
-     *   @desc: The line items to refund, these must be retrieved from the original payment line items otherwise it may cause undefined behaviour. When undefined the entire payment will be refunded.
-     * @param:
-     *   @name: reason
-     *   @type: string
-     *   @desc: The refund reason.
+     * {Refund Payment}
+     * Refund a payment based on the payment id for the authenticated user.
+     * @warning Refunding a subscription will also cancel all other subscriptions that were created by the same payment request.
+     * @nav Frontend/Payments
+     * @parameter payment The id of the payment object or the payment object itself.
+     * @parameter line_items The line items to refund, these must be retrieved from the original payment line items otherwise it may cause undefined behaviour. When undefined the entire payment will be refunded.
+     * @parameter reason The refund reason.
+     * @docs
      */
     export function create_refund(
-        payload: PaddleBackend.Endpoints.RefundPayment.Params
-    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.RefundPayment.Result> {
-        return Utils.request({
+        payload: PaddleBackend.Endpoints.RefundPayment["payload"]
+    ): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.RefundPayment> {
+        return request<PaddleBackend.Endpoints.RefundPayment>({
             method: "POST",
-            url: "/volt/payments/refund",
+            url: "/volt/api/v1/payments/refund",
             data: payload
         });
     }
 
     // Cancel subscription.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Cancel Subscription.
-     * @desc: Cancel a subscription based on the product id.
-     * @warning: Cancelling a subscription will also cancel all other subscriptions that were created by the same payment request.
-     * @param:
-     *   @name: product
-     *   @required: true
-     *   @type: string
-     *   @desc: The product id.
+     * {Cancel Subscription}
+     * Cancel a subscription based on the product id.
+     * @warning Cancelling a subscription will also cancel all other subscriptions that were created by the same payment request.
+     * @nav Frontend/Payments
+     * @parameter product The product id.
+     * @docs
      */
     export function cancel_subscription(
-        payload: PaddleBackend.Endpoints.CancelSubscription.Params
-    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.CancelSubscription.Result> {
-        return Utils.request({
+        payload: PaddleBackend.Endpoints.CancelSubscription["payload"]
+    ): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.CancelSubscription> {
+        return request<PaddleBackend.Endpoints.CancelSubscription>({
             method: "DELETE",
-            url: "/volt/payments/subscription",
+            url: "/volt/api/v1/payments/subscription",
             data: payload
         });
     }
 
     // Is subscribed.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Is Subscribed.
-     * @desc: Check if the authenticated user is subscribed to a product plan.
-     * @param:
-     *   @name: product
-     *   @required: true
-     *   @type: string
-     *   @desc: The product id.
+     * {Is Subscribed}
+     * Check if the authenticated user is subscribed to a product plan.
+     * @nav Frontend/Payments
+     * @parameter product The product id.
+     * @docs
      */
     export function is_subscribed(
-        payload: PaddleBackend.Endpoints.IsSubscribed.Params
-    ): Utils.RequestResultPromise<PaddleBackend.Endpoints.IsSubscribed.Result> {
-        return Utils.request({
+        payload: PaddleBackend.Endpoints.IsSubscribed["payload"]
+    ): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.IsSubscribed> {
+        return request<PaddleBackend.Endpoints.IsSubscribed>({
             method: "GET",
-            url: "/volt/payments/subscribed",
+            url: "/volt/api/v1/payments/subscribed",
             data: payload
         });
     }
 
     // Get active subscriptions.
     /**
-     * @docs:
-     * @nav: Frontend
-     * @chapter: Payments
-     * @title: Get active subscriptions
-     * @desc: Get the active subscriptions of the authenticated user.
+     * {Get active subscriptions}
+     * Get the active subscriptions of the authenticated user.
+     * @nav Frontend/Payments
+     * @docs
      */
-    export function get_active_subscriptions(): Utils.RequestResultPromise<PaddleBackend.Endpoints.GetActiveSubscriptions.Result> {
-        return Utils.request({
+    export function get_active_subscriptions(): Request.ResultPromiseFromInfo<PaddleBackend.Endpoints.GetActiveSubscriptions> {
+        return request<PaddleBackend.Endpoints.GetActiveSubscriptions>({
             method: "GET",
-            url: "/volt/payments/active_subscriptions",
+            url: "/volt/api/v1/payments/active_subscriptions",
         });
     }
 
@@ -2873,14 +2797,12 @@ export namespace Payments {
 
         // Refresh the shopping cart.
         /**
-         * @docs:
-         * @nav: Frontend
-         * @chapter: Payments
-         * @title: Refresh Cart
-         * @description:
-         *   Refresh the shopping cart.
-         *
-         *   The current cart items are accessible as `Payments.cart.items`.
+         * {Refresh Cart}
+         * Refresh the shopping cart.
+         * 
+         * The current cart items are accessible as `Payments.cart.items`.
+         * @nav Frontend/Payments
+         * @docs
          */
         export function refresh(): void {
             // Load from local storage.
@@ -2896,14 +2818,12 @@ export namespace Payments {
 
         // Save the shopping cart.
         /**
-         * @docs:
-         * @nav: Frontend
-         * @chapter: Payments
-         * @title: Save Cart
-         * @description:
-         *   Save the shopping cart in the local storage.
-         *
-         *   The current cart items are accessible as `Payments.cart.items`.
+         * {Save Cart}
+         * Save the shopping cart in the local storage.
+         * 
+         * The current cart items are accessible as `Payments.cart.items`.
+         * @nav Frontend/Payments
+         * @docs
          */
         export function save(): void {
             // Save to local storage.
@@ -2915,26 +2835,18 @@ export namespace Payments {
 
         // Add a product to the shopping cart.
         /**
-         * @docs:
-         * @nav: Frontend
-         * @chapter: Payments
-         * @title: Add to Cart
-         * @description: 
-         *   Add a product to the shopping cart.
-         *
-         *   When the product was already added to the shopping cart only the quantity will be incremented.
-         *
-         *   An error will be thrown if the product id does not exist.
-         *
-         *   The current cart items are accessible as `Payments.cart.items`.
-         * @param:
-         *   @name: id
-         *   @description: The product's id.
-         *   @type: string
-         * @param:
-         *   @name: quantity
-         *   @description: The quantity to add.
-         *   @type: number
+         * {Add to Cart}
+         * Add a product to the shopping cart.
+         * 
+         * When the product was already added to the shopping cart only the quantity will be incremented.
+         * 
+         * An error will be thrown if the product id does not exist.
+         * 
+         * The current cart items are accessible as `Payments.cart.items`.
+         * @nav Frontend/Payments
+         * @parameter id The product's id.
+         * @parameter quantity The quantity to add.
+         * @docs
          */
         export async function add(id: string, quantity: number = 1): Promise<void> {
             Cart.refresh(); // Update in case another window has updated the cart.
@@ -2964,24 +2876,16 @@ export namespace Payments {
 
         // Remove a product from the shopping cart.
         /**
-         * @docs:
-         * @nav: Frontend
-         * @chapter: Payments
-         * @title: Remove from Cart
-         * @description: 
-         *   Remove a product from the shopping cart.
-         *
-         *   Does not throw an error when the product was not added to the shopping cart.
-         *
-         *   The current cart items are accessible as `Payments.cart.items`.
-         * @param:
-         *   @name: id
-         *   @description: The product's id.
-         *   @type: string
-         * @param:
-         *   @name: quantity
-         *   @description: The quantity to remove. When the quantity value is "all", the entire product will be removed from the shopping cart.
-         *   @type: number | "all"
+         * {Remove from Cart}
+         * Remove a product from the shopping cart.
+         * 
+         * Does not throw an error when the product was not added to the shopping cart.
+         * 
+         * The current cart items are accessible as `Payments.cart.items`.
+         * @nav Frontend/Payments
+         * @parameter id The product's id.
+         * @parameter quantity The quantity to remove. When the quantity value is "all", the entire product will be removed from the shopping cart.
+         * @docs
          */
         export async function remove(id: string, quantity: number | "all" = 1): Promise<void> {
             Cart.refresh(); // Update in case another window has updated the cart.
@@ -3004,16 +2908,14 @@ export namespace Payments {
 
         // Clear the shopping cart.
         /**
-         * @docs:
-         * @nav: Frontend
-         * @chapter: Payments
-         * @title: Clear Cart
-         * @description: 
-         *   Clear the shopping cart.
-         *
-         *   Will automatically be called if `Payments.confirm_charge()` finishes without any errors.
-         *
-         *   The current cart items are accessible as `Payments.cart.items`.
+         * {Clear Cart}
+         * Clear the shopping cart.
+         * 
+         * Will automatically be called if `Payments.confirm_charge()` finishes without any errors.
+         * 
+         * The current cart items are accessible as `Payments.cart.items`.
+         * @nav Frontend/Payments
+         * @docs
          */
         export async function clear(): Promise<void> {
             Cart.items = [];

@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
@@ -38,7 +38,8 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
 };
 // Imports.
 import { Elements, isVElement } from "../elements/module.js";
-import { VStackElement } from "./stack";
+import { isButtonLike } from "./button.js";
+import { VStackElement } from "./stack.js";
 // Extended input.
 let FormElement = (() => {
     let _classDecorators = [Elements.create({
@@ -82,15 +83,17 @@ let FormElement = (() => {
                     if (id != null && id !== "") {
                         _this.fields[id] = child;
                         child.on_input(() => {
-                            if (child.missing() === true) {
-                                child.missing(false);
+                            if (child.has_error) {
+                                child.valid();
                             }
                         });
                         child.on_enter(() => _this.submit());
                     }
                 }
                 // Initialize button.
-                else if ( /*_this._button === undefined &&*/(child.element_name === "ButtonElement" || child.element_name === "LoaderButtonElement") && child.on_click() == null) { //  && child.attr("submit_button") != "false"
+                else if (isButtonLike(child)
+                    && child.on_click() == null
+                    && child.attr("submit_button") !== "false") {
                     if (_this._button !== undefined) {
                         _this._button.on_click(() => { });
                     }

@@ -1,6 +1,6 @@
-/*
- * Author: Daan van den Bergh
- * Copyright: © 2022 - 2024 Daan van den Bergh.
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 // Imports.
@@ -9,12 +9,14 @@ import * as PDFDocument from "pdfkit";
 import * as libcrypto from "crypto";
 import * as vlib from "@vandenberghinc/vlib";
 
-import { Utils, ExternalError } from "../utils.js";
+import { ExternalError } from "../errors/index.js";
 import { Status } from "../status.js";
 import { Collection } from "../database/collection.js";
 import { Endpoint } from "../endpoint.js";
 import { Server } from "../server.js";
 import { StrictFilter } from "../database/filters/filters.js";
+import { Utils } from "../utils.js";
+import type { Request } from "../../../frontend/src/modules/request.js";
 
 // --------------------------------------------------------------------------------------------------------
 // Interfaces.
@@ -340,7 +342,7 @@ export class Paddle {
     // ---------------------------------------------------------
     // Utils (private).
 
-    private async _req(method: string, endpoint: string, params: any = null): Promise<any> {
+    private async _req(method: string, endpoint: string, params: Record<string, any> | null = null): Promise<any> {
         const promise = new Promise<any>((resolve, reject) => {
 
             // Build hostname + path for both relative and absolute endpoints.
@@ -1090,7 +1092,7 @@ export class Paddle {
         // Initialize and verify an order, check if the user is authenticated when subscriptions are present and check if the user is not already subscribed to the same item.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/payments/init",
+            endpoint: "/volt/api/v1/payments/init",
             content_type: "application/json",
             rate_limit: "global",
             params: {
@@ -1131,41 +1133,41 @@ export class Paddle {
                 }
 
                 // Success.
-                return stream.success({data: {message: "Successfully initialized the order."}});
+                return stream.success<Paddle.Endpoints.InitPayment["result"]>({data: {message: "Successfully initialized the order."}});
             }
         });
 
         // Get products.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/payments/products",
+            endpoint: "/volt/api/v1/payments/products",
             content_type: "application/json",
             rate_limit: "global",
             callback: (stream) => {
-                const data: Paddle.Endpoints.GetProducts.Result = this.products;
-                return stream.success({ data });
+                return stream.success<Paddle.Endpoints.GetProducts["result"]>({ data: this.products });
             }
         });
 
         // Get payment by id.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/payments/payment",
+            endpoint: "/volt/api/v1/payments/payment",
             content_type: "application/json",
             rate_limit: "global",
             params: {
                 id: "string",
             },
             callback: async (stream, params) => {
-                const data: Paddle.Endpoints.GetPayment.Result = await this._load_payment_for_public(params.id);
-                return stream.success({ data });
+                return stream.success<Paddle.Endpoints.GetPayment["result"]>({
+                    data: await this._load_payment_for_public(params.id),
+                });
             }
         });
 
         // Get payments.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/payments/payments",
+            endpoint: "/volt/api/v1/payments/payments",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1175,20 +1177,21 @@ export class Paddle {
                 status: { type: "string", required: false, enum: PaymentStatusValues },
             },
             callback: async (stream, params) => {
-                const result: Paddle.Endpoints.GetPayments.Result = await this.get_payments({
-                    uid: stream.uid,
-                    days: params.days,
-                    limit: params.limit,
-                    status: params.status,
-                })
-                return stream.success({data: result});
+                return stream.success<Paddle.Endpoints.GetPayments["result"]>({
+                    data: await this.get_payments({
+                        uid: stream.uid,
+                        days: params.days,
+                        limit: params.limit,
+                        status: params.status,
+                    })
+                });
             }
         });
 
         // Get refundable payments.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/payments/payments/refundable",
+            endpoint: "/volt/api/v1/payments/payments/refundable",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1197,20 +1200,21 @@ export class Paddle {
                 limit: { type: "number", required: false },
             },
             callback: async (stream, params) => {
-                const result: Paddle.Endpoints.GetRefundablePayments.Result = await this.get_refundable_payments({
-                    uid: stream.uid,
-                    days: params.days,
-                    limit: params.limit,
-                    for_public: true,
-                })
-                return stream.success({data: result});
+                return stream.success<Paddle.Endpoints.GetRefundablePayments["result"]>({
+                    data: await this.get_refundable_payments({
+                        uid: stream.uid,
+                        days: params.days,
+                        limit: params.limit,
+                        for_public: true,
+                    })
+                });
             }
         });
 
         // Get refunded payments.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/payments/payments/refunded",
+            endpoint: "/volt/api/v1/payments/payments/refunded",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1219,20 +1223,21 @@ export class Paddle {
                 limit: { type: "number", required: false },
             },
             callback: async (stream, params) => {
-                const result: Paddle.Endpoints.GetRefundedPayments.Result = await this.get_refunded_payments({
-                    uid: stream.uid,
-                    days: params.days,
-                    limit: params.limit,
-                    for_public: true,
-                })
-                return stream.success({data: result});
+                return stream.success<Paddle.Endpoints.GetRefundedPayments["result"]>({
+                    data: await this.get_refunded_payments({
+                        uid: stream.uid,
+                        days: params.days,
+                        limit: params.limit,
+                        for_public: true,
+                    })
+                });
             }
         });
 
         // Get refunding payments.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/payments/payments/refunding",
+            endpoint: "/volt/api/v1/payments/payments/refunding",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1241,20 +1246,21 @@ export class Paddle {
                 limit: { type: "number", required: false },
             },
             callback: async (stream, params) => {
-                const result: Paddle.Endpoints.GetRefundingPayments.Result = await this.get_refunding_payments({
-                    uid: stream.uid,
-                    days: params.days,
-                    limit: params.limit,
-                    for_public: true,
-                })
-                return stream.success({data: result});
+                return stream.success<Paddle.Endpoints.GetRefundingPayments["result"]>({
+                    data: await this.get_refunding_payments({
+                        uid: stream.uid,
+                        days: params.days,
+                        limit: params.limit,
+                        for_public: true,
+                    })
+                });
             }
         });
 
         // Create a refund.
         this.server.endpoint({
             method: "POST",
-            endpoint: "/volt/payments/refund",
+            endpoint: "/volt/api/v1/payments/refund",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1271,14 +1277,14 @@ export class Paddle {
                     params.line_items as LineItem[] | undefined,
                     params.reason,
                 );
-                return stream.success();
+                return stream.success<Paddle.Endpoints.RefundPayment["result"]>();
             }
         });
 
         // Cancel a subscription.
         this.server.endpoint({
             method: "DELETE",
-            endpoint: "/volt/payments/subscription",
+            endpoint: "/volt/api/v1/payments/subscription",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1287,14 +1293,14 @@ export class Paddle {
             },
             callback: async (stream, params) => {
                 await this.cancel_subscription(stream.uid, params.product);
-                return stream.success();
+                return stream.success<Paddle.Endpoints.CancelSubscription["result"]>();
             }
         });
 
         // Cancel a subscription by payment.
         // {
         //     method: "DELETE",
-        //     endpoint: "/volt/payments/subscription_by_payment",
+        //     endpoint: "/volt/api/v1/payments/subscription_by_payment",
         //     content_type: "application/json",
         //     authenticated: true,
         //     rate_limit: "global",
@@ -1310,16 +1316,15 @@ export class Paddle {
         // Get active subscriptions.
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/payments/active_subscriptions",
+            endpoint: "/volt/api/v1/payments/active_subscriptions",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
             callback: async (stream) => {
-                const data: Paddle.Endpoints.GetActiveSubscriptions.Result = {
-                    subscriptions: await this.get_active_subscriptions(stream.uid)
-                };
-                return stream.success({
-                    data,
+                return stream.success<Paddle.Endpoints.GetActiveSubscriptions["result"]>({
+                    data: {
+                        subscriptions: await this.get_active_subscriptions(stream.uid)
+                    },
                 });
             }
         });
@@ -1327,7 +1332,7 @@ export class Paddle {
         // Is subscribed
         this.server.endpoint({
             method: "GET",
-            endpoint: "/volt/payments/subscribed",
+            endpoint: "/volt/api/v1/payments/subscribed",
             content_type: "application/json",
             authenticated: true,
             rate_limit: "global",
@@ -1335,11 +1340,10 @@ export class Paddle {
                 product: "string",
             },
             callback: async (stream, params) => {
-                const data: Paddle.Endpoints.IsSubscribed.Result = {
-                    is_subscribed: (await this.is_subscribed(stream.uid, params.product))
-                };
-                return stream.success({
-                    data
+                return stream.success<Paddle.Endpoints.IsSubscribed["result"]>({
+                    data: {
+                        is_subscribed: (await this.is_subscribed(stream.uid, params.product))
+                    }
                 });
             }
         });
@@ -1770,12 +1774,9 @@ export class Paddle {
 
     // Create and register the webhook endpoint.
     private async _create_webhook(): Promise<Endpoint.Opts> {
+        /* @performance */ const now = this.performance.start();
 
         // Register the webhook.
-        const webhook_doc = await this._webhook_conf_db.load({ production: this.server.production, version: 1 }, { throw: false });
-        if (webhook_doc instanceof Error && !(webhook_doc instanceof Collection.NotFoundError)) {
-            throw webhook_doc;
-        }
         const webhook_settings = {
             description: "volt webhook",
             destination: `${this.server.full_domain}/volt/payments/webhook`,
@@ -1802,6 +1803,7 @@ export class Paddle {
                 "adjustment.updated",
             ],
         };
+        const hashed_webhook_settings = this.server.hash(webhook_settings);
 
         // Register webhook.
         const register_webhook = async () => {
@@ -1815,69 +1817,88 @@ export class Paddle {
             });
         }
 
-        // Webhook registered.
-        if (!(webhook_doc instanceof Collection.NotFoundError)) {
-            this.webhook_key = webhook_doc.key;
+        // For speeding up the restart process we store the hash of the previous webhook under a temporary document.
+        const home_dir = vlib.Path.home().join(".volt/cache")
+        if (!home_dir.exists()) {
+            home_dir.mkdir({ recursive: true });
+        }
+        const cached_local_hash_file = home_dir.join(`paddle_webhook_${this.server.production ? "live" : "sandbox"}.hash`);
+        const cached_local_hash = cached_local_hash_file.exists() ? (await cached_local_hash_file.load()) : null;
+        if (cached_local_hash !== hashed_webhook_settings) {
 
-            // Check update required.
-            if (webhook_doc.hash !== this.server.hash(webhook_settings)) {
-                this.server.log(0, `Checking payments webhook.`);
+            // Load webhook doc.
+            const webhook_doc = await this._webhook_conf_db.load({ production: this.server.production, version: 1 }, { throw: false });
+            if (webhook_doc instanceof Error && !(webhook_doc instanceof Collection.NotFoundError)) {
+                throw webhook_doc;
+            }
+
+            // Webhook registered.
+            if (!(webhook_doc instanceof Collection.NotFoundError)) {
+                this.webhook_key = webhook_doc.key;
 
                 // Check update required.
-                const webhook_id = webhook_doc.id;
-                let registered
-                try {
-                    registered = await this._req("GET", `/notification-settings/${webhook_id}`);
-                } catch (error: any) {
-                    if (error.status === 404 || error.status_code === 404) {
-                        registered = undefined;
-                        await register_webhook();
-                    } else {
-                        throw error;
-                    }
-                }
-                if (registered) {
-                    const item = registered.data;
-                    const patch = (() => {
-                        if (
-                            item.active !== true ||
-                            item.destination !== webhook_settings.destination ||
-                            item.type !== webhook_settings.type ||
-                            item.description !== webhook_settings.description ||
-                            item.subscribed_events.length != webhook_settings.subscribed_events.length
-                        ) {
-                            return true;
+                if (webhook_doc.hash !== hashed_webhook_settings) {
+                    this.server.log(0, `Checking payments webhook.`);
+
+                    // Check update required.
+                    const webhook_id = webhook_doc.id;
+                    let registered
+                    try {
+                        registered = await this._req("GET", `/notification-settings/${webhook_id}`);
+                    } catch (error: any) {
+                        if (error.status === 404 || error.status_code === 404) {
+                            registered = undefined;
+                            await register_webhook();
+                        } else {
+                            throw error;
                         }
-                        return webhook_settings.subscribed_events.iterate((x) => {
-                            const found = item.subscribed_events.iterate((y) => {
-                                if (x === y.name) {
+                    }
+                    if (registered) {
+                        const item = registered.data;
+                        const patch = (() => {
+                            if (
+                                item.active !== true ||
+                                item.destination !== webhook_settings.destination ||
+                                item.type !== webhook_settings.type ||
+                                item.description !== webhook_settings.description ||
+                                item.subscribed_events.length != webhook_settings.subscribed_events.length
+                            ) {
+                                return true;
+                            }
+                            return webhook_settings.subscribed_events.iterate((x) => {
+                                const found = item.subscribed_events.iterate((y) => {
+                                    if (x === y.name) {
+                                        return true;
+                                    }
+                                })
+                                if (found === false) {
                                     return true;
                                 }
                             })
-                            if (found === false) {
-                                return true;
-                            }
-                        })
-                    })();
+                        })();
 
-                    // Update.
-                    if (patch === true) {
-                        this.server.log(0, "Updating payments webhook.");
-                        await this._req("PATCH", `/notification-settings/${webhook_id}`, {...webhook_settings, active: true});
+                        // Update.
+                        if (patch === true) {
+                            this.server.log(0, "Updating payments webhook.");
+                            await this._req("PATCH", `/notification-settings/${webhook_id}`, {...webhook_settings, active: true});
+                        }
+
+                        // Save new hash.
+                        await this._webhook_conf_db.set(
+                            { production: this.server.production, version: 1 },
+                            { hash: this.server.hash(webhook_settings) }
+                        );
                     }
-
-                    // Save new hash.
-                    await this._webhook_conf_db.set(
-                        { production: this.server.production, version: 1 },
-                        { hash: this.server.hash(webhook_settings) }
-                    );
                 }
             }
-        }
 
-        // Register webhook.
-        else {
-            await register_webhook();
+            // Register webhook.
+            else {
+                await register_webhook();
+            }
+
+            // Save the new hash.
+            await cached_local_hash_file.save(hashed_webhook_settings);
         }
 
         // Ip whitelist.
@@ -1898,10 +1919,12 @@ export class Paddle {
             "100.20.172.113",
         ];
 
+        /* @performance */ this.server.performance.end("create-payments-webhook", now);
+
         // Create the endpoint.
         return  {
             method: "POST",
-            endpoint: "/volt/payments/webhook",
+            endpoint: "/volt/api/v1/payments/webhook",
             content_type: "application/json",
             rate_limit: undefined,
             callback: async (stream) => {
@@ -2712,126 +2735,192 @@ export namespace Paddle {
     export namespace Endpoints {
 
         /** The initialize payment endpoint. */
-        export namespace InitPayment {
-            /** The request params. */
-            export interface Params {
+        export type InitPayment = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/payments/init",
+            // Params.
+            {
                 items: {
                     product: Product;
                     quantity: number;
                 }[];
-            }
-            /** The result interface for a **successful** request. */
-            export type Result = vlib.Types.Optional<Payment, "billing_details">;
-        }
+            },
+            // Result.
+            {
+                message: string;
+            },
+            // Error.
+            undefined
+        >;
 
         /** The get products endpoint. */
-        export namespace GetProducts {
-            /** The request params. */
-            export interface Params {
-            }
-            /** The result interface for a **successful** request. */
-            export type Result = Product[];
-        }
+        export type GetProducts = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/payments/products",
+            // Params.
+            undefined,
+            // Result.
+            Product[],
+            // Error.
+            undefined
+        >;
 
         /** The get payment endpoint. */
-        export namespace GetPayment {
-            /** The request params. */
-            export interface Params {
+        export type GetPayment = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/payments/payment",
+            // Params.
+            {
                 id: string;
-            }
-            /** The result interface for a **successful** request. */
-            export type Result = Payment.Public;
-        }
+            },
+            // Result.
+            Payment.Public,
+            // Error.
+            undefined
+        >;
 
         /** The get payments endpoint. */
-        export namespace GetPayments {
-            /** The request params. */
-            export interface Params {
+        export type GetPayments = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/payments/payments",
+            // Params.
+            {
                 days?: number;
                 limit?: number;
                 status?: string | string[];
-            }
-            /** The result interface for a **successful** request. */
-            export type Result = Payment.Public[]
-        }
+            },
+            // Result.
+            Payment.Public[],
+            // Error.
+            undefined
+        >;
 
         /** The get refundable payments endpoint. */
-        export namespace GetRefundablePayments {
-            /** The request params. */
-            export interface Params {
+        export type GetRefundablePayments = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/payments/payments/refundable",
+            // Params.
+            {
                 days?: number;
                 limit?: number;
-            }
-            /** The result interface for a **successful** request. */
-            export type Result = Payment.Public[]
-        }
+            },
+            // Result.
+            Payment.Public[],
+            // Error.
+            undefined
+        >;
 
         /** The get refunded payments endpoint. */
-        export namespace GetRefundedPayments {
-            /** The request params. */
-            export interface Params {
+        export type GetRefundedPayments = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/payments/payments/refunded",
+            // Params.
+            {
                 days?: number;
                 limit?: number;
-            }
-            /** The result interface for a **successful** request. */
-            export type Result = Payment.Public[]
-        }
+            },
+            // Result.
+            Payment.Public[],
+            // Error.
+            undefined
+        >;
 
         /** The get refunding payments endpoint. */
-        export namespace GetRefundingPayments {
-            /** The request params. */
-            export interface Params {
+        export type GetRefundingPayments = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/payments/payments/refunding",
+            // Params.
+            {
                 days?: number;
                 limit?: number;
-            }
-            /** The result interface for a **successful** request. */
-            export type Result = Payment.Public[]
-        }
+            },
+            // Result.
+            Payment.Public[],
+            // Error.
+            undefined
+        >;
 
         /** The refund payment endpoint. */
-        export namespace RefundPayment {
-            /** The request params. */
-            export interface Params {
+        export type RefundPayment = Request.Info<
+            // Method.
+            "POST",
+            // Endpoint.
+            "/volt/api/v1/payments/refund",
+            // Params.
+            {
                 payment: string | Payment;
                 line_items?: LineItem[];
                 reason?: string;
-            }
-            /** The result interface for a **successful** request. */
-            export type Result = undefined;
-        }
+            },
+            // Result.
+            undefined,
+            // Error.
+            undefined
+        >;
 
         /** The cancel subscription endpoint. */
-        export namespace CancelSubscription {
-            /** The request params. */
-            export interface Params {
+        export type CancelSubscription = Request.Info<
+            // Method.
+            "DELETE",
+            // Endpoint.
+            "/volt/api/v1/payments/subscription",
+            // Params.
+            {
                 product: string;
-            }
-            /** The result interface for a **successful** request. */
-            export type Result = undefined;
-        }
+            },
+            // Result.
+            undefined,
+            // Error.
+            undefined
+        >;
 
         /** The is subscribed endpoint. */
-        export namespace IsSubscribed {
-            /** The request params. */
-            export interface Params {
+        export type IsSubscribed = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/payments/subscribed",
+            // Params.
+            {
                 product: string;
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+            },
+            // Result.
+            {
                 is_subscribed: boolean;
-            };
-        }
+            },
+            // Error.
+            undefined
+        >;
 
         /** The get active subscriptions endpoint. */
-        export namespace GetActiveSubscriptions {
-            /** The request params. */
-            export interface Params {
-            }
-            /** The result interface for a **successful** request. */
-            export interface Result {
+        export type GetActiveSubscriptions = Request.Info<
+            // Method.
+            "GET",
+            // Endpoint.
+            "/volt/api/v1/payments/active_subscriptions",
+            // Params.
+            undefined,
+            // Result.
+            {
                 subscriptions: string[];
-            };
-        }
+            },
+            // Error.
+            undefined
+        >;
 
     }
 }

@@ -37,13 +37,13 @@ var import_cookieStore = require("../cookieStore");
 var network = __toESM(require("../network"));
 var bidi = __toESM(require("./third_party/bidiProtocol"));
 class BidiNetworkManager {
-  constructor(bidiSession, page, onNavigationResponseStarted) {
+  constructor(bidiSession, page) {
     this._userRequestInterceptionEnabled = false;
     this._protocolRequestInterceptionEnabled = false;
+    this._attemptedAuthentications = /* @__PURE__ */ new Set();
     this._session = bidiSession;
     this._requests = /* @__PURE__ */ new Map();
     this._page = page;
-    this._onNavigationResponseStarted = onNavigationResponseStarted;
     this._eventListeners = [
       import_eventsHelper.eventsHelper.addEventListener(bidiSession, "network.beforeRequestSent", this._onBeforeRequestSent.bind(this)),
       import_eventsHelper.eventsHelper.addEventListener(bidiSession, "network.responseStarted", this._onResponseStarted.bind(this)),
@@ -59,11 +59,11 @@ class BidiNetworkManager {
     if (param.request.url.startsWith("data:"))
       return;
     const redirectedFrom = param.redirectCount ? this._requests.get(param.request.request) || null : null;
-    const frame = redirectedFrom ? redirectedFrom.request.frame() : param.context ? this._page._frameManager.frame(param.context) : null;
+    const frame = redirectedFrom ? redirectedFrom.request.frame() : param.context ? this._page.frameManager.frame(param.context) : null;
     if (!frame)
       return;
     if (redirectedFrom)
-      this._requests.delete(redirectedFrom._id);
+      this._deleteRequest(redirectedFrom._id);
     let route;
     if (param.intercepts) {
       if (redirectedFrom) {
@@ -80,14 +80,16 @@ class BidiNetworkManager {
     }
     const request = new BidiRequest(frame, redirectedFrom, param, route);
     this._requests.set(request._id, request);
-    this._page._frameManager.requestStarted(request.request, route);
+    this._page.frameManager.requestStarted(request.request, route);
   }
   _onResponseStarted(params) {
     const request = this._requests.get(params.request.request);
     if (!request)
       return;
     const getResponseBody = async () => {
-      throw new Error(`Response body is not available for requests in Bidi`);
+      const { bytes } = await this._session.send("network.getData", { request: params.request.request, dataType: bidi.Network.DataType.Response });
+      const encoding = bytes.type === "base64" ? "base64" : "utf8";
+      return Buffer.from(bytes.value, encoding);
     };
     const timings = params.request.timings;
     const startTime = timings.requestTime;
@@ -111,9 +113,7 @@ class BidiNetworkManager {
     response._securityDetailsFinished();
     response.setRawResponseHeaders(null);
     response.setResponseHeadersSize(params.response.headersSize);
-    this._page._frameManager.requestReceivedResponse(response);
-    if (params.navigation)
-      this._onNavigationResponseStarted(params);
+    this._page.frameManager.requestReceivedResponse(response);
   }
   _onResponseCompleted(params) {
     const request = this._requests.get(params.request.request);
@@ -127,17 +127,17 @@ class BidiNetworkManager {
     if (isRedirected) {
       response._requestFinished(responseEndTime);
     } else {
-      this._requests.delete(request._id);
+      this._deleteRequest(request._id);
       response._requestFinished(responseEndTime);
     }
     response._setHttpVersion(params.response.protocol);
-    this._page._frameManager.reportRequestFinished(request.request, response);
+    this._page.frameManager.reportRequestFinished(request.request, response);
   }
   _onFetchError(params) {
     const request = this._requests.get(params.request.request);
     if (!request)
       return;
-    this._requests.delete(request._id);
+    this._deleteRequest(request._id);
     const response = request.request._existingResponse();
     if (response) {
       response.setTransferSize(null);
@@ -145,27 +145,39 @@ class BidiNetworkManager {
       response._requestFinished(-1);
     }
     request.request._setFailureText(params.errorText);
-    this._page._frameManager.requestFailed(request.request, params.errorText === "NS_BINDING_ABORTED");
+    this._page.frameManager.requestFailed(request.request, params.errorText === "NS_BINDING_ABORTED");
   }
   _onAuthRequired(params) {
     const isBasic = params.response.authChallenges?.some((challenge) => challenge.scheme.startsWith("Basic"));
-    const credentials = this._page._browserContext._options.httpCredentials;
-    if (isBasic && credentials) {
-      this._session.sendMayFail("network.continueWithAuth", {
-        request: params.request.request,
-        action: "provideCredentials",
-        credentials: {
-          type: "password",
-          username: credentials.username,
-          password: credentials.password
-        }
-      });
+    const credentials = this._page.browserContext._options.httpCredentials;
+    if (isBasic && credentials && (!credentials.origin || new URL(params.request.url).origin.toLowerCase() === credentials.origin.toLowerCase())) {
+      if (this._attemptedAuthentications.has(params.request.request)) {
+        this._session.sendMayFail("network.continueWithAuth", {
+          request: params.request.request,
+          action: "cancel"
+        });
+      } else {
+        this._attemptedAuthentications.add(params.request.request);
+        this._session.sendMayFail("network.continueWithAuth", {
+          request: params.request.request,
+          action: "provideCredentials",
+          credentials: {
+            type: "password",
+            username: credentials.username,
+            password: credentials.password
+          }
+        });
+      }
     } else {
       this._session.sendMayFail("network.continueWithAuth", {
         request: params.request.request,
-        action: "default"
+        action: "cancel"
       });
     }
+  }
+  _deleteRequest(requestId) {
+    this._requests.delete(requestId);
+    this._attemptedAuthentications.delete(requestId);
   }
   async setRequestInterception(value) {
     this._userRequestInterceptionEnabled = value;
@@ -206,13 +218,13 @@ class BidiRequest {
       redirectedFrom._redirectedTo = this;
     const postDataBuffer = null;
     this.request = new network.Request(
-      frame._page._browserContext,
+      frame._page.browserContext,
       frame,
       null,
       redirectedFrom ? redirectedFrom.request : null,
       payload.navigation ?? void 0,
       payload.request.url,
-      "other",
+      resourceTypeFromBidi(payload.request.destination, payload.request.initiatorType, payload.initiator?.type),
       payload.request.method,
       postDataBuffer,
       fromBidiHeaders(payload.request.headers)
@@ -312,6 +324,57 @@ function toBidiSameSite(sameSite) {
   if (sameSite === "Lax")
     return bidi.Network.SameSite.Lax;
   return bidi.Network.SameSite.None;
+}
+function resourceTypeFromBidi(requestDestination, requestInitiatorType, eventInitiatorType) {
+  switch (requestDestination) {
+    case "audio":
+      return "media";
+    case "audioworklet":
+      return "script";
+    case "document":
+      return "document";
+    case "font":
+      return "font";
+    case "frame":
+      return "document";
+    case "iframe":
+      return "document";
+    case "image":
+      return "image";
+    case "object":
+      return "object";
+    case "paintworklet":
+      return "script";
+    case "script":
+      return "script";
+    case "serviceworker":
+      return "script";
+    case "sharedworker":
+      return "script";
+    case "style":
+      return "stylesheet";
+    case "track":
+      return "texttrack";
+    case "video":
+      return "media";
+    case "worker":
+      return "script";
+    case "":
+      switch (requestInitiatorType) {
+        case "fetch":
+          return "fetch";
+        case "font":
+          return "font";
+        case "xmlhttprequest":
+          return "xhr";
+        case null:
+          return eventInitiatorType === "script" ? "xhr" : "document";
+        default:
+          return "other";
+      }
+    default:
+      return "other";
+  }
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

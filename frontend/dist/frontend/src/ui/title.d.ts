@@ -1,3 +1,7 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementTagMap } from "../elements/module.js";
 export declare class TitleElement extends VElementTagMap.h1 {
     constructor(text?: string);

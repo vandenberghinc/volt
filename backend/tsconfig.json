@@ -6,7 +6,7 @@
         "declaration": true,
         "declarationDir": "./dist/esm",
         "outDir": "./dist/esm",
-        "rootDir": "./src/",
+        "rootDir": "../",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,

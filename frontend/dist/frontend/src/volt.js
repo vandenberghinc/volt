@@ -17,7 +17,11 @@ export * from "./modules/themes.js";
 export * from "./modules/user.js";
 export * from "./modules/utils.js";
 export * from "./modules/theme.js";
+export * from "./modules/request.js";
+export * from "./modules/attachment.js";
 // Elements.
 export * from "./elements/module.js";
 // VoltUI.
 export * from "./ui/ui.js";
+// Backend.
+export * from "../../backend/src/status.js";

@@ -1,5 +1,15 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
+ */
 import { VElementBaseSignature, VDivElement } from "../elements/module.js";
-import { RingLoaderElement } from "./loaders";
+import { RingLoaderElement } from "./loaders.js";
+/**
+ * Is any loader button,
+ * excluding non loader buttons,
+ * use {@link IsButtonLike} for that.
+ */
+export declare function isLoaderButtonLike(element: any): element is LoaderButtonElement;
 declare const LoaderButtonElement_base: VElementBaseSignature;
 /**
  * @warning: you should not use function "LoaderButton.loader.hide() / LoaderButton.loader.show()" use "LoaderButton.hide_loader() / LoaderButton.show_loader()" instead.

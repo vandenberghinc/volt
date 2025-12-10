@@ -145,10 +145,36 @@ export class SystemError extends Error {
             name: opts.name,
             ttl: opts.ttl,
             indexes: [
-                { keys: { id: 1 }, unique: true }
+                { keys: { id: 1 }, unique: true, forced: true }
             ],
             record_version: 1,
         });
+    }
+
+    /**
+     * Configure the newly created system error instances,
+     * assigning a global database collection and logger instance.
+     */
+    static setup(opts: {
+        /** The initialized server instance. */
+        server: Server,
+        /** The collection options to use. */
+        collection: Pick<
+            Collection.Opts<SystemError.Document>,
+            "name" | "ttl"
+        >,
+        /** The logger to use, defaults to {@link Server.log}. */
+        logger?: SystemError.Logger,
+    }) {
+        SystemError.collection = opts.server.db.collection<SystemError.Document>({
+            name: opts.collection.name,
+            ttl: opts.collection.ttl,
+            indexes: [
+                { keys: { id: 1 }, unique: true, forced: true }
+            ],
+            record_version: 1,
+        });
+        SystemError.logger = opts.logger ?? opts.server.log;
     }
 
     /**
@@ -279,7 +305,11 @@ export class SystemError extends Error {
     /** Construct a system error & save it to the database. */
     static async create(opts: SystemError.Opts): Promise<SystemError> {
         const error = new SystemError(opts);
-        error.logger.error(error.format({ colored: false }));
+        const formatted = error.format({ colored: false });
+        console.error("[debug]", formatted);
+        if (error.logger) {
+            error.logger.error(formatted);
+        }
         if (error.collection) {
             await error.collection.set(
                 { id: error.id },
@@ -298,7 +328,11 @@ export class SystemError extends Error {
      */
     static create_detach(opts: SystemError.Opts): SystemError {
         const error = new SystemError(opts);
-        error.logger.error(error.format({ colored: false }));
+        const formatted = error.format({ colored: false });
+        console.error("[debug]", formatted);
+        if (error.logger) {
+            error.logger.error(formatted);
+        }
         if (error.collection) {
             void error.collection.set(
                 { id: error.id },
@@ -400,8 +434,13 @@ export class SystemError extends Error {
             if (this.cause) {
                 lines.push(
                     `  nested error:`,
-                    ...(this.cause?.stack ?? this.cause.toString()).split("\n")
-                        .map(line => `    ${line.trim()}`),
+                    // ...(this.cause?.stack ?? this.cause.toString()).split("\n")
+                    //    .map(line => `    ${line.trim()}`)
+                    vlib.logging.format_error(this.cause, {
+                        colored: colored,
+                        indent: 2,
+                        start_indent: 2,
+                    })
                 );
             }
 
