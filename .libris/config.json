@@ -4,5 +4,15 @@
         "**/node_modules/**",
         "**/dist/**",
         "**/dev/**"
-    ]
+    ],
+    "$schema": "https://uselibris.io/schemas/project_config.json",
+    "icon": {
+        "dark": "X"
+    },
+    "theme": {
+        "dark": {},
+        "light": {},
+        "default": "dark"
+    },
+    "assistant": {}
 }
