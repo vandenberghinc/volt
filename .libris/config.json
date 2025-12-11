@@ -10,8 +10,12 @@
         "dark": "X"
     },
     "theme": {
-        "dark": {},
-        "light": {},
+        "dark": {
+            "extends": "dark"
+        },
+        "light": {
+            "extends": "light"
+        },
         "default": "dark"
     },
     "assistant": {}
