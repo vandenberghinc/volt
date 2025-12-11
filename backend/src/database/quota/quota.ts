@@ -1358,8 +1358,14 @@ export namespace QuotaManager {
 
             /** The schema to validate quota {@link Opts} */
             export const Schema: vlib.Schema.Entries.Opts = {
-                max: { type: "number", required: true },
-                interval: { type: "number", required: true },
+                max: {
+                    type: "number",
+                    required: true,
+                },
+                interval: {
+                    type: "number",
+                    required: true,
+                },
             };
 
             /**

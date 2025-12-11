@@ -5,6 +5,7 @@
 
 // Imports.
 import { Elements, VElementBaseSignature, VElement } from "../elements/module.js"
+import type { None, BorderOpts } from "../elements/types.js"
 import { VStack, VStackElement } from "./stack.js"
 
 export namespace SwitchElement {
@@ -305,6 +306,76 @@ export class SwitchElement extends VStackElement {
     	this.on_change_handler = handler;
     	return this;
     }		
+
+    border_color(): string;
+    border_color(value: string): this;
+    /**
+     * {Border Color}
+     * Sets the color of the four borders. This is equivalent to the CSS attribute `borderColor`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining. Unless parameter `value` is `null`,
+     * then the attribute's value is returned.
+     * @docs
+     */
+    border_color(value?: string): string | this {
+        if (value == null) { return this.slider.border_color(); }
+        this.slider.border_color(value);
+        this.button.border_color(value);
+        return this;
+    }
+
+    border_width(): string;
+    border_width(value: string | number): this;
+    /**
+     * {Border Width}
+     * Sets the width of the four borders, equivalent to the CSS attribute `borderWidth`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining, unless the parameter `value` is `null`,
+     * then the attribute's value is returned.
+     * @docs
+     */
+    border_width(value?: string | number): string | this {
+        if (value == null) { return this.slider.border_width(); }
+        this.slider.border_width(value);
+        this.button.border_width(value);
+        return this;
+    }
+
+    border_style(): string;
+    border_style(value: string): this;
+    /**
+     * {Border Style}
+     * Sets the style of the four borders. The equivalent of CSS attribute `borderStyle`.
+     * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+     * @returns Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
+     * @docs
+     */
+    border_style(value?: string): string | this {
+        if (value == null) { return this.slider.border_style(); }
+        this.slider.border_style(value);
+        this.button.border_style(value);
+        return this;
+    }
+
+    border(): string;
+    border(value: string): this;
+    border(width: string | number, color: string): this;
+    border(width: string | number, style: string, color: string): this;
+    border(opts: BorderOpts): this;
+    /**
+     * Assigns the border color of this node, also supports a `GradientType` element. 
+     * @param value The value to assign. Leave `undefined` to retrieve the attribute's value.
+     * @returns Returns the instance for chaining unless parameter `value` is `undefined`, then the attribute's value is returned. 
+     * @docs
+     */
+    border(...values: any[]): this | string {
+        if (values.length === 0) {
+            return this.slider.border();
+        }
+        this.slider.border(...values as [any]);
+        this.button.border(...values as [any]);
+        return this;
+    }
 }
 export const Switch = Elements.wrapper(SwitchElement);
 export const NullSwitch = Elements.create_null(SwitchElement);

@@ -2,6 +2,7 @@
  * @author Daan van den Bergh
  * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
+import type { BorderOpts } from "../elements/types.js";
 import { VStackElement } from "./stack.js";
 export declare namespace SwitchElement {
     type OnChangeCallback<This> = (element: This, enabled: boolean) => void;
@@ -47,6 +48,17 @@ export declare class SwitchElement extends VStackElement {
     value(value: boolean, animate?: boolean): this;
     on_change(): SwitchElement.OnChangeCallback<this>;
     on_change(handler: SwitchElement.OnChangeCallback<this>): this;
+    border_color(): string;
+    border_color(value: string): this;
+    border_width(): string;
+    border_width(value: string | number): this;
+    border_style(): string;
+    border_style(value: string): this;
+    border(): string;
+    border(value: string): this;
+    border(width: string | number, color: string): this;
+    border(width: string | number, style: string, color: string): this;
+    border(opts: BorderOpts): this;
 }
 export declare const Switch: <Extensions extends object = {}>(enabled?: boolean | undefined) => SwitchElement & Extensions;
 export declare const NullSwitch: <Extensions extends object = {}>() => SwitchElement & Extensions;

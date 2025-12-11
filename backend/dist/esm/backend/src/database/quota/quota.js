@@ -1049,8 +1049,14 @@ export class QuotaManager {
         (function (Opts) {
             /** The schema to validate quota {@link Opts} */
             Opts.Schema = {
-                max: { type: "number", required: true },
-                interval: { type: "number", required: true },
+                max: {
+                    type: "number",
+                    required: true,
+                },
+                interval: {
+                    type: "number",
+                    required: true,
+                },
             };
             /**
              * Validate {@link Quota.Opts} at runtime.

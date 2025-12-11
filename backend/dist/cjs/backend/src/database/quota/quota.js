@@ -965,8 +965,14 @@ class QuotaManager {
     let Opts;
     (function(Opts2) {
       Opts2.Schema = {
-        max: { type: "number", required: true },
-        interval: { type: "number", required: true }
+        max: {
+          type: "number",
+          required: true
+        },
+        interval: {
+          type: "number",
+          required: true
+        }
       };
       function validate(quota, collection) {
         if (quota.max <= 0 || !Number.isFinite(quota.max)) {

@@ -288,6 +288,67 @@ let SwitchElement = (() => {
             this.on_change_handler = handler;
             return this;
         }
+        /**
+         * {Border Color}
+         * Sets the color of the four borders. This is equivalent to the CSS attribute `borderColor`.
+         * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+         * @returns Returns the `VElement` object for chaining. Unless parameter `value` is `null`,
+         * then the attribute's value is returned.
+         * @docs
+         */
+        border_color(value) {
+            if (value == null) {
+                return this.slider.border_color();
+            }
+            this.slider.border_color(value);
+            this.button.border_color(value);
+            return this;
+        }
+        /**
+         * {Border Width}
+         * Sets the width of the four borders, equivalent to the CSS attribute `borderWidth`.
+         * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+         * @returns Returns the `VElement` object for chaining, unless the parameter `value` is `null`,
+         * then the attribute's value is returned.
+         * @docs
+         */
+        border_width(value) {
+            if (value == null) {
+                return this.slider.border_width();
+            }
+            this.slider.border_width(value);
+            this.button.border_width(value);
+            return this;
+        }
+        /**
+         * {Border Style}
+         * Sets the style of the four borders. The equivalent of CSS attribute `borderStyle`.
+         * @param value The value to assign. Leave `null` to retrieve the attribute's value.
+         * @returns Returns the `VElement` object for chaining, or the attribute's value if `value` is `null`.
+         * @docs
+         */
+        border_style(value) {
+            if (value == null) {
+                return this.slider.border_style();
+            }
+            this.slider.border_style(value);
+            this.button.border_style(value);
+            return this;
+        }
+        /**
+         * Assigns the border color of this node, also supports a `GradientType` element.
+         * @param value The value to assign. Leave `undefined` to retrieve the attribute's value.
+         * @returns Returns the instance for chaining unless parameter `value` is `undefined`, then the attribute's value is returned.
+         * @docs
+         */
+        border(...values) {
+            if (values.length === 0) {
+                return this.slider.border();
+            }
+            this.slider.border(...values);
+            this.button.border(...values);
+            return this;
+        }
     };
     return SwitchElement = _classThis;
 })();

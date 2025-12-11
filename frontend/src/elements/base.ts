@@ -16,7 +16,7 @@ import type { AnyElement } from "../ui/any_element.js"
 import { register_element } from "./register_element.js";
 import type { PseudoElement } from "../ui/pseudo.js"
 
-import type { None, ValueOrThis, BorderOpts } from "./types.js"
+import type { None, BorderOpts } from "./types.js"
 import { Attachment } from "../modules/attachment.js"
 
 // Vars.
@@ -2198,7 +2198,7 @@ export abstract class VElement extends HTMLElement {
      * @returns Returns the instance for chaining unless parameter `value` is `undefined`, then the attribute's value is returned. 
      * @docs
      */
-    border(...values: (string | number)[]): this | string {
+    border(...values: any[]): this | string {
         if (values.length === 0) {
             return this.style.border ?? "";
         } else if (values.length === 1) {
