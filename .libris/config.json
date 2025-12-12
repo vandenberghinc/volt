@@ -17,6 +17,5 @@
             "extends": "light"
         },
         "default": "dark"
-    },
-    "assistant": {}
+    }
 }
