@@ -1,9 +1,9 @@
 {
     "version": "1.0.0",
     "excludes": [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/dev/**"
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/dev/**"
     ],
     "$schema": "https://uselibris.io/schemas/project_config.json",
     "icon": {
