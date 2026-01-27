@@ -27,17 +27,14 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var stdin_exports = {};
 __export(stdin_exports, {
-  vhighlight: () => vhighlight,
   vlib: () => vlib,
   vts: () => vts
 });
 module.exports = __toCommonJS(stdin_exports);
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var vts = __toESM(require("@vandenberghinc/vlib/vts"));
-var vhighlight = __toESM(require("@vandenberghinc/vhighlight"));
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  vhighlight,
   vlib,
   vts
 });

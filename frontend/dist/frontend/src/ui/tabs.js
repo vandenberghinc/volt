@@ -294,7 +294,7 @@ let TabsElement = (() => {
                 .background(this._div_bg)
                 .margin(1, 0, 25, 0), zstack = ZStack());
             let index = 0;
-            content.iterate(item => {
+            for (const item of content) {
                 const content_stack = item.content;
                 if (index === 0) {
                     content_stack.show();
@@ -312,7 +312,8 @@ let TabsElement = (() => {
                 content_stack.transition(`opacity ${this._duration}ms ease-in-out`);
                 zstack.append(content_stack);
                 ++index;
-            });
+            }
+            ;
         }
         /**
          * Selected
@@ -333,12 +334,12 @@ let TabsElement = (() => {
             if (tab == null) {
                 return this._selected_node ? this._selected_node.textContent : null;
             }
-            this._tab_nodes.iterate(node => {
+            for (const node of this._tab_nodes) {
                 if (node.textContent === tab) {
                     node.select();
-                    return true;
+                    break;
                 }
-            });
+            }
             return this;
         }
         /**
@@ -370,11 +371,11 @@ let TabsElement = (() => {
                 value = 0.8;
             }
             this._tab_opac = value;
-            this._tab_nodes.iterate(node => {
+            for (const node of this._tab_nodes) {
                 if (this._selected_node !== node) {
                     node.opacity(value);
                 }
-            });
+            }
             return this;
         }
         /**

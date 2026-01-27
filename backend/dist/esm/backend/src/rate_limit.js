@@ -480,7 +480,7 @@ export class RateLimitServer {
     }
     // Returns null when rate limit is approved, and returns the unix timestamp (as str) of reset when rate limit has been exceeded.
     async limit(ip, groups = [{ group: null, limit: null, interval: null }]) {
-        return groups.iterate((rate_limit) => {
+        for (const rate_limit of groups) {
             for (let attempts = 2; attempts >= 0; --attempts) {
                 try {
                     // Get endpoint limits.
@@ -522,7 +522,8 @@ export class RateLimitServer {
                     }
                 }
             }
-        }) ?? null;
+        }
+        return null;
     }
     // Reset a group limit.
     async reset(group) {

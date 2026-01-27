@@ -309,7 +309,7 @@ export class TabsElement extends (VStackElement as any as VElementBaseSignature)
             zstack = ZStack(),
         )
         let index = 0;
-        content.iterate(item => {
+        for (const item of content as TabContentItem[]) {
             const content_stack = item.content;
             if (index === 0) {
                 content_stack.show();
@@ -326,7 +326,7 @@ export class TabsElement extends (VStackElement as any as VElementBaseSignature)
             content_stack.transition(`opacity ${this._duration}ms ease-in-out`)
             zstack.append(content_stack);
             ++index;
-        });
+        };
     }
 
     /**
@@ -351,12 +351,12 @@ export class TabsElement extends (VStackElement as any as VElementBaseSignature)
     // @ts-ignore
     select(tab?: string): this | string | null {
         if (tab == null) { return this._selected_node ? this._selected_node.textContent : null; }
-        this._tab_nodes.iterate(node => {
+        for (const node of this._tab_nodes) {
             if (node.textContent === tab) {
                 node.select();
-                return true;
+                break;
             }
-        })
+        }
         return this;
     }
 
@@ -389,11 +389,11 @@ export class TabsElement extends (VStackElement as any as VElementBaseSignature)
             value = 0.8;
         }
         this._tab_opac = value;
-        this._tab_nodes.iterate(node => {
+        for (const node of this._tab_nodes) {
             if (this._selected_node !== node) {
                 node.opacity(value);
             }
-        })
+        }
         return this;
     }
 

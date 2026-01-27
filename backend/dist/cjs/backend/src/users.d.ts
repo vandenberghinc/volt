@@ -267,7 +267,10 @@ export declare class Users {
     /**
      * Initialize default authentication, user, and support endpoints.
      */
-    _initialize(): Promise<void>;
+    _initialize({ worker, }?: {
+        /** The `worker` flag passed to `Server.initialize()` */
+        worker?: boolean;
+    }): Promise<void>;
     /**
      * DEVELOPMENT:
      * @warning

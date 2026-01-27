@@ -250,9 +250,9 @@ class Paddle {
       return list;
     }
     const products = [];
-    list.iterate((doc) => {
+    for (const doc of list) {
       products.push(doc.prod_id);
-    });
+    }
     return products;
   }
   async _save_subscription(subscription) {
@@ -309,20 +309,24 @@ class Paddle {
   // Overall (private).
   // Get product by paddle product id.
   _get_product_by_paddle_prod_id(id, throw_err = false) {
-    const product = this.products.iterate((p) => {
+    let product = null;
+    for (const p of this.products) {
       if (p.is_subscription) {
         if (p.plans == null) {
           throw Error(`Invalid project "${p.id}" subscription is activated yet no plans are defined.`);
         }
-        return p.plans.iterate((plan) => {
+        for (const plan of p.plans) {
           if (plan.paddle_prod_id === id) {
-            return plan;
+            product = plan;
           }
-        });
+        }
+        if (product != null)
+          break;
       } else if (p.paddle_prod_id === id) {
-        return p;
+        product = p;
+        break;
       }
-    });
+    }
     if (product == null && throw_err) {
       throw Error(`Unable to find product "${id}".`);
     }
@@ -383,11 +387,13 @@ class Paddle {
       }
       return this._has_create_products_permission;
     };
-    const existing_product = existing_products.iterate((item) => {
+    let existing_product = null;
+    for (const item of existing_products) {
       if (item.custom_data.id === product.id) {
-        return item;
+        existing_product = item;
+        break;
       }
-    });
+    }
     if (existing_product == null) {
       if (!await has_create_products_permission()) {
         return;
@@ -430,11 +436,13 @@ class Paddle {
           status: "active"
         });
       }
-      const existing_price = existing_prices.iterate((item) => {
+      let existing_price = null;
+      for (const item of existing_prices) {
         if (item.product_id === product.paddle_prod_id) {
-          return item;
+          existing_price = item;
+          break;
         }
-      });
+      }
       if (existing_price == null) {
         if (!await has_create_products_permission()) {
           return;
@@ -619,7 +627,7 @@ class Paddle {
   //     */
   // }
   // Initialize all products.
-  async _initialize_products() {
+  async _initialize_products({ worker = false } = {}) {
     let now = this.performance.start();
     const product_ids = [];
     let product_index = 0;
@@ -660,7 +668,7 @@ class Paddle {
       }
     };
     let sub_products = 0;
-    this.products.iterate((product) => {
+    for (const product of this.products) {
       if (product.is_subscription) {
         if (!product.plans || !Array.isArray(product.plans)) {
           throw Error(`Product "${product_index}" has an incorrect value type for attribute "plans", the valid type is "array".`);
@@ -672,7 +680,7 @@ class Paddle {
         product_ids.push(product.id);
         ++sub_products;
         product.is_subscription = true;
-        product.plans.iterate((plan) => {
+        for (const plan of product.plans) {
           plan.is_subscription = true;
           plan.subscription_id = product.id;
           if (plan.description == null) {
@@ -694,24 +702,24 @@ class Paddle {
             plan.icon = product.icon;
           }
           initialize_product(plan);
-        });
+        }
       } else {
         product.is_subscription = false;
         initialize_product(product);
       }
-    });
+    }
     now = this.performance.end("init-products", now);
     const last_products = await this._last_products_db.load({ production: this.server.production, version: 1 }, { throw: false });
     if (last_products instanceof Error && !(last_products instanceof import_collection.Collection.NotFoundError))
       throw last_products;
     if (!(last_products instanceof import_collection.Collection.NotFoundError) && vlib.Object.eq(last_products.last_products, this.products)) {
-      last_products.product_ids.iterate((item) => {
+      for (const item of last_products.product_ids) {
         const product = this.get_product_sync(item.id);
         if (product != null) {
           product.paddle_prod_id = item.paddle_prod_id;
           product.price_id = item.price_id;
         }
-      });
+      }
       now = this.performance.end("assign-product-ids", now);
     } else if (this.server.offline === false) {
       const existing_products = await this._get_products();
@@ -748,226 +756,228 @@ class Paddle {
     }
   }
   // Initialize the payments.
-  async _initialize() {
-    await this._initialize_products();
+  async _initialize({ worker = false } = {}) {
+    await this._initialize_products({ worker });
     let now = this.performance.start();
-    this.server.endpoint({
-      method: "POST",
-      endpoint: "/volt/api/v1/payments/init",
-      content_type: "application/json",
-      rate_limit: "global",
-      params: {
-        items: { type: "array", required: true, value_schema: "object" }
-        // add schema for items
-      },
-      callback: async (stream, params) => {
-        if (params.items.length === 0) {
-          return stream.error({ status: import_status.Status.bad_request, message: "Shopping cart is empty." });
-        }
-        let sub_plan_count = {};
-        let error = void 0;
-        for (const item of params.items) {
-          if (item.product.is_subscription) {
-            if (stream.uid == null) {
-              error = "You must be signed-in to purchase a subscription.";
-              break;
-            }
-            if (item.quantity != null && item.quantity > 1) {
-              error = "Subscriptions have a max quantity of 1.";
-              break;
-            }
-            if (sub_plan_count[item.product.subscription_id] == null) {
-              sub_plan_count[item.product.subscription_id] = 1;
-            } else {
-              error = "You can not charge two different subscription plans from the same subscription product.";
-              break;
-            }
-            if (await this._check_subscription(stream.uid, item.product.id, false)) {
-              error = `You are already subscribed to product "${item.product.name}".`;
-              break;
+    if (!worker) {
+      this.server.endpoint({
+        method: "POST",
+        endpoint: "/volt/api/v1/payments/init",
+        content_type: "application/json",
+        rate_limit: "global",
+        params: {
+          items: { type: "array", required: true, value_schema: "object" }
+          // add schema for items
+        },
+        callback: async (stream, params) => {
+          if (params.items.length === 0) {
+            return stream.error({ status: import_status.Status.bad_request, message: "Shopping cart is empty." });
+          }
+          let sub_plan_count = {};
+          let error = void 0;
+          for (const item of params.items) {
+            if (item.product.is_subscription) {
+              if (stream.uid == null) {
+                error = "You must be signed-in to purchase a subscription.";
+                break;
+              }
+              if (item.quantity != null && item.quantity > 1) {
+                error = "Subscriptions have a max quantity of 1.";
+                break;
+              }
+              if (sub_plan_count[item.product.subscription_id] == null) {
+                sub_plan_count[item.product.subscription_id] = 1;
+              } else {
+                error = "You can not charge two different subscription plans from the same subscription product.";
+                break;
+              }
+              if (await this._check_subscription(stream.uid, item.product.id, false)) {
+                error = `You are already subscribed to product "${item.product.name}".`;
+                break;
+              }
             }
           }
-        }
-        if (error) {
-          return stream.error({ status: import_status.Status.bad_request, message: error });
-        }
-        return stream.success({ data: { message: "Successfully initialized the order." } });
-      }
-    });
-    this.server.endpoint({
-      method: "GET",
-      endpoint: "/volt/api/v1/payments/products",
-      content_type: "application/json",
-      rate_limit: "global",
-      callback: (stream) => {
-        return stream.success({ data: this.products });
-      }
-    });
-    this.server.endpoint({
-      method: "GET",
-      endpoint: "/volt/api/v1/payments/payment",
-      content_type: "application/json",
-      rate_limit: "global",
-      params: {
-        id: "string"
-      },
-      callback: async (stream, params) => {
-        return stream.success({
-          data: await this._load_payment_for_public(params.id)
-        });
-      }
-    });
-    this.server.endpoint({
-      method: "GET",
-      endpoint: "/volt/api/v1/payments/payments",
-      content_type: "application/json",
-      authenticated: true,
-      rate_limit: "global",
-      params: {
-        days: { type: "number", default: 30 },
-        limit: { type: "number", required: false },
-        status: { type: "string", required: false, enum: PaymentStatusValues }
-      },
-      callback: async (stream, params) => {
-        return stream.success({
-          data: await this.get_payments({
-            uid: stream.uid,
-            days: params.days,
-            limit: params.limit,
-            status: params.status
-          })
-        });
-      }
-    });
-    this.server.endpoint({
-      method: "GET",
-      endpoint: "/volt/api/v1/payments/payments/refundable",
-      content_type: "application/json",
-      authenticated: true,
-      rate_limit: "global",
-      params: {
-        days: { type: "number", default: 30 },
-        limit: { type: "number", required: false }
-      },
-      callback: async (stream, params) => {
-        return stream.success({
-          data: await this.get_refundable_payments({
-            uid: stream.uid,
-            days: params.days,
-            limit: params.limit,
-            for_public: true
-          })
-        });
-      }
-    });
-    this.server.endpoint({
-      method: "GET",
-      endpoint: "/volt/api/v1/payments/payments/refunded",
-      content_type: "application/json",
-      authenticated: true,
-      rate_limit: "global",
-      params: {
-        days: { type: "number", default: 30 },
-        limit: { type: "number", required: false }
-      },
-      callback: async (stream, params) => {
-        return stream.success({
-          data: await this.get_refunded_payments({
-            uid: stream.uid,
-            days: params.days,
-            limit: params.limit,
-            for_public: true
-          })
-        });
-      }
-    });
-    this.server.endpoint({
-      method: "GET",
-      endpoint: "/volt/api/v1/payments/payments/refunding",
-      content_type: "application/json",
-      authenticated: true,
-      rate_limit: "global",
-      params: {
-        days: { type: "number", default: 30 },
-        limit: { type: "number", required: false }
-      },
-      callback: async (stream, params) => {
-        return stream.success({
-          data: await this.get_refunding_payments({
-            uid: stream.uid,
-            days: params.days,
-            limit: params.limit,
-            for_public: true
-          })
-        });
-      }
-    });
-    this.server.endpoint({
-      method: "POST",
-      endpoint: "/volt/api/v1/payments/refund",
-      content_type: "application/json",
-      authenticated: true,
-      rate_limit: "global",
-      params: {
-        payment: { type: ["string", "object"], schema: { id: "string" } },
-        line_items: { type: "array", required: false, value_schema: {
-          type: "object",
-          schema: LineItem.Schema
-        } },
-        reason: { type: "string", default: "refund" }
-      },
-      callback: async (stream, params) => {
-        await this.create_refund(typeof params.payment === "string" ? params.payment : params.payment.id, params.line_items, params.reason);
-        return stream.success();
-      }
-    });
-    this.server.endpoint({
-      method: "DELETE",
-      endpoint: "/volt/api/v1/payments/subscription",
-      content_type: "application/json",
-      authenticated: true,
-      rate_limit: "global",
-      params: {
-        product: "string"
-      },
-      callback: async (stream, params) => {
-        await this.cancel_subscription(stream.uid, params.product);
-        return stream.success();
-      }
-    });
-    this.server.endpoint({
-      method: "GET",
-      endpoint: "/volt/api/v1/payments/active_subscriptions",
-      content_type: "application/json",
-      authenticated: true,
-      rate_limit: "global",
-      callback: async (stream) => {
-        return stream.success({
-          data: {
-            subscriptions: await this.get_active_subscriptions(stream.uid)
+          if (error) {
+            return stream.error({ status: import_status.Status.bad_request, message: error });
           }
-        });
+          return stream.success({ data: { message: "Successfully initialized the order." } });
+        }
+      });
+      this.server.endpoint({
+        method: "GET",
+        endpoint: "/volt/api/v1/payments/products",
+        content_type: "application/json",
+        rate_limit: "global",
+        callback: (stream) => {
+          return stream.success({ data: this.products });
+        }
+      });
+      this.server.endpoint({
+        method: "GET",
+        endpoint: "/volt/api/v1/payments/payment",
+        content_type: "application/json",
+        rate_limit: "global",
+        params: {
+          id: "string"
+        },
+        callback: async (stream, params) => {
+          return stream.success({
+            data: await this._load_payment_for_public(params.id)
+          });
+        }
+      });
+      this.server.endpoint({
+        method: "GET",
+        endpoint: "/volt/api/v1/payments/payments",
+        content_type: "application/json",
+        authenticated: true,
+        rate_limit: "global",
+        params: {
+          days: { type: "number", default: 30 },
+          limit: { type: "number", required: false },
+          status: { type: "string", required: false, enum: PaymentStatusValues }
+        },
+        callback: async (stream, params) => {
+          return stream.success({
+            data: await this.get_payments({
+              uid: stream.uid,
+              days: params.days,
+              limit: params.limit,
+              status: params.status
+            })
+          });
+        }
+      });
+      this.server.endpoint({
+        method: "GET",
+        endpoint: "/volt/api/v1/payments/payments/refundable",
+        content_type: "application/json",
+        authenticated: true,
+        rate_limit: "global",
+        params: {
+          days: { type: "number", default: 30 },
+          limit: { type: "number", required: false }
+        },
+        callback: async (stream, params) => {
+          return stream.success({
+            data: await this.get_refundable_payments({
+              uid: stream.uid,
+              days: params.days,
+              limit: params.limit,
+              for_public: true
+            })
+          });
+        }
+      });
+      this.server.endpoint({
+        method: "GET",
+        endpoint: "/volt/api/v1/payments/payments/refunded",
+        content_type: "application/json",
+        authenticated: true,
+        rate_limit: "global",
+        params: {
+          days: { type: "number", default: 30 },
+          limit: { type: "number", required: false }
+        },
+        callback: async (stream, params) => {
+          return stream.success({
+            data: await this.get_refunded_payments({
+              uid: stream.uid,
+              days: params.days,
+              limit: params.limit,
+              for_public: true
+            })
+          });
+        }
+      });
+      this.server.endpoint({
+        method: "GET",
+        endpoint: "/volt/api/v1/payments/payments/refunding",
+        content_type: "application/json",
+        authenticated: true,
+        rate_limit: "global",
+        params: {
+          days: { type: "number", default: 30 },
+          limit: { type: "number", required: false }
+        },
+        callback: async (stream, params) => {
+          return stream.success({
+            data: await this.get_refunding_payments({
+              uid: stream.uid,
+              days: params.days,
+              limit: params.limit,
+              for_public: true
+            })
+          });
+        }
+      });
+      this.server.endpoint({
+        method: "POST",
+        endpoint: "/volt/api/v1/payments/refund",
+        content_type: "application/json",
+        authenticated: true,
+        rate_limit: "global",
+        params: {
+          payment: { type: ["string", "object"], schema: { id: "string" } },
+          line_items: { type: "array", required: false, value_schema: {
+            type: "object",
+            schema: LineItem.Schema
+          } },
+          reason: { type: "string", default: "refund" }
+        },
+        callback: async (stream, params) => {
+          await this.create_refund(typeof params.payment === "string" ? params.payment : params.payment.id, params.line_items, params.reason);
+          return stream.success();
+        }
+      });
+      this.server.endpoint({
+        method: "DELETE",
+        endpoint: "/volt/api/v1/payments/subscription",
+        content_type: "application/json",
+        authenticated: true,
+        rate_limit: "global",
+        params: {
+          product: "string"
+        },
+        callback: async (stream, params) => {
+          await this.cancel_subscription(stream.uid, params.product);
+          return stream.success();
+        }
+      });
+      this.server.endpoint({
+        method: "GET",
+        endpoint: "/volt/api/v1/payments/active_subscriptions",
+        content_type: "application/json",
+        authenticated: true,
+        rate_limit: "global",
+        callback: async (stream) => {
+          return stream.success({
+            data: {
+              subscriptions: await this.get_active_subscriptions(stream.uid)
+            }
+          });
+        }
+      });
+      this.server.endpoint({
+        method: "GET",
+        endpoint: "/volt/api/v1/payments/subscribed",
+        content_type: "application/json",
+        authenticated: true,
+        rate_limit: "global",
+        params: {
+          product: "string"
+        },
+        callback: async (stream, params) => {
+          return stream.success({
+            data: {
+              is_subscribed: await this.is_subscribed(stream.uid, params.product)
+            }
+          });
+        }
+      });
+      if (!this.server.offline) {
+        this.server.endpoint(await this._create_webhook());
       }
-    });
-    this.server.endpoint({
-      method: "GET",
-      endpoint: "/volt/api/v1/payments/subscribed",
-      content_type: "application/json",
-      authenticated: true,
-      rate_limit: "global",
-      params: {
-        product: "string"
-      },
-      callback: async (stream, params) => {
-        return stream.success({
-          data: {
-            is_subscribed: await this.is_subscribed(stream.uid, params.product)
-          }
-        });
-      }
-    });
-    if (!this.server.offline) {
-      this.server.endpoint(await this._create_webhook());
     }
     now = this.performance.end("init-endpoints", now);
   }
@@ -1109,24 +1119,24 @@ class Paddle {
         switch (adj.action) {
           case "refund":
           case "chargeback":
-            adj.items.iterate((adj_item) => {
-              payment.line_items.iterate((item) => {
+            for (const adj_item of adj.items) {
+              for (const item of payment.line_items) {
                 if (adj_item.item_id === item.item_id) {
                   item.status = "refunded";
-                  return false;
+                  break;
                 }
-              });
-            });
+              }
+            }
             break;
           case "chargeback_reversal":
-            adj.items.iterate((adj_item) => {
-              payment.line_items.iterate((item) => {
+            for (const adj_item of adj.items) {
+              for (const item of payment.line_items) {
                 if (adj_item.item_id === item.item_id) {
                   item.status = "paid";
-                  return false;
+                  break;
                 }
-              });
-            });
+              }
+            }
             break;
           default:
             break;
@@ -1204,16 +1214,16 @@ class Paddle {
       const is_approved = data.status === "approved";
       const payment = await this._load_payment_by_transaction(data.transaction_id);
       const line_items = [], cancel_products = [];
-      data.items.iterate((adj_item) => {
-        payment.line_items.iterate((item) => {
+      for (const adj_item of data.items) {
+        for (const item of payment.line_items) {
           if (item.item_id === adj_item.item_id) {
             item.status = is_approved ? "refunded" : "paid";
             cancel_products.push(item.product);
             line_items.push(item);
-            return false;
+            break;
           }
-        });
-      });
+        }
+      }
       if (payment.sub_id != null && is_approved) {
         await this._cancel_subscription(payment.sub_id, true);
       }
@@ -1233,14 +1243,14 @@ class Paddle {
         this.server.log(0, `Chargeback reversed for payment ${payment.id} from user "${payment.uid}".`);
       }
       let line_items = [];
-      data.items.iterate((adj_item) => {
-        payment.line_items.iterate((item) => {
+      for (const adj_item of data.items) {
+        for (const item of payment.line_items) {
           if (item.item_id === adj_item.item_id) {
             item.status = "paid";
             line_items.push(item);
           }
-        });
-      });
+        }
+      }
       if (line_items.length > 0) {
         await this._save_payment(payment);
       }
@@ -1319,16 +1329,21 @@ class Paddle {
               if (item.active !== true || item.destination !== webhook_settings.destination || item.type !== webhook_settings.type || item.description !== webhook_settings.description || item.subscribed_events.length != webhook_settings.subscribed_events.length) {
                 return true;
               }
-              return webhook_settings.subscribed_events.iterate((x) => {
-                const found = item.subscribed_events.iterate((y) => {
+              let has_subscribed_event_missing = false;
+              for (const x of webhook_settings.subscribed_events) {
+                let found = false;
+                for (const y of item.subscribed_events) {
                   if (x === y.name) {
-                    return true;
+                    found = true;
+                    break;
                   }
-                });
-                if (found === false) {
-                  return true;
                 }
-              });
+                if (found === false) {
+                  has_subscribed_event_missing = true;
+                  break;
+                }
+              }
+              return has_subscribed_event_missing;
             })();
             if (patch === true) {
               this.server.log(0, "Updating payments webhook.");
@@ -1419,20 +1434,24 @@ class Paddle {
     return this.get_product_sync(id, throw_err);
   }
   get_product_sync(id, throw_err = false) {
-    const product = this.products.iterate((p) => {
+    let product = null;
+    for (const p of this.products) {
       if (p.is_subscription) {
         if (p.id === id) {
-          return p;
+          product = p;
+          break;
         }
-        return p.plans?.iterate((plan) => {
+        for (const plan of p.plans) {
           if (plan.id === id) {
-            return plan;
+            product = plan;
+            break;
           }
-        });
+        }
       } else if (p.id === id) {
-        return p;
+        product = p;
+        break;
       }
-    });
+    }
     if (product == null && throw_err) {
       throw Error(`Unable to find product "${id}".`);
     }
@@ -1517,12 +1536,12 @@ class Paddle {
   async get_refundable_payments({ uid, days = 30, limit = void 0, for_public }) {
     const out = [];
     const all_payments = await this.get_payments({ uid, days, limit, status: "paid", for_public });
-    all_payments.iterate((pmt) => {
+    for (const pmt of all_payments) {
       const refundable = pmt.line_items.filter((li) => li.status === "paid" && li.total > 0);
       if (refundable.length > 0) {
         out.push({ ...pmt, line_items: refundable });
       }
-    });
+    }
     return out;
   }
   /*  @docs:
@@ -1543,12 +1562,12 @@ class Paddle {
   async get_refunded_payments({ uid, days = 30, limit = void 0, for_public }) {
     const out = [];
     const all_payments = await this.get_payments({ uid, days, limit, status: "paid", for_public });
-    all_payments.iterate((pmt) => {
+    for (const pmt of all_payments) {
       const refundable = pmt.line_items.filter((li) => li.status === "refunded" && li.total > 0);
       if (refundable.length > 0) {
         out.push({ ...pmt, line_items: refundable });
       }
-    });
+    }
     return out;
   }
   /*  @docs:
@@ -1569,12 +1588,12 @@ class Paddle {
   async get_refunding_payments({ uid, days = void 0, limit = void 0, for_public }) {
     const out = [];
     const all_payments = await this.get_payments({ uid, days, limit, status: "paid", for_public });
-    all_payments.iterate((pmt) => {
+    for (const pmt of all_payments) {
       const refundable = pmt.line_items.filter((li) => li.status === "refunding" && li.total > 0);
       if (refundable.length > 0) {
         out.push({ ...pmt, line_items: refundable });
       }
-    });
+    }
     return out;
   }
   /*  @docs:
@@ -1609,9 +1628,9 @@ class Paddle {
     }
     const items = [];
     const item_ids = [];
-    line_items.iterate((item) => {
+    for (const item of line_items) {
       if (item.status === "refunded" || item.status === "refunding") {
-        return null;
+        continue;
       }
       item_ids.push(item.item_id);
       items.push({
@@ -1619,7 +1638,7 @@ class Paddle {
         type: "full"
         // partial refudings are not supported per line item since there is no convenient way to keep track of how much is refunded.
       });
-    });
+    }
     if (items.length === 0) {
       throw Error("This payment no longer has any refundable line items.");
     }
@@ -1635,17 +1654,17 @@ class Paddle {
     if (response.data.status === "rejected") {
       throw Error("This payment is no longer refundable.");
     } else if (response.data.status === "approved") {
-      payment.line_items.iterate((item) => {
+      for (const item of payment.line_items) {
         if (line_items.find((i) => i.item_id === item.item_id)) {
           item.status = "refunded";
         }
-      });
+      }
     } else {
-      payment.line_items.iterate((item) => {
+      for (const item of payment.line_items) {
         if (line_items.find((i) => i.item_id === item.item_id)) {
           item.status = "refunding";
         }
-      });
+      }
     }
     await this._save_payment(payment);
   }
@@ -1767,7 +1786,7 @@ class Paddle {
     let subtotal = 0;
     let subtotal_tax = 0;
     let total = 0;
-    payment.line_items.iterate((item) => {
+    for (const item of payment.line_items) {
       if (typeof item.product === "string") {
         item.product = this.get_product_sync(item.product, true);
       }
@@ -1781,7 +1800,7 @@ class Paddle {
       subtotal += item.subtotal;
       subtotal_tax += item.tax;
       total += item.total;
-    });
+    }
     let total_due = payment.status === "open" ? total : 0;
     let doc = new PDFDocument({ size: "A4", margin: 50 });
     let expanded_payment = payment;
@@ -1822,19 +1841,19 @@ class Paddle {
       let x = 50;
       let max_height = 0;
       const full_width = 550 - 50 - 10 * 4;
-      items.iterate((item) => {
+      for (const item of items) {
         max_height = Math.max(max_height, doc.heightOfString(item[1], x, top_offset, { width: full_width * item[0], align: "left" }));
         x += full_width * item[0] + 10;
-      });
+      }
       if (top_offset + max_height + 10 > doc.page.height - 50) {
         doc.addPage();
         top_offset = 50;
       }
       x = 50;
-      items.iterate((item) => {
+      for (const item of items) {
         gen_col_text(item[1], x, { width: full_width * item[0], align: "left" });
         x += full_width * item[0] + 10;
-      });
+      }
       top_offset += max_height + spacing;
     };
     const format_date = (date) => {
@@ -1868,13 +1887,13 @@ class Paddle {
     doc.font("Helvetica-Bold");
     gen_text("Invoice details", 550 - (150 + 10 + 80), null, null, 3);
     doc.font("Helvetica");
-    [
+    for (const item of [
       ["Invoice:", expanded_payment.id],
       ["Date of issue:", format_date(/* @__PURE__ */ new Date())]
-    ].iterate((item) => {
+    ]) {
       gen_col_text(item[0], 550 - (150 + 10 + 80), { width: 80 });
       gen_col_text(item[1], 550 - 150, { width: 150 }, true);
-    });
+    }
     top_offset = Math.max(top_offset, left_top_offset) + 25;
     doc.fillColor("#444444");
     doc.fontSize(10);
@@ -1904,7 +1923,7 @@ class Paddle {
     top_offset -= spacing * 0.5;
     doc.font("Helvetica");
     gen_divider();
-    expanded_payment.line_items.iterate((item) => {
+    for (const item of expanded_payment.line_items) {
       gen_line_item({
         name: item.product.name,
         desc: item.product.description,
@@ -1914,7 +1933,8 @@ class Paddle {
       });
       top_offset += 10;
       gen_divider();
-    });
+    }
+    ;
     gen_line_item({ unit_cost: "Subtotal:", total_cost: `${currency} ${subtotal.toFixed(2)}` });
     top_offset -= spacing - 3;
     gen_line_item({ unit_cost: "Taxes:", total_cost: `${currency} ${subtotal_tax.toFixed(2)}` });

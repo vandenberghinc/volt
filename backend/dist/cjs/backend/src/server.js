@@ -1258,7 +1258,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
   _db_init_promise;
   // Initialize.
   // Initialize.
-  async initialize() {
+  async initialize({ worker = false } = {}) {
     this.log(1, "Initializing server.");
     const initialize_start = Date.now();
     this.performance.start();
@@ -1270,58 +1270,62 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       await this.db.connect();
       this.performance.end("connect-db", start);
     })();
-    if (this.tls) {
-      this.https = http2.createSecureServer({
-        key: new vlib.Path(this.tls.key).load_sync({ encoding: "utf8" }),
-        cert: new vlib.Path(this.tls.cert).load_sync({ encoding: "utf8" }),
-        ca: this.tls.ca == null ? void 0 : new vlib.Path(this.tls.ca).load_sync({ encoding: "utf8" }),
-        passphrase: this.tls.passphrase,
-        allowHTTP1: true
-      });
-      this.https.on("stream", (stream, headers) => {
-        this._serve(stream, headers, void 0, void 0);
-      });
-      this.https.on("request", (req, res) => {
-        if (req.httpVersionMajor === 1) {
+    if (!worker) {
+      if (this.tls) {
+        this.https = http2.createSecureServer({
+          key: new vlib.Path(this.tls.key).load_sync({ encoding: "utf8" }),
+          cert: new vlib.Path(this.tls.cert).load_sync({ encoding: "utf8" }),
+          ca: this.tls.ca == null ? void 0 : new vlib.Path(this.tls.ca).load_sync({ encoding: "utf8" }),
+          passphrase: this.tls.passphrase,
+          allowHTTP1: true
+        });
+        this.https.on("stream", (stream, headers) => {
+          this._serve(stream, headers, void 0, void 0);
+        });
+        this.https.on("request", (req, res) => {
+          if (req.httpVersionMajor === 1) {
+            this._serve(void 0, void 0, req, res);
+          }
+        });
+      } else if (this.production && this.payments) {
+        throw Error("Accepting payments in production mode requires HTTPS.");
+      }
+      this.performance.end("create-https-server");
+      if (this.tls) {
+        this.http = http.createServer((request, response) => {
+          const reqUrl = typeof request.url === "string" ? request.url : "/";
+          const location = `https://${this.domain}${reqUrl}`;
+          response.writeHead(308, { Location: location });
+          response.end();
+        });
+      } else {
+        this.http = http.createServer((req, res) => {
           this._serve(void 0, void 0, req, res);
-        }
-      });
-    } else if (this.production && this.payments) {
-      throw Error("Accepting payments in production mode requires HTTPS.");
+        });
+      }
+      this.performance.end("create-http-server");
+      this._init_default_headers();
+      this.performance.end("init-default-headers");
+      this._create_default_endpoints();
+      this.performance.end("create-default-endpoints");
+      await this._initialize_statics();
+      this.performance.end("_initialize_statics()");
     }
-    this.performance.end("create-https-server");
-    if (this.tls) {
-      this.http = http.createServer((request, response) => {
-        const reqUrl = typeof request.url === "string" ? request.url : "/";
-        const location = `https://${this.domain}${reqUrl}`;
-        response.writeHead(308, { Location: location });
-        response.end();
-      });
-    } else {
-      this.http = http.createServer((req, res) => {
-        this._serve(void 0, void 0, req, res);
-      });
-    }
-    this.performance.end("create-http-server");
-    this._init_default_headers();
-    this.performance.end("init-default-headers");
-    this._create_default_endpoints();
-    this.performance.end("create-default-endpoints");
-    await this._initialize_statics();
-    this.performance.end("_initialize_statics()");
     await this._initialize_keys();
     this.performance.end("load-keys");
     const promises = [];
     this.performance.start();
-    promises.push(this.users._initialize());
+    promises.push(this.users._initialize({ worker }));
     if (this.payments !== void 0) {
-      promises.push(this.payments._initialize());
+      promises.push(this.payments._initialize({ worker }));
     }
-    if (this.find_endpoint("/sitemap.xml") == null) {
-      promises.push(this._create_sitemap());
-    }
-    if (this.find_endpoint("/robots.txt") == null) {
-      promises.push(this._create_robots_txt());
+    if (!worker) {
+      if (this.find_endpoint("/sitemap.xml") == null) {
+        promises.push(this._create_sitemap());
+      }
+      if (this.find_endpoint("/robots.txt") == null) {
+        promises.push(this._create_robots_txt());
+      }
     }
     if (this.company.stroke_icon || this.company.icon) {
       for (const endpoint of this.endpoints.values()) {
@@ -1333,24 +1337,26 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         }
       }
       if (this.company.stroke_icon != null && this.company.stroke_icon_path == null) {
-        throw Error(`Unable to find the company's stroke icon endpoint "${this.company.stroke_icon}".`);
+        throw Error(`Unable to find the company's stroke icon endpoint "${this.company.stroke_icon}", consider defining the "company.stroke_icon_path" property.`);
       }
       if (this.company.icon != null && this.company.icon_path == null) {
-        throw Error(`Unable to find the company's icon endpoint "${this.company.icon}".`);
+        throw Error(`Unable to find the company's icon endpoint "${this.company.icon}", consider defining the "company.icon_path" property.`);
       }
     }
     await Promise.all(promises);
     this.performance.end("awaiting-promise-list");
-    this.performance.start();
-    for (const endpoint of this.endpoints.values()) {
-      endpoint._initialize(this);
+    if (!worker) {
+      this.performance.start();
+      for (const endpoint of this.endpoints.values()) {
+        endpoint._initialize(this);
+      }
+      for (const endpoint of this.err_endpoints.values()) {
+        endpoint._initialize(this);
+      }
+      this.performance.end("initialize-endpoints");
     }
-    for (const endpoint of this.err_endpoints.values()) {
-      endpoint._initialize(this);
-    }
-    this.performance.end("initialize-endpoints");
     for (const callback of this.events.get("initialize")) {
-      await callback();
+      await callback({ worker });
     }
     this.performance.end("on-initialize-callbacks");
     this.performance.end("initialize()", initialize_start);

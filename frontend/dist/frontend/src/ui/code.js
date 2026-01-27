@@ -36,7 +36,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
-// @exports: CodeBlockElement, CodeBlock, CodePreElement, CodePre, CodeLineElement, CodeLine, MultiLanguageCodeBlockElement, MultiLanguageCodeBlock
+import * as vhighlight from "@vandenberghinc/vhighlight";
 // Imports.
 import { Utils } from "../modules/utils.js";
 import { Elements, VElementTagMap, VDiv } from "../elements/module.js";
@@ -46,8 +46,6 @@ import { ImageMask } from "./image.js";
 import { ForEach } from "./for_each.js";
 import { Spacer } from "./spacer.js";
 import { Divider } from "./divider.js";
-// import * as vhighlight from "/Users/administrator/persistance/private/dev/vinc/vhighlight.js"
-import * as vhighlight from "@vandenberghinc/vhighlight";
 // All codeblocks using languages.
 const language_codeblocks = [];
 // CodeBlock.
@@ -534,7 +532,7 @@ let CodePreElement = (() => {
         duration = undefined, // animation duration in milliseconds, only used when animatinos are enabled.
         opts = {}, // special args of the language's tokenizer constructor.
         _post_tokenized_callback = undefined, } = {}) {
-            console.log("> Highlight");
+            // console.log("> Highlight")
             // Vars.
             if (code != null) {
                 this.code = code;
@@ -554,7 +552,7 @@ let CodePreElement = (() => {
             // Cancel previous animation.
             this.cancel_animation()
                 .then(() => {
-                console.log("> Cancelled animation");
+                // console.log("> Cancelled animation")
                 // Get tokenizer.
                 this.tokenizer = vhighlight.init_tokenizer(this.language, opts);
                 if (this.tokenizer == null) {
@@ -565,7 +563,7 @@ let CodePreElement = (() => {
                 this.tokens = this.tokenizer.tokenize();
                 // Build the html.
                 const highlighted_code = this.tokenizer.build_html(this.tokens);
-                console.log("> Highlighted:", highlighted_code);
+                // console.log("> Highlighted:", highlighted_code)
                 // Post tokenize callback.
                 if (_post_tokenized_callback != null) {
                     _post_tokenized_callback(this.tokens);
@@ -847,7 +845,7 @@ let MultiLanguageCodeBlockElement = (() => {
                     this.selected_lang = code[index].language ?? "__unknown__";
                     this.selected_code_pre = main_this._pre_nodes[index];
                     // Set title.
-                    main_this._title_nodes.iterate((i) => {
+                    for (const i of main_this._title_nodes) {
                         i.opacity(main_this._title_opac);
                         if (code.length > 1) {
                             i.divider
@@ -855,7 +853,8 @@ let MultiLanguageCodeBlockElement = (() => {
                                 .background("transparent")
                                 .remove_on_theme_updates();
                         }
-                    });
+                    }
+                    ;
                     main_this._title_nodes[index].opacity(1);
                     if (code.length > 1) {
                         main_this._title_nodes[index].divider.background(main_this._tint);
@@ -916,12 +915,12 @@ let MultiLanguageCodeBlockElement = (() => {
                 .width("100%")
                 .overflow("scroll");
             let index = 0;
-            code.iterate((item) => {
+            for (const item of code) {
                 if (item.data == null) {
                     console.error("Undefined codeblock data" + (item.language === "__unknown__" ? "" : ` for language ${item.language}`) + ".");
-                    return null;
+                    break;
                 }
-                if (highlight) {
+                if (highlight && item.language != null && item.language !== "__unknown__") {
                     const tokenizer = vhighlight.init_tokenizer(item.language);
                     if (tokenizer) {
                         item.data = tokenizer.tokenize({ code: item.data, build_html: true });
@@ -939,7 +938,7 @@ let MultiLanguageCodeBlockElement = (() => {
                 this._pre_nodes.append(pre);
                 this.content.append(pre);
                 ++index;
-            });
+            }
             // Main container (this).
             this
                 .display("block")

@@ -1,18 +1,88 @@
-{
-    "version": "1.0.0",
-    "excludes": [
-        "**/node_modules/**",
-        "**/dist/**",
-        "**/dev/**"
-    ],
-    "$schema": "https://uselibris.io/schemas/project_config.json",
-    "theme": {
-        "dark": {
-            "extends": "dark"
+[
+    {
+        "project": "volt",
+        "version": "1.1.1",
+        "entry": [
+            "backend/src/volt.ts"
+        ],
+        "exclude": [
+            "**/*.js"
+        ],
+        "favicon": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/favicon.ico",
+        "icon": {
+            "dark": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/stroke.png",
+            "light": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/stroke.dark.png",
+            "height": 30
         },
-        "light": {
-            "extends": "light"
+        "theme": {
+            "dark": {
+                "extends": "dark",
+                "primary": "#58B684",
+                "bg": "#2A364A",
+                "note": {
+                    "bg": "#58B684"
+                }
+            },
+            "light": {
+                "extends": "light",
+                "primary": "#58B684",
+                "note": {
+                    "bg": "#58B684"
+                }
+            }
         },
-        "default": "dark"
+        "sections": [
+            {
+                "text": "Node.js",
+                "url": "/docs/miF5fmUsvgaEcqLP/volt/latest"
+            },
+            {
+                "text": "Browser",
+                "url": "/docs/miF5fmUsvgaEcqLP/volt-web/latest"
+            }
+        ]
+    },
+    {
+        "project": "volt-web",
+        "version": "1.1.1",
+        "entry": [
+            "frontend/src/volt.ts"
+        ],
+        "exclude": [
+            "**/*.js"
+        ],
+        "favicon": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/favicon.ico",
+        "icon": {
+            "dark": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/stroke.png",
+            "light": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/stroke.dark.png",
+            "height": 30
+        },
+        "theme": {
+            "dark": {
+                "extends": "dark",
+                "primary": "#58B684",
+                "bg": "#2A364A",
+                "note": {
+                    "bg": "#58B684"
+                }
+            },
+            "light": {
+                "extends": "light",
+                "primary": "#58B684",
+                "note": {
+                    "bg": "#58B684"
+                }
+            }
+        },
+        "sections": [
+            {
+                "text": "Node.js",
+                "url": "/docs/miF5fmUsvgaEcqLP/volt/latest"
+            },
+            {
+                "text": "Browser",
+                "url": "/docs/miF5fmUsvgaEcqLP/volt-web/latest"
+            }
+        ]
     }
-}
+]

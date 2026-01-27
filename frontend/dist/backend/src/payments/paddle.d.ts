@@ -212,7 +212,10 @@ export declare class Paddle {
     private _check_product;
     private _cancel_subscription;
     private _initialize_products;
-    _initialize(): Promise<void>;
+    _initialize({ worker, }?: {
+        /** The `worker` flag passed to `Server.initialize()` */
+        worker?: boolean;
+    }): Promise<void>;
     private _exec_user_callback;
     private _payment_webhook;
     private _subscription_webhook;

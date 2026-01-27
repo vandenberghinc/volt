@@ -396,12 +396,12 @@ let DropdownElement = (() => {
                 return super.color();
             }
             super.color(value);
-            this.content_items.iterate(e => {
+            for (const e of this.content_items) {
                 e.color(value);
                 if (e.image) {
                     e.image.mask_color(value);
                 }
-            });
+            }
             return this;
         }
         /**
@@ -410,7 +410,9 @@ let DropdownElement = (() => {
          * @docs
         */
         iterate_content(callback) {
-            this.content_items.iterate((node) => { callback(node); });
+            for (const node of this.content_items) {
+                callback(node);
+            }
             return this;
         }
         /**
@@ -422,7 +424,9 @@ let DropdownElement = (() => {
                 return this._content_padding;
             }
             this._content_padding = args;
-            this.content_items.iterate((node) => { node.padding(...args); });
+            for (const node of this.content_items) {
+                node.padding(...args);
+            }
             // this.content_items.iterate((node) => { node.padding(...(args as [number, string])); })
             return this;
         }
@@ -435,7 +439,9 @@ let DropdownElement = (() => {
                 return this._content_margin;
             }
             this._content_margin = args;
-            this.content_items.iterate((node) => { node.margin(...args); });
+            for (const node of this.content_items) {
+                node.margin(...args);
+            }
             // this.content_items.iterate((node) => { node.margin(...(args as [number, string])); })
             return this;
         }
@@ -459,7 +465,9 @@ let DropdownElement = (() => {
                 return this.mouse_out_opacity;
             }
             this.mouse_out_opacity = value;
-            this.content_items.iterate((node) => { node.opacity(value); });
+            for (const node of this.content_items) {
+                node.opacity(value);
+            }
             return this;
         }
         static {

@@ -448,14 +448,14 @@ let ScrollerElement = (() => {
         // Remove a on scroll callback.
         remove_on_scroll(callback) {
             let dropped = [];
-            this.on_scroll_callbacks.iterate((item) => {
+            for (const item of this.on_scroll_callbacks) {
                 if (item.user_callback === callback) {
                     this.content.removeEventListener("scroll", item.callback);
                 }
                 else {
                     dropped.push(item);
                 }
-            });
+            }
             this.on_scroll_callbacks = dropped;
             return this;
         }
@@ -469,18 +469,20 @@ let ScrollerElement = (() => {
         }
         // Small wrapper to set scroll top / left without triggering a certain on scroll handler.
         set_scroll_position_without_event(top, left) {
-            this.on_scroll_callbacks.iterate((item) => {
+            for (const item of this.on_scroll_callbacks) {
                 this.content.removeEventListener("scroll", item.callback);
-            });
+            }
+            ;
             if (top != null) {
                 this.scroll_top(top);
             }
             if (left != null) {
                 this.scroll_left(left);
             }
-            this.on_scroll_callbacks.iterate((item) => {
+            for (const item of this.on_scroll_callbacks) {
                 this.content.addEventListener("scroll", item.callback);
-            });
+            }
+            ;
             return this;
         }
         align(value) {

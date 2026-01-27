@@ -1121,30 +1121,6 @@ export class Server {
                 })
             },
         })
-
-        // Default static endpoints.
-        // const defaults = [
-        //     {
-        //         method: "GET",
-        //         endpoint: "/vhighlight/vhighlight.js",
-        //         content_type: "application/javascript",
-        //         path: new vlib.Path(vhighlight.web_exports.js),
-        //     },
-        // ]
-        // defaults.forEach((item) => {
-        //     this.endpoint(
-        //         new Endpoint({
-        //             method: item.method,
-        //             endpoint: item.endpoint,
-        //             content_type: item.content_type,
-        //             compress: (item as any).compress,
-        //             _static_path: item.path.str(),
-        //             _templates: (item as any).templates,
-        //             _server: this,
-        //         })
-        //         ._load_data_by_path(this)
-        //     )
-        // })
     }
 
     // Create the sitemap endpoint.
@@ -1888,7 +1864,21 @@ export class Server {
 
     // Initialize.
     // Initialize.
-    async initialize(): Promise<void> {
+    async initialize({
+        worker = false,
+    }: {
+        /**
+         * By default the server is initialized as web server.
+         * 
+         * However, when using worker threads, the web server parts are skipped.
+         * Only essential operations such as database, users, payments etc. are initialized.
+         * Therefore the server can still be used within a worker threads without
+         * the overhead of creating http/https servers, endpoints, static files, etc.
+         * 
+         * The user-defined initialize callbacks are still executed but the `worker` is passed as indication.
+         */
+        worker?: boolean,
+    } = {}): Promise<void> {
 
         // Logs.
         this.log(1, "Initializing server.");
@@ -1906,67 +1896,69 @@ export class Server {
         })();
 
         // Create HTTPS server.
-        if (this.tls) {
-            this.https = http2.createSecureServer(
-                {
-                    key: new vlib.Path(this.tls.key).load_sync({ encoding: 'utf8' }),
-                    cert: new vlib.Path(this.tls.cert).load_sync({ encoding: 'utf8' }),
-                    ca: this.tls.ca == null ? undefined : new vlib.Path(this.tls.ca).load_sync({ encoding: 'utf8' }),
-                    passphrase: this.tls.passphrase,
-                    allowHTTP1: true,
-                },
-            );
-            this.https.on('stream', (stream: http2.ServerHttp2Stream, headers: any) => {
-                this._serve(stream, headers, undefined, undefined)
-            });
-            // HTTP/1.1 (compatibility 'request' is also emitted for HTTP/2; filter it out)
-            this.https.on("request", (req: http.IncomingMessage, res: http.ServerResponse) => {
-                if (req.httpVersionMajor === 1) {
-                    this._serve(undefined, undefined, req, res);
-                }
-            });
+        if (!worker) {
+            if (this.tls) {
+                this.https = http2.createSecureServer(
+                    {
+                        key: new vlib.Path(this.tls.key).load_sync({ encoding: 'utf8' }),
+                        cert: new vlib.Path(this.tls.cert).load_sync({ encoding: 'utf8' }),
+                        ca: this.tls.ca == null ? undefined : new vlib.Path(this.tls.ca).load_sync({ encoding: 'utf8' }),
+                        passphrase: this.tls.passphrase,
+                        allowHTTP1: true,
+                    },
+                );
+                this.https.on('stream', (stream: http2.ServerHttp2Stream, headers: any) => {
+                    this._serve(stream, headers, undefined, undefined)
+                });
+                // HTTP/1.1 (compatibility 'request' is also emitted for HTTP/2; filter it out)
+                this.https.on("request", (req: http.IncomingMessage, res: http.ServerResponse) => {
+                    if (req.httpVersionMajor === 1) {
+                        this._serve(undefined, undefined, req, res);
+                    }
+                });
+            }
+
+            // Payments require HTTPS in production.
+            else if (this.production && this.payments) {
+                throw Error("Accepting payments in production mode requires HTTPS.");
+            }
+            /* @performance */ this.performance.end("create-https-server");
+
+            // Create http server.
+            if (this.tls) {
+                // Redirect HTTP requests to HTTPS.
+                this.http = http.createServer((request: http.IncomingMessage, response: http.ServerResponse) => {
+                    const reqUrl = typeof request.url === "string" ? request.url : "/";
+                    // Build redirect using the canonical configured domain, not the untrusted Host header.
+                    const location = `https://${this.domain}${reqUrl}`;
+                    // 308 preserves method and body; safe for non-GET as well.
+                    response.writeHead(308, { Location: location });
+                    response.end();
+                });
+            } else {
+                // Serve http.
+                this.http = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
+                    this._serve(undefined, undefined, req, res)
+                });
+            }
+            /* @performance */ this.performance.end("create-http-server");
+
+            // Initialize default headers.
+            this._init_default_headers();
+            /* @performance */ this.performance.end("init-default-headers");
+
+            // Create default endpoints.
+            this._create_default_endpoints();
+            /* @performance */ this.performance.end("create-default-endpoints");
+
+            // Create admin endpoints.
+            // this._create_admin_endpoint();
+            // /* @performance */ this.performance.end("create-admin-endpoints");
+
+            // Create static endpoints.
+            await this._initialize_statics();
+            /* @performance */ this.performance.end("_initialize_statics()");
         }
-
-        // Payments require HTTPS in production.
-        else if (this.production && this.payments) {
-            throw Error("Accepting payments in production mode requires HTTPS.");
-        }
-        /* @performance */ this.performance.end("create-https-server");
-
-        // Create http server.
-        if (this.tls) {
-            // Redirect HTTP requests to HTTPS.
-            this.http = http.createServer((request: http.IncomingMessage, response: http.ServerResponse) => {
-                const reqUrl = typeof request.url === "string" ? request.url : "/";
-                // Build redirect using the canonical configured domain, not the untrusted Host header.
-                const location = `https://${this.domain}${reqUrl}`;
-                // 308 preserves method and body; safe for non-GET as well.
-                response.writeHead(308, { Location: location });
-                response.end();
-            });
-        } else {
-            // Serve http.
-            this.http = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
-                this._serve(undefined, undefined, req, res)
-            });
-        }
-        /* @performance */ this.performance.end("create-http-server");
-
-        // Initialize default headers.
-        this._init_default_headers();
-        /* @performance */ this.performance.end("init-default-headers");
-
-        // Create default endpoints.
-        this._create_default_endpoints();
-        /* @performance */ this.performance.end("create-default-endpoints");
-
-        // Create admin endpoints.
-        // this._create_admin_endpoint();
-        // /* @performance */ this.performance.end("create-admin-endpoints");
-
-        // Create static endpoints.
-        await this._initialize_statics();
-        /* @performance */ this.performance.end("_initialize_statics()");
 
         /**
          * Initialize keys.
@@ -1982,27 +1974,29 @@ export class Server {
         /* @performance */ this.performance.start();
 
         // Initialize users.
-        promises.push(this.users._initialize());
+        promises.push(this.users._initialize({ worker }));
         // /* @performance */ this.performance.end("users._initialize()");
 
         // Payments.
         if (this.payments !== undefined) {
-            promises.push(this.payments._initialize());
+            promises.push(this.payments._initialize({ worker }));
             // /* @performance */ this.performance.end("payments._initialize()");
         }
 
-        // Create sitemap when it does not exist.
-        // Must be done at the end of initialization func since some funcs might still create endpoints.
-        if (this.find_endpoint("/sitemap.xml") == null) {
-            promises.push(this._create_sitemap());
-            // /* @performance */ this.performance.end("_create_sitemap()");
-        }
+        if (!worker) {
+            // Create sitemap when it does not exist.
+            // Must be done at the end of initialization func since some funcs might still create endpoints.
+            if (this.find_endpoint("/sitemap.xml") == null) {
+                promises.push(this._create_sitemap());
+                // /* @performance */ this.performance.end("_create_sitemap()");
+            }
 
-        // Create robots.txt when it does not exist.
-        // Must be done at the end of initialization func since some funcs might still create endpoints.
-        if (this.find_endpoint("/robots.txt") == null) {
-            promises.push(this._create_robots_txt());
-            // /* @performance */ this.performance.end("_create_robots_txt()");
+            // Create robots.txt when it does not exist.
+            // Must be done at the end of initialization func since some funcs might still create endpoints.
+            if (this.find_endpoint("/robots.txt") == null) {
+                promises.push(this._create_robots_txt());
+                // /* @performance */ this.performance.end("_create_robots_txt()");
+            }
         }
 
         // Get the icon and stroke icon file paths when defined.
@@ -2016,10 +2010,10 @@ export class Server {
                 }
             }
             if (this.company.stroke_icon != null && this.company.stroke_icon_path == null) {
-                throw Error(`Unable to find the company's stroke icon endpoint "${this.company.stroke_icon}".`);
+                throw Error(`Unable to find the company's stroke icon endpoint "${this.company.stroke_icon}", consider defining the "company.stroke_icon_path" property.`);
             }
             if (this.company.icon != null && this.company.icon_path == null) {
-                throw Error(`Unable to find the company's icon endpoint "${this.company.icon}".`);
+                throw Error(`Unable to find the company's icon endpoint "${this.company.icon}", consider defining the "company.icon_path" property.`);
             }
         }
 
@@ -2028,18 +2022,20 @@ export class Server {
         /* @performance */ this.performance.end("awaiting-promise-list");
 
         // Initialize all endpoints.
-        this.performance.start();
-        for (const endpoint of this.endpoints.values()) {
-            endpoint._initialize(this);
+        if (!worker) {
+            this.performance.start();
+            for (const endpoint of this.endpoints.values()) {
+                endpoint._initialize(this);
+            }
+            for (const endpoint of this.err_endpoints.values()) {
+                endpoint._initialize(this);
+            }
+            /* @performance */ this.performance.end("initialize-endpoints");
         }
-        for (const endpoint of this.err_endpoints.values()) {
-            endpoint._initialize(this);
-        }
-        /* @performance */ this.performance.end("initialize-endpoints");
 
         // On initialize callbacks.
         for (const callback of this.events.get("initialize")) {
-            await callback();
+            await callback({ worker });
         }
         /* @performance */ this.performance.end("on-initialize-callbacks");
 

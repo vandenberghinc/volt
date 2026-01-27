@@ -412,12 +412,12 @@ export class DropdownElement extends (VStackElement as any as VElementBaseSignat
     color(value?: string): string | this {
         if (value == null) { return super.color(); }
         super.color(value);
-        this.content_items.iterate(e => {
+        for (const e of this.content_items) {
             e.color(value);
             if (e.image) {
                 e.image.mask_color(value);
             }
-        })
+        }
         return this;
     }
 
@@ -427,7 +427,7 @@ export class DropdownElement extends (VStackElement as any as VElementBaseSignat
      * @docs
     */
     iterate_content(callback: (element: AnchorHStackElement | HStackElement) => any): this {
-        this.content_items.iterate((node) => { callback(node) })
+        for (const node of this.content_items) { callback(node) }
         return this;
     }
 
@@ -440,7 +440,7 @@ export class DropdownElement extends (VStackElement as any as VElementBaseSignat
     content_padding(...args: [] | typeof this._content_padding): this | typeof this._content_padding {
         if (args == null || args.length === 0) { return this._content_padding; }
         this._content_padding = args;
-        this.content_items.iterate((node) => { node.padding(...args as [any, any]); })
+        for (const node of this.content_items) { node.padding(...args as [any, any]); }
         // this.content_items.iterate((node) => { node.padding(...(args as [number, string])); })
         return this;
     }
@@ -454,7 +454,7 @@ export class DropdownElement extends (VStackElement as any as VElementBaseSignat
     content_margin(...args: [] | typeof this._content_margin): this | typeof this._content_margin {
         if (args == null || args.length === 0) { return this._content_margin; }
         this._content_margin = args;
-        this.content_items.iterate((node) => { node.margin(...args as [any, any]); })
+        for (const node of this.content_items) { node.margin(...args as [any, any]); }
         // this.content_items.iterate((node) => { node.margin(...(args as [number, string])); })
         return this;
     }
@@ -480,7 +480,7 @@ export class DropdownElement extends (VStackElement as any as VElementBaseSignat
     content_opacity(value?: number): number | this {
         if (value == null) { return this.mouse_out_opacity; }
         this.mouse_out_opacity = value;
-        this.content_items.iterate((node) => { node.opacity(value); })
+        for (const node of this.content_items) { node.opacity(value); }
         return this;
     }
 }

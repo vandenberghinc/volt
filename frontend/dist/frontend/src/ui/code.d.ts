@@ -156,7 +156,7 @@ declare module './any_element.d.ts' {
  * Content object used by multi-language code blocks.
  */
 interface MLContentObject {
-    language: string;
+    language?: string;
     title?: string;
     data: string;
 }

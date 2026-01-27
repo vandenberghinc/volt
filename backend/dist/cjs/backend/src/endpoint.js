@@ -210,7 +210,7 @@ class Endpoint {
     if (compress === "auto" || typeof compress !== "boolean") {
       compress = Endpoint.compressed_content_types.includes(this.content_type ?? "");
     } else if (compress === true && this.content_type != null && Endpoint.compressed_content_types.includes(this.content_type)) {
-      debug(3, this.route.id, ": ", `Overriding parameter "compress", disabling compression.`);
+      debug(4, this.route.id, ": ", `Overriding parameter "compress", disabling compression.`);
       compress = false;
     }
     this._compress = compress;

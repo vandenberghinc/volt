@@ -488,13 +488,13 @@ export class ScrollerElement extends VElementTagMap.div {
     // Remove a on scroll callback.
     remove_on_scroll(callback: OnScrollCallback): this {
         let dropped: ScrollCallbackItem[] = [];
-        this.on_scroll_callbacks.iterate((item) => {
+        for (const item of this.on_scroll_callbacks) {
             if (item.user_callback === callback) {
                 this.content.removeEventListener("scroll", item.callback);
             } else {
                 dropped.push(item);
             }
-        })
+        }
         this.on_scroll_callbacks = dropped;
         return this;
     }
@@ -511,18 +511,18 @@ export class ScrollerElement extends VElementTagMap.div {
 
     // Small wrapper to set scroll top / left without triggering a certain on scroll handler.
     set_scroll_position_without_event(top?: number | string, left?: number | string) {
-        this.on_scroll_callbacks.iterate((item) => {
+        for (const item of this.on_scroll_callbacks) {
             this.content.removeEventListener("scroll", item.callback);
-        });
+        };
         if (top != null) {
             this.scroll_top(top);
         }
         if (left != null) {
             this.scroll_left(left);
         }
-        this.on_scroll_callbacks.iterate((item) => {
+        for (const item of this.on_scroll_callbacks) {
             this.content.addEventListener("scroll", item.callback);
-        });
+        };
         return this;
     }
 

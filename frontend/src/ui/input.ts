@@ -999,7 +999,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 		// Arguments.
 		if (Array.isArray(items)) {
 			this.items = [];
-			items.iterate((item) => {
+			for (const item of items) {
 				if (typeof item === "string") {
 					this.items.append({
 						id: item,
@@ -1011,10 +1011,10 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 					}
 					this.items.append(item)
 				}
-			});
+			}
 		} else if (typeof items === "object" && items != null) {
 			this.items = [];
-			Object.keys(items).iterate((key) => {
+			for (const key of Object.keys(items)) {
 				if (typeof items[key] === "string") {
 					this.items.append({
 						id: key,
@@ -1026,7 +1026,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 						id: key, 
 					});
 				}
-			})
+			}
 		} else {
             throw Error(`Parameter "items" should be a defined value of type "array" or "object".`);
 		}
@@ -1306,9 +1306,9 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 				const query = e.value();
 				if (query.length === 0) {
 					content.inner_html("");
-					this.items.iterate((item) => {
+                    for (const item of this.items) {
 						content.append(item.stack);
-					})
+					}
 				} else {
 					const results = vlib.fuzzy.search({
 						query, 
@@ -1319,9 +1319,9 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 						key: ["id", "text"], 
 					});
 					content.inner_html("");
-					results.iterate((item) => {
+                    for (const item of results) {
 						content.append(item.stack);
-					})
+					}
 				}
 			})
 
@@ -1334,7 +1334,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 		let i = 0;
 		let min_height;
 		// this.dropdown.items = [];
-		this.items.iterate((item) => {
+		for (const item of this.items) {
 
 			// Image.
 			let img;
@@ -1384,7 +1384,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 			// Increment.
 			++i;
 
-		})
+		}
 
 		// Show search bar or just show everything.
 		if (this.items.length > 15) {
@@ -1428,7 +1428,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 	value(val: string): this;
 	value(val?: string): string | this {
 		if (val == null) { return this._value ?? ""; }
-		this.items.iterate((item) => {
+		for (const item of this.items) {
 			if (item.id === val) {
 				this._value = val;
 				this.input.value(item.text ?? item.id);
@@ -1436,7 +1436,7 @@ export class ExtendedSelectElement extends (VStackElement as any as VElementBase
 					this._on_change_callback(this, val);
 				}
 			}
-		})
+		}
 		return this;
 	}
 

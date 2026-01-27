@@ -72,7 +72,6 @@ class View {
   raw_html;
   _bundle;
   payments;
-  // vhighlight?: string | undefined;
   min_device_width;
   server;
   endpoint;

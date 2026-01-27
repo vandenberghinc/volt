@@ -4164,7 +4164,12 @@ export class VElement extends HTMLElement {
      * @docs
      */
     exec(callback) {
-        callback(this);
+        try {
+            callback(this);
+        }
+        catch (e) {
+            console.error("Error in exec callback:", e);
+        }
         return this;
     }
     /**
