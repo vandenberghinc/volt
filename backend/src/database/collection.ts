@@ -3914,7 +3914,7 @@ export namespace Collection {
      * Generic `Throw` defaults to `true`, so `undefined` counts as `true`.
      * 
      * @returns
-     * 1. When `Throw`` is `true | undefined`, the returned type will be `NoThrowType`. 
+     * 1. When `Throw` is `true | undefined`, the returned type will be `NoThrowType`. 
      * 2. When `Throw` is `false` the returned type will be `NoThrowType | PossibleErrors`.
      * 
      * @template Throw The throw generic, defaults to `true` if `undefined`.
@@ -4939,7 +4939,7 @@ export namespace Collection {
      * Generic `Projection` defaults to `undefined`, so `undefined` returns a non projected document.
      * 
      * @returns
-     * 1. When `Projection`` is `Collection.Projection`, the returned type will be `ProjectedDocument<Data, Projection>`. 
+     * 1. When `Projection` is `Collection.Projection`, the returned type will be `ProjectedDocument<Data, Projection>`. 
      * 2. When `Projection` is `undefined` the returned type will be `Data`.
      * 
      * @template Projection The throw generic, defaults to `undefined`.
