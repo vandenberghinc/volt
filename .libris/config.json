@@ -19,7 +19,7 @@
                 "extends": "dark",
                 "primary": "linear-gradient(70deg, #F9DB4A 0%, #EA682C 100%)",
                 "primary_base": "#EA682C",
-                "bg": "#242D3A",
+                "bg": "#222D3D",
                 "note": {
                     "bg": "#222D3D"
                 }
