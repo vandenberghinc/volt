@@ -1457,8 +1457,11 @@ export class Server {
     // Server (private).
     /** The promise of database initialization and connecting. */
     _db_init_promise;
-    // Initialize.
-    // Initialize.
+    /**
+     * Initialize the server.
+     * @returns A promise that resolves when the server has been initialized.
+     * @docs
+     */
     async initialize({ worker = false, } = {}) {
         // Logs.
         this.log(1, "Initializing server.");
@@ -1626,8 +1629,12 @@ export class Server {
     /**
      * Start the server.
      * @example
+     * {Start}
+     * Start the server
+     * ```
      * ...
      * server.start();
+     * ```
      */
     async start() {
         // Always initialize, even when forking.

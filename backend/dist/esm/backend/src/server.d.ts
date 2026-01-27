@@ -288,6 +288,11 @@ export declare class Server {
     private _serve;
     /** The promise of database initialization and connecting. */
     private _db_init_promise;
+    /**
+     * Initialize the server.
+     * @returns A promise that resolves when the server has been initialized.
+     * @docs
+     */
     initialize({ worker, }?: {
         /**
          * By default the server is initialized as web server.
@@ -301,13 +306,21 @@ export declare class Server {
          */
         worker?: boolean;
     }): Promise<void>;
+    /**
+     * Find an endpoint by route or string.
+     * @docs
+     */
     find_endpoint(route: Route): Endpoint | undefined;
     find_endpoint(endpoint: string, method?: string): Endpoint | undefined;
     /**
      * Start the server.
      * @example
+     * {Start}
+     * Start the server
+     * ```
      * ...
      * server.start();
+     * ```
      */
     start(): Promise<void>;
     /**

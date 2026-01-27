@@ -4,7 +4,7 @@
  */
 /**
  * The js view meta information class.
- * @nav: Backend/Endpoints
+ * @nav Backend/Endpoints
  */
 export class Meta {
     author;

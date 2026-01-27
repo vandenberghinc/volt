@@ -2077,13 +2077,16 @@ export class Server {
 
     /**
      * Start the server.
+     * 
      * @example
      * {Start}
-     * Start the server
+     * Start the server/
      * ```
-     * ...
-     * server.start();
+     * const server = new volt.Server({ ... });
+     * await server.start();
      * ```
+     * 
+     * @docs
      */
     async start(): Promise<void> {
 
@@ -2284,12 +2287,20 @@ export class Server {
         // debug(2, () => this.performance.dump(v => v >= 50));
     }
 
-    // Stop the server.
     /**
      * Stop the server.
+     * 
      * @example
+     * {Stop}
+     * Stop the server.
+     * ```
+     * const server = new volt.Server({ ... });
+     * await server.start();
      * ...
-     * server.stop();
+     * await server.stop();
+     * ```
+     * 
+     * @docs
      */
     async stop(): Promise<void> {
         this.log(0, "Stopping the server...");

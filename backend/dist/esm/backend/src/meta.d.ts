@@ -26,7 +26,7 @@ export declare namespace Meta {
 }
 /**
  * The js view meta information class.
- * @nav: Backend/Endpoints
+ * @nav Backend/Endpoints
  */
 export declare class Meta {
     author?: string;
