@@ -12,7 +12,7 @@ import * as vlib from "@vandenberghinc/vlib";
 // Imports.
 import { SystemError } from "../../errors/system_error.js";
 import { Collection, TransactionCollection } from "../collection.js";
-import { InvalidUsageError } from "src/volt.js";
+import { InvalidUsageError } from "src/index.js";
 import type { StrictFilter } from "../filters/strict_filter.js";
 import type { StrictUpdateFilter } from "mongodb";
 import { Server } from "../../server.js"

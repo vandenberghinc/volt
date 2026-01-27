@@ -3,13 +3,8 @@
  * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
-import { RegisteredEndpoint } from "../../../backend/src/server.js";
-import type { APIError } from "../../../backend/src/stream.js";
+
 import { AnyElement } from "../ui/any_element.js";
-
-
-
-
 
 /** Utils module.  */
 export namespace Utils {

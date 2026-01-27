@@ -25,10 +25,8 @@ const { debug } = vlib;
 
 
 /**
- * @nav Backend
- * @chapter Endpoints
- * @title Endpoint
- * @description The endpoint class.
+ * The endpoint class.
+ * @nav Endpoints
  *
  * @param method
  *   The method type.
@@ -229,6 +227,8 @@ export class Endpoint<
     /**
      * Clone this endpoint, used to create a modified copy of the current endpoint.
      * @param override Override specific endpoint options, note that this will be shallow merged.
+     * 
+     * @docs
      */
     clone<
         const M extends Endpoint.Method = "GET",
@@ -259,7 +259,10 @@ export class Endpoint<
         } as Endpoint.Opts<M, E, S>);
     }
 
-    /** Construct an endpoint. */
+    /**
+     * Construct an endpoint.
+     * @docs
+     */
     constructor({
         method,
         endpoint,
@@ -400,6 +403,7 @@ export class Endpoint<
     /**
      * Serve this endpoint manually from a stream.
      * This can for instance be used to serve a HTML `/error` endpoint from within a callback.
+     * @docs
      */
     async serve({
         stream,
@@ -682,10 +686,16 @@ export class Endpoint<
 }
 export namespace Endpoint {
 
-    /** The endpoint method. */
+    /**
+     * The endpoint method.
+     * @docs
+     */
     export type Method = "GET" | "POST" | "DELETE" | "PUT" | "PATCH" | "OPTIONS";
 
-    /** Options for constructing an endpoint. */
+    /**
+     * Options for constructing an endpoint.
+     * @docs
+     */
     export type Opts<
         M extends Method = Method,
         E extends string | RegExp = string,

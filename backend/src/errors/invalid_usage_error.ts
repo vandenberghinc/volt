@@ -7,6 +7,9 @@
  * An invalid usage error.
  * This only extends the base Error class.
  * By default this class will be shown as an internal server error when caused inside an endpoint callback.
+ * 
+ * @nav Errors
+ * @docs
  */
 export class InvalidUsageError extends Error {
 

@@ -19,12 +19,6 @@ import { InvalidUsageError } from '../errors/index.js';
 // ---------------------------------------------------------
 
 /**
- * @todo Deprecate `document.ts: Ref & Document`
- *       AND add a `record_version` `transform_version` collection params
- *       That move the versioning logic to the collection layer.
- *       AND potentially other additional features implemented in the depr classes.
- */
-/**
  * A wrapper class for the MongoDB collection.
  * 
  * @example
@@ -34,6 +28,8 @@ import { InvalidUsageError } from '../errors/index.js';
  *    indexes: ["uid", "name"],
  *    ttl: 1000 * 60 * 60 * 24, // 1 day
  * });
+ * 
+ * @docs
  */
 export class Collection<Data extends mongodb.Document = mongodb.Document> {
 
@@ -107,6 +103,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * @param opts The constructor options for the collection.
      * 
      * @throws An error when attempting to initialize a transaction-based collection without initializing the derived collection first.
+     * 
+     * @docs
      */
     constructor(opts: Collection.Opts<Data> | TransactionCollection.Opts<Data>) {
 
@@ -572,6 +570,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
     /**
      * Initialize the collection, creating indexes and setting up TTL if needed.
      * @returns The initialized collection instance.
+     * 
+     * @docs
      */
     async init(): Promise<this> {
         if (this.initialized === false) {
@@ -693,6 +693,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * Assert that the collection is initialized and has a valid MongoDB collection.
      * @throws {Error} Throws if the collection is not initialized or _col is null
      * @returns An initialized collection type assertion
+     * 
+     * @docs
      */
     assert_init(): asserts this is { _col: mongodb.Collection<Data>, initialized: true } {
         if (!this.initialized || this._col == null) {
@@ -706,6 +708,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
     /**
      * Assert that if this is a transaction, it has not been finalized.
      * @throws Error if this is a finalized transaction.
+     * 
+     * @docs
      */
     assert_not_finalized(): void {
         if (this.is_transaction && this.is_finalized_transaction) {
@@ -718,6 +722,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
 
     /**
      * Assert that this collection is not transaction based.
+     * 
+     * @docs
      */
     assert_not_transaction_based(): void {
         if (this.is_transaction) {
@@ -731,6 +737,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
     /**
      * Get operation options with session if this is a transaction.
      * @returns Options object with session if applicable.
+     * 
+     * @docs
      */
     get_operation_options<T extends Record<string, any> = {}>(opts?: T): T & { session?: mongodb.ClientSession } {
         if (this.is_transaction && this._session) {
@@ -742,6 +750,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
     /**
      * Get the raw and initialized MongoDB collection.
      * @returns The MongoDB collection instance.
+     * 
+     * @docs
      */
     async col(): Promise<mongodb.Collection<Data>> {
         await this.init();
@@ -753,6 +763,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * @note Not supported for transaction based collections.
      * @param index The name of the index to check.
      * @returns True if the index exists, false otherwise.
+     * 
+     * @docs
      */
     async has_index(index: string): Promise<boolean> {
         if (!this.initialized) { await this.init(); } this.assert_init();
@@ -768,6 +780,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * @note When transaction mode is enabled, the session option will not be used.
      *
      * @param opts The index create options.
+     * 
+     * @docs
      */
     async create_index(opts: string | Collection.IndexOpts): Promise<string> {
         // Not supported on transaction-based collections.
@@ -900,6 +914,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * Clones assigned nested objects/arrays/dates once (when `clone` is true).
      *
      * @throws An error if the max depth recursion depth has been exceeded.
+     * 
+     * @docs
      */
     static insert_defaults(
         target: Record<string, any>,
@@ -960,6 +976,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * const nested = { a: { b: 1, c: { d: 2 } }, e: 3 };
      * const flat = flatten(nested);
      * // flat = { 'a.b': 1, 'a.c.d': 2, 'e': 3 }
+     * 
+     * @docs
      */
     flatten<T extends Record<string, any>>(obj: T, prefix?: string): FlattenToDotNotation<T>;
     flatten<T extends Record<string, any>, const Prefix extends string>(obj: T, prefix: Prefix): FlattenToDotNotation<T, Prefix>;
@@ -971,6 +989,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * Execute `on_transform_version` and `on_load_cb` on a loaded document.
      * Ensures `__record_version` is set when {@link record_version} is defined.
      * 
+     * @note This is done automatically during load operations.
+     * 
      * @param data The loaded document.
      * @param opts Additional options.
      * 
@@ -978,6 +998,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * 
      * @throws {Collection.OnTransformError} When an error occurs during the {@link Collection.Opts.on_transform_version} callback.
      * @throws {Collection.OnLoadError} When an error occurs during the {@link Collection.Opts.on_load} callback.
+     * 
+     * @docs
      */
     async apply_on_load<Projection extends Collection.Projection | undefined>(
         data: any,
@@ -1113,6 +1135,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      *
      * @throws {Collection.CountError} When `throw !== false` and the count fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async count<
         Throw extends Collection.CountOpts.Throw = undefined
@@ -1172,6 +1196,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      *
      * @throws {Collection.CountError} When `throw !== false` and the count fails.
      * @throws {InvalidUsageError} (always) When the collection was not used properly.
+     * 
+     * @docs
      */
     async count_estimated<
         Throw extends Collection.CountOpts.Throw = undefined
@@ -1234,6 +1260,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * 
      * @throws {Collection.ListError} When `throw !== false` if an error occurred during the operation, in which case {@link Collection.ListError.cause} is defined.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async list<
         Projection extends Collection.ListOpts.Projection = undefined,
@@ -1561,6 +1589,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * 
      * @throws {Collection.ListError} When `throw !== false` if an error occurred during the operation, in which case {@link Collection.ListError.cause} is defined.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async list_all<
         Projection extends Collection.ListOpts.Projection = undefined,
@@ -1590,6 +1620,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * 
      * @throws {Collection.ExistsError} When `throw !== false` if an error occurred during the operation, in which case {@link Collection.ExistsError.cause} is defined.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async exists<Throw extends Collection.ExistsOpts.Throw = undefined>(
         query: Collection.Query<Data>,
@@ -1664,6 +1696,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * @throws {Collection.LoadError} Only when `opts.throw !== false` and the load fails.
      * @throws {Collection.NotFoundError} When the document is not found and `opts.throw !== false && opts.default == null`.
      * @throws {InvalidUsageError} When the provided arguments are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async load<
         Default extends Collection.LoadOpts.Default<Data> = undefined,
@@ -1792,6 +1826,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      *
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async set<
         Bulk extends Collection.SetOpts.Bulk = undefined,
@@ -1839,6 +1875,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      *
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async save<
         Bulk extends Collection.SaveOpts.Bulk = undefined,
@@ -2024,6 +2062,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {Collection.ListError} Only when `opts.throw !== false` and the follow-up list fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or the collection was misused.
+     * 
+     * @docs
      */
     async save_many<
         Bulk extends boolean | undefined = undefined,
@@ -2143,21 +2183,21 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
 
 
     /**
- * Build an aggregation replacement pipeline that preserves _id on matches and
- * applies versioning/TTL consistently with non-pipeline paths.
- *
- * - On matches: preserve stored `__record_version` and (for static TTL) stored `__ttl_timestamp`.
- * - On upserts:
- *   - `__record_version`: respect user value if provided, else stamp `this.record_version`.
- *   - `__ttl_timestamp`:
- *       • sliding TTL  → always set to "now"
- *       • static  TTL  → respect user value if provided, else set to "now"
- *
- * @param base_replacement A shallow clone of the user replacement. For replace_many, pass without `_id`.
- * @param upsert           Whether the write is an upsert.
- * @param apply_ttl        Whether TTL logic should be applied (`this.ttl_enabled && opts?.apply_ttl !== false`).
- * @returns A MongoDB aggregation pipeline that performs the replacement.
- */
+     * Build an aggregation replacement pipeline that preserves _id on matches and
+     * applies versioning/TTL consistently with non-pipeline paths.
+     *
+     * - On matches: preserve stored `__record_version` and (for static TTL) stored `__ttl_timestamp`.
+     * - On upserts:
+     *   - `__record_version`: respect user value if provided, else stamp `this.record_version`.
+     *   - `__ttl_timestamp`:
+     *       • sliding TTL  → always set to "now"
+     *       • static  TTL  → respect user value if provided, else set to "now"
+     *
+     * @param base_replacement A shallow clone of the user replacement. For replace_many, pass without `_id`.
+     * @param upsert           Whether the write is an upsert.
+     * @param apply_ttl        Whether TTL logic should be applied (`this.ttl_enabled && opts?.apply_ttl !== false`).
+     * @returns A MongoDB aggregation pipeline that performs the replacement.
+     */
     private _build_replace_pipeline(
         base_replacement: Record<string, any>,
         upsert: boolean,
@@ -2275,6 +2315,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      *
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async replace<
         Bulk extends boolean | undefined = undefined,
@@ -2467,6 +2509,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {Collection.ListError} Only when `opts.throw !== false` and the follow-up list fails.
      * @throws {InvalidUsageError} (always) When arguments are invalid or the collection was misused.
+     * 
+     * @docs
      */
     async replace_many<
         Bulk extends boolean | undefined = undefined,
@@ -2593,6 +2637,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      *
      * @throws {Collection.DeleteError} When `opts.throw !== false` and if the deletion was not acknowledged, this does not check against the deleted document count.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async delete<
         Bulk extends boolean | undefined = undefined,
@@ -2676,6 +2722,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      *
      * @throws {Collection.DeleteError} When `opts.throw !== false` and if the deletion was not acknowledged, this does not check against the deleted document count.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async delete_many<
         Bulk extends boolean | undefined = undefined,
@@ -2758,6 +2806,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      *
      * @throws {Collection.DeleteError} When `opts.throw !== false` and if the deletion was not acknowledged, this does not check against the deleted document count.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async delete_all<
         Bulk extends boolean | undefined = undefined,
@@ -2783,6 +2833,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      *
      * @throws {Collection.DeleteError} When `opts.throw !== false` and if the deletion was not acknowledged, this does not check against the deleted document count.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async delete_collection<
         Throw extends boolean | undefined = undefined,
@@ -3108,6 +3160,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * 
      * @throws {Collection.BulkError} When `opts.throw !== false` and if the bulk operation failed, this does not check against the bulk write result (this may change in the future).
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async bulk_operations<Throw extends boolean | undefined = undefined>(
         operations: mongodb.AnyBulkWriteOperation<Data>[],
@@ -3247,6 +3301,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * 
      * @throws {Collection.AggregateError} When `opts.throw !== false` and if the aggregate operation failed, this does not check against the aggregate result (this may change in the future).
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     * 
+     * @docs
      */
     async aggregate<
         T extends Partial<Data> = Data,
@@ -3316,6 +3372,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
      * Clean a document from all default system attributes.
      * @param doc The document to clean.
      * @returns The cleaned document without system attributes.
+     * 
+     * @docs
      */
     clean<T extends Partial<Data> = Data>(doc: T): Omit<T, "_id" | "_path" | "__ttl_timestamp" | "__record_version">  {
         if (doc == null) { return doc; }
@@ -3341,6 +3399,8 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
     /**
      * Start a new transaction by creating a TransactionCollection instance.
      * @returns A new TransactionCollection instance with transaction capabilities.
+     * 
+     * @docs
      */
     async start_transaction(): Promise<TransactionCollection<Data>> {
         if (!this.db.client) {
@@ -3646,7 +3706,11 @@ export class Collection<Data extends mongodb.Document = mongodb.Document> {
 /** Nested types for the {@link Collection} class. */
 export namespace Collection {
 
-    /** The constructor options for {@link Collection}. */
+    /**
+     * The constructor options for {@link Collection}.
+     * 
+     * @docs
+     */
     export interface Opts<Data extends mongodb.Document = mongodb.Document> {
         /** The name of the collection. */
         name: string,
@@ -3723,6 +3787,8 @@ export namespace Collection {
     /**
      * The type for the {@link Opts.on_transform_version} and {@link Collection.on_transform_version} callback.
      * @note The input `data` may be an older document shape that does not match {@link Data}.
+     * 
+     * @docs
      */
     export type OnTransformVersion<
         Data extends mongodb.Document,
@@ -3736,7 +3802,11 @@ export namespace Collection {
         },
     ) => WithProjection<Projection, Data> | Promise<WithProjection<Projection, Data>>;
 
-    /** The type for the {@link Opts.on_load} and {@link Collection.on_load_cb} callback */
+    /**
+     * The type for the {@link Opts.on_load} and {@link Collection.on_load_cb} callback
+     * 
+     * @docs
+     */
     export type OnLoad<
         Data extends mongodb.Document,
     > = <Projection extends Collection.LoadOpts.Projection>(
@@ -3751,7 +3821,11 @@ export namespace Collection {
     // Index types.
     // -------------------------------------------------------------------
 
-    /** Index options for {@link Collection.create_index}. */
+    /**
+     * Index options for {@link Collection.create_index}.
+     * 
+     * @docs
+     */
     export type IndexOpts = {
         /**
          * Creates a unique index.
@@ -3920,6 +3994,8 @@ export namespace Collection {
      * @template Throw The throw generic, defaults to `true` if `undefined`.
      * @template PossibleErrors The errors that are returned if `Throw` is `false`.
      * @template NoThrowType The type when `Throw` is `false`.
+     * 
+     * @docs
      */
     export type WithThrow<
         Throw extends boolean | undefined,
@@ -3935,6 +4011,8 @@ export namespace Collection {
 
     /**
      * Options for {@link Collection.count} and {@link Collection.count_estimated}.
+     * 
+     * @docs
      */
     export interface CountOpts<
         Throw extends CountOpts.Throw = undefined,
@@ -3964,6 +4042,8 @@ export namespace Collection {
     /**
      * The return type of {@link Collection.count} and {@link Collection.count_estimated}.
      * @note `Error` is also a returned type since other errors might be thrown as well.
+     * 
+     * @docs
      */
     export type CountResult<
         Throw extends CountOpts.Throw = undefined,
@@ -3974,7 +4054,11 @@ export namespace Collection {
     // List operation types.
     // -------------------------------------------------------------------
 
-    /** The options for {@link Collection.list} and alike */
+    /**
+     * The options for {@link Collection.list} and alike
+     * 
+     * @docs
+     */
     export interface ListOpts<
         Data extends ListOpts.Data = ListOpts.Data,
         Projection extends ListOpts.Projection = undefined,
@@ -4060,7 +4144,11 @@ export namespace Collection {
             : never;
     }
 
-    /** A per-document streaming callback for {@link Collection.list}. */
+    /**
+     * A per-document streaming callback for {@link Collection.list}.
+     * 
+     * @docs
+     */
     export type ListCallback<
         Data extends ListOpts.Data = ListOpts.Data,
         Projection extends ListOpts.Projection = undefined
@@ -4072,7 +4160,9 @@ export namespace Collection {
         doc: WithProjection<Projection, WithId<Data>>
     ) => void | Promise<void>;
 
-    /** Nested types for the {@link ListOpts} */ 
+    /**
+     * Nested types for the {@link ListOpts}
+     */ 
     export namespace ListOpts {
         /** The default value for the `Data` template of {@link ListOpts} */
         export type Data = mongodb.Document;
@@ -4091,7 +4181,11 @@ export namespace Collection {
         export type PageInfo = boolean | undefined;
     }
 
-    /** The returned page information. */
+    /**
+     * The returned page information.
+     * 
+     * @docs
+     */
     export interface ListedPage<T> {
         /** The returned documents. */
         items: T[];
@@ -4102,6 +4196,7 @@ export namespace Collection {
     /**
      * The return type of {@link Collection.list} and alike
      * @note `Error` is also a returned type since some other errors might be thrown as well.
+     * @docs
      */
     export type ListResult<
         Data extends ListOpts.Data = ListOpts.Data,
@@ -4127,7 +4222,11 @@ export namespace Collection {
     // Exists operation types.
     // -------------------------------------------------------------------
 
-    /** The options for {@link Collection.exist} */
+    /**
+     * The options for {@link Collection.exist}
+     * 
+     * @docs
+     */
     export interface ExistsOpts<
         Throw extends ExistsOpts.Throw = undefined,
     > {
@@ -4147,7 +4246,9 @@ export namespace Collection {
         timeout?: number;
     }
 
-    /** Nested types for the {@link ExistsOpts} */
+    /**
+     * Nested types for the {@link ExistsOpts}
+     */
     export namespace ExistsOpts {
         /** The default value for the `Throw` template of {@link ExistsOpts} */
         export type Throw = boolean | undefined;
@@ -4156,6 +4257,8 @@ export namespace Collection {
     /**
      * The return type of {@link Collection.exists} and alike
      * @note `Error` is also a returned type since some other errors might be thrown as well.
+     * 
+     * @docs
      */
     export type ExistsResult<
         Throw extends ExistsOpts.Throw = undefined,
@@ -4165,7 +4268,11 @@ export namespace Collection {
     // Load operation types.
     // -------------------------------------------------------------------
 
-    /** The options for {@link Collection.load} */
+    /**
+     * The options for {@link Collection.load}
+     * 
+     * @docs
+     */
     export interface LoadOpts<
         Data extends LoadOpts.Data = LoadOpts.Data,
         Default extends LoadOpts.Default<Data> = undefined,
@@ -4205,7 +4312,9 @@ export namespace Collection {
         timeout?: number;
     }
 
-    /** Nested types for the {@link LoadOpts} interface. */
+    /**
+     * Nested types for the {@link LoadOpts} interface.
+     */
     export namespace LoadOpts {
         /** The default value for the `Data` template of {@link LoadOpts} */
         export type Data = mongodb.Document;
@@ -4226,6 +4335,8 @@ export namespace Collection {
     /**
      * The return type of {@link Collection.load}
      * @note `Error` is also a returned type since some other errors might be thrown as well.
+     * 
+     * @docs
      */
     export type LoadResult<
         Data extends LoadOpts.Data = LoadOpts.Data,
@@ -4265,6 +4376,8 @@ export namespace Collection {
      * @property apply_ttl If `false` the TTL index will not be applied to the operation.
      *                     This behaviour only takes effect if the collection has TTL settings enabled.
      *                     Defaults to `true`.
+     * 
+     * @docs
      */
     export type SaveOpts<
         Bulk extends SaveOpts.Bulk = undefined,
@@ -4296,6 +4409,8 @@ export namespace Collection {
     /**
      * The return type of {@link Collection.save}.
      * @note `Error` is also a returned type since some other errors might be thrown as well.
+     * 
+     * @docs
      */
     export type SaveResult<
         Data extends SaveOpts.Data = SaveOpts.Data,
@@ -4311,8 +4426,12 @@ export namespace Collection {
     // -------------------------------------------------------------------
     // Set operation types.
     // -------------------------------------------------------------------
-    
-    /** The options (third arg) for {@link Collection.set} */
+
+    /**
+     * The options (third arg) for {@link Collection.set}
+     * 
+     * @docs
+     */
     export type SetOpts<
         Bulk extends SetOpts.Bulk = undefined,
         Return extends SetOpts.Return = undefined,
@@ -4337,7 +4456,11 @@ export namespace Collection {
         export type Upsert = boolean | undefined;
     }
 
-    /** The return type of {@link Collection.set}. */
+    /**
+     * The return type of {@link Collection.set}.
+     * 
+     * @docs
+     */
     export type SetResult<
         Data extends mongodb.Document = mongodb.Document,
         Bulk extends SetOpts.Bulk = undefined,
@@ -4349,7 +4472,11 @@ export namespace Collection {
     // Save-many operation types.
     // -------------------------------------------------------------------
 
-    /** The additional return options for {@link SaveManyOpts.return} */
+    /**
+     * The additional return options for {@link SaveManyOpts.return}
+     * 
+     * @docs
+     */
     export type SaveManyReturnOpts = Omit<
         ListOpts,
         // Omitted fields that are initialized from `SaveManyOpts`
@@ -4359,6 +4486,7 @@ export namespace Collection {
 
     /**
      * Options for the {@link Collection.save_many} operation.
+     * @docs
      */
     export interface SaveManyOpts<
         Bulk extends boolean | undefined = undefined,
@@ -4403,6 +4531,7 @@ export namespace Collection {
 
     /**
      * The return type of {@link Collection.save_many}.
+     * @docs
      */
     export type SaveManyResult<
         Data extends mongodb.Document = mongodb.Document,
@@ -4426,7 +4555,10 @@ export namespace Collection {
     // Replace operation types (aliases of Save types).
     // -------------------------------------------------------------------
 
-    /** The options (third arg) for {@link Collection.replace} */
+    /**
+     * The options (third arg) for {@link Collection.replace}
+     * @docs
+     */
     export type ReplaceOpts<
         Bulk extends boolean | undefined = undefined,
         Return extends boolean | undefined = undefined,
@@ -4434,7 +4566,10 @@ export namespace Collection {
         Upsert extends boolean | undefined = undefined
     > = SaveOpts<Bulk, Return, Throw, Upsert>;
 
-    /** The return type of {@link Collection.replace}. */
+    /**
+     * The return type of {@link Collection.replace}.
+     * @docs
+     */
     export type ReplaceResult<
         Data extends mongodb.Document = mongodb.Document,
         Bulk extends boolean | undefined = undefined,
@@ -4442,7 +4577,10 @@ export namespace Collection {
         Throw extends boolean | undefined = undefined,
     > = SaveResult<Data, Bulk, Return, Throw>;
 
-    /** The options for {@link Collection.replace_many} */
+    /**
+     * The options for {@link Collection.replace_many}
+     * @docs
+     */
     export type ReplaceManyOpts<
         Bulk extends boolean | undefined = undefined,
         Return extends boolean | undefined | SaveManyReturnOpts = undefined,
@@ -4450,7 +4588,10 @@ export namespace Collection {
         Upsert extends boolean | undefined = undefined
     > = SaveManyOpts<Bulk, Return, Throw, Upsert>;
     
-    /** The return type of {@link Collection.replace_many} */
+    /**
+     * The return type of {@link Collection.replace_many}
+     * @docs
+     */
     export type ReplaceManyResult<
         Data extends mongodb.Document = mongodb.Document,
         Bulk extends boolean | undefined = undefined,
@@ -4463,7 +4604,10 @@ export namespace Collection {
     // Delete operation types.
     // -------------------------------------------------------------------
 
-    /** The options for {@link Collection.delete} */
+    /**
+     * The options for {@link Collection.delete}
+     * @docs
+     */
     export interface DeleteOpts<
         Bulk extends boolean | undefined = undefined,
         Throw extends boolean | undefined = undefined,
@@ -4486,7 +4630,10 @@ export namespace Collection {
         timeout?: number;
     }
 
-    /** The return type of {@link Collection.delete} */
+    /**
+     * The return type of {@link Collection.delete}
+     * @docs
+     */
     export type DeleteResult<
         Data extends mongodb.Document = mongodb.Document,
         Bulk extends boolean | undefined = undefined,
@@ -4499,12 +4646,18 @@ export namespace Collection {
     // Delete collection operation types.
     // -------------------------------------------------------------------
 
-    /** The options for {@link Collection.delete_collection} */
+    /**
+     * The options for {@link Collection.delete_collection}
+     * @docs
+     */
     export type DeleteCollectionOpts<
         Throw extends boolean | undefined = undefined,
     > = Pick<DeleteOpts<false, Throw>, "retry" | "throw" | "timeout">;
 
-    /** The return type of {@link Collection.delete_collection} */
+    /**
+     * The return type of {@link Collection.delete_collection}
+     * @docs
+     */
     export type DeleteCollectionResult<
         Throw extends boolean | undefined = undefined,
     > = WithThrow<Throw, DeleteError | Error, undefined>
@@ -4513,7 +4666,10 @@ export namespace Collection {
     // Bulk operation types.
     // -------------------------------------------------------------------
 
-    /** The options for {@link Collection.bulk_operations} */
+    /**
+     * The options for {@link Collection.bulk_operations}
+     * @docs
+     */
     export interface BulkOpts<
         Throw extends boolean | undefined = undefined,
     > {
@@ -4533,7 +4689,10 @@ export namespace Collection {
         timeout?: number;
     }
 
-    /** The return type of {@link Collection.bulk_operations} */
+    /**
+     * The return type of {@link Collection.bulk_operations}
+     * @docs
+     */
     export type BulkResult<
         Throw extends boolean | undefined = undefined,
     > = WithThrow<Throw, BulkError | Error, mongodb.BulkWriteResult>;
@@ -4542,7 +4701,10 @@ export namespace Collection {
     // Aggregate operation types.
     // -------------------------------------------------------------------
 
-    /** The options for {@link Collection.aggregate} */
+    /**
+     * The options for {@link Collection.aggregate}
+     * @docs
+     */
     export interface AggregateOpts<
         Throw extends boolean | undefined = undefined,
         Cursor extends boolean | undefined = undefined,
@@ -4570,7 +4732,10 @@ export namespace Collection {
         timeout?: number;
     }
 
-    /** The return type of {@link Collection.aggregate} */
+    /**
+     * The return type of {@link Collection.aggregate}
+     * @docs
+     */
     export type AggregateResult<
         Data extends mongodb.Document = mongodb.Document,
         Throw extends boolean | undefined = undefined,
@@ -4584,7 +4749,9 @@ export namespace Collection {
     // Errors.
     // ---------------------------------------------------------
 
-    /** The base error for {@link NotFoundError}, {@link DeleteError} etc. */
+    /**
+     * The base error for {@link NotFoundError}, {@link DeleteError} etc.
+     */
     export class OperationError extends Error implements OperationError.Opts {
         /** The error message. */
         message: string;
@@ -4633,6 +4800,7 @@ export namespace Collection {
     /**
      * Error thrown when a document is not found.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class NotFoundError extends OperationError {
         /**
@@ -4649,6 +4817,7 @@ export namespace Collection {
     /**
      * Error thrown when a {@link Collection.Opts.on_transform_version} callback fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class OnTransformError extends OperationError {
         /**
@@ -4665,6 +4834,7 @@ export namespace Collection {
     /**
      * Error thrown when a {@link Collection.Opts.on_load} callback fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class OnLoadError extends OperationError {
         /**
@@ -4681,6 +4851,7 @@ export namespace Collection {
     /**
      * Error thrown when a count operation fails.
      * This error extends {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class CountError extends OperationError {
         /**
@@ -4697,6 +4868,7 @@ export namespace Collection {
     /**
      * Error thrown when a list operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class ListError extends OperationError {
         /**
@@ -4713,6 +4885,7 @@ export namespace Collection {
     /**
      * Error thrown when a load operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class ExistsError extends OperationError {
         /**
@@ -4729,6 +4902,7 @@ export namespace Collection {
     /**
      * Error thrown when a load operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class LoadError extends OperationError {
         /**
@@ -4745,6 +4919,7 @@ export namespace Collection {
     /**
      * Error thrown when a save operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class SaveError extends OperationError {
         /**
@@ -4761,6 +4936,7 @@ export namespace Collection {
     /**
      * Error thrown when a delete operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class DeleteError extends OperationError {
         /**
@@ -4777,6 +4953,7 @@ export namespace Collection {
     /**
      * Error thrown when a bulk operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class BulkError extends OperationError {
         /**
@@ -4793,6 +4970,7 @@ export namespace Collection {
     /**
      * Error thrown when an aggregate operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     export class AggregateError extends OperationError {
         /**
@@ -4915,6 +5093,7 @@ export namespace Collection {
      * Projected document.
      * The projected fields are included as is, and the non included fields
      * are included as optional, since {@link LoadOpts.default} may add them.
+     * @docs
      */
     export type Projected<
         Projection extends Collection.Projection,
@@ -4944,6 +5123,8 @@ export namespace Collection {
      * 
      * @template Projection The throw generic, defaults to `undefined`.
      * @template Data The document data type.
+     * 
+     * @docs
      */
     export type WithProjection<
         Projection extends Collection.Projection | undefined,
@@ -5008,9 +5189,19 @@ export namespace Collection {
 /**
  * TransactionCollection extends Collection with transaction-specific methods.
  * This class provides commit and abort functionality for MongoDB transactions.
+ * @warning The tranaction collection should only be initialized via {@link Collection.start_transaction}.
+ * @docs
  */
 export class TransactionCollection<Data extends mongodb.Document = mongodb.Document> extends Collection<Data> {
 
+    /**
+     * Commit the current transaction.
+     * Implements retry logic for transient errors and unknown commit results.
+     * @throws {InvalidUsageError} If there is no active session or if the transaction has already been finalized.
+     * @throws {Error} If the commit fails after retries or encounters a non-retryable error.
+     * 
+     * @docs
+     */
     async commit(): Promise<void> {
         const session = this._session;
         if (!session) {
@@ -5096,6 +5287,14 @@ export class TransactionCollection<Data extends mongodb.Document = mongodb.Docum
         }
     }
 
+    /**
+     * Abort the current transaction.
+     * Implements retry logic for transient errors.
+     * @throws {InvalidUsageError} If there is no active session or if the transaction has already been finalized.
+     * @throws {Error} If the abort fails after retries or encounters a non-retryable error.
+     * 
+     * @docs
+     */
     async abort(): Promise<void> {
         const session = this._session;
         if (!session) {
@@ -5162,6 +5361,7 @@ export class TransactionCollection<Data extends mongodb.Document = mongodb.Docum
      * Can be called manually or via async disposal
      *
      * @warning This method aborts the transaction if it is still active.
+     * @docs
      */
     async cleanup(): Promise<void> {
         if (this._session && !this.is_finalized_transaction) {
@@ -5191,6 +5391,7 @@ export class TransactionCollection<Data extends mongodb.Document = mongodb.Docum
     /**
      * Check if the transaction is still active (not finalized).
      * @returns True if the transaction is active, false otherwise.
+     * @docs
      */
     is_active(): boolean {
         return this.is_transaction && !this.is_finalized_transaction && this._session != null;
@@ -5200,7 +5401,10 @@ export class TransactionCollection<Data extends mongodb.Document = mongodb.Docum
 /** Nested types for the {@link TransactionCollection} class. */
 export namespace TransactionCollection {
 
-    /** The constructor options for a transaction based {@link Collection}. */
+    /**
+     * The constructor options for a transaction based {@link Collection}.
+     * @docs
+     */
     export interface Opts<Data extends mongodb.Document = mongodb.Document> {
         /** Construct the collection in transaction mode. */
         transaction_based: true,

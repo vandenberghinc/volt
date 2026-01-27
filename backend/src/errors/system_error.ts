@@ -13,7 +13,10 @@ import { Server } from "../server.js"
 /** Utility types for the `SystemError`. */
 export namespace SystemError {
 
-    /** Options for creating a system error. */
+    /**
+     * Options for creating a system error.
+     * @docs
+     */
     export interface Opts {
         /** The message of the error. */
         message: string;
@@ -62,7 +65,10 @@ export namespace SystemError {
      */
     export type Logger = { error: (message: string) => void };
 
-    /** The database record for a saved system error. */
+    /**
+     * The database record for a saved system error.
+     * @docs
+     */
     export interface Document {
         /** The unique id for this error. */
         id: string;
@@ -104,6 +110,7 @@ export namespace SystemError {
  * The system error.
  * Used to indicate a fatal system error that should not occur and should be reported to developers.
  * When created, it is logged and (optionally) persisted to the configured collection.
+ * @docs
  */
 export class SystemError extends Error {
 
@@ -134,6 +141,8 @@ export class SystemError extends Error {
      * Set a collection that will be used as default to save system errors to.
      * 
      * @param collection The collection options to use.
+     * 
+     * @docs
      */
     static set_collection(opts: Pick<
         Collection.Opts<SystemError.Document>,
@@ -154,6 +163,8 @@ export class SystemError extends Error {
     /**
      * Configure the newly created system error instances,
      * assigning a global database collection and logger instance.
+     * 
+     * @docs
      */
     static setup(opts: {
         /** The initialized server instance. */
@@ -302,7 +313,10 @@ export class SystemError extends Error {
         // Perhaps we also want to create a constructor for loaded sys errs later.
     }
 
-    /** Construct a system error & save it to the database. */
+    /**
+     * Construct a system error & save it to the database.
+     * @docs
+     */
     static async create(opts: SystemError.Opts): Promise<SystemError> {
         const error = new SystemError(opts);
         const formatted = error.format({ colored: false });
@@ -325,6 +339,7 @@ export class SystemError extends Error {
      * This is a synchronous version of the create method.
      * Beware that this does not join the async save operation,
      * Instead it detaches and catches and logs any errors that occur during saving
+     * @docs
      */
     static create_detach(opts: SystemError.Opts): SystemError {
         const error = new SystemError(opts);
@@ -351,6 +366,7 @@ export class SystemError extends Error {
      * Get the error as a database document.
      * 
      * @returns A plain object representing the system error for database storage.
+     * @docs
      */
     document(): SystemError.Document {
         const doc: SystemError.Document = {
@@ -386,6 +402,7 @@ export class SystemError extends Error {
      * @param colored Present the formatted error with colors to make it more visually pleasing.
      *                Defaults to `false`.
      * @returns A string representation of the system error.
+     * @docs
      */
     format({ colored = false }: { colored?: boolean } = {}): string {
         if (colored && this._format_colored) return this._format_colored;
@@ -458,6 +475,7 @@ export class SystemError extends Error {
      * Convert the error to a string without ANSI colors to avoid leaking escape codes into sinks
      * (e.g., files, JSON logs) that assume plain text.
      * @returns Non-colored string representation of the error.
+     * @docs
      */
     toString(): string {
         return this.format({ colored: false });

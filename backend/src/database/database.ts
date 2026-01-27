@@ -19,7 +19,11 @@ import type { Server } from "../server.js";
 
 export namespace Database {
 
-    /** The database constructor options. */
+    /**
+     * Options for constructing a {@link Database} object.
+     * 
+     * @docs
+     */
     export interface Opts {
         /** The database URI. */
         uri: string,
@@ -32,8 +36,11 @@ export namespace Database {
 
 /**
  * The MongoDB database class, accessable under `Server.db`.
+ * 
+ * @note This class is initialized under server property `db` when the server is started with the `database` option.
+ * 
+ * @nav Database
  * @docs
- * @nav Backend/Database
 */
 export class Database {
     static constructor_scheme = {
@@ -155,7 +162,11 @@ export class Database {
         });
     }
 
-    /** Initialize. */
+    /**
+     * Initialize the database.
+     * @note This is done automatically by initializing the server.
+     * @docs
+     */
     async initialize(): Promise<void> {
         this.server.log(3, "Initializing the database.");
         // Initialize client (same as before)
@@ -188,14 +199,20 @@ export class Database {
     }
 
 
-    /** Ensure connection. */
+    /** 
+     * Ensure the database connection is established.
+     * @docs
+     */
     async ensure_connection(): Promise<void> {
         if (this.connected) return;
         if (this.connect_promise) return this.connect_promise;
         return this.connect();
     }
 
-    // Close.
+    /**
+     * Close the database connection.
+     * @docs
+     */
     async close(): Promise<void> {
         this.server.log(0, "Stopping the database.");
         await this.client?.close();
@@ -203,11 +220,12 @@ export class Database {
     }
 
     /**
-     * {Create Collection}
      * Initialize database collection.
      * @note When called multiple times with the same name, it will return the same cached collection.
      * @param info.unique If true, an error will be thrown if the collection already exists.
      *                    Defauls to `true`.
+     * 
+     * @docs
      */
     collection<Data extends mongodb.Document = mongodb.Document>(info: 
         string |

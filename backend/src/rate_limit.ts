@@ -44,7 +44,8 @@ export interface RateLimitCacheData {
  * A group can either be registered through this class or by defining the rate limit group on an endpoint using `Endpoint.rate_limit`.
  * 
  * This class will be accessable under `Server` attribute `rate_limits`.
- * @nav Backend/Rate Limit
+ * 
+ * @nav Rate Limit
  * @docs
  */
 export namespace RateLimits {
@@ -111,6 +112,8 @@ export namespace RateLimits {
      * @param ip The input IPv4/IPv6 address.
      * @returns Canonical address string.
      * @throws {Error} If the input is not a valid IPv4 or IPv6 address.
+     * 
+     * @docs
      */
     export function normalize_ip(ip: string): string {
         let s = strip_brackets_zone_and_port(ip);
@@ -381,7 +384,10 @@ export namespace RateLimits {
 /** Nested types for the {@link RateLimitServer}. */
 export namespace RateLimitServer {
 
-    /** Constructor options. */
+    /**
+     * Constructor options.
+     * @docs
+     */
     export interface Opts {
         /** The port to which the rate limiting server will bind. The default is `51234`. */
         port?: number,
@@ -395,8 +401,6 @@ export namespace RateLimitServer {
 /**
  * The rate limit websocket class (server).
  * Rate limiting is handled automatically when the endpoints has it enabled.
- * 
- * @nav Backend/Rate Limit
  */
 export class RateLimitServer {
     // Static attributes.
@@ -613,7 +617,10 @@ export class RateLimitServer {
 /** Nested types for the {@link RateLimitClient}. */
 export namespace RateLimitClient {
 
-    /** Constructor options. */
+    /**
+     * Constructor options.
+     * @docs
+     */
     export interface Opts {
         /** The port to which the rate limiting server will bind. The default is `51234`. */
         port?: number,
@@ -630,8 +637,6 @@ export namespace RateLimitClient {
  * The secondary rate limit class (client).
  * 
  * Rate limiting is handled automatically when the endpoints has it enabled.
- * 
- * @nav Backend/Rate Limit
  */
 export class RateLimitClient {
     private ip: string;

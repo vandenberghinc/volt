@@ -26,6 +26,9 @@ import { SafeInt } from "./safe_int.js";
  * use a non numeric `uid` to simulate a `uid` if needed.
  * 
  * @template Type The allowed type for {@link Query.type}, provided at class level.
+ * 
+ * @nav Database
+ * @docs
  */
 export class QuotaManager {
 
@@ -45,6 +48,8 @@ export class QuotaManager {
      * @throws {InvalidUsageError} If {@link QuotaManager.Opts.collection} is already initialized and does not have the correct index.
      *                             If the passed collection has manually assigned fields for {@link Collection.record_version} or {@link Collection.on_transform_version}.
      *                             If the passed collection is transaction based.
+     * 
+     * @docs
      */
     constructor(opts: QuotaManager.Opts) {
 
@@ -104,6 +109,8 @@ export class QuotaManager {
      * @throws {Collection.NotFoundError} When `opts.throw !== false` and the quota does not exist.
      * @throws {Collection.LoadError} When `opts.throw !== false` and a database error was encountered during the load operation.
      * @throws {Collection.InvalidUsageError} When `opts.throw !== false` and the query is invalid.
+     * 
+     * @docs
      */
     async get<
         Default extends Collection.LoadOpts.Default<QuotaManager.Document> = undefined,
@@ -155,6 +162,8 @@ export class QuotaManager {
      * 
      * @returns An object containing error or status information,
      *          see {@link QuotaManager.GetStatusResult}
+     * 
+     * @docs
      */
     async get_status(
         query: QuotaManager.Query,
@@ -226,6 +235,8 @@ export class QuotaManager {
      * @param uid The user identifier.
      * @param type Optional quota type filter.
      * @returns List of quotas with their current status.
+     * 
+     * @docs
      */
     async list({
         uid,
@@ -279,6 +290,8 @@ export class QuotaManager {
      *
      * @throws {InvalidUsageError} When `opts.throw !== false` and validation fails.
      * @throws {Collection.SaveError} When `opts.throw !== false` and a database error occurs during the save operation.
+     * 
+     * @docs
      */
     async set<
         Throw extends Collection.SaveOpts.Throw = true,
@@ -354,6 +367,8 @@ export class QuotaManager {
      * @throws {Collection.NotFoundError} When `opts.throw !== false` and the quota does not exist.
      * @throws {Collection.SaveError} When `opts.throw !== false` and a database error was encountered during the save operation.
      * @throws {Collection.InvalidUsageError} When `opts.throw !== false` and the query is invalid.
+     * 
+     * @docs
      */
     async reset_usage<
         Throw extends Collection.SaveOpts.Throw = undefined,
@@ -406,7 +421,11 @@ export class QuotaManager {
         );
     }
 
-    /** Delete all quotas for a user. */
+    /**
+     * Delete all quotas for a user.
+     * 
+     * @docs
+     */
     async delete_by_user({ uid }: { uid: string }): Promise<void> {
         await this.collection.delete_many({ uid }, { retry: 25 });
     }
@@ -417,7 +436,9 @@ export class QuotaManager {
 
     /**
      * Validate the required {@link limit_helper} parameters.
-     * @note requested_usage may be a negative number.
+     * @note Parameter `requested_usage` may be a negative number.
+     * 
+     * @docs
      */
     private validate_limit_helper_params({
         requested_usage,
@@ -499,6 +520,8 @@ export class QuotaManager {
      *       When `perform_increment` is false, it only validates availability without modifying the database.
      * 
      * @returns Success with updated quota info or validation/error details.
+     * 
+     * @docs
      * 
      */
     async limit_helper({
@@ -1050,6 +1073,8 @@ export class QuotaManager {
      *
      * @returns On success, returns the (possibly updated) quota and remaining capacity; on failure,
      *          returns a diagnostic indicating why the request was rejected.
+     * 
+     * @docs
      */
     async limit({
         query, requested_usage, upsert, safety_ratio, perform_increment = true
@@ -1084,6 +1109,8 @@ export class QuotaManager {
      * @note This function allows for negative `requested_usage` values.
      *
      * @returns The updated quota record or a diagnostic if the quota was not found in the database or if the max retries have been exceeded.
+     * 
+     * @docs
      */
     async increment({
         query, requested_usage, upsert,
@@ -1112,6 +1139,8 @@ export class QuotaManager {
      * @param limits The quota limits to validate and increment upon success, or roll back upon failure.
      * 
      * @returns Success with updated quota info or validation/error details.
+     * 
+     * @docs
      */
     async batch_limit({
         limits
@@ -1244,6 +1273,8 @@ export namespace QuotaManager {
 
     /**
      * The constructor options of the {@link QuotaManager} class.
+     * 
+     * @docs
      */
     export interface Opts {
         /** The parent server instance, used to create the database collection. */
@@ -1290,6 +1321,8 @@ export namespace QuotaManager {
      * The interface for a quota search query.
      * 
      * @dev_note Ensure this remains a FLAT interface, or update spread copies to deep copies.
+     * 
+     * @docs
      */
     export interface Query {
         /** The user id (index attribute). */
@@ -1321,6 +1354,8 @@ export namespace QuotaManager {
      * This interface can serves as a quota group which can be configured for account-wide, project-wide etc quotas.
      * 
      * @dev_note Ensure this remains a FLAT interface, or update spread copies to deep copies.
+     * 
+     * @docs
      */
     export interface Quota {
         /**
@@ -1409,6 +1444,8 @@ export namespace QuotaManager {
          * @param q The number, quota or undefined to convert, undefined will simply return undefined again.
          * 
          * @returns The scaled input type.
+         * 
+         * @docs
          */
         export function to_nano(q: null | undefined | number | Quota.Opts): undefined | number | Quota.Opts {
             if (q == null) return undefined
@@ -1451,7 +1488,11 @@ export namespace QuotaManager {
     // Method types.
     // ----------------------------------------------------------------
 
-    /** The listed quota from {@link QuotaManager.list}. */
+    /**
+     * The listed quota from {@link QuotaManager.list}.
+     * 
+     * @docs
+     */
     export interface ListedQuota {
         /** The listed quota. */
         quota: QuotaManager.Document,
@@ -1463,7 +1504,11 @@ export namespace QuotaManager {
         needs_reset: boolean,
     }
 
-    /** The returned type of {@link QuotaManager.get_status} */
+    /**
+     * The returned type of {@link QuotaManager.get_status}
+     * 
+     * @docs
+     */
     export type GetStatusResult = 
         | { /** Indicates the quota was not found or an error occurred. */
             found: false;
@@ -1490,7 +1535,11 @@ export namespace QuotaManager {
             time_until_reset: number;
         }
 
-    /** The parameter options for {@link limit} and {@link increment} */
+    /**
+     * The parameter options for {@link limit} and {@link increment}
+     * 
+     * @docs
+     */
     export interface LimitOpts {
         /** The quota identifier arguments. */
         query: Query,
@@ -1511,7 +1560,11 @@ export namespace QuotaManager {
         perform_increment?: boolean,
     }
 
-    /** The non allowed response of {@link limit}. */
+    /**
+     * The non allowed response of {@link limit}.
+     * 
+     * @docs
+     */
     export interface LimitFailure {
         /** Validation success indicator. */
         success: false;
@@ -1528,7 +1581,11 @@ export namespace QuotaManager {
         remaining?: number;
     }
 
-    /** The allowed response of {@link limit}. */
+    /**
+     * The allowed response of {@link limit}.
+     * 
+     * @docs
+     */
     export interface LimitSuccess {
         /** Validation success indicator. */
         success: true;
@@ -1544,6 +1601,8 @@ export namespace QuotaManager {
 
     /**
      * The batch limit query and requested usage for {@link batch_limit}.
+     * 
+     * @docs
      */
     export interface BatchLimit {
         /** The query identifying the quota */
@@ -1570,13 +1629,21 @@ export namespace QuotaManager {
         perform_increment?: boolean,
     }
 
-    /** The batch limit failure response. */
+    /**
+     * The batch limit failure response.
+     * 
+     * @docs
+     */
     export interface BatchLimitFailure extends LimitFailure {
         /** The failed query identifying the quota */
         failed_query: Query;
     }
 
-    /** The batch limit success response. */
+    /**
+     * The batch limit success response.
+     * 
+     * @docs
+     */
     export interface BatchLimitSuccess {
         /** Validation success indicator. */
         success: true;

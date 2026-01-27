@@ -4,16 +4,16 @@
     "version": "1.1.52",
     "description": "",
     "type": "module",
-    "types": "./backend/dist/esm/volt.d.ts",
-    "main": "./backend/dist/cjs/volt.js",
-    "module": "./backend/dist/esm/volt.js",
+    "types": "./backend/dist/esm/index.d.ts",
+    "main": "./backend/dist/cjs/index.js",
+    "module": "./backend/dist/esm/index.js",
     "exports": {
         ".": {
-            "require": "./backend/dist/cjs/backend/src/volt.js",
-            "import": "./backend/dist/esm/backend/src/volt.js"
+            "require": "./backend/dist/cjs/backend/src/index.js",
+            "import": "./backend/dist/esm/backend/src/index.js"
         },
         "./frontend": {
-            "import": "./frontend/dist/frontend/src/volt.js"
+            "import": "./frontend/dist/frontend/src/index.js"
         }
     },
     "scripts": {

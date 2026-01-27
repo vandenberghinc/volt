@@ -31,7 +31,7 @@ import Stream from './stream.js';
  *     - `height` number: The width of the image as a number `100` or percentage `50%` / `0.5x`. The aspect ratio will be maintained when `width` is undefined.
  *     - `aspect_ratio` boolean: Maintain the aspect ratio when only one resizing dimension has been defined.
  * @docs
- * @nav Backend/Endpoints
+ * @nav Endpoints
  */
 class ImageEndpoint extends Endpoint implements Endpoint {
 
@@ -58,6 +58,10 @@ class ImageEndpoint extends Endpoint implements Endpoint {
     private i_cache: Map<string, Buffer>;
     public is_image_endpoint: boolean;
 
+    /**
+     * Construct an image endpoint.
+     * @docs
+     */
     constructor({
         endpoint,
         path,

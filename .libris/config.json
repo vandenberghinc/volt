@@ -3,11 +3,12 @@
         "project": "volt",
         "version": "1.1.1",
         "entry": [
-            "backend/src/volt.ts"
+            "backend/src/index.ts"
         ],
         "exclude": [
             "**/*.js"
         ],
+        "sort": "descending",
         "favicon": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/favicon.ico",
         "icon": {
             "dark": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/stroke.png",
@@ -48,11 +49,12 @@
         "project": "volt-web",
         "version": "1.1.1",
         "entry": [
-            "frontend/src/volt.ts"
+            "frontend/src/index.ts"
         ],
         "exclude": [
             "**/*.js"
         ],
+        "sort": "descending",
         "favicon": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/favicon.ico",
         "icon": {
             "dark": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/stroke.png",

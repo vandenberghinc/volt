@@ -39,6 +39,8 @@ type ResponseBody = undefined | string | boolean | number | any[] | Record<strin
  * The http2 stream wrapper object.
  *
  * @property headers The request headers.
+ * 
+ * @nav Stream
  * @docs
  */
 export class Stream {
@@ -449,6 +451,7 @@ export class Stream {
      * Retrieve the normalized IP address, suitable for rate limiting and logging.
      * @throws {Error} If the IP is invalid.
      * @returns The normalized IP.
+     * @docs
      */
     normalized_ip(): string {
         if (this._normalized_ip != null) {
@@ -1149,7 +1152,12 @@ export class Stream {
     }
 }
 
-/** A stream that passed the `authenticated: true` attribute of an {@link Endpoint}. */
+/**
+ * A stream that passed the `authenticated: true` attribute of an {@link Endpoint}.
+ * 
+ * @nav Stream
+ * @docs
+ */
 export type AuthStream = Stream & {
     // private _uid: string;
     get uid(): string;
@@ -1160,6 +1168,9 @@ export type AuthStream = Stream & {
  * The API error field from {@link APIErrorResult}.
  * 
  * @note This should be compatible with the frontend {@link Utils.RequestResult} interface.
+ * 
+ * @nav Stream
+ * @docs
  */
 export interface APIError {
     /** The error message. */
@@ -1180,6 +1191,9 @@ type RequestDataBase = unknown | null | undefined | number | boolean | string | 
  * This interface can be used to create response interfaces in the backend, imported by the frontend.
  * 
  * @note This should be compatible with the frontend {@link Utils.RequestResult} interface.
+ * 
+ * @nav Stream
+ * @docs
  */
 export interface APIErrorResult<ErrorData extends RequestDataBase = unknown> {
     /** The error object. */
@@ -1192,6 +1206,9 @@ export interface APIErrorResult<ErrorData extends RequestDataBase = unknown> {
  * The request result from {@link Stream.error}, {@link Stream.success} or {@link Stream.send}.
  * 
  * @note This should be compatible with the frontend {@link Utils.RequestResult} interface.
+ * 
+ * @nav Stream
+ * @docs
  */
 export type APIResult<SuccessData extends RequestDataBase = unknown, ErrorData extends RequestDataBase = unknown> =
     | APIErrorResult<ErrorData>

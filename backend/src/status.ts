@@ -16,7 +16,7 @@
  *     console.log("Request was successful!");
  * }
  * ```
- * @nav Backend/Server
+ * 
  * @docs
  */
 export enum Status {

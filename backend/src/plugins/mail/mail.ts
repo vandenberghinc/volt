@@ -15,7 +15,12 @@ import { ExternalError } from "../../errors/index.js";
 import { Status } from "../../status.js";
 
 /**
- * mail module.
+ * The mail class, used to send emails via SMTP.
+ * 
+ * @note This class is initialized under server property `mail` when the server is started with the `smtp` option.
+ * 
+ * @nav Plugins
+ * @docs
  */
 export class Mail {
 
@@ -70,6 +75,8 @@ export class Mail {
      * @param max_attachments limit on number of attachments; -1 disables.
      * @param max_attachment_size max size (bytes) per attachment; -1 disables.
      * @param max_attachments_size max total size (bytes) across attachments; -1 disables.
+     * 
+     * @docs
      */
     async send({
         sender = undefined,

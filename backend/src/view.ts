@@ -24,86 +24,13 @@ const { debug } = vlib;
 
 // ---------------------------------------------------------
 // View.
-// @todo add template vars for callback and css and js include files. 
+
 /**
- * @nav Backend
- * @chapter Endpoints
- * @title View
- * @class
- *
- * @param source
- *   The file path to the client side JavaScript source code.
- *
- * @param callback
- *   The client side callback function; this function will be executed at the client side.
- *   For this feature the `Content-Security-Policy: script-src` must be updated with, for example, `unsafe-inline`.
- *
- * @param includes
- *   The included static JS files.
- *
- *   By default, the local includes will be embedded into the HTML page. However, this behaviour can be disabled by passing an object of type `IncludeObject` with the attribute `embed = false`.
- *
- * @param links
- *   The included static CSS files.
- *
- *   By default, the local links will be embedded into the HTML page. However, this behaviour can be disabled by passing an object of type `LinkObject` with the attribute `embed = false`.
- *
- * @param templates
- *   Templates that will replace the `callback` code. Templates can be created using the `$TEMPLATE` template style.
- *
- * @warning
- *   Templates will only be used on the code of the `callback` attribute.
- *
- * @param meta
- *   The meta information object.
- *
- * @param jquery
- *   Include jQuery by default.
- *
- * @param body_style
- *   The style of the `<body>` element. When left undefined, the static attribute `View.body_style` will be used.
- *
- * @param splash_screen
- *   The splash screen settings. When left undefined, the static attribute `View.splash_screen` will be used.
- *
- * @param tree_shaking
- *   Optimize JavaScript source code by removing dead code.
- *
- * @param mangle
- *   Optimize JavaScript source code by mangling function names.
- *
- * @param _src
- *   Internal parameter (ignored).
- *
- * @typedef IncludeObject
- * @property src
- *   The source URL of the script to include. (required)
- * @property embed
- *   When set to `false`, disables embedding the endpoint's content into the HTML page.
- * @property attributes
- *   Any other attributes will be assigned to the `<script>` tag.
- *
- * @typedef LinkObject
- * @property href
- *   The source URL of the link to include. (required)
- * @property rel
- *   The `rel` attribute of the link tag.
- * @property embed
- *   When set to `false`, disables embedding the endpoint's content into the HTML page.
- * @property attributes
- *   Any other attributes will be assigned to the `<link>` tag.
- *
- * @static
- * @memberof View
- * @member body_style
- *   The style of the `<body>` element. This static attribute will be used on all Views when defined. However,
- *   it can be overridden for a single View by defining the parameter.
- *
- * @static
- * @memberof View
- * @member splash_screen
- *   The splash screen settings. This static attribute will be used on all Views when defined. However,
- *   it can be overridden for a single View by defining the parameter.
+ * The view class can be used to create HTML pages through JavaScript or TypeScript source code.
+ * The view instance or constructor options can be passed to an {@link Endpoint} to serve the view at a specific route.
+ * 
+ * @docs
+ * @nav Endpoints
  */
 export class View {
 
@@ -150,6 +77,8 @@ export class View {
      * - `params`
      * - `data`
      * @param override Override specific endpoint options, note that this will be shallow merged.
+     * 
+     * @docs
      */
     clone(this: View, override?: Partial<View.Opts>): View {
         return new View({
@@ -173,7 +102,10 @@ export class View {
         });
     }
 
-    // Constructor.
+    /**
+     * Options for constructing a {@link View} instance.
+     * @docs
+     */
     constructor({
         source = null,
         callback = null,
@@ -190,17 +122,40 @@ export class View {
         min_device_width = 600,
         _src,
     }: {
+        /** The file path to the client side JavaScript source code. */
         source?: string | null;
+        /**
+         * The client side callback function; this function will be executed at the client side.
+         * For this feature the `Content-Security-Policy: script-src` must be updated with, for example, `unsafe-inline`.
+         */
         callback?: Function | null;
+        /**
+         * The included static JS files.
+         * By default, the local includes will be embedded into the HTML page. However, this behaviour can be disabled by passing an object of type `IncludeObject` with the attribute `embed = false`.
+         */
         includes?: (string | Record<string, any>)[];
+        /**
+         * The included static CSS files.
+         * By default, the local links will be embedded into the HTML page. However, this behaviour can be disabled by passing an object of type `LinkObject` with the attribute `embed = false`.
+         */
         links?: (string | Record<string, any>)[];
+        /**
+         * Templates that will replace the `callback` code. Templates can be created using the `$TEMPLATE` template style.
+         * However, templates will only be used on the code of the `callback` attribute.
+         */
         templates?: Record<string, any>;
+        /** The meta information object. */
         meta?: Meta;
+        /** Include jQuery by default. */
         jquery?: boolean;
+        /** The style of the `<body>` element. When left undefined, the static attribute `View.body_style` will be used. */
         lang?: string;
         body_style?: string | null;
+        /** The splash screen settings. When left undefined, the static attribute `View.splash_screen` will be used. */
         splash_screen?: SplashScreen;
+        /** Optimize JavaScript source code by removing dead code. */
         tree_shaking?: boolean;
+        /** Optimize JavaScript source code by mangling function names. */
         mangle?: boolean;
         min_device_width?: number,
         _src?: string;

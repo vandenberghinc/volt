@@ -24,6 +24,8 @@
  * - Instances are **immutable**; all arithmetic returns new `SafeInt` instances.
  * - Conversions are **exact by default**. Provide a {@link SafeInt.RoundingNode} `mode` to allow rounding.
  * - Arithmetic is **same-scale only**: pass raw integers or another `SafeInt<S>`.
+ * 
+ * @docs
  */
 export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
@@ -66,6 +68,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      *
      * @throws
      * Error If inputs are invalid, conversion overflows, or exactness is required but not met.
+     * 
+     * @docs
      */
     constructor(
         value: number,
@@ -171,6 +175,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Retrieve the underlying integer (measured in {@link scale} units).
      *
      * @returns The stored safe integer.
+     * 
+     * @docs
      */
     value(): number {
         return this.int_value;
@@ -180,6 +186,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Alias of {@link value}. Provided for JavaScript numeric coercion.
      *
      * @returns The stored safe integer.
+     * 
+     * @docs
      */
     valueOf(): number {
         return this.int_value;
@@ -189,6 +197,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Retrieve this instance's canonical scale.
      *
      * @returns The positive integer scale for this value.
+     * 
+     * @docs
      */
     scale(): S {
         return this.int_scale;
@@ -202,6 +212,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Convert to base scale (1) as a floating-point number (presentation).
      *
      * @returns The amount in base units as a float.
+     * 
+     * @docs
      */
     to_base_float(): number {
         if (this.int_scale === SafeInt.Scale.Base) return this.int_value;
@@ -221,6 +233,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @param mode     Rounding mode for non-exact ratios (default `"exact"`).
      *
      * @returns A new {@link SafeInt} typed as `SafeInt<T>`, storing an integer at `to_scale`.
+     * 
+     * @docs
      */
     to_scale<T extends SafeInt.Scale>(to_scale: T, mode: SafeInt.RoundingNode = "exact"): SafeInt<T> {
         // validate target scale
@@ -254,6 +268,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Rescale to base (1).
      *
      * @returns A new `SafeInt<SafeInt.Scale.Base>`.
+     * 
+     * @docs
      */
     base(): SafeInt<SafeInt.Scale.Base> {
         return this.to_scale(SafeInt.Scale.Base);
@@ -263,6 +279,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Rescale to milli (1e3).
      *
      * @returns A new `SafeInt<SafeInt.Scale.Milli>`.
+     * 
+     * @docs
      */
     milli(): SafeInt<SafeInt.Scale.Milli> {
         return this.to_scale(SafeInt.Scale.Milli);
@@ -272,6 +290,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Rescale to micro (1e6).
      *
      * @returns A new `SafeInt<SafeInt.Scale.Micro>`.
+     * 
+     * @docs
      */
     micro(): SafeInt<SafeInt.Scale.Micro> {
         return this.to_scale(SafeInt.Scale.Micro);
@@ -281,6 +301,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Rescale to nano (1e9).
      *
      * @returns A new `SafeInt<SafeInt.Scale.Nano>`.
+     * 
+     * @docs
      */
     nano(): SafeInt<SafeInt.Scale.Nano> {
         return this.to_scale(SafeInt.Scale.Nano);
@@ -290,6 +312,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Rescale to pico (1e12).
      *
      * @returns A new `SafeInt<SafeInt.Scale.Pico>`.
+     * 
+     * @docs
      */
     pico(): SafeInt<SafeInt.Scale.Pico> {
         return this.to_scale(SafeInt.Scale.Pico);
@@ -306,6 +330,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @returns     A new `SafeInt<S>` with the sum.
      *
      * @throws Error If the operand is invalid or the sum overflows.
+     * 
+     * @docs
      */
     add(other: number | SafeInt<S>): SafeInt<S> {
         const b = typeof other === "number" ? other : other.int_value;
@@ -326,6 +352,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @returns     A new `SafeInt<S>` with the difference.
      *
      * @throws Error If the operand is invalid or subtraction overflows.
+     * 
+     * @docs
      */
     sub(other: number | SafeInt<S>): SafeInt<S> {
         const b = typeof other === "number" ? other : other.int_value;
@@ -346,6 +374,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @returns      A new `SafeInt<S>` with the product.
      *
      * @throws Error If the factor is invalid or the product overflows.
+     * 
+     * @docs
      */
     mul(factor: number | SafeInt<S>): SafeInt<S> {
         const f = typeof factor === "number" ? factor : factor.int_value;
@@ -367,6 +397,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @returns       A new `SafeInt<S>` with the integer quotient (per {@link mode}).
      *
      * @throws Error If the divisor is invalid, division by zero, non-exact remainder in `"exact"` mode, or overflow.
+     * 
+     * @docs
      */
     div(divisor: number | SafeInt<S>, mode: SafeInt.RoundingNode = "exact"): SafeInt<S> {
         const d = typeof divisor === "number" ? divisor : divisor.int_value;
@@ -386,6 +418,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      *
      * @param other The other amount (same scale).
      * @returns     `-1` if this < other, `0` if equal, `1` if this > other.
+     * 
+     * @docs
      */
     cmp(other: SafeInt<S>): number {
         const rhs = other.int_value;
@@ -399,6 +433,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      *
      * @param other The other amount (same scale).
      * @returns     `true` if equal, otherwise `false`.
+     * 
+     * @docs
      */
     eq(other: SafeInt<S>): boolean {
         return this.cmp(other) === 0;
@@ -410,6 +446,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
     /**
      * Assert `value` is a `>=0` safe integer.
+     * 
+     * @docs
      */
     assert_non_negative(): void {
         if (!Number.isSafeInteger(this.int_value) || this.int_value < 0) {
@@ -419,6 +457,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
     /**
      * Assert `value` is a `>0` safe integer.
+     * 
+     * @docs
      */
     assert_positive(): void {
         if (!Number.isSafeInteger(this.int_value) || this.int_value <= 0) {
@@ -428,6 +468,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
     /**
      * Assert `value` is a `<=0` safe integer.
+     * 
+     * @docs
      */
     assert_non_positive(): void {
         if (!Number.isSafeInteger(this.int_value) || this.int_value > 0) {
@@ -437,6 +479,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
     /**
      * Assert `value` is a `<0` safe integer.
+     * 
+     * @docs
      */
     assert_negative(): void {
         if (!Number.isSafeInteger(this.int_value) || this.int_value >= 0) {
@@ -446,6 +490,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
     /**
      * Assert `value` is a `>=0` safe integer.
+     * 
+     * @docs
      */
     static assert_non_negative(value: number, label: string): void {
         if (!Number.isSafeInteger(value) || value < 0) {
@@ -455,6 +501,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
     /**
      * Assert `value` is a `>0` safe integer.
+     * 
+     * @docs
      */
     static assert_positive(value: number, label: string): void {
         if (!Number.isSafeInteger(value) || value <= 0) {
@@ -464,6 +512,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
     /**
      * Assert `value` is a `<=0` safe integer.
+     * 
+     * @docs
      */
     static assert_non_positive(value: number, label: string): void {
         if (!Number.isSafeInteger(value) || value > 0) {
@@ -473,6 +523,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
     /**
      * Assert `value` is a `<0` safe integer.
+     * 
+     * @docs
      */
     static assert_negative(value: number, label: string): void {
         if (!Number.isSafeInteger(value) || value >= 0) {
@@ -621,6 +673,8 @@ export namespace SafeInt {
      * - `"floor"` — truncate toward zero.
      * - `"ceil"`  — round up if any remainder exists.
      * - `"round"` — round half up (≥ 0.5).
+     * 
+     * @docs
      */
     export type RoundingNode = "exact" | "floor" | "ceil" | "round";
 
@@ -629,6 +683,8 @@ export namespace SafeInt {
      *
      * @example
      * Base = 1, Milli = 1e3, Micro = 1e6, Nano = 1e9, Pico = 1e12
+     * 
+     * @docs
      */
     export enum Scale {
         /** Base units (whole units). */
@@ -686,18 +742,33 @@ export namespace SafeInt {
         }
     }
 
-    /** Alias for `SafeInt<Scale.Base>` */
+    /**
+     * Alias for `SafeInt<Scale.Base>`
+     * @docs
+     */
     export type Base = SafeInt<Scale.Base>;
 
-    /** Alias for `SafeInt<Scale.Milli>` */
+    /**
+     * Alias for `SafeInt<Scale.Milli>`
+     * @docs
+     */
     export type Milli = SafeInt<Scale.Milli>;
 
-    /** Alias for `SafeInt<Scale.Micro>` */
+    /**
+     * Alias for `SafeInt<Scale.Micro>`
+     * @docs
+     */
     export type Micro = SafeInt<Scale.Micro>;
 
-    /** Alias for `SafeInt<Scale.Nano>` */
+    /**
+     * Alias for `SafeInt<Scale.Nano>`
+     * @docs
+     */
     export type Nano = SafeInt<Scale.Nano>;
 
-    /** Alias for `SafeInt<Scale.Pico>` */
+    /**
+     * Alias for `SafeInt<Scale.Pico>`
+     * @docs
+     */
     export type Pico = SafeInt<Scale.Pico>;
 }

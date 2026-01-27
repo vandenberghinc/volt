@@ -43,7 +43,10 @@ class BaseError extends Error {
 }
 
 /**
- * Thrown internal errors are not presented to the user, isntead an internal server error message is shown.
+ * Thrown internal errors are not presented to the user, instead an internal server error message is shown.
+ * 
+ * @nav Errors
+ * @docs
  */
 export class InternalError extends BaseError {
     constructor(args: ConstructorParameters<typeof BaseError>[0]) {
@@ -51,6 +54,10 @@ export class InternalError extends BaseError {
         super(args);
         this.name = "InternalError";
     }
+    /**
+     * Serve a generic internal server error response.
+     * @docs
+     */
     serve(stream: Stream) {
         stream.error({
             status: Status.internal_server_error,
@@ -63,7 +70,10 @@ export class InternalError extends BaseError {
 }
 
 /**
- * Thrown external errors are presented to the user.
+ * Thrown external errors are presented to the user when caused inside a request context.
+ * 
+ * @nav Errors
+ * @docs
  */
 export class ExternalError extends BaseError {
     constructor(args: ConstructorParameters<typeof BaseError>[0]) {
@@ -71,6 +81,10 @@ export class ExternalError extends BaseError {
         super(args);
         this.name = "ExternalError";
     }
+    /**
+     * Serve the external error response.
+     * @docs
+     */
     serve(stream: Stream) {
         stream.error({
             status: this.status ?? Status.internal_server_error,

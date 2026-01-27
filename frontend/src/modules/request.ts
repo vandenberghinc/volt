@@ -3,7 +3,7 @@
  * @copyright © 2022 - 2025 Daan van den Bergh.
  */
 
-import type { RegisteredEndpoint } from "../../../backend/src/server.js";
+import type { Server } from "../../../backend/src/server.js";
 import type { APIError } from "../../../backend/src/stream.js";
 
 export namespace Request {
@@ -43,10 +43,10 @@ export namespace Request {
      * Create request info from a registered endpoint.
      */
     export type InfoFromEndpoint<
-        E extends RegisteredEndpoint<any, any, any>,
+        E extends Server.RegisteredEndpoint<any, any, any>,
         SuccessBody extends ResponseBodyBase = undefined,
         ErrorBody extends ResponseBodyBase = undefined,
-    > = E extends RegisteredEndpoint<infer M, infer EP, infer P>
+    > = E extends Server.RegisteredEndpoint<infer M, infer EP, infer P>
         ? Info<
             M extends undefined ? "GET" : M extends Method ? M : never,
             EP extends string ? EP : never,
