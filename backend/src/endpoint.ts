@@ -27,89 +27,7 @@ const { debug } = vlib;
 /**
  * The endpoint class.
  * @nav Endpoints
- *
- * @param method
- *   The method type.
- *
- * @param endpoint
- *   The endpoint sub url.
- *
- * @param authenticated
- *   Only allow authenticated requests.
- *
- * @param rate_limit
- *   The rate limit settings.
- *
- *   Rate limiting works by creating a rate limit per group of endpoints. Multiple
- *   rate limiting groups can be applied by defining an array with rate limit objects.
- *   A group's interval and limit only need to be defined once on a single endpoint.
- *   When defined again these values will override the initial group settings.
- *
- *   The rate limit parameter may be defined as three types:
- *   - `string`: Assign the rate limit group without any group parameters. Useful when the group is already defined.
- *   - `RateLimitGroup`: As a rate limit object.
- *   - An array with multiple rate limit objects.
- *
- *   When left undefined no rate limiting will be applied.
- *
- * @param callback
- *   The callback that will be executed when a client requests this endpoint.
- *   Parameter `callback` precedes over parameter `data` and parameter `view`.
- *   The callback can take parameter `stream` assigned with the `volt.Stream` object of the request.
- *
- * @param view
- *   The JavaScript view that will be executed on the client side.
- *   Parameter `view` precedes over parameter `data`.
- *
- * @param data
- *   The data that will be returned as the response body.
- *
- * @param content_type
- *   The content type for parameter `data` or `callback`.
- *
- * @param compress
- *   Compress data, only available when initialized with one of the following parameters `view` or `data`.
- *
- * @param cache
- *   Parameter cache can define the max age of the cached response in seconds or as a boolean `true`.
- *   Anything higher than zero enables caching.
- *
- *   When server production mode is enabled caching is done automatically unless `cache` is `false`.
- *   When production mode is disabled responses are never cached, even though the parameter is assigned.
- *   The response of an endpoint that uses parameter `callback` is never cached.
- *
- * @param sitemap
- *   A boolean indicating if the endpoint should show up in the sitemap.
- *   By default only when the attribute `view` is defined and the endpoint is unauthenticated,
- *   the endpoint will show up in sitemap.
- *
- * @param robots
- *   A boolean indicating if the endpoint should be crawled by search engines.
- *   By default only endpoints with `view` enabled will be crawled, unless specified otherwise.
- *
- * @param ip_whitelist
- *   An IP whitelist for the endpoint. When the parameter is defined with an Array,
- *   the whitelist will become active.
- *
- * @param _path
- *   Internal parameter (ignored).
- *
- * @param _is_static
- *   Internal parameter (ignored).
- *
- * @typedef RateLimitGroup
- * @property group
- *   The rate limit group.
- *
- * @property limit
- *   The maximum requests per rate limit interval. These settings will be cached per group
- *   and only have to be assigned once. The assigned attributes will be overridden when
- *   these attributes are reassigned for the same group.
- *
- * @property interval
- *   The rate limit interval in seconds. These settings will be cached per group
- *   and only have to be assigned once. The assigned attributes will be overridden when
- *   these attributes are reassigned for the same group.
+ * @docs
  */
 
 export class Endpoint<
@@ -707,13 +625,51 @@ export namespace Endpoint {
              * @default "GET"
              */
             method?: M extends undefined ? "GET" : M,
+            /** The endpoint sub url. */
             endpoint: E,
+            /**
+             * The rate limit settings.
+             *
+             * Rate limiting works by creating a rate limit per group of endpoints. Multiple
+             * rate limiting groups can be applied by defining an array with rate limit objects.
+             * A group's interval and limit only need to be defined once on a single endpoint.
+             * When defined again these values will override the initial group settings.
+             *
+             * The rate limit parameter may be defined as three types:
+             * - `string`: Assign the rate limit group without any group parameters. Useful when the group is already defined.
+             * - `RateLimitGroup`: As a rate limit object.
+             * - An array with multiple rate limit objects.
+             *
+             * When left undefined no rate limiting will be applied.
+             */
             rate_limit?: string | RateLimitGroup | (string | RateLimitGroup)[],
             params?: S,
+            /** Compress data, only available when initialized with one of the following parameters `view` or `data`. */
             compress?: "auto" | boolean,
+            /**
+             * Parameter cache can define the max age of the cached response in seconds or as a boolean `true`.
+             * Anything higher than zero enables caching.
+             * 
+             * When server production mode is enabled caching is done automatically unless `cache` is `false`.
+             * When production mode is disabled responses are never cached, even though the parameter is assigned.
+             * The response of an endpoint that uses parameter `callback` is never cached.
+             */
             cache?: boolean | number,
+            /**
+             * An IP whitelist for the endpoint. When the parameter is defined with an Array,
+             * the whitelist will become active.
+             */
             ip_whitelist?: string[],
+            /**
+             * A boolean indicating if the endpoint should show up in the sitemap.
+             * By default only when the attribute `view` is defined and the endpoint is unauthenticated,
+             * the endpoint will show up in sitemap.
+             */
             sitemap?: boolean,
+            /**
+             * A boolean indicating if the endpoint should be crawled by search engines.
+             * By default only endpoints with `view` enabled will be crawled, unless specified otherwise.
+             */
             robots?: boolean,
             _is_static?: boolean,
             allow_unknown_params?: boolean;
@@ -722,47 +678,61 @@ export namespace Endpoint {
         & (
             // With data & content type.
             | {
+                /** The data that will be returned as the response body. */
                 data?: Buffer | string | any[] | Record<any, any>;
                 file_path?: never;
                 view?: never;
+                /** Only allow authenticated requests. */
                 authenticated?: boolean,
                 callback?: never;
+                /** The content type for parameter `data` or `callback`. */
                 content_type: string;
             }
             // With file path & content type.
             | {
                 data?: never;
                 file_path: string | vlib.Path;
+                /** Only allow authenticated requests. */
                 authenticated?: boolean,
                 callback?: never;
                 view?: never;
+                /** The content type for parameter `data` or `callback`. */
                 content_type: string;
             }
             // With callback & content type.
             | {
                 data?: never;
                 file_path?: never;
+                /** Only allow authenticated requests. */
                 authenticated?: false,
+                /** The callback that will be executed when a client requests this endpoint. */
                 callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any)
                 view?: never;
+                /** The content type for parameter `data` or `callback`. */
                 content_type: string;
             }
             // With authenticated callback & content type.
             | {
                 data?: never;
                 file_path?: never;
+                /** Only allow authenticated requests. */
                 authenticated: true,
+                /** The callback that will be executed when a client requests this endpoint. */
                 callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any),
                 view?: never;
+                /** The content type for parameter `data` or `callback`. */
                 content_type: string;
             }
             // With view, and optional content type.
             | {
                 data?: never;
                 file_path?: never;
+                /** Only allow authenticated requests. */
                 authenticated?: boolean,
                 callback?: never;
+                /** The JavaScript view that will be executed on the client side. */
                 view: View | View.Opts;
+                /** The content type for parameter `data` or `callback`. */
                 content_type?: string;
             }
         )
