@@ -586,7 +586,7 @@ declare module './any_element.d.ts' { interface AnyElementMap { ScrollerElement:
 
 // Virtual Scroller.
 // /*  @ docs:
-//     @nav: Frontend
+//     @nav Frontend
 //     @chapter: Elements
 //     @title: Virtual Scroller
 //     @experimental: true

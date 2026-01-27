@@ -1862,8 +1862,11 @@ export class Server {
     /** The promise of database initialization and connecting. */
     private _db_init_promise: Promise<void> | undefined;
 
-    // Initialize.
-    // Initialize.
+    /**
+     * Initialize the server.
+     * @returns A promise that resolves when the server has been initialized.
+     * @docs
+     */
     async initialize({
         worker = false,
     }: {
@@ -2042,7 +2045,10 @@ export class Server {
         /* @performance */ this.performance.end("initialize()", initialize_start);
     }
 
-    // Find endpoint.
+    /**
+     * Find an endpoint by route or string.
+     * @docs
+     */
     find_endpoint(route: Route): Endpoint | undefined;
     find_endpoint(endpoint: string, method?: string): Endpoint | undefined;
     find_endpoint(endpoint: Route | string, method?: string): Endpoint | undefined {
@@ -2072,8 +2078,12 @@ export class Server {
     /**
      * Start the server.
      * @example
+     * {Start}
+     * Start the server
+     * ```
      * ...
      * server.start();
+     * ```
      */
     async start(): Promise<void> {
 

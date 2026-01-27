@@ -13,7 +13,7 @@ const {vlib} = require("./vinc.js");
 // Utils.
 
 /*  @docs:
- *  @nav: Backend
+ *  @nav Backend
     @parent: Utils
     @chapter: Exceptions
     @title: Frontend Error
@@ -48,7 +48,7 @@ class FrontendError extends Error {
 }
 
 /*  @docs:
- *  @nav: Backend
+ *  @nav Backend
     @parent: Utils
     @chapter: Exceptions
     @title: API Error

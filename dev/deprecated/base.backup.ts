@@ -261,10 +261,10 @@ export type undefstrnr = null | undefined | string | number;
 // Base element.
 // @note: this.tagName can not be used since they have different values on safari and other browsers.
 /*  @docs:
-    @nav: FrontendVElement
-    @chapter: Elements
-    @title: Base element
-    @desc: The base element of the volt frontend elements.
+    @nav FrontendVElement
+    @chapter Elements
+    @title Base element
+    @desc The base element of the volt frontend elements.
 */
 // export class VElement extends (HTMLElement as {new(): VBaseElementInterface, prototype: VBaseElementInterface}) {
 export abstract class VElement extends HTMLElement {
