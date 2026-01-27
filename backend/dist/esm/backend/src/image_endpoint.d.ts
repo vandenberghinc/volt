@@ -14,7 +14,7 @@ import { RateLimitGroup } from "./rate_limit.js";
  *     - `height` number: The width of the image as a number `100` or percentage `50%` / `0.5x`. The aspect ratio will be maintained when `width` is undefined.
  *     - `aspect_ratio` boolean: Maintain the aspect ratio when only one resizing dimension has been defined.
  * @docs
- * @nav Backend/Endpoints
+ * @nav Endpoints
  */
 declare class ImageEndpoint extends Endpoint implements Endpoint {
     static cache_in_memory: boolean;
@@ -24,6 +24,10 @@ declare class ImageEndpoint extends Endpoint implements Endpoint {
     private i_data?;
     private i_cache;
     is_image_endpoint: boolean;
+    /**
+     * Construct an image endpoint.
+     * @docs
+     */
     constructor({ endpoint, path, content_type, cache, _is_static, rate_limit, }: {
         endpoint: string;
         path: vlib.Path;

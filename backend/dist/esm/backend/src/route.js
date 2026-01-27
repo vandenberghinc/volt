@@ -1,6 +1,9 @@
 /**
  * A Route encapsulates an HTTP method and an endpoint pattern (string, colon-style, or RegExp),
  * and provides a `.match()` method which returns true/false and populates `.params` on success.
+ * @note A route is automatically created for each `Endpoint` inside the `Endpoint` class.
+ * @nav Endpoints
+ * @docs
  */
 export class Route {
     method;
@@ -47,7 +50,7 @@ export class Route {
         this.id = `${this.method}:${this.endpoint_str}`;
     }
     // /** Create match args
-    //   * @warning this is required for the `match()` method 
+    //   * @warning this is required for the `match()` method
     //   */
     // public static create_match_args(method: string, endpoint: string): { method: string, endpoint: string} {
     //     return {
@@ -58,6 +61,7 @@ export class Route {
     /**
      * Tests this route against another Route (e.g. a “request” Route).
      * @returns `false` when not matched, and a `params` object when matched.
+     * @docs
      */
     match(other) {
         // 0) reject regex-vs-regex

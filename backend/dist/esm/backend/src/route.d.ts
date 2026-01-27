@@ -1,6 +1,9 @@
 /**
  * A Route encapsulates an HTTP method and an endpoint pattern (string, colon-style, or RegExp),
  * and provides a `.match()` method which returns true/false and populates `.params` on success.
+ * @note A route is automatically created for each `Endpoint` inside the `Endpoint` class.
+ * @nav Endpoints
+ * @docs
  */
 export declare class Route {
     readonly method: string;
@@ -25,6 +28,7 @@ export declare class Route {
     /**
      * Tests this route against another Route (e.g. a “request” Route).
      * @returns `false` when not matched, and a `params` object when matched.
+     * @docs
      */
     match(other: Route): false | Record<string, any>;
     private _create_route_matcher;

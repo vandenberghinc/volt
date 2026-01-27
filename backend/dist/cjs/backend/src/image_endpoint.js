@@ -53,6 +53,10 @@ class ImageEndpoint extends import_endpoint.Endpoint {
   i_data;
   i_cache;
   is_image_endpoint;
+  /**
+   * Construct an image endpoint.
+   * @docs
+   */
   constructor({ endpoint, path, content_type, cache = true, _is_static = true, rate_limit = void 0 }) {
     super({
       method: "GET",

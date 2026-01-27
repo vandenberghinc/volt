@@ -58,7 +58,7 @@ class Route {
     this.id = `${this.method}:${this.endpoint_str}`;
   }
   // /** Create match args
-  //   * @warning this is required for the `match()` method 
+  //   * @warning this is required for the `match()` method
   //   */
   // public static create_match_args(method: string, endpoint: string): { method: string, endpoint: string} {
   //     return {
@@ -69,6 +69,7 @@ class Route {
   /**
    * Tests this route against another Route (e.g. a “request” Route).
    * @returns `false` when not matched, and a `params` object when matched.
+   * @docs
    */
   match(other) {
     if (this.endpoint instanceof RegExp && other.endpoint instanceof RegExp) {

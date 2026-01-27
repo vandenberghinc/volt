@@ -136,6 +136,8 @@ class Endpoint {
   /**
    * Clone this endpoint, used to create a modified copy of the current endpoint.
    * @param override Override specific endpoint options, note that this will be shallow merged.
+   *
+   * @docs
    */
   clone(override) {
     return new Endpoint({
@@ -161,7 +163,10 @@ class Endpoint {
       ...override
     });
   }
-  /** Construct an endpoint. */
+  /**
+   * Construct an endpoint.
+   * @docs
+   */
   constructor({
     method,
     endpoint,
@@ -280,6 +285,7 @@ class Endpoint {
   /**
    * Serve this endpoint manually from a stream.
    * This can for instance be used to serve a HTML `/error` endpoint from within a callback.
+   * @docs
    */
   async serve({ stream, status = 200, templates = void 0 }) {
     return await this._serve(stream, status, { templates });

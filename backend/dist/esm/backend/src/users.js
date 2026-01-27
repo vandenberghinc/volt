@@ -16,7 +16,10 @@ import { Collection } from "./database/collection.js";
 // The users manager.
 // ---------------------------------------------------------
 /**
- * The users class, accessible under `Server.users`.
+ * The users class, used for user management, authentication, and user data storage.
+ * @note This class is accessible via `Server.users`.
+ * @nav Users
+ * @docs
  */
 export class Users {
     // ---------------------------------------------------------
@@ -97,7 +100,7 @@ export class Users {
     // ---------------------------------------------------------
     // Constructor.
     // ---------------------------------------------------------
-    /** Construct the server. */
+    /** Construct the users manager. */
     constructor(opts) {
         this.server = opts._server;
         this.enable_2fa = opts.enable_2fa ?? false;
@@ -1413,13 +1416,12 @@ export class Users {
     // Public methods.
     // ---------------------------------------------------------
     /**
-     * DEVELOPMENT:
-     * @warning
+     * Validate a UID against ASCII charset and allowed lengths (current + legacy).
+     * @dev_warning
      * If you change {@link Users.UID_CHARSET} or {@link Users.UID_LENGTH},
      * update {@link Users.LEGACY_UID_LENGTHS} for backward compatibility.
-     */
-    /**
-     * Validate a UID against ASCII charset and allowed lengths (current + legacy).
+     *
+     * @docs
      */
     is_valid_uid(uid) {
         const len = uid.length; // ASCII-only, so code units == chars
@@ -1446,6 +1448,8 @@ export class Users {
      * Check if a uid exists.
      * @param uid The user ID to check.
      * @returns True if a user with the given uid exists.
+     *
+     * @docs
      */
     async uid_exists(uid) {
         return await this._users_db.exists({ uid });
@@ -1456,6 +1460,8 @@ export class Users {
      * @param username The username to check.
      * @example
      * const exists = await server.users.username_exists("someusername");
+     *
+     * @docs
      */
     async username_exists(username) {
         return await this._users_db.exists({ username });
@@ -1466,6 +1472,8 @@ export class Users {
      * @param email The email to check.
      * @example
      * const exists = await server.users.email_exists("some@email.com");
+     *
+     * @docs
      */
     async email_exists(email) {
         return await this._users_db.exists({ email });
@@ -1476,6 +1484,8 @@ export class Users {
      * @param uid The id of the user.
      * @example
      * const activated = await server.users.is_activated("0");
+     *
+     * @docs
      */
     async is_activated(uid) {
         return (await this.get(uid)).is_activated === true;
@@ -1486,6 +1496,8 @@ export class Users {
      * @param is_activated The boolean with the new activated status.
      * @example
      * await server.users.set_activated("1", true);
+     *
+     * @docs
      */
     async set_activated(uid, is_activated) {
         await this._sys_set(uid, { is_activated: is_activated });
@@ -1509,6 +1521,8 @@ export class Users {
      *   email: "johndoe@email.com",
      *   password: "HelloWorld!"
      * });
+     *
+     * @docs
      */
     async create({ first_name, last_name, username, email, password, verify_password, phone_number = "", is_activated = undefined, _check_username_email = false, }) {
         // Verify params.
@@ -1590,6 +1604,8 @@ export class Users {
      * @param uid The user id.
      * @example
      * await server.users.delete("0");
+     *
+     * @docs
      */
     async delete(uid) {
         // Load the user to verify it exists and to pass it to the callback.
@@ -1623,6 +1639,8 @@ export class Users {
      * @param first_name The new first name.
      * @example
      * await server.users.set_first_name("1", "John");
+     *
+     * @docs
      */
     async set_first_name(uid, first_name) {
         await this._sys_set(uid, { first_name });
@@ -1633,6 +1651,8 @@ export class Users {
      * @param last_name The new last name.
      * @example
      * await server.users.set_last_name("1", "Doe");
+     *
+     * @docs
      */
     async set_last_name(uid, last_name) {
         await this._sys_set(uid, { last_name });
@@ -1643,6 +1663,8 @@ export class Users {
      * @param username The new username.
      * @example
      * await server.users.set_username("1", "newusername");
+     *
+     * @docs
      */
     async set_username(uid, username) {
         if (await this.username_exists(username)) {
@@ -1656,6 +1678,8 @@ export class Users {
      * @param email The new email.
      * @example
      * await server.users.set_email("1", "new@email.com");
+     *
+     * @docs
      */
     async set_email(uid, email) {
         if (await this.email_exists(email)) {
@@ -1669,6 +1693,8 @@ export class Users {
      * @param password The new password.
      * @example
      * await server.users.set_password("1", "XXXXXX");
+     *
+     * @docs
      */
     async set_password(uid, password, verify_password) {
         const { error } = this._verify_new_pass(password, verify_password ?? password);
@@ -1689,6 +1715,8 @@ export class Users {
      * Updating the API key through this function is not allowed (wont work).
      *
      * @warning Does not upsert documents.
+     *
+     * @docs
      */
     async set(uid, data) {
         let old_data;
@@ -1758,6 +1786,8 @@ export class Users {
     /**
      * Insert new data into an EXISTING user.
      * @warning Does not upsert documents.
+     *
+     * @docs
      */
     async _sys_set(uid, data) {
         await this._users_db.set({ uid }, data, { upsert: false });
@@ -1769,6 +1799,8 @@ export class Users {
      * @throws {Collection.NotFoundError} If the user id does not exist.
      * @example
      * const user = await server.users.get("0");
+     *
+     * @docs
      */
     async get(uid) {
         return await this._users_db.load({ uid });
@@ -1780,6 +1812,8 @@ export class Users {
      * @throws {Collection.NotFoundError} If the username does not exist.
      * @example
      * const user = await server.users.get_by_username("myusername");
+     *
+     * @docs
      */
     async get_by_username(username) {
         return await this._users_db.load({ username });
@@ -1793,6 +1827,8 @@ export class Users {
      * @throws {Collection.NotFoundError} If the username or uid does not exist.
      * @example
      * const user = await server.users.get_by_username("myusername");
+     *
+     * @docs
      */
     async get_by_uid_or_username(uid_or_username) {
         return await this._users_db.load({
@@ -1809,6 +1845,8 @@ export class Users {
      * @throws {Collection.NotFoundError} If the email does not exist.
      * @example
      * const user = await server.users.get_by_email("my@email.com");
+     *
+     * @docs
      */
     async get_by_email(email) {
         return await this._users_db.load({ email });
@@ -1819,6 +1857,8 @@ export class Users {
      * @param api_key The API key of the user to fetch.
      * @example
      * const user = await server.users.get_by_api_key("XXXXXX");
+     *
+     * @docs
      */
     async get_by_api_key(api_key) {
         const uid = this.get_uid_by_api_key(api_key);
@@ -1840,6 +1880,8 @@ export class Users {
      * @param token The authentication token of the user to fetch.
      * @example
      * const user = await server.users.get_by_token("XXXXXX");
+     *
+     * @docs
      */
     async get_by_token(token) {
         const uid = this.get_uid_by_token(token);
@@ -1860,6 +1902,8 @@ export class Users {
      * @param username The username of the uid to fetch.
      * @example
      * const uid = await server.users.get_uid("myusername");
+     *
+     * @docs
      */
     async get_uid(username) {
         try {
@@ -1875,6 +1919,8 @@ export class Users {
      * @param username The username of the uid to fetch.
      * @example
      * const uid = await server.users.get_uid_by_username("myuser");
+     *
+     * @docs
      */
     async get_uid_by_username(username) {
         try {
@@ -1890,6 +1936,8 @@ export class Users {
      * @param email The email of the uid to fetch.
      * @example
      * const uid = await server.users.get_uid_by_email("my@email.com");
+     *
+     * @docs
      */
     async get_uid_by_email(email) {
         try {
@@ -1905,6 +1953,8 @@ export class Users {
      * @param api_key The API key to parse.
      * @example
      * const uid = server.users.get_uid_by_api_key("XXXXXXXXXX");
+     *
+     * @docs
      */
     get_uid_by_api_key(api_key) {
         return this._parse_uid_from_token_api_key(api_key, "ak_");
@@ -1915,6 +1965,8 @@ export class Users {
      * @param token The token to parse.
      * @example
      * const uid = server.users.get_uid_by_token("XXXXXXXXXX");
+     *
+     * @docs
      */
     get_uid_by_token(token) {
         return this._parse_uid_from_token_api_key(token, "tk_");
@@ -1925,6 +1977,8 @@ export class Users {
      * @param uid The user id.
      * @example
      * const pin = await server.users.get_support_pin("1");
+     *
+     * @docs
      */
     async get_support_pin(uid) {
         return (await this.get(uid)).support_pin;
@@ -1935,6 +1989,8 @@ export class Users {
      * @param uid The user id.
      * @example
      * const api_key = await server.users.generate_api_key("0");
+     *
+     * @docs
      */
     async generate_api_key(uid) {
         const api_key = this._generate_api_key(uid);
@@ -1948,6 +2004,8 @@ export class Users {
      * @throws {Collection.NotFoundError} If the user id does not exist.
      * @example
      * const has_api_key = await server.users.has_api_key("0");
+     *
+     * @docs
      */
     async has_api_key(uid) {
         const data = await this._users_db.load({ uid }, {
@@ -1960,6 +2018,8 @@ export class Users {
      * @param uid The user id.
      * @example
      * await server.users.revoke_api_key("0");
+     *
+     * @docs
      */
     async revoke_api_key(uid) {
         await this._users_db.save({ uid }, { $unset: { api_key: "" } }, { upsert: false });
@@ -1971,6 +2031,8 @@ export class Users {
      * @param password The plaintext password.
      * @example
      * const success = await server.users.verify_password("1", "XXXXXX");
+     *
+     * @docs
      */
     async verify_password(uid, password) {
         try {
@@ -1987,6 +2049,8 @@ export class Users {
      * @param api_key The api key to verify.
      * @example
      * const success = await server.users.verify_api_key("XXXXXX");
+     *
+     * @docs
      */
     async verify_api_key(api_key) {
         return await this.verify_api_key_by_uid(this.get_uid_by_api_key(api_key), api_key);
@@ -1998,6 +2062,8 @@ export class Users {
      * @param api_key The api key to verify.
      * @example
      * const success = await server.users.verify_api_key_by_uid("1", "XXXXXX");
+     *
+     * @docs
      */
     async verify_api_key_by_uid(uid, api_key) {
         try {
@@ -2017,6 +2083,8 @@ export class Users {
      * @param token The token to verify.
      * @example
      * const success = await server.users.verify_token("XXXXXX");
+     *
+     * @docs
      */
     async verify_token(token) {
         return await this.verify_token_by_uid(this.get_uid_by_token(token), token);
@@ -2028,6 +2096,8 @@ export class Users {
      * @param token The token to verify.
      * @example
      * const success = await server.users.verify_token_by_uid("1", "XXXXXX");
+     *
+     * @docs
      */
     async verify_token_by_uid(uid, token) {
         try {
@@ -2054,6 +2124,8 @@ export class Users {
      * @returns Returns undefined on success, otherwise a string describing the error.
      * @example
      * await server.users.verify_2fa("1", "123456");
+     *
+     * @docs
      */
     async verify_2fa(uid, code) {
         try {
@@ -2092,6 +2164,8 @@ export class Users {
      * @param expiration The amount of seconds in which the code will expire.
      * @example
      * await server.users.send_2fa({ uid: "0", stream });
+     *
+     * @docs
      */
     async send_2fa({ uid, stream, expiration = 300, _user_agent = undefined, _username = undefined, _email = undefined, }) {
         // Generate 2fa and get user email.
@@ -2135,6 +2209,8 @@ export class Users {
     /**
      * List all users.
      * @returns An array of User objects.
+     *
+     * @docs
      */
     async list() {
         return await this._users_db.list_all();

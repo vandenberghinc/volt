@@ -9,10 +9,8 @@ import { Stream, AuthStream } from "./stream.js";
 import type { Server } from "./server.js";
 import { Route } from './route.js';
 /**
- * @nav Backend
- * @chapter Endpoints
- * @title Endpoint
- * @description The endpoint class.
+ * The endpoint class.
+ * @nav Endpoints
  *
  * @param method
  *   The method type.
@@ -141,13 +139,19 @@ export declare class Endpoint<const M extends Endpoint.Method = "GET", const E e
     /**
      * Clone this endpoint, used to create a modified copy of the current endpoint.
      * @param override Override specific endpoint options, note that this will be shallow merged.
+     *
+     * @docs
      */
     clone<const M extends Endpoint.Method = "GET", const E extends string | RegExp = string, const S extends vlib.Schema.Entries.Opts = {}>(this: Endpoint<M, E, S>, override?: Partial<Endpoint.Opts<M, E, S>>): Endpoint<M, E, S>;
-    /** Construct an endpoint. */
+    /**
+     * Construct an endpoint.
+     * @docs
+     */
     constructor({ method, endpoint, authenticated, rate_limit, params, compress, cache, ip_whitelist, sitemap, robots, allow_unknown_params, _is_static, callback, view, data, file_path, content_type, }: Endpoint.Opts<M, E, S>);
     /**
      * Serve this endpoint manually from a stream.
      * This can for instance be used to serve a HTML `/error` endpoint from within a callback.
+     * @docs
      */
     serve({ stream, status, templates, }: {
         stream: Stream;
@@ -167,9 +171,15 @@ export declare class Endpoint<const M extends Endpoint.Method = "GET", const E e
     private _load_data_by_path;
 }
 export declare namespace Endpoint {
-    /** The endpoint method. */
+    /**
+     * The endpoint method.
+     * @docs
+     */
     type Method = "GET" | "POST" | "DELETE" | "PUT" | "PATCH" | "OPTIONS";
-    /** Options for constructing an endpoint. */
+    /**
+     * Options for constructing an endpoint.
+     * @docs
+     */
     type Opts<M extends Method = Method, E extends string | RegExp = string, S extends vlib.Schema.Entries.Opts = {}> = {
         /**
          * The endpoint method.

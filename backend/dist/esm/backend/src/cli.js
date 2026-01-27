@@ -7,7 +7,7 @@
 // Imports.
 import * as vlib from "@vandenberghinc/vlib";
 import * as vhighlight from "@vandenberghinc/vhighlight";
-import * as volt from "./volt.js";
+import * as volt from "./index.js";
 // ---------------------------------------------------------
 // Global constants.
 const CONFIG_PATHS = [

@@ -31,7 +31,8 @@ export interface RateLimitCacheData {
  * A group can either be registered through this class or by defining the rate limit group on an endpoint using `Endpoint.rate_limit`.
  *
  * This class will be accessable under `Server` attribute `rate_limits`.
- * @nav Backend/Rate Limit
+ *
+ * @nav Rate Limit
  * @docs
  */
 export declare namespace RateLimits {
@@ -62,12 +63,17 @@ export declare namespace RateLimits {
      * @param ip The input IPv4/IPv6 address.
      * @returns Canonical address string.
      * @throws {Error} If the input is not a valid IPv4 or IPv6 address.
+     *
+     * @docs
      */
     function normalize_ip(ip: string): string;
 }
 /** Nested types for the {@link RateLimitServer}. */
 export declare namespace RateLimitServer {
-    /** Constructor options. */
+    /**
+     * Constructor options.
+     * @docs
+     */
     interface Opts {
         /** The port to which the rate limiting server will bind. The default is `51234`. */
         port?: number;
@@ -80,8 +86,6 @@ export declare namespace RateLimitServer {
 /**
  * The rate limit websocket class (server).
  * Rate limiting is handled automatically when the endpoints has it enabled.
- *
- * @nav Backend/Rate Limit
  */
 export declare class RateLimitServer {
     static default_port: number;
@@ -105,7 +109,10 @@ export declare class RateLimitServer {
 }
 /** Nested types for the {@link RateLimitClient}. */
 export declare namespace RateLimitClient {
-    /** Constructor options. */
+    /**
+     * Constructor options.
+     * @docs
+     */
     interface Opts {
         /** The port to which the rate limiting server will bind. The default is `51234`. */
         port?: number;
@@ -121,8 +128,6 @@ export declare namespace RateLimitClient {
  * The secondary rate limit class (client).
  *
  * Rate limiting is handled automatically when the endpoints has it enabled.
- *
- * @nav Backend/Rate Limit
  */
 export declare class RateLimitClient {
     private ip;

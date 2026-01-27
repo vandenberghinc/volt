@@ -10,8 +10,11 @@ import { MongoClient, ServerApiVersion } from 'mongodb';
 import { Collection } from "./collection.js";
 /**
  * The MongoDB database class, accessable under `Server.db`.
+ *
+ * @note This class is initialized under server property `db` when the server is started with the `database` option.
+ *
+ * @nav Database
  * @docs
- * @nav Backend/Database
 */
 export class Database {
     static constructor_scheme = {
@@ -118,7 +121,11 @@ export class Database {
             }
         });
     }
-    /** Initialize. */
+    /**
+     * Initialize the database.
+     * @note This is done automatically by initializing the server.
+     * @docs
+     */
     async initialize() {
         this.server.log(3, "Initializing the database.");
         // Initialize client (same as before)
@@ -147,7 +154,10 @@ export class Database {
         }
         this.server.log(3, "Database initialized.");
     }
-    /** Ensure connection. */
+    /**
+     * Ensure the database connection is established.
+     * @docs
+     */
     async ensure_connection() {
         if (this.connected)
             return;
@@ -155,18 +165,22 @@ export class Database {
             return this.connect_promise;
         return this.connect();
     }
-    // Close.
+    /**
+     * Close the database connection.
+     * @docs
+     */
     async close() {
         this.server.log(0, "Stopping the database.");
         await this.client?.close();
         this.connect_promise = undefined;
     }
     /**
-     * {Create Collection}
      * Initialize database collection.
      * @note When called multiple times with the same name, it will return the same cached collection.
      * @param info.unique If true, an error will be thrown if the collection already exists.
      *                    Defauls to `true`.
+     *
+     * @docs
      */
     collection(info) {
         // Set name by single string argument.

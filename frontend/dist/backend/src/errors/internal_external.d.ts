@@ -22,17 +22,31 @@ declare class BaseError extends Error {
     serve(stream: Stream): this;
 }
 /**
- * Thrown internal errors are not presented to the user, isntead an internal server error message is shown.
+ * Thrown internal errors are not presented to the user, instead an internal server error message is shown.
+ *
+ * @nav Errors
+ * @docs
  */
 export declare class InternalError extends BaseError {
     constructor(args: ConstructorParameters<typeof BaseError>[0]);
+    /**
+     * Serve a generic internal server error response.
+     * @docs
+     */
     serve(stream: Stream): this;
 }
 /**
- * Thrown external errors are presented to the user.
+ * Thrown external errors are presented to the user when caused inside a request context.
+ *
+ * @nav Errors
+ * @docs
  */
 export declare class ExternalError extends BaseError {
     constructor(args: ConstructorParameters<typeof BaseError>[0]);
+    /**
+     * Serve the external error response.
+     * @docs
+     */
     serve(stream: Stream): this;
 }
 export {};

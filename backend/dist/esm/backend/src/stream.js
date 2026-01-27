@@ -14,6 +14,8 @@ const { debug } = vlib;
  * The http2 stream wrapper object.
  *
  * @property headers The request headers.
+ *
+ * @nav Stream
  * @docs
  */
 export class Stream {
@@ -384,6 +386,7 @@ export class Stream {
      * Retrieve the normalized IP address, suitable for rate limiting and logging.
      * @throws {Error} If the IP is invalid.
      * @returns The normalized IP.
+     * @docs
      */
     normalized_ip() {
         if (this._normalized_ip != null) {

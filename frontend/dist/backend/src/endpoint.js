@@ -17,10 +17,8 @@ const { debug } = vlib;
 // ---------------------------------------------------------
 // Endpoint
 /**
- * @nav Backend
- * @chapter Endpoints
- * @title Endpoint
- * @description The endpoint class.
+ * The endpoint class.
+ * @nav Endpoints
  *
  * @param method
  *   The method type.
@@ -197,6 +195,8 @@ export class Endpoint {
     /**
      * Clone this endpoint, used to create a modified copy of the current endpoint.
      * @param override Override specific endpoint options, note that this will be shallow merged.
+     *
+     * @docs
      */
     clone(override) {
         return new Endpoint({
@@ -222,7 +222,10 @@ export class Endpoint {
             ...override,
         });
     }
-    /** Construct an endpoint. */
+    /**
+     * Construct an endpoint.
+     * @docs
+     */
     constructor({ method, endpoint, authenticated = false, rate_limit = undefined, params = undefined, compress = "auto", cache = true, ip_whitelist = undefined, sitemap = undefined, robots = undefined, allow_unknown_params = false, _is_static = false, 
     // mode options.
     callback = undefined, view = undefined, data = undefined, file_path = undefined, content_type, // = "text/plain",
@@ -343,6 +346,7 @@ export class Endpoint {
     /**
      * Serve this endpoint manually from a stream.
      * This can for instance be used to serve a HTML `/error` endpoint from within a callback.
+     * @docs
      */
     async serve({ stream, status = 200, templates = undefined, }) {
         return await this._serve(stream, status, { templates });

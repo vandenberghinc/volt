@@ -57,6 +57,8 @@ class SystemError extends Error {
    * Set a collection that will be used as default to save system errors to.
    *
    * @param collection The collection options to use.
+   *
+   * @docs
    */
   static set_collection(opts) {
     SystemError.collection = opts.server.db.collection({
@@ -71,6 +73,8 @@ class SystemError extends Error {
   /**
    * Configure the newly created system error instances,
    * assigning a global database collection and logger instance.
+   *
+   * @docs
    */
   static setup(opts) {
     SystemError.collection = opts.server.db.collection({
@@ -169,7 +173,10 @@ class SystemError extends Error {
     }
     this.trace = (holder.stack || "").split("\n").slice(1).map((line) => line.trim());
   }
-  /** Construct a system error & save it to the database. */
+  /**
+   * Construct a system error & save it to the database.
+   * @docs
+   */
   static async create(opts) {
     const error = new SystemError(opts);
     const formatted = error.format({ colored: false });
@@ -187,6 +194,7 @@ class SystemError extends Error {
    * This is a synchronous version of the create method.
    * Beware that this does not join the async save operation,
    * Instead it detaches and catches and logs any errors that occur during saving
+   * @docs
    */
   static create_detach(opts) {
     const error = new SystemError(opts);
@@ -210,6 +218,7 @@ class SystemError extends Error {
    * Get the error as a database document.
    *
    * @returns A plain object representing the system error for database storage.
+   * @docs
    */
   document() {
     const doc = {
@@ -244,6 +253,7 @@ class SystemError extends Error {
    * @param colored Present the formatted error with colors to make it more visually pleasing.
    *                Defaults to `false`.
    * @returns A string representation of the system error.
+   * @docs
    */
   format({ colored = false } = {}) {
     if (colored && this._format_colored)
@@ -299,6 +309,7 @@ class SystemError extends Error {
    * Convert the error to a string without ANSI colors to avoid leaking escape codes into sinks
    * (e.g., files, JSON logs) that assume plain text.
    * @returns Non-colored string representation of the error.
+   * @docs
    */
   toString() {
     return this.format({ colored: false });

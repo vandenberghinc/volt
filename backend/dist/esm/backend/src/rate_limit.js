@@ -11,7 +11,8 @@ import * as vlib from "@vandenberghinc/vlib";
  * A group can either be registered through this class or by defining the rate limit group on an endpoint using `Endpoint.rate_limit`.
  *
  * This class will be accessable under `Server` attribute `rate_limits`.
- * @nav Backend/Rate Limit
+ *
+ * @nav Rate Limit
  * @docs
  */
 export var RateLimits;
@@ -66,6 +67,8 @@ export var RateLimits;
      * @param ip The input IPv4/IPv6 address.
      * @returns Canonical address string.
      * @throws {Error} If the input is not a valid IPv4 or IPv6 address.
+     *
+     * @docs
      */
     function normalize_ip(ip) {
         let s = strip_brackets_zone_and_port(ip);
@@ -350,8 +353,6 @@ export var RateLimits;
 /**
  * The rate limit websocket class (server).
  * Rate limiting is handled automatically when the endpoints has it enabled.
- *
- * @nav Backend/Rate Limit
  */
 export class RateLimitServer {
     // Static attributes.
@@ -548,8 +549,6 @@ export class RateLimitServer {
  * The secondary rate limit class (client).
  *
  * Rate limiting is handled automatically when the endpoints has it enabled.
- *
- * @nav Backend/Rate Limit
  */
 export class RateLimitClient {
     ip;

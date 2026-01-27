@@ -7,7 +7,11 @@ import { Stream } from "./stream.js";
 import { Server } from "./server.js";
 import { Collection } from "./database/collection.js";
 import { Request } from "../../frontend/src/modules/request.js";
-/** The user object / document. */
+/**
+ * The user object / document.
+ * @nav Users
+ * @docs
+ */
 export type User = {
     /** The user identifier (unique index). */
     uid: string;
@@ -34,7 +38,11 @@ export type User = {
 };
 /** Nested types for the {@link User} interface */
 export declare namespace User {
-    /** The frontend representation of a user. */
+    /**
+     * The frontend representation of a user.
+     * @nav Users
+     * @docs
+     */
     type Frontend = {
         uid: string;
         username: string;
@@ -47,31 +55,40 @@ export declare namespace User {
         support_pin: string;
         is_activated: boolean;
     };
+    /**
+     * The token object / document.
+     * @docs
+     */
+    type Token = {
+        /** The user id. */
+        uid: string;
+        /** Expiration unix timestamp */
+        expiration: number;
+        /** The hashed token. */
+        token: string;
+        /** Is token still active. */
+        active: boolean;
+    };
+    /**
+     * The token object / document.
+     * @docs
+     */
+    type TwoFactorAuthToken = {
+        /** The user id. */
+        uid: string;
+        /** Expiration unix timestamp */
+        expiration: number;
+        /** The correct 2fa code. */
+        code: string;
+        /** Is token still active. */
+        active: boolean;
+    };
 }
-/** The token object / document. */
-export type Token = {
-    /** The user id. */
-    uid: string;
-    /** Expiration unix timestamp */
-    expiration: number;
-    /** The hashed token. */
-    token: string;
-    /** Is token still active. */
-    active: boolean;
-};
-/** The token object / document. */
-export type TwoFactorAuthToken = {
-    /** The user id. */
-    uid: string;
-    /** Expiration unix timestamp */
-    expiration: number;
-    /** The correct 2fa code. */
-    code: string;
-    /** Is token still active. */
-    active: boolean;
-};
 /**
- * The users class, accessible under `Server.users`.
+ * The users class, used for user management, authentication, and user data storage.
+ * @note This class is accessible via `Server.users`.
+ * @nav Users
+ * @docs
  */
 export declare class Users {
     /**
@@ -145,7 +162,7 @@ export declare class Users {
         query?: string;
         data: Users.Endpoints.JsonValue;
     }>;
-    /** Construct the server. */
+    /** Construct the users manager. */
     constructor(opts: Users.Opts & {
         _server: Server;
     });
@@ -246,7 +263,7 @@ export declare class Users {
      * @param stream The request stream.
      * @param token The token string or Token object.
      */
-    _create_token_cookie(stream: Stream, token: string | Token): void;
+    _create_token_cookie(stream: Stream, token: string | User.Token): void;
     /**
      * Create user cookies (id and activation flag).
      * @param stream The request stream.
@@ -272,19 +289,20 @@ export declare class Users {
         worker?: boolean;
     }): Promise<void>;
     /**
-     * DEVELOPMENT:
-     * @warning
+     * Validate a UID against ASCII charset and allowed lengths (current + legacy).
+     * @dev_warning
      * If you change {@link Users.UID_CHARSET} or {@link Users.UID_LENGTH},
      * update {@link Users.LEGACY_UID_LENGTHS} for backward compatibility.
-     */
-    /**
-     * Validate a UID against ASCII charset and allowed lengths (current + legacy).
+     *
+     * @docs
      */
     is_valid_uid(uid: string): boolean;
     /**
      * Check if a uid exists.
      * @param uid The user ID to check.
      * @returns True if a user with the given uid exists.
+     *
+     * @docs
      */
     uid_exists(uid: string): Promise<boolean>;
     /**
@@ -293,6 +311,8 @@ export declare class Users {
      * @param username The username to check.
      * @example
      * const exists = await server.users.username_exists("someusername");
+     *
+     * @docs
      */
     username_exists(username: string): Promise<boolean>;
     /**
@@ -301,6 +321,8 @@ export declare class Users {
      * @param email The email to check.
      * @example
      * const exists = await server.users.email_exists("some@email.com");
+     *
+     * @docs
      */
     email_exists(email: string): Promise<boolean>;
     /**
@@ -309,6 +331,8 @@ export declare class Users {
      * @param uid The id of the user.
      * @example
      * const activated = await server.users.is_activated("0");
+     *
+     * @docs
      */
     is_activated(uid: string): Promise<boolean>;
     /**
@@ -317,6 +341,8 @@ export declare class Users {
      * @param is_activated The boolean with the new activated status.
      * @example
      * await server.users.set_activated("1", true);
+     *
+     * @docs
      */
     set_activated(uid: string, is_activated: boolean): Promise<void>;
     /**
@@ -338,6 +364,8 @@ export declare class Users {
      *   email: "johndoe@email.com",
      *   password: "HelloWorld!"
      * });
+     *
+     * @docs
      */
     create({ first_name, last_name, username, email, password, verify_password, phone_number, is_activated, _check_username_email, }: {
         first_name: string;
@@ -355,6 +383,8 @@ export declare class Users {
      * @param uid The user id.
      * @example
      * await server.users.delete("0");
+     *
+     * @docs
      */
     delete(uid: string): Promise<void>;
     /**
@@ -363,6 +393,8 @@ export declare class Users {
      * @param first_name The new first name.
      * @example
      * await server.users.set_first_name("1", "John");
+     *
+     * @docs
      */
     set_first_name(uid: string, first_name: string): Promise<void>;
     /**
@@ -371,6 +403,8 @@ export declare class Users {
      * @param last_name The new last name.
      * @example
      * await server.users.set_last_name("1", "Doe");
+     *
+     * @docs
      */
     set_last_name(uid: string, last_name: string): Promise<void>;
     /**
@@ -379,6 +413,8 @@ export declare class Users {
      * @param username The new username.
      * @example
      * await server.users.set_username("1", "newusername");
+     *
+     * @docs
      */
     set_username(uid: string, username: string): Promise<void>;
     /**
@@ -387,6 +423,8 @@ export declare class Users {
      * @param email The new email.
      * @example
      * await server.users.set_email("1", "new@email.com");
+     *
+     * @docs
      */
     set_email(uid: string, email: string): Promise<void>;
     /**
@@ -395,6 +433,8 @@ export declare class Users {
      * @param password The new password.
      * @example
      * await server.users.set_password("1", "XXXXXX");
+     *
+     * @docs
      */
     set_password(uid: string, password: string, verify_password?: string): Promise<void>;
     /**
@@ -409,6 +449,8 @@ export declare class Users {
      * Updating the API key through this function is not allowed (wont work).
      *
      * @warning Does not upsert documents.
+     *
+     * @docs
      */
     set(uid: string, data: {
         first_name?: User["first_name"];
@@ -422,6 +464,8 @@ export declare class Users {
     /**
      * Insert new data into an EXISTING user.
      * @warning Does not upsert documents.
+     *
+     * @docs
      */
     private _sys_set;
     /**
@@ -431,6 +475,8 @@ export declare class Users {
      * @throws {Collection.NotFoundError} If the user id does not exist.
      * @example
      * const user = await server.users.get("0");
+     *
+     * @docs
      */
     get(uid: string): Promise<User>;
     /**
@@ -440,6 +486,8 @@ export declare class Users {
      * @throws {Collection.NotFoundError} If the username does not exist.
      * @example
      * const user = await server.users.get_by_username("myusername");
+     *
+     * @docs
      */
     get_by_username(username: string): Promise<User>;
     /**
@@ -451,6 +499,8 @@ export declare class Users {
      * @throws {Collection.NotFoundError} If the username or uid does not exist.
      * @example
      * const user = await server.users.get_by_username("myusername");
+     *
+     * @docs
      */
     get_by_uid_or_username(uid_or_username: string): Promise<User>;
     /**
@@ -460,6 +510,8 @@ export declare class Users {
      * @throws {Collection.NotFoundError} If the email does not exist.
      * @example
      * const user = await server.users.get_by_email("my@email.com");
+     *
+     * @docs
      */
     get_by_email(email: string): Promise<User>;
     /**
@@ -468,6 +520,8 @@ export declare class Users {
      * @param api_key The API key of the user to fetch.
      * @example
      * const user = await server.users.get_by_api_key("XXXXXX");
+     *
+     * @docs
      */
     get_by_api_key(api_key: string): Promise<User>;
     /**
@@ -476,6 +530,8 @@ export declare class Users {
      * @param token The authentication token of the user to fetch.
      * @example
      * const user = await server.users.get_by_token("XXXXXX");
+     *
+     * @docs
      */
     get_by_token(token: string): Promise<User>;
     /**
@@ -484,6 +540,8 @@ export declare class Users {
      * @param username The username of the uid to fetch.
      * @example
      * const uid = await server.users.get_uid("myusername");
+     *
+     * @docs
      */
     get_uid(username: string): Promise<string | undefined>;
     /**
@@ -492,6 +550,8 @@ export declare class Users {
      * @param username The username of the uid to fetch.
      * @example
      * const uid = await server.users.get_uid_by_username("myuser");
+     *
+     * @docs
      */
     get_uid_by_username(username: string): Promise<string | undefined>;
     /**
@@ -500,6 +560,8 @@ export declare class Users {
      * @param email The email of the uid to fetch.
      * @example
      * const uid = await server.users.get_uid_by_email("my@email.com");
+     *
+     * @docs
      */
     get_uid_by_email(email: string): Promise<string | undefined>;
     /**
@@ -508,6 +570,8 @@ export declare class Users {
      * @param api_key The API key to parse.
      * @example
      * const uid = server.users.get_uid_by_api_key("XXXXXXXXXX");
+     *
+     * @docs
      */
     get_uid_by_api_key(api_key: string): string | undefined;
     /**
@@ -516,6 +580,8 @@ export declare class Users {
      * @param token The token to parse.
      * @example
      * const uid = server.users.get_uid_by_token("XXXXXXXXXX");
+     *
+     * @docs
      */
     get_uid_by_token(token: string): string | undefined;
     /**
@@ -524,6 +590,8 @@ export declare class Users {
      * @param uid The user id.
      * @example
      * const pin = await server.users.get_support_pin("1");
+     *
+     * @docs
      */
     get_support_pin(uid: string): Promise<string>;
     /**
@@ -532,6 +600,8 @@ export declare class Users {
      * @param uid The user id.
      * @example
      * const api_key = await server.users.generate_api_key("0");
+     *
+     * @docs
      */
     generate_api_key(uid: string): Promise<string>;
     /**
@@ -541,6 +611,8 @@ export declare class Users {
      * @throws {Collection.NotFoundError} If the user id does not exist.
      * @example
      * const has_api_key = await server.users.has_api_key("0");
+     *
+     * @docs
      */
     has_api_key(uid: string): Promise<boolean>;
     /**
@@ -548,6 +620,8 @@ export declare class Users {
      * @param uid The user id.
      * @example
      * await server.users.revoke_api_key("0");
+     *
+     * @docs
      */
     revoke_api_key(uid: string): Promise<void>;
     /**
@@ -557,6 +631,8 @@ export declare class Users {
      * @param password The plaintext password.
      * @example
      * const success = await server.users.verify_password("1", "XXXXXX");
+     *
+     * @docs
      */
     verify_password(uid: string, password: string): Promise<boolean>;
     /**
@@ -565,6 +641,8 @@ export declare class Users {
      * @param api_key The api key to verify.
      * @example
      * const success = await server.users.verify_api_key("XXXXXX");
+     *
+     * @docs
      */
     verify_api_key(api_key: string): Promise<boolean>;
     /**
@@ -574,6 +652,8 @@ export declare class Users {
      * @param api_key The api key to verify.
      * @example
      * const success = await server.users.verify_api_key_by_uid("1", "XXXXXX");
+     *
+     * @docs
      */
     verify_api_key_by_uid(uid: string | undefined | null, api_key: string): Promise<boolean>;
     /**
@@ -582,6 +662,8 @@ export declare class Users {
      * @param token The token to verify.
      * @example
      * const success = await server.users.verify_token("XXXXXX");
+     *
+     * @docs
      */
     verify_token(token: string): Promise<boolean>;
     /**
@@ -591,6 +673,8 @@ export declare class Users {
      * @param token The token to verify.
      * @example
      * const success = await server.users.verify_token_by_uid("1", "XXXXXX");
+     *
+     * @docs
      */
     verify_token_by_uid(uid: string | undefined | null, token: string): Promise<boolean>;
     /**
@@ -600,6 +684,8 @@ export declare class Users {
      * @returns Returns undefined on success, otherwise a string describing the error.
      * @example
      * await server.users.verify_2fa("1", "123456");
+     *
+     * @docs
      */
     verify_2fa(uid: string, code: string): Promise<string | undefined>;
     /**
@@ -612,6 +698,8 @@ export declare class Users {
      * @param expiration The amount of seconds in which the code will expire.
      * @example
      * await server.users.send_2fa({ uid: "0", stream });
+     *
+     * @docs
      */
     send_2fa({ uid, stream, expiration, _user_agent, _username, _email, }: {
         uid: string;
@@ -624,12 +712,17 @@ export declare class Users {
     /**
      * List all users.
      * @returns An array of User objects.
+     *
+     * @docs
      */
     list(): Promise<User[]>;
 }
 /** Nested types for the {@link User} class. */
 export declare namespace Users {
-    /** Constructor options. */
+    /**
+     * Options for constructing a {@link Users} instance.
+     * @docs
+     */
     interface Opts {
         /** The number of seconds a sign-in token will be valid. */
         token_expiration?: number;

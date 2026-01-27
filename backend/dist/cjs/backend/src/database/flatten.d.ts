@@ -11,6 +11,9 @@
  * const nested = { a: { b: 1, c: { d: 2 } }, e: 3 };
  * const flat = flatten(nested);
  * // flat = { 'a.b': 1, 'a.c.d': 2, 'e': 3 }
+ *
+ * @nav Database
+ * @docs
  */
 export declare function flatten<T extends Record<string, any>>(obj: T, prefix?: string): FlattenToDotNotation<T>;
 export declare function flatten<T extends Record<string, any>, const Prefix extends string>(obj: T, prefix: Prefix): FlattenToDotNotation<T, Prefix>;

@@ -23,7 +23,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var vhighlight = __toESM(require("@vandenberghinc/vhighlight"));
-var volt = __toESM(require("./volt.js"));
+var volt = __toESM(require("./index.js"));
 const CONFIG_PATHS = [
   "./server.json",
   "./server.js",

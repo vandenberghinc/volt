@@ -6,7 +6,10 @@ import { Collection } from "../database/collection.js";
 import { Server } from "../server.js";
 /** Utility types for the `SystemError`. */
 export declare namespace SystemError {
-    /** Options for creating a system error. */
+    /**
+     * Options for creating a system error.
+     * @docs
+     */
     interface Opts {
         /** The message of the error. */
         message: string;
@@ -55,7 +58,10 @@ export declare namespace SystemError {
     type Logger = {
         error: (message: string) => void;
     };
-    /** The database record for a saved system error. */
+    /**
+     * The database record for a saved system error.
+     * @docs
+     */
     interface Document {
         /** The unique id for this error. */
         id: string;
@@ -96,6 +102,7 @@ export declare namespace SystemError {
  * The system error.
  * Used to indicate a fatal system error that should not occur and should be reported to developers.
  * When created, it is logged and (optionally) persisted to the configured collection.
+ * @docs
  */
 export declare class SystemError extends Error {
     /**
@@ -123,6 +130,8 @@ export declare class SystemError extends Error {
      * Set a collection that will be used as default to save system errors to.
      *
      * @param collection The collection options to use.
+     *
+     * @docs
      */
     static set_collection(opts: Pick<Collection.Opts<SystemError.Document>, "name" | "ttl"> & {
         server: Server;
@@ -130,6 +139,8 @@ export declare class SystemError extends Error {
     /**
      * Configure the newly created system error instances,
      * assigning a global database collection and logger instance.
+     *
+     * @docs
      */
     static setup(opts: {
         /** The initialized server instance. */
@@ -186,19 +197,24 @@ export declare class SystemError extends Error {
      * Use {@link SystemError.create} or {@link SystemError.create_detach} to create a new system error.
      */
     private constructor();
-    /** Construct a system error & save it to the database. */
+    /**
+     * Construct a system error & save it to the database.
+     * @docs
+     */
     static create(opts: SystemError.Opts): Promise<SystemError>;
     /**
      * Construct a system error & save it to the database.
      * This is a synchronous version of the create method.
      * Beware that this does not join the async save operation,
      * Instead it detaches and catches and logs any errors that occur during saving
+     * @docs
      */
     static create_detach(opts: SystemError.Opts): SystemError;
     /**
      * Get the error as a database document.
      *
      * @returns A plain object representing the system error for database storage.
+     * @docs
      */
     document(): SystemError.Document;
     /**
@@ -206,6 +222,7 @@ export declare class SystemError extends Error {
      * @param colored Present the formatted error with colors to make it more visually pleasing.
      *                Defaults to `false`.
      * @returns A string representation of the system error.
+     * @docs
      */
     format({ colored }?: {
         colored?: boolean;
@@ -214,6 +231,7 @@ export declare class SystemError extends Error {
      * Convert the error to a string without ANSI colors to avoid leaking escape codes into sinks
      * (e.g., files, JSON logs) that assume plain text.
      * @returns Non-colored string representation of the error.
+     * @docs
      */
     toString(): string;
     /**

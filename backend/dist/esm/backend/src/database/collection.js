@@ -10,12 +10,6 @@ import { InvalidUsageError } from '../errors/index.js';
 // The collection class.
 // ---------------------------------------------------------
 /**
- * @todo Deprecate `document.ts: Ref & Document`
- *       AND add a `record_version` `transform_version` collection params
- *       That move the versioning logic to the collection layer.
- *       AND potentially other additional features implemented in the depr classes.
- */
-/**
  * A wrapper class for the MongoDB collection.
  *
  * @example
@@ -25,6 +19,8 @@ import { InvalidUsageError } from '../errors/index.js';
  *    indexes: ["uid", "name"],
  *    ttl: 1000 * 60 * 60 * 24, // 1 day
  * });
+ *
+ * @docs
  */
 export class Collection {
     /** Collection name */
@@ -85,6 +81,8 @@ export class Collection {
      * @param opts The constructor options for the collection.
      *
      * @throws An error when attempting to initialize a transaction-based collection without initializing the derived collection first.
+     *
+     * @docs
      */
     constructor(opts) {
         // Public constructor.
@@ -499,6 +497,8 @@ export class Collection {
     /**
      * Initialize the collection, creating indexes and setting up TTL if needed.
      * @returns The initialized collection instance.
+     *
+     * @docs
      */
     async init() {
         if (this.initialized === false) {
@@ -607,6 +607,8 @@ export class Collection {
      * Assert that the collection is initialized and has a valid MongoDB collection.
      * @throws {Error} Throws if the collection is not initialized or _col is null
      * @returns An initialized collection type assertion
+     *
+     * @docs
      */
     assert_init() {
         if (!this.initialized || this._col == null) {
@@ -619,6 +621,8 @@ export class Collection {
     /**
      * Assert that if this is a transaction, it has not been finalized.
      * @throws Error if this is a finalized transaction.
+     *
+     * @docs
      */
     assert_not_finalized() {
         if (this.is_transaction && this.is_finalized_transaction) {
@@ -630,6 +634,8 @@ export class Collection {
     }
     /**
      * Assert that this collection is not transaction based.
+     *
+     * @docs
      */
     assert_not_transaction_based() {
         if (this.is_transaction) {
@@ -642,6 +648,8 @@ export class Collection {
     /**
      * Get operation options with session if this is a transaction.
      * @returns Options object with session if applicable.
+     *
+     * @docs
      */
     get_operation_options(opts) {
         if (this.is_transaction && this._session) {
@@ -652,6 +660,8 @@ export class Collection {
     /**
      * Get the raw and initialized MongoDB collection.
      * @returns The MongoDB collection instance.
+     *
+     * @docs
      */
     async col() {
         await this.init();
@@ -662,6 +672,8 @@ export class Collection {
      * @note Not supported for transaction based collections.
      * @param index The name of the index to check.
      * @returns True if the index exists, false otherwise.
+     *
+     * @docs
      */
     async has_index(index) {
         if (!this.initialized) {
@@ -679,6 +691,8 @@ export class Collection {
      * @note When transaction mode is enabled, the session option will not be used.
      *
      * @param opts The index create options.
+     *
+     * @docs
      */
     async create_index(opts) {
         // Not supported on transaction-based collections.
@@ -827,6 +841,8 @@ export class Collection {
      * Clones assigned nested objects/arrays/dates once (when `clone` is true).
      *
      * @throws An error if the max depth recursion depth has been exceeded.
+     *
+     * @docs
      */
     static insert_defaults(target, source, opts = {}) {
         const max_depth = opts.max_depth ?? 1_000;
@@ -876,6 +892,8 @@ export class Collection {
      * Execute `on_transform_version` and `on_load_cb` on a loaded document.
      * Ensures `__record_version` is set when {@link record_version} is defined.
      *
+     * @note This is done automatically during load operations.
+     *
      * @param data The loaded document.
      * @param opts Additional options.
      *
@@ -883,6 +901,8 @@ export class Collection {
      *
      * @throws {Collection.OnTransformError} When an error occurs during the {@link Collection.Opts.on_transform_version} callback.
      * @throws {Collection.OnLoadError} When an error occurs during the {@link Collection.Opts.on_load} callback.
+     *
+     * @docs
      */
     async apply_on_load(data, opts) {
         let transformed = false;
@@ -990,6 +1010,8 @@ export class Collection {
      *
      * @throws {Collection.CountError} When `throw !== false` and the count fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async count(query, opts) {
         // Asserts.
@@ -1035,6 +1057,8 @@ export class Collection {
      *
      * @throws {Collection.CountError} When `throw !== false` and the count fails.
      * @throws {InvalidUsageError} (always) When the collection was not used properly.
+     *
+     * @docs
      */
     async count_estimated(opts) {
         // Asserts.
@@ -1086,6 +1110,8 @@ export class Collection {
      *
      * @throws {Collection.ListError} When `throw !== false` if an error occurred during the operation, in which case {@link Collection.ListError.cause} is defined.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async list(query, opts, allow_empty_query = false) {
         // Assert.
@@ -1370,6 +1396,8 @@ export class Collection {
      *
      * @throws {Collection.ListError} When `throw !== false` if an error occurred during the operation, in which case {@link Collection.ListError.cause} is defined.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async list_all(opts) {
         return this.list({}, opts, true);
@@ -1390,6 +1418,8 @@ export class Collection {
      *
      * @throws {Collection.ExistsError} When `throw !== false` if an error occurred during the operation, in which case {@link Collection.ExistsError.cause} is defined.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async exists(query, opts) {
         // Asserts.
@@ -1456,6 +1486,8 @@ export class Collection {
      * @throws {Collection.LoadError} Only when `opts.throw !== false` and the load fails.
      * @throws {Collection.NotFoundError} When the document is not found and `opts.throw !== false && opts.default == null`.
      * @throws {InvalidUsageError} When the provided arguments are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async load(query, opts) {
         // Checks.
@@ -1571,6 +1603,8 @@ export class Collection {
      *
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async set(query, content, opts) {
         // Flatten.
@@ -1602,6 +1636,8 @@ export class Collection {
      *
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async save(query, operation, // @todo add strict pipeline type.
     opts) {
@@ -1768,6 +1804,8 @@ export class Collection {
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {Collection.ListError} Only when `opts.throw !== false` and the follow-up list fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or the collection was misused.
+     *
+     * @docs
      */
     async save_many(query, operation, opts) {
         // Asserts / init.
@@ -1862,21 +1900,21 @@ export class Collection {
         return out;
     }
     /**
- * Build an aggregation replacement pipeline that preserves _id on matches and
- * applies versioning/TTL consistently with non-pipeline paths.
- *
- * - On matches: preserve stored `__record_version` and (for static TTL) stored `__ttl_timestamp`.
- * - On upserts:
- *   - `__record_version`: respect user value if provided, else stamp `this.record_version`.
- *   - `__ttl_timestamp`:
- *       • sliding TTL  → always set to "now"
- *       • static  TTL  → respect user value if provided, else set to "now"
- *
- * @param base_replacement A shallow clone of the user replacement. For replace_many, pass without `_id`.
- * @param upsert           Whether the write is an upsert.
- * @param apply_ttl        Whether TTL logic should be applied (`this.ttl_enabled && opts?.apply_ttl !== false`).
- * @returns A MongoDB aggregation pipeline that performs the replacement.
- */
+     * Build an aggregation replacement pipeline that preserves _id on matches and
+     * applies versioning/TTL consistently with non-pipeline paths.
+     *
+     * - On matches: preserve stored `__record_version` and (for static TTL) stored `__ttl_timestamp`.
+     * - On upserts:
+     *   - `__record_version`: respect user value if provided, else stamp `this.record_version`.
+     *   - `__ttl_timestamp`:
+     *       • sliding TTL  → always set to "now"
+     *       • static  TTL  → respect user value if provided, else set to "now"
+     *
+     * @param base_replacement A shallow clone of the user replacement. For replace_many, pass without `_id`.
+     * @param upsert           Whether the write is an upsert.
+     * @param apply_ttl        Whether TTL logic should be applied (`this.ttl_enabled && opts?.apply_ttl !== false`).
+     * @returns A MongoDB aggregation pipeline that performs the replacement.
+     */
     _build_replace_pipeline(base_replacement, upsert, apply_ttl) {
         const now = new Date();
         // Merge order matters (later overrides earlier):
@@ -1981,6 +2019,8 @@ export class Collection {
      *
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async replace(query, replacement, opts) {
         // Asserts / init.
@@ -2152,6 +2192,8 @@ export class Collection {
      * @throws {Collection.SaveError} Only when `opts.throw !== false` and the write fails.
      * @throws {Collection.ListError} Only when `opts.throw !== false` and the follow-up list fails.
      * @throws {InvalidUsageError} (always) When arguments are invalid or the collection was misused.
+     *
+     * @docs
      */
     async replace_many(query, replacement, opts) {
         // Asserts / init.
@@ -2252,6 +2294,8 @@ export class Collection {
      *
      * @throws {Collection.DeleteError} When `opts.throw !== false` and if the deletion was not acknowledged, this does not check against the deleted document count.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async delete(query, opts) {
         // Asserts.
@@ -2321,6 +2365,8 @@ export class Collection {
      *
      * @throws {Collection.DeleteError} When `opts.throw !== false` and if the deletion was not acknowledged, this does not check against the deleted document count.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async delete_many(query, opts, allow_empty_query = false) {
         // Asserts.
@@ -2388,6 +2434,8 @@ export class Collection {
      *
      * @throws {Collection.DeleteError} When `opts.throw !== false` and if the deletion was not acknowledged, this does not check against the deleted document count.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async delete_all(opts) {
         return this.delete_many({}, opts, true);
@@ -2407,6 +2455,8 @@ export class Collection {
      *
      * @throws {Collection.DeleteError} When `opts.throw !== false` and if the deletion was not acknowledged, this does not check against the deleted document count.
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async delete_collection(opts) {
         // Asserts.
@@ -2688,6 +2738,8 @@ export class Collection {
      *
      * @throws {Collection.BulkError} When `opts.throw !== false` and if the bulk operation failed, this does not check against the bulk write result (this may change in the future).
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async bulk_operations(operations, opts) {
         // Assert.
@@ -2813,6 +2865,8 @@ export class Collection {
      *
      * @throws {Collection.AggregateError} When `opts.throw !== false` and if the aggregate operation failed, this does not check against the aggregate result (this may change in the future).
      * @throws {InvalidUsageError} (always) When the provided argument(s) are invalid or if the collection was not used properly.
+     *
+     * @docs
      */
     async aggregate(pipeline, // @todo add strict pipeline type.
     opts) {
@@ -2866,6 +2920,8 @@ export class Collection {
      * Clean a document from all default system attributes.
      * @param doc The document to clean.
      * @returns The cleaned document without system attributes.
+     *
+     * @docs
      */
     clean(doc) {
         if (doc == null) {
@@ -2891,6 +2947,8 @@ export class Collection {
     /**
      * Start a new transaction by creating a TransactionCollection instance.
      * @returns A new TransactionCollection instance with transaction capabilities.
+     *
+     * @docs
      */
     async start_transaction() {
         if (!this.db.client) {
@@ -3009,7 +3067,9 @@ export class Collection {
     // -------------------------------------------------------------------
     // Errors.
     // ---------------------------------------------------------
-    /** The base error for {@link NotFoundError}, {@link DeleteError} etc. */
+    /**
+     * The base error for {@link NotFoundError}, {@link DeleteError} etc.
+     */
     class OperationError extends Error {
         /** The error message. */
         message;
@@ -3032,6 +3092,7 @@ export class Collection {
     /**
      * Error thrown when a document is not found.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class NotFoundError extends OperationError {
         /**
@@ -3048,6 +3109,7 @@ export class Collection {
     /**
      * Error thrown when a {@link Collection.Opts.on_transform_version} callback fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class OnTransformError extends OperationError {
         /**
@@ -3064,6 +3126,7 @@ export class Collection {
     /**
      * Error thrown when a {@link Collection.Opts.on_load} callback fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class OnLoadError extends OperationError {
         /**
@@ -3080,6 +3143,7 @@ export class Collection {
     /**
      * Error thrown when a count operation fails.
      * This error extends {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class CountError extends OperationError {
         /**
@@ -3096,6 +3160,7 @@ export class Collection {
     /**
      * Error thrown when a list operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class ListError extends OperationError {
         /**
@@ -3112,6 +3177,7 @@ export class Collection {
     /**
      * Error thrown when a load operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class ExistsError extends OperationError {
         /**
@@ -3128,6 +3194,7 @@ export class Collection {
     /**
      * Error thrown when a load operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class LoadError extends OperationError {
         /**
@@ -3144,6 +3211,7 @@ export class Collection {
     /**
      * Error thrown when a save operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class SaveError extends OperationError {
         /**
@@ -3160,6 +3228,7 @@ export class Collection {
     /**
      * Error thrown when a delete operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class DeleteError extends OperationError {
         /**
@@ -3176,6 +3245,7 @@ export class Collection {
     /**
      * Error thrown when a bulk operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class BulkError extends OperationError {
         /**
@@ -3192,6 +3262,7 @@ export class Collection {
     /**
      * Error thrown when an aggregate operation fails.
      * This error extends the {@link OperationError} which in turn extends the default {@link Error} class.
+     * @docs
      */
     class AggregateError extends OperationError {
         /**
@@ -3263,8 +3334,18 @@ export class Collection {
 /**
  * TransactionCollection extends Collection with transaction-specific methods.
  * This class provides commit and abort functionality for MongoDB transactions.
+ * @warning The tranaction collection should only be initialized via {@link Collection.start_transaction}.
+ * @docs
  */
 export class TransactionCollection extends Collection {
+    /**
+     * Commit the current transaction.
+     * Implements retry logic for transient errors and unknown commit results.
+     * @throws {InvalidUsageError} If there is no active session or if the transaction has already been finalized.
+     * @throws {Error} If the commit fails after retries or encounters a non-retryable error.
+     *
+     * @docs
+     */
     async commit() {
         const session = this._session;
         if (!session) {
@@ -3371,6 +3452,14 @@ export class TransactionCollection extends Collection {
             }
         }
     }
+    /**
+     * Abort the current transaction.
+     * Implements retry logic for transient errors.
+     * @throws {InvalidUsageError} If there is no active session or if the transaction has already been finalized.
+     * @throws {Error} If the abort fails after retries or encounters a non-retryable error.
+     *
+     * @docs
+     */
     async abort() {
         const session = this._session;
         if (!session) {
@@ -3449,6 +3538,7 @@ export class TransactionCollection extends Collection {
      * Can be called manually or via async disposal
      *
      * @warning This method aborts the transaction if it is still active.
+     * @docs
      */
     async cleanup() {
         if (this._session && !this.is_finalized_transaction) {
@@ -3479,6 +3569,7 @@ export class TransactionCollection extends Collection {
     /**
      * Check if the transaction is still active (not finalized).
      * @returns True if the transaction is active, false otherwise.
+     * @docs
      */
     is_active() {
         return this.is_transaction && !this.is_finalized_transaction && this._session != null;

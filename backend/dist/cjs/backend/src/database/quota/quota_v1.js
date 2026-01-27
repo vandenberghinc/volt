@@ -22,7 +22,7 @@ __export(stdin_exports, {
 module.exports = __toCommonJS(stdin_exports);
 var import_system_error = require("../../errors/system_error.js");
 var import_collection = require("../collection.js");
-var import_volt = require("src/volt.js");
+var import_src = require("src/index.js");
 APPLY_FIX;
 class QuotaManager {
   // ----------------------------------------------------------------
@@ -92,7 +92,7 @@ class QuotaManager {
   async get(query, opts) {
     const val_err = this.query_validator ? this.query_validator(query) : void 0;
     if (val_err != null) {
-      const err = new import_volt.InvalidUsageError({
+      const err = new import_src.InvalidUsageError({
         message: `Invalid query: ${val_err}`,
         reason: "invalid_query",
         field: "query"
@@ -216,7 +216,7 @@ class QuotaManager {
   async set(query, quota, opts) {
     let query_err;
     if (this.query_validator && (query_err = this.query_validator(query)) != null) {
-      const err = new import_volt.InvalidUsageError({
+      const err = new import_src.InvalidUsageError({
         message: `Invalid query: ${query_err}`,
         reason: "invalid_query",
         field: "query"
@@ -227,7 +227,7 @@ class QuotaManager {
     }
     const val_err = QuotaManager.Quota.Opts.validate(quota);
     if (val_err) {
-      const err = new import_volt.InvalidUsageError({
+      const err = new import_src.InvalidUsageError({
         message: `Invalid quota: ${val_err}`,
         reason: "invalid_quota",
         field: "quota"
@@ -273,7 +273,7 @@ class QuotaManager {
   async reset_usage(query, opts) {
     let query_err;
     if (this.query_validator && (query_err = this.query_validator(query)) != null) {
-      const err = new import_volt.InvalidUsageError({
+      const err = new import_src.InvalidUsageError({
         message: `Invalid query: ${query_err}`,
         reason: "invalid_query",
         field: "query"

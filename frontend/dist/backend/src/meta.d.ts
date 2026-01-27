@@ -4,7 +4,11 @@
  */
 /** Nested types for the {@link Meta} class. */
 export declare namespace Meta {
-    /** Constructor options. */
+    /**
+     * Options for constructing a {@link Meta} object.
+     *
+     * @docs
+     */
     interface Opts {
         /** The author's name. */
         author?: string;
@@ -25,8 +29,10 @@ export declare namespace Meta {
     }
 }
 /**
- * The js view meta information class.
- * @nav: Backend/Endpoints
+ * The meta information class for HTML endpoints.
+ *
+ * @nav Endpoints
+ * @docs
  */
 export declare class Meta {
     author?: string;
@@ -37,6 +43,10 @@ export declare class Meta {
     charset: string;
     viewport: string;
     favicon: string;
+    /**
+     * Construct a meta information object.
+     * @docs
+     */
     constructor({ author, title, description, image, robots, charset, viewport, favicon, }?: Meta.Opts);
     /**
      * Create a copy of the current meta object without any references.
@@ -45,19 +55,57 @@ export declare class Meta {
      */
     copy(override?: Partial<Meta.Opts>): Meta;
     /**
-     * Set value funcs that return the current object.
-     * @return: Returns the current <Type>Meta</Type> object.
-     * @funcs 8
+     * Update the author property.
+     * @return Returns the current {@link Meta} instance for chaining.
      * @docs
      */
     set_author(value: string | undefined): this;
+    /**
+     * Update the title property.
+     * @return Returns the current {@link Meta} instance for chaining.
+     * @docs
+     */
     set_title(value: string | undefined): this;
+    /**
+     * Update the description property.
+     * @return Returns the current {@link Meta} instance for chaining.
+     * @docs
+     */
     set_description(value: string | undefined): this;
+    /**
+     * Update the image property.
+     * @return Returns the current {@link Meta} instance for chaining.
+     * @docs
+     */
     set_image(value: string | undefined): this;
+    /**
+     * Update the robots property.
+     * @return Returns the current {@link Meta} instance for chaining.
+     * @docs
+     */
     set_robots(value: string): this;
+    /**
+     * Update the charset property.
+     * @return Returns the current {@link Meta} instance for chaining.
+     * @docs
+     */
     set_charset(value: string): this;
+    /**
+     * Update the viewport property.
+     * @return Returns the current {@link Meta} instance for chaining.
+     * @docs
+     */
     set_viewport(value: string): this;
+    /**
+     * Update the favicon property.
+     * @return Returns the current {@link Meta} instance for chaining.
+     * @docs
+     */
     set_favicon(value: string): this;
+    /**
+     * Get the meta information as a plain object.
+     * @docs
+     */
     obj(): Meta.Opts;
     build_html(domain?: string | null): string;
 }

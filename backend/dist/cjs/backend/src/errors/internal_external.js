@@ -53,6 +53,10 @@ class InternalError extends BaseError {
     super(args);
     this.name = "InternalError";
   }
+  /**
+   * Serve a generic internal server error response.
+   * @docs
+   */
   serve(stream) {
     stream.error({
       status: import_status.Status.internal_server_error,
@@ -69,6 +73,10 @@ class ExternalError extends BaseError {
     super(args);
     this.name = "ExternalError";
   }
+  /**
+   * Serve the external error response.
+   * @docs
+   */
   serve(stream) {
     stream.error({
       status: this.status ?? import_status.Status.internal_server_error,

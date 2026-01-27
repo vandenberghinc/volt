@@ -3,7 +3,7 @@
  * @copyright ...
  */
 
-import { AnyElement } from "src/volt.js";
+import { AnyElement } from "src/index.js";
 import { Compression } from "./compression.js";
 import type { Mail } from "../../../backend/src/plugins/mail/mail.js"
 

@@ -2,7 +2,7 @@
  * @author Daan van den Bergh
  * @copyright © 2022 - 2025 Daan van den Bergh.
  */
-import type { RegisteredEndpoint } from "../../../backend/src/server.js";
+import type { Server } from "../../../backend/src/server.js";
 import type { APIError } from "../../../backend/src/stream.js";
 export declare namespace Request {
     /** The method type. */
@@ -29,7 +29,7 @@ export declare namespace Request {
     /**
      * Create request info from a registered endpoint.
      */
-    export type InfoFromEndpoint<E extends RegisteredEndpoint<any, any, any>, SuccessBody extends ResponseBodyBase = undefined, ErrorBody extends ResponseBodyBase = undefined> = E extends RegisteredEndpoint<infer M, infer EP, infer P> ? Info<M extends undefined ? "GET" : M extends Method ? M : never, EP extends string ? EP : never, P, SuccessBody, ErrorBody> : never;
+    export type InfoFromEndpoint<E extends Server.RegisteredEndpoint<any, any, any>, SuccessBody extends ResponseBodyBase = undefined, ErrorBody extends ResponseBodyBase = undefined> = E extends Server.RegisteredEndpoint<infer M, infer EP, infer P> ? Info<M extends undefined ? "GET" : M extends Method ? M : never, EP extends string ? EP : never, P, SuccessBody, ErrorBody> : never;
     /** The request options. */
     export interface Opts<Method extends Request.Method = "GET", Url extends string | RegExp = string, // use regex for backend support.
     RequestBody extends RequestBodyBase = unknown> {

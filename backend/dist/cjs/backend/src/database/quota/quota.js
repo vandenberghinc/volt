@@ -38,6 +38,8 @@ class QuotaManager {
    * @throws {InvalidUsageError} If {@link QuotaManager.Opts.collection} is already initialized and does not have the correct index.
    *                             If the passed collection has manually assigned fields for {@link Collection.record_version} or {@link Collection.on_transform_version}.
    *                             If the passed collection is transaction based.
+   *
+   * @docs
    */
   constructor(opts) {
     this.collection = opts.server.db.collection({
@@ -89,6 +91,8 @@ class QuotaManager {
    * @throws {Collection.NotFoundError} When `opts.throw !== false` and the quota does not exist.
    * @throws {Collection.LoadError} When `opts.throw !== false` and a database error was encountered during the load operation.
    * @throws {Collection.InvalidUsageError} When `opts.throw !== false` and the query is invalid.
+   *
+   * @docs
    */
   async get(query, opts) {
     const val_err = QuotaManager.Query.validate(query);
@@ -117,6 +121,8 @@ class QuotaManager {
    *
    * @returns An object containing error or status information,
    *          see {@link QuotaManager.GetStatusResult}
+   *
+   * @docs
    */
   async get_status(query, opts) {
     const now_sec = Math.floor(Date.now() / 1e3);
@@ -175,6 +181,8 @@ class QuotaManager {
    * @param uid The user identifier.
    * @param type Optional quota type filter.
    * @returns List of quotas with their current status.
+   *
+   * @docs
    */
   async list({ uid, timeout }) {
     const now_sec = Math.floor(Date.now() / 1e3);
@@ -215,6 +223,8 @@ class QuotaManager {
    *
    * @throws {InvalidUsageError} When `opts.throw !== false` and validation fails.
    * @throws {Collection.SaveError} When `opts.throw !== false` and a database error occurs during the save operation.
+   *
+   * @docs
    */
   async set(quota, opts) {
     const val_err = QuotaManager.Document.Opts.validate(quota, this.collection);
@@ -261,6 +271,8 @@ class QuotaManager {
    * @throws {Collection.NotFoundError} When `opts.throw !== false` and the quota does not exist.
    * @throws {Collection.SaveError} When `opts.throw !== false` and a database error was encountered during the save operation.
    * @throws {Collection.InvalidUsageError} When `opts.throw !== false` and the query is invalid.
+   *
+   * @docs
    */
   async reset_usage(query, opts) {
     const query_err = QuotaManager.Query.validate(query);
@@ -288,7 +300,11 @@ class QuotaManager {
       }
     }, save_opts);
   }
-  /** Delete all quotas for a user. */
+  /**
+   * Delete all quotas for a user.
+   *
+   * @docs
+   */
   async delete_by_user({ uid }) {
     await this.collection.delete_many({ uid }, { retry: 25 });
   }
@@ -297,7 +313,9 @@ class QuotaManager {
   // ----------------------------------------------------------------
   /**
    * Validate the required {@link limit_helper} parameters.
-   * @note requested_usage may be a negative number.
+   * @note Parameter `requested_usage` may be a negative number.
+   *
+   * @docs
    */
   validate_limit_helper_params({ requested_usage, safety_ratio, query, upsert }) {
     if (!Number.isFinite(requested_usage)) {
@@ -355,6 +373,8 @@ class QuotaManager {
    *       When `perform_increment` is false, it only validates availability without modifying the database.
    *
    * @returns Success with updated quota info or validation/error details.
+   *
+   * @docs
    *
    */
   async limit_helper({ query, requested_usage, upsert, safety_ratio = 1, check_limit = true, perform_increment = true, collection }) {
@@ -793,6 +813,8 @@ class QuotaManager {
    *
    * @returns On success, returns the (possibly updated) quota and remaining capacity; on failure,
    *          returns a diagnostic indicating why the request was rejected.
+   *
+   * @docs
    */
   async limit({ query, requested_usage, upsert, safety_ratio, perform_increment = true }) {
     if (requested_usage < 0) {
@@ -821,6 +843,8 @@ class QuotaManager {
    * @note This function allows for negative `requested_usage` values.
    *
    * @returns The updated quota record or a diagnostic if the quota was not found in the database or if the max retries have been exceeded.
+   *
+   * @docs
    */
   async increment({ query, requested_usage, upsert }) {
     return this.limit_helper({
@@ -846,6 +870,8 @@ class QuotaManager {
    * @param limits The quota limits to validate and increment upon success, or roll back upon failure.
    *
    * @returns Success with updated quota info or validation/error details.
+   *
+   * @docs
    */
   async batch_limit({ limits }) {
     if (limits.length === 0) {

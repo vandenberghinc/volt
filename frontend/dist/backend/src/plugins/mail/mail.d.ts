@@ -8,7 +8,12 @@ import { Readable } from "stream";
 import { Url } from "url";
 import * as UI from "./ui.js";
 /**
- * mail module.
+ * The mail class, used to send emails via SMTP.
+ *
+ * @note This class is initialized under server property `mail` when the server is started with the `smtp` option.
+ *
+ * @nav Plugins
+ * @docs
  */
 export declare class Mail {
     /** the smpt mailer. */
@@ -33,6 +38,8 @@ export declare class Mail {
      * @param max_attachments limit on number of attachments; -1 disables.
      * @param max_attachment_size max size (bytes) per attachment; -1 disables.
      * @param max_attachments_size max total size (bytes) across attachments; -1 disables.
+     *
+     * @docs
      */
     send({ sender, recipients, subject, body, attachments, max_attachments, max_attachment_size, max_attachments_size, allow_untrusted_urls, }: {
         sender?: Mail.Address;

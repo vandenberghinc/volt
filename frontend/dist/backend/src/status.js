@@ -7,9 +7,15 @@
 /**
  * HTTP status codes.
  * @example
- * 	#include <vlib/sockets/http.h>
- * 	short success = vlib::http::status::success;
- * @nav Backend/Server
+ * {Success status check}
+ * Check if a response was successful using `volt.Status.success`.
+ * ```
+ * ...
+ * if (response.status === volt.Status.success) {
+ *     console.log("Request was successful!");
+ * }
+ * ```
+ *
  * @docs
  */
 export var Status;
@@ -74,7 +80,14 @@ export var Status;
 })(Status || (Status = {}));
 ;
 (function (Status) {
-    // Get description.
+    /**
+     * Get the description string for a status code.
+     *
+     * @param status The status number.
+     * @returns The description string that corresponds to the status code.
+     *
+     * @docs
+     */
     function get_description(status) {
         switch (status) {
             case 0:

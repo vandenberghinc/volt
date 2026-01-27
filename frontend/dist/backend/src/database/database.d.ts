@@ -7,7 +7,11 @@ import * as mongodb from "mongodb";
 import { Collection } from "./collection.js";
 import type { Server } from "../server.js";
 export declare namespace Database {
-    /** The database constructor options. */
+    /**
+     * Options for constructing a {@link Database} object.
+     *
+     * @docs
+     */
     interface Opts {
         /** The database URI. */
         uri: string;
@@ -19,8 +23,11 @@ export declare namespace Database {
 }
 /**
  * The MongoDB database class, accessable under `Server.db`.
+ *
+ * @note This class is initialized under server property `db` when the server is started with the `database` option.
+ *
+ * @nav Database
  * @docs
- * @nav Backend/Database
 */
 export declare class Database {
     static constructor_scheme: {
@@ -55,17 +62,29 @@ export declare class Database {
     connected: boolean;
     private connect_promise?;
     connect(): Promise<void>;
-    /** Initialize. */
+    /**
+     * Initialize the database.
+     * @note This is done automatically by initializing the server.
+     * @docs
+     */
     initialize(): Promise<void>;
-    /** Ensure connection. */
+    /**
+     * Ensure the database connection is established.
+     * @docs
+     */
     ensure_connection(): Promise<void>;
+    /**
+     * Close the database connection.
+     * @docs
+     */
     close(): Promise<void>;
     /**
-     * {Create Collection}
      * Initialize database collection.
      * @note When called multiple times with the same name, it will return the same cached collection.
      * @param info.unique If true, an error will be thrown if the collection already exists.
      *                    Defauls to `true`.
+     *
+     * @docs
      */
     collection<Data extends mongodb.Document = mongodb.Document>(info: string | (Omit<Collection.Opts<Data>, "db"> & {
         unique?: boolean;

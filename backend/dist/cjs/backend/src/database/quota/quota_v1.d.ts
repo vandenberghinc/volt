@@ -5,7 +5,7 @@
 import * as vlib from "@vandenberghinc/vlib";
 import { SystemError } from "../../errors/system_error.js";
 import { Collection, TransactionCollection } from "../collection.js";
-import { InvalidUsageError } from "src/volt.js";
+import { InvalidUsageError } from "src/index.js";
 import { Server } from "../../server.js";
 /**
  * The quota manager.

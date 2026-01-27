@@ -31,15 +31,15 @@ import { Paddle } from "./payments/paddle.js";
 import { RateLimits, RateLimitServer, RateLimitClient } from "./rate_limit.js";
 import { Route } from "./route.js";
 import { ExternalError } from '@vandenberghinc/volt';
-/**
- * The backend server class.
- *
- * When the HTTPS parameters `certificate` and `private_key` are defined, the server will run automatically on HTTP and HTTPS.
- *
- * @property users The initialized {@link Users} instance.
- */
 // @tdo implement 3D secure "requires_action" status for a refund and payment intent.
 // https://stripe.com/docs/payments/3d-secure
+/**
+ * The server class.
+ * @note Automatically runs on HTTP/HTTPS depending on the constructor options.
+ *
+ * @property users The initialized {@link Users} instance.
+ * @docs
+ */
 export class Server {
     // ---------------------------------------------------------
     // Static attributes.
@@ -263,7 +263,10 @@ export class Server {
     _keys_db;
     _sys_keys_db;
     _website_status_db;
-    /** Construct a new server instance. */
+    /**
+     * Construct a new server instance.
+     * @docs
+     */
     constructor({ ip = "127.0.0.1", port, // leave undefined for blank detection.
     domain, is_primary = true, source, database, statics = [], favicon, company, meta = new Meta(), tls, mail, rate_limit = {
         server: {
@@ -637,20 +640,33 @@ export class Server {
     // ---------------------------------------------------------
     // Utils.
     /** Get a content type (MIME) from a file extension. */
+    /**
+     * Get a content type (MIME) from a file extension. The file extension should include the leading dot, e.g. ".html".
+     * @docs
+     */
     get_content_type(extension) {
         return Server.content_type_mimes.get(extension.toLowerCase()) ?? "application/octet-stream";
     }
-    /** Set the logging verbosity level. */
+    /**
+     * Set the logging verbosity level.
+     * @docs
+     */
     set_log_level(level) {
         this.log.level.set(level);
     }
     // ---------------------------------------------------------
     // Crypto (private).
-    /** Generate a cryptographically secure random key as a hex string. */
+    /**
+     * Generate a cryptographically secure random key as a hex string.
+     * @docs
+     */
     generate_crypto_key(length = 32) {
         return crypto.randomBytes(length).toString('hex');
     }
-    /** Create an HMAC hash using the provided key and data. */
+    /**
+     * Create an HMAC hash using the provided key and data.
+     * @docs
+     */
     hmac(key, data, algo = "sha256") {
         const hmac = crypto.createHmac(algo, key);
         hmac.update(data);
@@ -665,7 +681,10 @@ export class Server {
     //     hmac.update(data);
     //     return hmac.digest("hex");
     // }
-    /** Create a hash (no key) of the given data using the specified algorithm. */
+    /**
+     * Create a hash (no key) of the given data using the specified algorithm.
+     * @docs
+     */
     hash(data, algo = "sha256") {
         if (typeof data !== "string") {
             data = JSON.stringify(data);
@@ -1457,8 +1476,11 @@ export class Server {
     // Server (private).
     /** The promise of database initialization and connecting. */
     _db_init_promise;
-    // Initialize.
-    // Initialize.
+    /**
+     * Initialize the server.
+     * @returns A promise that resolves when the server has been initialized.
+     * @docs
+     */
     async initialize({ worker = false, } = {}) {
         // Logs.
         this.log(1, "Initializing server.");
@@ -1625,9 +1647,15 @@ export class Server {
     // Server.
     /**
      * Start the server.
+     *
      * @example
-     * ...
-     * server.start();
+     * {Start}
+     * Start the server.
+     * ```
+     * const server = new volt.Server({ ... });
+     * await server.start();
+     * ```
+     * @docs
      */
     async start() {
         // Always initialize, even when forking.
@@ -1803,12 +1831,20 @@ export class Server {
         // console.log(this.performance.dump(v => v >= 50));
         // debug(2, () => this.performance.dump(v => v >= 50));
     }
-    // Stop the server.
     /**
      * Stop the server.
+     *
      * @example
+     * {Stop}
+     * Stop the server.
+     * ```
+     * const server = new volt.Server({ ... });
+     * await server.start();
      * ...
-     * server.stop();
+     * await server.stop();
+     * ```
+     *
+     * @docs
      */
     async stop() {
         this.log(0, "Stopping the server...");
@@ -1841,12 +1877,20 @@ export class Server {
     }
     // ---------------------------------------------------------
     // Events.
-    /** Add an event callback. */
+    /**
+     * Add an event callback.
+     * See {@link Events} for more info.
+     * @docs
+     */
     on(name, callback) {
         this.events.add(name, callback);
         return this;
     }
-    /** Remove an event callback. */
+    /**
+     * Remove an event callback.
+     * See {@link Events} for more info.
+     * @docs
+     */
     off(name, callback) {
         this.events.remove(name, callback);
         return this;
@@ -1861,6 +1905,8 @@ export class Server {
      * @template S system template for inferring the endpoint callback parameters.
      * @param endpoint The endpoint or endpoint options to add.
      * @returns A registered endpoint object that can for instance be used to infer the endpoint parameters.
+     *
+     * @docs
      */
     endpoint(endpoint) {
         const e = endpoint instanceof Endpoint ? endpoint : new Endpoint(endpoint);
@@ -1875,7 +1921,6 @@ export class Server {
             route: e.route,
         };
     }
-    // Add an error endpoint.
     /**
      *  Add an endpoint per error status code.
      * @param status_code
@@ -1889,6 +1934,8 @@ export class Server {
      * @note
      * Best practice is to define a universal `/error` endpoint using `Endpoint.templates` to render the error details.
      * Then this endpoint can be cloned using `Endpoint.clone()` and defined with specific template values per status code.
+     *
+     * @docs
      */
     error_endpoint(status_code, endpoint) {
         let e;
@@ -1918,7 +1965,6 @@ export class Server {
     }
     // ---------------------------------------------------------
     // Content Security Policy.
-    // Add a csp.
     /**
      * Add an url to the Content-Security-Policy. This function does not overwrite the existing key's value.
      * @warning This function no longer has any effect when `Server.start()` has been called.
@@ -1928,6 +1974,7 @@ export class Server {
      * ...
      * server.add_csp("script-src", "somewebsite.com");
      * server.add_csp("upgrade-insecure-requests");
+     * @docs
      */
     add_csp(key, value = null) {
         if (this.csp[key] === undefined) {
@@ -1954,6 +2001,7 @@ export class Server {
      * ...
      * server.remove_csp("script-src", "somewebsite.com");
      * server.remove_csp("upgrade-insecure-requests");
+     * @docs
      */
     remove_csp(key, value = null) {
         if (this.csp[key] === undefined) {
@@ -1975,17 +2023,18 @@ export class Server {
      * ...
      * server.del_csp("script-src");
      * server.del_csp("upgrade-insecure-requests");
+     * @docs
      */
     del_csp(key) {
         delete this.csp[key];
     }
     // ---------------------------------------------------------
     // Status.
-    // Fetch status.
     /**
      * This function is meant to be used when the server is in production mode, it will make an API request to your server through the defined `Server.domain` parameter.
      * @note This function can be called without initializing the server.
      * @param type The wanted output type. Either an `object` or a `string` type for CLI purposes.
+     * @docs
      */
     async fetch_status(type = "object") {
         // Load key.
@@ -2020,7 +2069,10 @@ export class Server {
     }
     // ---------------------------------------------------------
     // TLS.
-    /** Generate a key and csr for tls. */
+    /**
+     * Generate a key and csr for tls.
+     * @docs
+     */
     async generate_ssl_key({ output_path, ec = true, }) {
         // Args.
         if (output_path == null) {
@@ -2044,7 +2096,10 @@ export class Server {
             throw Error(`Encountered an error while generating the private key [${proc.exit_status}]: ${proc.err}`);
         }
     }
-    /** Generate a csr for tls. */
+    /**
+     * Generate a csr for tls.
+     * @docs
+     */
     async generate_csr({ output_path, key_path, name, domain, organization_unit, country_code, province, city, }) {
         // Args.
         if (key_path == null) {
@@ -2273,8 +2328,9 @@ export class Server {
             throw new ExternalError({ message: "Mail is not configured." });
         }
     }
-    // On 2fa mail.
-    /** Build the 2FA verification email content. */
+    /**
+     * Build the 2FA verification email content.
+     */
     on_2fa_mail({ code, username, email, date, ip, device }) {
         this.assert_mail();
         const style = this.mail.style;
@@ -2335,8 +2391,9 @@ export class Server {
             ],
         });
     }
-    // On successfull payment mail.
-    /** Build the successful payment email content. */
+    /**
+     * Build the successful payment email content.
+     */
     on_payment_mail({ payment }) {
         this.assert_mail();
         // Shortcuts.
@@ -2378,8 +2435,9 @@ export class Server {
             ],
         });
     }
-    // On failed payment mail.
-    /** Build the failed payment email content. */
+    /**
+     * Build the failed payment email content.
+     */
     on_failed_payment_mail({ payment }) {
         this.assert_mail();
         // Shortcuts.

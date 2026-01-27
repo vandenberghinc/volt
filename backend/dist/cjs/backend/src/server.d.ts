@@ -4,112 +4,22 @@
  */
 import * as vlib from "@vandenberghinc/vlib";
 import { Meta } from './meta.js';
+import * as MailUI from './plugins/mail/ui.js';
 import { Mail } from "./plugins/mail/mail.js";
 import { Status } from "./status.js";
 import { Endpoint } from "./endpoint.js";
 import { Database } from "./database/database.js";
 import { Users } from "./users.js";
-import { Paddle } from "./payments/paddle.js";
+import { Paddle, Payment } from "./payments/paddle.js";
 import { RateLimits, RateLimitServer, RateLimitClient } from "./rate_limit.js";
 import { Route } from "./route.js";
 import { EventCallback, EventName, Events } from './events.js';
-/** Company profile information used in invoices, emails, and branding. */
-export interface CompanyInfo {
-    /** The name of your company. */
-    name: string;
-    /** The legal name of your company. */
-    legal_name: string;
-    /** The street name of your company's address. */
-    street: string;
-    /** The house number or house name of your company's address. */
-    house_number: string;
-    /** The postal/zip code of your company's address. */
-    postal_code: string;
-    /** The city of your company's address. */
-    city: string;
-    /** The province or state of your company's address. */
-    province: string;
-    /** The country name of your company's address. */
-    country: string;
-    /** The two-letter ISO country code of your company's location. */
-    country_code: string;
-    /** The tax ID of your company. */
-    tax_id?: string;
-    /** The type of company. */
-    type?: string;
-    /** The endpoint URL path of your company's icon (PNG). Must be an endpoint URL since access to the file path is also required for creating invoices. */
-    icon?: string;
-    /** The endpoint URL path of your company's stroke icon (PNG). In payment invoices the stroke icon precedes the default icon. Must be an endpoint URL since access to the file path is also required for creating invoices. */
-    stroke_icon?: string;
-    /** The file path of your company's icon (PNG), automatically retrieved from the {@link CompanyInfo.icon} property when possible. */
-    icon_path?: string;
-    /** The file path of your company's stroke icon (PNG), automatically retrieved from the {@link CompanyInfo.stroke_icon} property when possible. */
-    stroke_icon_path?: string;
-}
-/** TLS certificate configuration for enabling HTTPS. */
-export interface TLSConfig {
-    /** The path to the certificate. */
-    cert: string;
-    /** The path to the private key file. */
-    key: string;
-    /** The path to the CA bundle file. */
-    ca?: string | null;
-    /** The passphrase of the private key. */
-    passphrase?: string;
-}
-/** Description of a static directory or file that should be served. */
-export interface StaticDirectory {
-    /** The path to the static directory or file. */
-    path: string;
-    /** The base endpoint of the static directory, by default the path's name will be used.*/
-    endpoint?: string;
-    /** Enable caching for the static endpoints; this value will be used for parameter `Endpoint.cache`. */
-    cache?: number | boolean;
-    /** Define a specific cache policy per endpoint from this static directory as `{<endpoint>: <cache>}`; the cache value will be used for parameter `Endpoint.cache`. */
-    endpoints_cache?: Record<string, boolean | number>;
-    /** An array of paths to exclude. The array may contain regexes. */
-    exclude?: Array<string | RegExp>;
-}
-/**
- * A definition of a registered endpoint, can be used to export params and response types to the frontend.
- * @prop params The inferred interface of the endpoint parameters, note that the runtime value of this property is always `undefined`.
- * @prop Params Alias for property {@link RegisteredEndpoint.params}.
- */
-export type RegisteredEndpoint<M extends Endpoint.Method, E extends string | RegExp, P extends Record<string, any>> = {
-    /** The HTTP method for the endpoint (e.g. GET, POST). */
-    method: M;
-    /** A pascal cased alias for the endpoint, for type exports conforming with `Params`. */
-    Method: M;
-    /**
-     * The route's endpoint endpoint, string or regex,
-     * use `route.endpoint_str` for the string representation.
-     */
-    endpoint: E;
-    /** A pascal cased alias for the method, for type exports conforming with `Params`. */
-    Endpoint: E;
-    /** The endpoint route. */
-    route: Route;
-    /**
-     * The inferred params type, can be used to export the params payload type.
-     * @warning This value is `undefined` at runtime, but contains the correct params payload type at compile time.
-     */
-    Params: P;
-};
-/** The payment options. */
-export type PaymentOpts = (Paddle.Opts & {
-    /** The payment provider type. */
-    type: "paddle";
-});
 /** Nested types for the {@link Server} class. */
 export declare namespace Server {
-    /** Key options for the {@link Server.Opts} interface. */
-    interface KeyOpts {
-        /** The name of the key. */
-        name: string;
-        /** The length of the key. */
-        length: number;
-    }
-    /** Constructor options. */
+    /**
+     * Options for constructing a server.
+     * @docs
+     */
     interface Opts {
         /** Whether the server is in production mode or in development mode. */
         production?: boolean;
@@ -125,16 +35,16 @@ export declare namespace Server {
         source: string;
         /** The database settings, see {@link Database.Opts}. */
         database: string | Database.Opts;
-        /** Array with paths to static directories or static directory objects, see {@link StaticDirectory}. */
-        statics?: Array<string | vlib.Path | StaticDirectory>;
+        /** Array with paths to static directories or static directory objects, see {@link Server.StaticDirectory}. */
+        statics?: Array<string | vlib.Path | Server.StaticDirectory>;
         /** The path to the favicon. */
         favicon?: string;
-        /** Your company information, see {@link CompanyInfo}. */
-        company: CompanyInfo;
+        /** Your company information, see {@link Server.CompanyInfo}. */
+        company: Server.CompanyInfo;
         /** The default meta object. */
         meta?: Meta | Meta.Opts;
-        /** The TLS settings for HTTPS, see {@link TLSConfig}. */
-        tls?: TLSConfig;
+        /** The TLS settings for HTTPS, see {@link Server.TLSConfig}. */
+        tls?: Server.TLSConfig;
         /** The mail options. */
         mail?: Mail.Opts;
         /**
@@ -149,8 +59,8 @@ export declare namespace Server {
         };
         /** An array with names of crypto keys. Keys will be generated and stored in the database when they do not exist, and accessible as `Server.keys.$name`. Items may be a string (name) or an object with `name` and `length`, see {@link Server.KeyOpts}. */
         keys?: (string | Server.KeyOpts)[];
-        /** The arguments for the payment class, see {@link PaymentOpts}. */
-        payments?: PaymentOpts;
+        /** The arguments for the payment class, see {@link Server.PaymentOpts}. */
+        payments?: Server.PaymentOpts;
         /** Override the default headers generated by volt. Leave `default_headers` undefined to let volt automatically generate default headers. */
         default_headers?: Record<string, any>;
         /** The Google Tag ID. */
@@ -180,13 +90,124 @@ export declare namespace Server {
         /** The active log level. */
         log_level?: number;
     }
+    /**
+     * Key options for the {@link Server.Opts} interface.
+     * @docs
+     */
+    interface KeyOpts {
+        /** The name of the key. */
+        name: string;
+        /** The length of the key. */
+        length: number;
+    }
+    /**
+     * Company profile information used in invoices, emails, and branding.
+     * @experimental
+     * @docs
+     */
+    interface CompanyInfo {
+        /** The name of your company. */
+        name: string;
+        /** The legal name of your company. */
+        legal_name: string;
+        /** The street name of your company's address. */
+        street: string;
+        /** The house number or house name of your company's address. */
+        house_number: string;
+        /** The postal/zip code of your company's address. */
+        postal_code: string;
+        /** The city of your company's address. */
+        city: string;
+        /** The province or state of your company's address. */
+        province: string;
+        /** The country name of your company's address. */
+        country: string;
+        /** The two-letter ISO country code of your company's location. */
+        country_code: string;
+        /** The tax ID of your company. */
+        tax_id?: string;
+        /** The type of company. */
+        type?: string;
+        /** The endpoint URL path of your company's icon (PNG). Must be an endpoint URL since access to the file path is also required for creating invoices. */
+        icon?: string;
+        /** The endpoint URL path of your company's stroke icon (PNG). In payment invoices the stroke icon precedes the default icon. Must be an endpoint URL since access to the file path is also required for creating invoices. */
+        stroke_icon?: string;
+        /** The file path of your company's icon (PNG), automatically retrieved from the {@link Server.CompanyInfo.icon} property when possible. */
+        icon_path?: string;
+        /** The file path of your company's stroke icon (PNG), automatically retrieved from the {@link Server.CompanyInfo.stroke_icon} property when possible. */
+        stroke_icon_path?: string;
+    }
+    /**
+     * TLS certificate configuration for enabling HTTPS.
+     * @docs
+     */
+    interface TLSConfig {
+        /** The path to the certificate. */
+        cert: string;
+        /** The path to the private key file. */
+        key: string;
+        /** The path to the CA bundle file. */
+        ca?: string | null;
+        /** The passphrase of the private key. */
+        passphrase?: string;
+    }
+    /**
+     * Description of a static directory or file that should be served.
+     * @docs
+     */
+    interface StaticDirectory {
+        /** The path to the static directory or file. */
+        path: string;
+        /** The base endpoint of the static directory, by default the path's name will be used.*/
+        endpoint?: string;
+        /** Enable caching for the static endpoints; this value will be used for parameter `Endpoint.cache`. */
+        cache?: number | boolean;
+        /** Define a specific cache policy per endpoint from this static directory as `{<endpoint>: <cache>}`; the cache value will be used for parameter `Endpoint.cache`. */
+        endpoints_cache?: Record<string, boolean | number>;
+        /** An array of paths to exclude. The array may contain regexes. */
+        exclude?: Array<string | RegExp>;
+    }
+    /**
+     * A definition of a registered endpoint, can be used to export params and response types to the frontend.
+     * @prop params The inferred interface of the endpoint parameters, note that the runtime value of this property is always `undefined`.
+     * @prop Params Alias for property {@link Server.RegisteredEndpoint.params}.
+     * @docs
+     */
+    type RegisteredEndpoint<M extends Endpoint.Method, E extends string | RegExp, P extends Record<string, any>> = {
+        /** The HTTP method for the endpoint (e.g. GET, POST). */
+        method: M;
+        /** A pascal cased alias for the endpoint, for type exports conforming with `Params`. */
+        Method: M;
+        /**
+         * The route's endpoint endpoint, string or regex,
+         * use `route.endpoint_str` for the string representation.
+         */
+        endpoint: E;
+        /** A pascal cased alias for the method, for type exports conforming with `Params`. */
+        Endpoint: E;
+        /** The endpoint route. */
+        route: Route;
+        /**
+         * The inferred params type, can be used to export the params payload type.
+         * @warning This value is `undefined` at runtime, but contains the correct params payload type at compile time.
+         */
+        Params: P;
+    };
+    /**
+     * The payment options.
+     * @docs
+     */
+    type PaymentOpts = (Paddle.Opts & {
+        /** The payment provider type. */
+        type: "paddle";
+    });
 }
 /**
- * The backend server class.
- *
- * When the HTTPS parameters `certificate` and `private_key` are defined, the server will run automatically on HTTP and HTTPS.
+ * The server class.
+ * @note Automatically runs on HTTP/HTTPS depending on the constructor options.
  *
  * @property users The initialized {@link Users} instance.
+ * @docs
  */
 export declare class Server {
     /** Content type per mime. */
@@ -210,7 +231,7 @@ export declare class Server {
     /** Is in production mode. */
     production: boolean;
     /** The company information. */
-    company: CompanyInfo;
+    company: Server.CompanyInfo;
     /** The default meta information. */
     meta: Meta;
     /** Is running in offline mode. */
@@ -258,18 +279,37 @@ export declare class Server {
     private _keys_db;
     private _sys_keys_db;
     private _website_status_db;
-    /** Construct a new server instance. */
+    /**
+     * Construct a new server instance.
+     * @docs
+     */
     constructor({ ip, port, // leave undefined for blank detection.
     domain, is_primary, source, database, statics, favicon, company, meta, tls, mail, rate_limit, keys, payments, default_headers, google_tag, users, production, threading, offline, additional_sitemap_endpoints, log_level, daemon, }: Server.Opts);
     /** Get a content type (MIME) from a file extension. */
+    /**
+     * Get a content type (MIME) from a file extension. The file extension should include the leading dot, e.g. ".html".
+     * @docs
+     */
     get_content_type(extension: string): string;
-    /** Set the logging verbosity level. */
+    /**
+     * Set the logging verbosity level.
+     * @docs
+     */
     set_log_level(level: number): void;
-    /** Generate a cryptographically secure random key as a hex string. */
+    /**
+     * Generate a cryptographically secure random key as a hex string.
+     * @docs
+     */
     generate_crypto_key(length?: number): string;
-    /** Create an HMAC hash using the provided key and data. */
+    /**
+     * Create an HMAC hash using the provided key and data.
+     * @docs
+     */
     hmac(key: string, data: string, algo?: string): string;
-    /** Create a hash (no key) of the given data using the specified algorithm. */
+    /**
+     * Create a hash (no key) of the given data using the specified algorithm.
+     * @docs
+     */
     hash(data: string | object, algo?: string): string;
     private _init_default_headers;
     private _set_header_defaults;
@@ -288,6 +328,11 @@ export declare class Server {
     private _serve;
     /** The promise of database initialization and connecting. */
     private _db_init_promise;
+    /**
+     * Initialize the server.
+     * @returns A promise that resolves when the server has been initialized.
+     * @docs
+     */
     initialize({ worker, }?: {
         /**
          * By default the server is initialized as web server.
@@ -301,25 +346,52 @@ export declare class Server {
          */
         worker?: boolean;
     }): Promise<void>;
+    /**
+     * Find an endpoint by route or string.
+     * @docs
+     */
     find_endpoint(route: Route): Endpoint | undefined;
     find_endpoint(endpoint: string, method?: string): Endpoint | undefined;
     /**
      * Start the server.
+     *
      * @example
-     * ...
-     * server.start();
+     * {Start}
+     * Start the server.
+     * ```
+     * const server = new volt.Server({ ... });
+     * await server.start();
+     * ```
+     * @docs
      */
     start(): Promise<void>;
     /**
      * Stop the server.
+     *
      * @example
+     * {Stop}
+     * Stop the server.
+     * ```
+     * const server = new volt.Server({ ... });
+     * await server.start();
      * ...
-     * server.stop();
+     * await server.stop();
+     * ```
+     *
+     * @docs
      */
     stop(): Promise<void>;
-    /** Add an event callback. */
+    /**
+     * Add an event callback.
+     * See {@link Events} for more info.
+     * @docs
+     */
     on<N extends EventName>(name: N, callback: EventCallback<N>): this;
-    /** Remove an event callback. */
+    /**
+     * Remove an event callback.
+     * See {@link Events} for more info.
+     * @docs
+     */
     off<N extends EventName>(name: N, callback: EventCallback<N>): this;
     /**
      * Add a single endpoint.
@@ -329,8 +401,10 @@ export declare class Server {
      * @template S system template for inferring the endpoint callback parameters.
      * @param endpoint The endpoint or endpoint options to add.
      * @returns A registered endpoint object that can for instance be used to infer the endpoint parameters.
+     *
+     * @docs
      */
-    endpoint<const M extends Endpoint.Method = "GET", const E extends string | RegExp = string, const S extends vlib.Schema.Entries.Opts = {}>(endpoint: Endpoint<M, E, S> | ConstructorParameters<typeof Endpoint<M, E, S>>[0]): RegisteredEndpoint<M, E, vlib.Schema.Entries.Infer<S>>;
+    endpoint<const M extends Endpoint.Method = "GET", const E extends string | RegExp = string, const S extends vlib.Schema.Entries.Opts = {}>(endpoint: Endpoint<M, E, S> | ConstructorParameters<typeof Endpoint<M, E, S>>[0]): Server.RegisteredEndpoint<M, E, vlib.Schema.Entries.Infer<S>>;
     /**
      *  Add an endpoint per error status code.
      * @param status_code
@@ -344,6 +418,8 @@ export declare class Server {
      * @note
      * Best practice is to define a universal `/error` endpoint using `Endpoint.templates` to render the error details.
      * Then this endpoint can be cloned using `Endpoint.clone()` and defined with specific template values per status code.
+     *
+     * @docs
      */
     error_endpoint<const S extends vlib.Schema.Entries.Opts = {}>(status_code: "*" | number, endpoint: Endpoint<any, any, S> | Omit<Endpoint.Opts<any, any, S>, "method" | "endpoint">): this;
     /**
@@ -355,6 +431,7 @@ export declare class Server {
      * ...
      * server.add_csp("script-src", "somewebsite.com");
      * server.add_csp("upgrade-insecure-requests");
+     * @docs
      */
     add_csp(key: string, value?: null | string | string[]): void;
     /**
@@ -366,6 +443,7 @@ export declare class Server {
      * ...
      * server.remove_csp("script-src", "somewebsite.com");
      * server.remove_csp("upgrade-insecure-requests");
+     * @docs
      */
     remove_csp(key: string, value?: null | string): void;
     /**
@@ -376,20 +454,28 @@ export declare class Server {
      * ...
      * server.del_csp("script-src");
      * server.del_csp("upgrade-insecure-requests");
+     * @docs
      */
     del_csp(key: string): void;
     /**
      * This function is meant to be used when the server is in production mode, it will make an API request to your server through the defined `Server.domain` parameter.
      * @note This function can be called without initializing the server.
      * @param type The wanted output type. Either an `object` or a `string` type for CLI purposes.
+     * @docs
      */
     fetch_status(type?: "object" | "string"): Promise<string | Record<string, any>>;
-    /** Generate a key and csr for tls. */
+    /**
+     * Generate a key and csr for tls.
+     * @docs
+     */
     generate_ssl_key({ output_path, ec, }: {
         output_path: string;
         ec?: boolean;
     }): Promise<void>;
-    /** Generate a csr for tls. */
+    /**
+     * Generate a csr for tls.
+     * @docs
+     */
     generate_csr({ output_path, key_path, name, domain, organization_unit, country_code, province, city, }: {
         output_path: string;
         key_path: string;
@@ -436,21 +522,16 @@ export declare class Server {
         line_items: any[];
     }): Promise<void>;
     /** Build the base email layout used by the various transactional email builders. */
-    _mail_template({ max_width, children, }: {
-        max_width?: number;
-        children?: any[];
-    }): any;
+    private _mail_template;
     /** Helper that renders a list of payment line items for use in transactional emails. */
-    _render_mail_payment_line_items({ payment, line_items, show_total_due }: {
-        payment: any;
-        line_items: any[];
-        show_total_due?: boolean;
-    }): any[];
+    private _render_mail_payment_line_items;
     /** Assert mail is configured. */
     assert_mail(): asserts this is {
         mail: Mail;
     };
-    /** Build the 2FA verification email content. */
+    /**
+     * Build the 2FA verification email content.
+     */
     on_2fa_mail({ code, username, email, date, ip, device }: {
         code: string;
         username: string;
@@ -459,14 +540,18 @@ export declare class Server {
         ip: string;
         device: string;
     }): any;
-    /** Build the successful payment email content. */
+    /**
+     * Build the successful payment email content.
+     */
     on_payment_mail({ payment }: {
-        payment: any;
-    }): any;
-    /** Build the failed payment email content. */
+        payment: Payment;
+    }): MailUI.MailElement;
+    /**
+     * Build the failed payment email content.
+     */
     on_failed_payment_mail({ payment }: {
-        payment: any;
-    }): any;
+        payment: Payment;
+    }): MailUI.MailElement;
     /** Build the successful cancellation email content. */
     on_cancellation_mail({ payment, line_items }: {
         payment: any;

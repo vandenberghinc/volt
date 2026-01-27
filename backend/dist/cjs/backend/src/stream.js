@@ -352,6 +352,7 @@ class Stream {
    * Retrieve the normalized IP address, suitable for rate limiting and logging.
    * @throws {Error} If the IP is invalid.
    * @returns The normalized IP.
+   * @docs
    */
   normalized_ip() {
     if (this._normalized_ip != null) {

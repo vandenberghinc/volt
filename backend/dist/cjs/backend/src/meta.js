@@ -30,6 +30,10 @@ class Meta {
   charset;
   viewport;
   favicon;
+  /**
+   * Construct a meta information object.
+   * @docs
+   */
   constructor({ author, title, description, image, robots = "index, follow", charset = "UTF-8", viewport = "width=device-width, initial-scale=1", favicon = "/favicon.ico" } = {}) {
     this.author = author;
     this.title = title;
@@ -40,7 +44,6 @@ class Meta {
     this.viewport = viewport;
     this.favicon = favicon;
   }
-  // Copy.
   /**
    * Create a copy of the current meta object without any references.
    * @param override - The <Type>Meta</Type> constructor arguments to override.
@@ -60,44 +63,81 @@ class Meta {
     });
   }
   /**
-   * Set value funcs that return the current object.
-   * @return: Returns the current <Type>Meta</Type> object.
-   * @funcs 8
+   * Update the author property.
+   * @return Returns the current {@link Meta} instance for chaining.
    * @docs
    */
   set_author(value) {
     this.author = value;
     return this;
   }
+  /**
+   * Update the title property.
+   * @return Returns the current {@link Meta} instance for chaining.
+   * @docs
+   */
   set_title(value) {
     this.title = value;
     return this;
   }
+  /**
+   * Update the description property.
+   * @return Returns the current {@link Meta} instance for chaining.
+   * @docs
+   */
   set_description(value) {
     this.description = value;
     return this;
   }
+  /**
+   * Update the image property.
+   * @return Returns the current {@link Meta} instance for chaining.
+   * @docs
+   */
   set_image(value) {
     this.image = value;
     return this;
   }
+  /**
+   * Update the robots property.
+   * @return Returns the current {@link Meta} instance for chaining.
+   * @docs
+   */
   set_robots(value) {
     this.robots = value;
     return this;
   }
+  /**
+   * Update the charset property.
+   * @return Returns the current {@link Meta} instance for chaining.
+   * @docs
+   */
   set_charset(value) {
     this.charset = value;
     return this;
   }
+  /**
+   * Update the viewport property.
+   * @return Returns the current {@link Meta} instance for chaining.
+   * @docs
+   */
   set_viewport(value) {
     this.viewport = value;
     return this;
   }
+  /**
+   * Update the favicon property.
+   * @return Returns the current {@link Meta} instance for chaining.
+   * @docs
+   */
   set_favicon(value) {
     this.favicon = value;
     return this;
   }
-  // Get as object.
+  /**
+   * Get the meta information as a plain object.
+   * @docs
+   */
   obj() {
     return {
       author: this.author,

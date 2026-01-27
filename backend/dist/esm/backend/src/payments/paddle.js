@@ -57,7 +57,7 @@ export var Payment;
  *
  * Sandbox env: https://sandbox-vendors.paddle.com
  *
- * @nav Backend/Payments
+ * @nav Payments
  * @docs
  * @deprecated Using stripe from now on.
  */

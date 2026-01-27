@@ -83,6 +83,8 @@ class View {
    * - `params`
    * - `data`
    * @param override Override specific endpoint options, note that this will be shallow merged.
+   *
+   * @docs
    */
   clone(override) {
     return new View({
@@ -105,7 +107,10 @@ class View {
       ...override
     });
   }
-  // Constructor.
+  /**
+   * Options for constructing a {@link View} instance.
+   * @docs
+   */
   constructor({ source = null, callback = null, includes = [], links = [], templates = {}, meta = new import_meta.Meta(), jquery = false, lang = "en", body_style = null, splash_screen = void 0, tree_shaking = false, mangle = false, min_device_width = 600, _src }) {
     this.source = source;
     this.callback = callback;

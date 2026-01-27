@@ -7,7 +7,7 @@ APPLY_FIX; // Ask final audit
 // Imports.
 import { SystemError } from "../../errors/system_error.js";
 import { Collection, TransactionCollection } from "../collection.js";
-import { InvalidUsageError } from "src/volt.js";
+import { InvalidUsageError } from "src/index.js";
 /**
  * The quota manager.
  * This manager can be used to manage and enforce usage quotas for different resources,

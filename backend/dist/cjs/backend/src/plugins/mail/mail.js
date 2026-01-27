@@ -80,6 +80,8 @@ class Mail {
    * @param max_attachments limit on number of attachments; -1 disables.
    * @param max_attachment_size max size (bytes) per attachment; -1 disables.
    * @param max_attachments_size max total size (bytes) across attachments; -1 disables.
+   *
+   * @docs
    */
   async send({ sender = void 0, recipients = [], subject = void 0, body = "", attachments = [], max_attachments = -1, max_attachment_size = -1, max_attachments_size = -1, allow_untrusted_urls = false }) {
     if (!this.smtp) {

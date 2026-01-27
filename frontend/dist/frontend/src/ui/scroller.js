@@ -543,7 +543,7 @@ export const Scroller = Elements.wrapper(ScrollerElement);
 export const NullScroller = Elements.create_null(ScrollerElement);
 // Virtual Scroller.
 // /*  @ docs:
-//     @nav: Frontend
+//     @nav Frontend
 //     @chapter: Elements
 //     @title: Virtual Scroller
 //     @experimental: true

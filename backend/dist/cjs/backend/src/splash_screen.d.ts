@@ -18,6 +18,8 @@ import { Stream } from "./stream.js";
  * @param loader.color The color of the loader.
  * @param loader.size The loader size in pixels as a number.
  * @param style The CSS style to add to the main element of the splash screen.
+ *
+ * @nav Endpoints
  * @docs
  */
 export declare class SplashScreen {
@@ -48,6 +50,8 @@ export declare class SplashScreen {
      * @param loader.color The color of the loader.
      * @param loader.size The loader size in pixels as a number.
      * @param style The CSS style to add to the main element of the splash screen.
+     *
+     * @docs
      */
     constructor({ background, image, loader, style, }: {
         background?: string | null;
@@ -67,12 +71,16 @@ export declare class SplashScreen {
     /**
      * Clone this splash screen,
      * creating a new instance with the same properties not shared by reference.
+     *
+     * @docs
      */
     clone(): SplashScreen;
     /**
      * Generate and return the splash screen HTML. Result is cached after the first call.
      *
      * @returns The splash screen HTML markup.
+     *
+     * docs
      */
     get html(): string;
     /**
