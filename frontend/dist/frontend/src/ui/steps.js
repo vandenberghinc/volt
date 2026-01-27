@@ -225,9 +225,9 @@ let StepsElement = (() => {
             if (value == null) {
                 return this._content_nodes[0].overflow();
             }
-            this._content_nodes.iterate(node => {
+            for (const node of this._content_nodes) {
                 node.overflow(value);
-            });
+            }
             return this;
         }
         divider_background(value) {
@@ -235,9 +235,9 @@ let StepsElement = (() => {
                 return this._div_bg;
             }
             this._div_bg = value;
-            this._div_nodes.iterate(node => {
+            for (const node of this._div_nodes) {
                 node.background(value);
-            });
+            }
             return this;
         }
         step_number_background(value) {
@@ -245,9 +245,9 @@ let StepsElement = (() => {
                 return this._step_bg;
             }
             this._step_bg = value;
-            this._step_nr_nodes.iterate(node => {
+            for (const node of this._step_nr_nodes) {
                 node.bg.background(value);
-            });
+            }
             return this;
         }
         step_number_border_color(value) {
@@ -255,9 +255,9 @@ let StepsElement = (() => {
                 return this._step_border;
             }
             this._step_border = value;
-            this._step_nr_nodes.iterate(node => {
+            for (const node of this._step_nr_nodes) {
                 node.border_color(value);
-            });
+            }
             return this;
         }
         step_number_border_radius(value) {
@@ -265,9 +265,9 @@ let StepsElement = (() => {
                 return this._step_border_radius;
             }
             this._step_border_radius = value;
-            this._step_nr_nodes.iterate(node => {
+            for (const node of this._step_nr_nodes) {
                 node.border_radius(value);
-            });
+            }
             return this;
         }
         step_number_margin_right(value) {
@@ -275,9 +275,9 @@ let StepsElement = (() => {
                 return this._step_margin_right;
             }
             this._step_margin_right = value;
-            this._step_nr_nodes.iterate(node => {
+            for (const node of this._step_nr_nodes) {
                 node.margin_right(value);
-            });
+            }
             return this;
         }
         /**
@@ -285,7 +285,9 @@ let StepsElement = (() => {
          * @docs
          */
         iterate_step_numbers(callback) {
-            this._step_nr_nodes.iterate(node => { callback(node); });
+            for (const node of this._step_nr_nodes) {
+                callback(node);
+            }
             return this;
         }
         /**
@@ -293,7 +295,9 @@ let StepsElement = (() => {
          * @docs
          */
         iterate_steps(callback) {
-            this._step_nodes.iterate(node => { callback(node); });
+            for (const node of this._step_nodes) {
+                callback(node);
+            }
             return this;
         }
     };

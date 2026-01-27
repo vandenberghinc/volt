@@ -54,7 +54,7 @@ export class Theme {
         this._light = themes.light;
         this._linked_themes = linked_themes;
         // Assign themes.
-        Object.keys(themes).iterate((theme) => {
+        for (const theme of Object.keys(themes)) {
             // Initialize.
             const theme_style = themes[theme];
             this[theme] = theme_style;
@@ -62,15 +62,16 @@ export class Theme {
             if (this.active_id === undefined) {
                 this.active_id = theme;
                 this.active = theme_style;
-                Object.keys(this.active).iterate((id) => {
+                for (const id of Object.keys(this.active)) {
                     document.documentElement.style.setProperty(`--${this._id}_${id}`, this.active[id] ?? "");
-                });
+                }
+                ;
             }
             // Initialize attr funcs.
-            Object.keys(theme_style).iterate((id) => {
+            for (const id of Object.keys(theme_style)) {
                 this._add_attr(id, theme);
-            });
-        });
+            }
+        }
         // Ensure type.
         if (this.active_id == null || this.active == null) {
             throw new Error("No themes were specified in parameter \"themes\".");
@@ -114,16 +115,18 @@ export class Theme {
             // Activate theme.
             this.active_id = id;
             this.active = this[id];
-            Object.keys(this.active).iterate((id) => {
+            for (const id of Object.keys(this.active)) {
                 document.documentElement.style.setProperty(`--${this._id}_${id}`, this.active[id] ?? "");
-            });
+            }
+            ;
             if (this._on_activate_callback != null) {
                 this._on_activate_callback(this, this.active_id);
             }
             if (this._linked_themes?.length) {
-                this._linked_themes.iterate((theme) => {
+                for (const theme of this._linked_themes) {
                     theme.activate(id, false);
-                });
+                }
+                ;
             }
             if (apply_theme_update) {
                 ThemesModule.apply_theme_update();

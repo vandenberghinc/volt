@@ -70,9 +70,9 @@ let ContextMenuElement = (() => {
                 derived: ContextMenuElement,
             });
             // Append content.
-            content.iterate((item) => {
+            for (const item of content) {
                 if (item == null) {
-                    return null;
+                    break;
                 }
                 else if (!(item instanceof HTMLElement)) {
                     const button = Button(item.label)
@@ -93,7 +93,7 @@ let ContextMenuElement = (() => {
                 else {
                     this.append(item);
                 }
-            });
+            }
             // Set styling
             this
                 .z_index(2) // one higher than sidebar.

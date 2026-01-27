@@ -207,7 +207,7 @@ export class TableElement extends VElementTagMap.div {
 	// Iterate the table data items.
 	iterate(callback) {
 		let row_index = 0;
-		this.table_rows.iterate(row => {
+		for (const row of this.table_rows) {
 			let column_index = 0;
 			row.iterate(column => {
 				callback({
@@ -223,17 +223,17 @@ export class TableElement extends VElementTagMap.div {
 				++column_index;
 			})
 			++row_index;
-		})
+		}
 		return this;
 	}
 
 	// Iterate table rows.
 	iterate_rows(callback: (row: TableRowElement, index: number, is_last: boolean) => void) {
 		let index = 0;
-		this.table_rows.iterate(e => {
+		for (const e of this.table_rows) {
 			callback(e, index, index === this.table_rows.length - 1)
 			++index;
-		});
+		}
 		return this;
 	}
 

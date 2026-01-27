@@ -28,7 +28,10 @@ export type Events = {
      * ...
      * server.on("initialize", () => console.log("Hello World!"));
      */
-    initialize: () => void | Promise<void>;
+    initialize: (opts: {
+        /** The `worker` flag passed to `Server.initialize()` */
+        worker: boolean;
+    }) => void | Promise<void>;
     /**
      * This callback is executed when a user is created.
      * @note Errors thrown in this callback will be logged but ignored.

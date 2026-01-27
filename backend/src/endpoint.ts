@@ -313,7 +313,7 @@ export class Endpoint<
         if (compress === "auto" || typeof compress !== "boolean") {
             compress = Endpoint.compressed_content_types.includes(this.content_type??"")
         } else if (compress === true && this.content_type != null && Endpoint.compressed_content_types.includes(this.content_type)) {
-            debug(3, this.route.id, ": ", `Overriding parameter "compress", disabling compression.`)
+            debug(4, this.route.id, ": ", `Overriding parameter "compress", disabling compression.`)
             compress = false;
         }
         this._compress = compress;
@@ -653,29 +653,6 @@ export class Endpoint<
         let data: string | Buffer;
         if (path.extension() === ".js") {
             data = path.load_sync();
-
-            // @deprecated compile using vhighlight, now esbuild is used for bundling, callback is not supported yet.
-            // const hash = server.hash(data);
-
-            // // Check cache for restarts by file watcher.
-            // const {cache_path, cache_hash, cache_data} = Utils.get_compiled_cache(server.domain, "GET", path.str());
-            // if (cache_data && hash === cache_hash) {
-            //     data = cache_data;
-            // }
-
-            // // Compile.
-            // else {
-            //     const compiler = new vhighlight.JSCompiler({
-            //         line_breaks: true,
-            //         double_line_breaks: false,
-            //         comments: false,
-            //         white_space: false,
-            //     })
-            //     data = compiler.compile_code(data, path.str());
-
-            //     // Cache for restarts.
-            //     Utils.set_compiled_cache(cache_path, data, hash);
-            // }
         }
         else if (path.extension() === ".css") {
             const minifier = new CleanCSS();

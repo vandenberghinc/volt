@@ -288,7 +288,19 @@ export declare class Server {
     private _serve;
     /** The promise of database initialization and connecting. */
     private _db_init_promise;
-    initialize(): Promise<void>;
+    initialize({ worker, }?: {
+        /**
+         * By default the server is initialized as web server.
+         *
+         * However, when using worker threads, the web server parts are skipped.
+         * Only essential operations such as database, users, payments etc. are initialized.
+         * Therefore the server can still be used within a worker threads without
+         * the overhead of creating http/https servers, endpoints, static files, etc.
+         *
+         * The user-defined initialize callbacks are still executed but the `worker` is passed as indication.
+         */
+        worker?: boolean;
+    }): Promise<void>;
     find_endpoint(route: Route): Endpoint | undefined;
     find_endpoint(endpoint: string, method?: string): Endpoint | undefined;
     /**

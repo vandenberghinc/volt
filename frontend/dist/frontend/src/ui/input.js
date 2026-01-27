@@ -773,7 +773,7 @@ let ExtendedSelectElement = (() => {
             // Arguments.
             if (Array.isArray(items)) {
                 this.items = [];
-                items.iterate((item) => {
+                for (const item of items) {
                     if (typeof item === "string") {
                         this.items.append({
                             id: item,
@@ -786,11 +786,11 @@ let ExtendedSelectElement = (() => {
                         }
                         this.items.append(item);
                     }
-                });
+                }
             }
             else if (typeof items === "object" && items != null) {
                 this.items = [];
-                Object.keys(items).iterate((key) => {
+                for (const key of Object.keys(items)) {
                     if (typeof items[key] === "string") {
                         this.items.append({
                             id: key,
@@ -803,7 +803,7 @@ let ExtendedSelectElement = (() => {
                             id: key,
                         });
                     }
-                });
+                }
             }
             else {
                 throw Error(`Parameter "items" should be a defined value of type "array" or "object".`);
@@ -1047,9 +1047,9 @@ let ExtendedSelectElement = (() => {
                 const query = e.value();
                 if (query.length === 0) {
                     content.inner_html("");
-                    this.items.iterate((item) => {
+                    for (const item of this.items) {
                         content.append(item.stack);
-                    });
+                    }
                 }
                 else {
                     const results = vlib.fuzzy.search({
@@ -1061,9 +1061,9 @@ let ExtendedSelectElement = (() => {
                         key: ["id", "text"],
                     });
                     content.inner_html("");
-                    results.iterate((item) => {
+                    for (const item of results) {
                         content.append(item.stack);
-                    });
+                    }
                 }
             });
             // The content.
@@ -1074,7 +1074,7 @@ let ExtendedSelectElement = (() => {
             let i = 0;
             let min_height;
             // this.dropdown.items = [];
-            this.items.iterate((item) => {
+            for (const item of this.items) {
                 // Image.
                 let img;
                 if (item.image != null) {
@@ -1117,7 +1117,7 @@ let ExtendedSelectElement = (() => {
                 content.append(stack);
                 // Increment.
                 ++i;
-            });
+            }
             // Show search bar or just show everything.
             if (this.items.length > 15) {
                 this.dropdown.append(search, Divider()
@@ -1151,7 +1151,7 @@ let ExtendedSelectElement = (() => {
             if (val == null) {
                 return this._value ?? "";
             }
-            this.items.iterate((item) => {
+            for (const item of this.items) {
                 if (item.id === val) {
                     this._value = val;
                     this.input.value(item.text ?? item.id);
@@ -1159,7 +1159,7 @@ let ExtendedSelectElement = (() => {
                         this._on_change_callback(this, val);
                     }
                 }
-            });
+            }
             return this;
         }
         background(val) {

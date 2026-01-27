@@ -4,4 +4,3 @@
  */
 export * as vlib from "@vandenberghinc/vlib";
 export * as vts from "@vandenberghinc/vlib/vts";
-export * as vhighlight from "@vandenberghinc/vhighlight";

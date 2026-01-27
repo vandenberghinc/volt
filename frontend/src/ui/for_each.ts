@@ -49,10 +49,10 @@ export class ForEachElement extends VElementTagMap.section {
 		} else if (typeof items === "object") {
 			let index = 0;
 			const keys = Object.keys(items);
-			keys.iterate((key) => {
+			for (const key of keys) {
 				this.append((func as ObjectCallback)(key, items[key], index, index === keys.length - 1));
 				++index;
-			})
+			}
 		} else {
 			throw Error(`Parameter "items" has an invalid value type, the valid value types are "array" or "object".`);
 		}

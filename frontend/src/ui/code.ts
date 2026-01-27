@@ -3,7 +3,7 @@
  * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
-// @exports: CodeBlockElement, CodeBlock, CodePreElement, CodePre, CodeLineElement, CodeLine, MultiLanguageCodeBlockElement, MultiLanguageCodeBlock
+import * as vhighlight from "@vandenberghinc/vhighlight"
 
 // Imports.
 import { Utils } from "../modules/utils.js"
@@ -14,9 +14,6 @@ import { ImageMaskElement, ImageMask } from "./image.js"
 import { ForEach } from "./for_each.js"
 import { Spacer } from "./spacer.js"
 import { DividerElement, Divider } from "./divider.js"
-
-// import * as vhighlight from "/Users/administrator/persistance/private/dev/vinc/vhighlight.js"
-import * as vhighlight from "@vandenberghinc/vhighlight"
 
 // All codeblocks using languages.
 const language_codeblocks = [];
@@ -547,7 +544,7 @@ export class CodePreElement extends VElementTagMap.pre {
         _post_tokenized_callback?: Function,
     } = {}) {
 
-        console.log("> Highlight")
+        // console.log("> Highlight")
 
         // Vars.
         if (code != null) {
@@ -571,7 +568,7 @@ export class CodePreElement extends VElementTagMap.pre {
         this.cancel_animation()
             .then(() => {
 
-                console.log("> Cancelled animation")
+                // console.log("> Cancelled animation")
 
                 // Get tokenizer.
                 this.tokenizer = vhighlight.init_tokenizer(this.language, opts);
@@ -586,7 +583,7 @@ export class CodePreElement extends VElementTagMap.pre {
                 // Build the html.
                 const highlighted_code = this.tokenizer.build_html(this.tokens);
 
-                console.log("> Highlighted:", highlighted_code)
+                // console.log("> Highlighted:", highlighted_code)
 
                 // Post tokenize callback.
                 if (_post_tokenized_callback != null) {
@@ -677,7 +674,7 @@ declare module './any_element.d.ts' { interface AnyElementMap { CodeLineElement:
  * Content object used by multi-language code blocks.
  */
 interface MLContentObject {
-    language: string;
+    language?: string;
     title?: string;
     data: string;
 }
@@ -887,7 +884,7 @@ export class MultiLanguageCodeBlockElement extends (VStackElement as any as VEle
                     this.selected_code_pre = main_this._pre_nodes[index];
 
                     // Set title.
-                    main_this._title_nodes.iterate((i) => {
+                    for (const i of main_this._title_nodes) {
                         i.opacity(main_this._title_opac)
                         if (code.length > 1) {
                             i.divider
@@ -895,7 +892,7 @@ export class MultiLanguageCodeBlockElement extends (VStackElement as any as VEle
                                 .background("transparent")
                                 .remove_on_theme_updates()
                         }
-                    });
+                    };
                     main_this._title_nodes[index].opacity(1)
                     if (code.length > 1) {
                         main_this._title_nodes[index].divider.background(main_this._tint)
@@ -956,12 +953,12 @@ export class MultiLanguageCodeBlockElement extends (VStackElement as any as VEle
             .width("100%")
             .overflow("scroll")
         let index = 0;
-        code.iterate((item) => {
+        for (const item of code) {
             if (item.data == null) {
                 console.error("Undefined codeblock data" + (item.language === "__unknown__" ? "" : ` for language ${item.language}`) + ".");
-                return null;
+                break;
             }
-            if (highlight) {
+            if (highlight && item.language != null && item.language !== "__unknown__") {
                 const tokenizer = vhighlight.init_tokenizer(item.language);
                 if (tokenizer) {
                     item.data = tokenizer.tokenize({ code: item.data, build_html: true });
@@ -979,7 +976,7 @@ export class MultiLanguageCodeBlockElement extends (VStackElement as any as VEle
             this._pre_nodes.append(pre);
             this.content.append(pre);
             ++index;
-        })
+        }
 
         // Main container (this).
         this

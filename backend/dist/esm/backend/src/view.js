@@ -127,7 +127,6 @@ export class View {
     raw_html;
     _bundle;
     payments;
-    // vhighlight?: string | undefined;
     min_device_width;
     server;
     endpoint;
@@ -239,7 +238,6 @@ export class View {
         });
         // Set options based on inputs.
         this.payments = this._bundle.inputs.find((path) => path.endsWith("/modules/paddle.js"));
-        // this.vhighlight = this.bundle.inputs.find((path: string) => path.endsWith("/vhighlight.js"));
     }
     /** Ensure the view is bundled when required. */
     async ensure_bundle() {
@@ -659,30 +657,6 @@ export class View {
         // JS code.
         else if (this.callback != null) {
             let code = this.callback.toString();
-            // @deprecated compile using vhighlight, now esbuild is used for bundling, callback is not supported yet.
-            // // Fill templates.
-            // const code_hash = this._server.hash(code);
-            // // Check cache.
-            // const { cache_path, cache_hash, cache_data } = utils.get_compiled_cache(this._server.domain, this._endpoint.method, this._endpoint.endpoint);
-            // if (cache_data && code_hash === cache_hash) {
-            //     code = cache_data;
-            // } else {
-            //     // Compile.
-            //     const compiler = new vhighlight.JSCompiler({
-            //         line_breaks: true,
-            //         double_line_breaks: true,
-            //         comments: false,
-            //         white_space: false,
-            //     })
-            //     try {
-            //         code = compiler.compile_code(code, this._src);
-            //     } catch (err) {
-            //         console.error("JS Compile error:");
-            //         console.error(err);
-            //     }
-            //     // Cache for restarts.
-            //     utils.set_compiled_cache(cache_path, code, code_hash);
-            // }
             // Add.
             this._html += `<script nonce="${nonce_identifier}">${line_break}(${code})()${line_break}</script>${line_break}`;
             // cached_code += `;(${code})();`;

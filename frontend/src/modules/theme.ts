@@ -79,7 +79,7 @@ export class Theme<ThemeOptions extends Record<string, any>> {
         this._linked_themes = linked_themes
 
         // Assign themes.
-        Object.keys(themes).iterate((theme) => {
+        for (const theme of Object.keys(themes)) {
 
             // Initialize.
             const theme_style = themes[theme] as Record<string, any>;
@@ -89,16 +89,16 @@ export class Theme<ThemeOptions extends Record<string, any>> {
             if (this.active_id === undefined) {
                 this.active_id = theme as ThemeId;
                 this.active = theme_style as any;
-                Object.keys(this.active as any).iterate((id) => {
+                for (const id of Object.keys(this.active as any)) {
                     document.documentElement.style.setProperty(`--${this._id}_${id}`, (this.active as any)[id] ?? "");
-                });
+                };
             }
 
             // Initialize attr funcs.
-            Object.keys(theme_style).iterate((id) => {
+            for (const id of Object.keys(theme_style)) {
                 this._add_attr(id, theme as ThemeId);
-            })
-        })
+            }
+        }
 
         // Ensure type.
         if (this.active_id == null || this.active == null) {
@@ -150,16 +150,16 @@ export class Theme<ThemeOptions extends Record<string, any>> {
             // Activate theme.
             this.active_id = id;
             this.active = (this as any)[id];
-            Object.keys(this.active as any).iterate((id) => {
+            for (const id of Object.keys(this.active as any)) {
                 document.documentElement.style.setProperty(`--${this._id}_${id}`, (this.active as any)[id] ?? "");
-            });
+            };
             if (this._on_activate_callback != null) {
                 this._on_activate_callback(this, this.active_id);
             }
             if (this._linked_themes?.length) {
-                this._linked_themes.iterate((theme) => {
+                for (const theme of this._linked_themes) {
                     theme.activate(id, false);
-                });
+                };
             }
             if (apply_theme_update) {
                 ThemesModule.apply_theme_update();

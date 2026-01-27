@@ -546,7 +546,7 @@ export class RateLimitServer {
         ip: string, 
         groups: RateLimitGroup[] = [{group: null, limit: null, interval: null}]
     ): Promise<number | null> {
-        return groups.iterate((rate_limit) => {
+        for (const rate_limit of groups) {
             for (let attempts = 2; attempts >= 0; --attempts) {
                 try {
                     // Get endpoint limits.
@@ -586,7 +586,8 @@ export class RateLimitServer {
                     }
                 }
             }
-        }) ?? null;
+        }
+        return null;
     }
 
     // Reset a group limit.

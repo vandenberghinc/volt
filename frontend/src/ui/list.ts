@@ -44,7 +44,7 @@ export class UnorderedListElement extends VElementTagMap.ul {
 	
 		// Add items.
 		if (Array.isArray(items)) {
-			items.iterate(node => {this.append_item(node)})
+			for (const node of items) { this.append_item(node) }
 		} else {
 			console.error(`Invalid type "${Schema.value_type(items)}" for parameter "items" the valid type is "array".`)
 		}
@@ -80,7 +80,7 @@ export class OrderedListElement extends VElementTagMap.ol {
 	
 		// Add items.
 		if (Array.isArray(items)) {
-			items.iterate(node => {this.append_item(node)})
+			for (const node of items) { this.append_item(node) }
 		} else {
 			console.error(`Invalid type "${Schema.value_type(items)}" for parameter "items" the valid type is "array".`)
 		}

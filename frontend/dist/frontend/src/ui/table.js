@@ -303,7 +303,7 @@ let TableElement = (() => {
         // Iterate the table data items.
         iterate(callback) {
             let row_index = 0;
-            this.table_rows.iterate(row => {
+            for (const row of this.table_rows) {
                 let column_index = 0;
                 row.iterate(column => {
                     callback({
@@ -319,16 +319,16 @@ let TableElement = (() => {
                     ++column_index;
                 });
                 ++row_index;
-            });
+            }
             return this;
         }
         // Iterate table rows.
         iterate_rows(callback) {
             let index = 0;
-            this.table_rows.iterate(e => {
+            for (const e of this.table_rows) {
                 callback(e, index, index === this.table_rows.length - 1);
                 ++index;
-            });
+            }
             return this;
         }
         // Create the table.
