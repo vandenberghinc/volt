@@ -618,8 +618,24 @@ export namespace Endpoint {
         M extends Method = Method,
         E extends string | RegExp = string,
         S extends vlib.Schema.Entries.Opts = {},
-    > = 
-        {
+    > =
+        | Opts.ByData<M, E, S>
+        | Opts.ByFilePath<M, E, S>
+        | Opts.ByCallback<M, E, S>
+        | Opts.ByAuthCallback<M, E, S>
+        | Opts.ByView<M, E, S>
+
+    /** Nested types for the {@link Opts} type. */
+    export namespace Opts {
+
+        /**
+         * The base options for constructing an endpoint.
+         */
+        export interface Base<
+            M extends Method = Method,
+            E extends string | RegExp = string,
+            S extends vlib.Schema.Entries.Opts = {},
+        > {
             /**
              * The endpoint method.
              * @default "GET"
@@ -674,68 +690,101 @@ export namespace Endpoint {
             _is_static?: boolean,
             allow_unknown_params?: boolean;
         }
-        // Modes.
-        & (
-            // With data & content type.
-            | {
-                /** The data that will be returned as the response body. */
-                data?: Buffer | string | any[] | Record<any, any>;
-                file_path?: never;
-                view?: never;
-                /** Only allow authenticated requests. */
-                authenticated?: boolean,
-                callback?: never;
-                /** The content type for parameter `data` or `callback`. */
-                content_type: string;
-            }
-            // With file path & content type.
-            | {
-                data?: never;
-                file_path: string | vlib.Path;
-                /** Only allow authenticated requests. */
-                authenticated?: boolean,
-                callback?: never;
-                view?: never;
-                /** The content type for parameter `data` or `callback`. */
-                content_type: string;
-            }
-            // With callback & content type.
-            | {
-                data?: never;
-                file_path?: never;
-                /** Only allow authenticated requests. */
-                authenticated?: false,
-                /** The callback that will be executed when a client requests this endpoint. */
-                callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any)
-                view?: never;
-                /** The content type for parameter `data` or `callback`. */
-                content_type: string;
-            }
-            // With authenticated callback & content type.
-            | {
-                data?: never;
-                file_path?: never;
-                /** Only allow authenticated requests. */
-                authenticated: true,
-                /** The callback that will be executed when a client requests this endpoint. */
-                callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any),
-                view?: never;
-                /** The content type for parameter `data` or `callback`. */
-                content_type: string;
-            }
-            // With view, and optional content type.
-            | {
-                data?: never;
-                file_path?: never;
-                /** Only allow authenticated requests. */
-                authenticated?: boolean,
-                callback?: never;
-                /** The JavaScript view that will be executed on the client side. */
-                view: View | View.Opts;
-                /** The content type for parameter `data` or `callback`. */
-                content_type?: string;
-            }
-        )
+
+        /**
+         * Options for constructing an endpoint by data & content type.
+         */
+        export interface ByData<
+            M extends Method = Method,
+            E extends string | RegExp = string,
+            S extends vlib.Schema.Entries.Opts = {},
+        > extends Base<M, E, S> {
+            /** The data that will be returned as the response body. */
+            data?: Buffer | string | any[] | Record<any, any>;
+            file_path?: never;
+            view?: never;
+            /** Only allow authenticated requests. */
+            authenticated?: boolean,
+            callback?: never;
+            /** The content type for parameter `data` or `callback`. */
+            content_type: string;
+        }
+
+        /**
+         * Options for constructing an endpoint by file path & content type.
+         */
+        export interface ByFilePath<
+            M extends Method = Method,
+            E extends string | RegExp = string,
+            S extends vlib.Schema.Entries.Opts = {},
+        > extends Base<M, E, S> {
+            data?: never;
+            file_path: string | vlib.Path;
+            /** Only allow authenticated requests. */
+            authenticated?: boolean,
+            callback?: never;
+            view?: never;
+            /** The content type for parameter `data` or `callback`. */
+            content_type: string;
+        }
+
+        /**
+         * Options for constructing an endpoint by unauthenticated callback.
+         */
+        export interface ByCallback<
+            M extends Method = Method,
+            E extends string | RegExp = string,
+            S extends vlib.Schema.Entries.Opts = {},
+        > extends Base<M, E, S> {
+            data?: never;
+            file_path?: never;
+            /** Only allow authenticated requests. */
+            authenticated?: false,
+            /** The callback that will be executed when a client requests this endpoint. */
+            callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any)
+            view?: never;
+            /** The content type for parameter `data` or `callback`. */
+            content_type: string;
+        }
+
+        /**
+         * Options for constructing an endpoint by authenticated callback.
+         */
+        export interface ByAuthCallback<
+            M extends Method = Method,
+            E extends string | RegExp = string,
+            S extends vlib.Schema.Entries.Opts = {},
+        > extends Base<M, E, S> {
+            data?: never;
+            file_path?: never;
+            /** Only allow authenticated requests. */
+            authenticated: true,
+            /** The callback that will be executed when a client requests this endpoint. */
+            callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any),
+            view?: never;
+            /** The content type for parameter `data` or `callback`. */
+            content_type: string;
+        }
+
+        /**
+         * Options for constructing an endpoint by authenticated view.
+         */
+        export interface ByView<
+            M extends Method = Method,
+            E extends string | RegExp = string,
+            S extends vlib.Schema.Entries.Opts = {},
+        > extends Base<M, E, S> {
+            data?: never;
+            file_path?: never;
+            /** Only allow authenticated requests. */
+            authenticated?: boolean,
+            callback?: never;
+            /** The JavaScript view that will be executed on the client side. */
+            view: View | View.Opts;
+            /** The content type for parameter `data` or `callback`. */
+            content_type?: string;
+        }
+    }
 }
 
 // const e = new Endpoint({
