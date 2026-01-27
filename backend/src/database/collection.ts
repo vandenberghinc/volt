@@ -5189,7 +5189,9 @@ export namespace Collection {
 /**
  * TransactionCollection extends Collection with transaction-specific methods.
  * This class provides commit and abort functionality for MongoDB transactions.
- * @warning The tranaction collection should only be initialized via {@link Collection.start_transaction}.
+ * @warning The transaction collection should only be initialized via {@link Collection.start_transaction}.
+ * 
+ * @nav Database
  * @docs
  */
 export class TransactionCollection<Data extends mongodb.Document = mongodb.Document> extends Collection<Data> {
