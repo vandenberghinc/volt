@@ -8,7 +8,7 @@
         "exclude": [
             "**/*.js"
         ],
-        "sort": "descending",
+        "sort": "ascending",
         "favicon": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/favicon.ico",
         "icon": {
             "dark": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/stroke.png",
@@ -54,7 +54,7 @@
         "exclude": [
             "**/*.js"
         ],
-        "sort": "descending",
+        "sort": "ascending",
         "favicon": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/favicon.ico",
         "icon": {
             "dark": "https://raw.githubusercontent.com/vandenberghinc/volt/master/dev/media/icon/stroke.png",
