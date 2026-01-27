@@ -17,8 +17,9 @@
         "theme": {
             "dark": {
                 "extends": "dark",
-                "primary": "#58B684",
-                "bg": "#2A364A",
+                "primary": "linear-gradient(70deg, #F9DB4A 0%, #EA682C 100%)",
+                "primary_base": "#EA682C",
+                "bg": "#242D3A",
                 "note": {
                     "bg": "#58B684"
                 }
@@ -60,8 +61,9 @@
         "theme": {
             "dark": {
                 "extends": "dark",
-                "primary": "#58B684",
-                "bg": "#2A364A",
+                "primary": "linear-gradient(70deg, #F9DB4A 0%, #EA682C 100%)",
+                "primary_base": "#EA682C",
+                "bg": "#242D3A",
                 "note": {
                     "bg": "#58B684"
                 }
