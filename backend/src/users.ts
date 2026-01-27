@@ -2055,8 +2055,6 @@ export class Users {
     /**
      * Insert new data into an EXISTING user.
      * @warning Does not upsert documents.
-     * 
-     * @docs
      */
     private async _sys_set(uid: string, data: Record<string, any>): Promise<void> {
         await this._users_db.set({ uid }, data, { upsert: false });
