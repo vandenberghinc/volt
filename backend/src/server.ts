@@ -38,7 +38,7 @@ import { Paddle, Payment } from "./payments/paddle.js";
 import { RateLimits, RateLimitServer, RateLimitClient } from "./rate_limit.js";
 import { Route } from "./route.js";
 import { EventCallback, EventName, Events } from './events.js';
-import { ExternalError } from '@vandenberghinc/volt';
+import { ExternalError } from './errors/internal_external.js';
 
 // import { ThreadMonitor } from "./plugins/thread_monitor.js";
 // const thread_monitor = new ThreadMonitor()

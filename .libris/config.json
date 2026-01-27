@@ -20,18 +20,12 @@
                 "extends": "dark",
                 "primary": "linear-gradient(70deg, #F9DB4A 0%, #EA682C 100%)",
                 "primary_base": "#EA682C",
-                "bg": "#1C232E",
-                "note": {
-                    "bg": "#222D3D"
-                }
+                "bg": "#1C232E"
             },
             "light": {
                 "extends": "light",
                 "primary": "linear-gradient(70deg, #F9DB4A 0%, #EA682C 100%)",
-                "primary_base": "#EA682C",
-                "note": {
-                    "bg": "#58B684"
-                }
+                "primary_base": "#EA682C"
             }
         },
         "sections": [
@@ -66,18 +60,12 @@
                 "extends": "dark",
                 "primary": "linear-gradient(70deg, #F9DB4A 0%, #EA682C 100%)",
                 "primary_base": "#EA682C",
-                "bg": "#1C232E",
-                "note": {
-                    "bg": "#58B684"
-                }
+                "bg": "#1C232E"
             },
             "light": {
                 "extends": "light",
                 "primary": "linear-gradient(70deg, #F9DB4A 0%, #EA682C 100%)",
-                "primary_base": "#EA682C",
-                "note": {
-                    "bg": "#58B684"
-                }
+                "primary_base": "#EA682C"
             }
         },
         "sections": [
