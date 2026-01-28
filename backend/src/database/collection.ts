@@ -29,6 +29,7 @@ import { InvalidUsageError } from '../errors/index.js';
  *    ttl: 1000 * 60 * 60 * 24, // 1 day
  * });
  * 
+ * @nav Database
  * @docs
  */
 export class Collection<Data extends mongodb.Document = mongodb.Document> {

@@ -148,34 +148,69 @@ export class Endpoint<
      * 
      * @docs
      */
-    clone<
+    static clone<
         const M extends Endpoint.Method = "GET",
         const E extends string | RegExp = string,
         const S extends vlib.Schema.Entries.Opts = {}
-    >(this: Endpoint<M, E, S>, override?: Partial<Endpoint.Opts<M, E, S>>): Endpoint<M, E, S> {
-        return new Endpoint({
+        >(endpoint: Endpoint<M, E, S>, override?: Partial<Endpoint.Opts<M, E, S>>): Endpoint<M, E, S> {
+        return new Endpoint<M, E, S>({
             ...vlib.Object.deep_copy({
-                method: this.route.method,
-                endpoint: this.route.endpoint,
-                authenticated: this.authenticated,
-                rate_limit: this.rate_limit_groups,
-                params: this.params_schema,
-                compress: this._compress,
-                cache: this._cache,
-                ip_whitelist: this.ip_whitelist,
-                sitemap: this.allow_sitemap,
-                robots: this.allow_robots,
-                allow_unknown_params: this.allow_unknown_params,
-                _is_static: this.is_static,
-                data: this.data,
-                file_path: this.file_path,
-                content_type: this.content_type,
-                callback: this.callback,
+                method: endpoint.route.method,
+                endpoint: endpoint.route.endpoint,
+                authenticated: endpoint.authenticated,
+                rate_limit: endpoint.rate_limit_groups,
+                params: endpoint.params_schema,
+                compress: endpoint._compress,
+                cache: endpoint._cache,
+                ip_whitelist: endpoint.ip_whitelist,
+                sitemap: endpoint.allow_sitemap,
+                robots: endpoint.allow_robots,
+                allow_unknown_params: endpoint.allow_unknown_params,
+                _is_static: endpoint.is_static,
+                data: endpoint.data,
+                file_path: endpoint.file_path,
+                content_type: endpoint.content_type,
+                callback: endpoint.callback,
             }),
-            view: this.view?.clone(),
+            view: endpoint.view?.clone(),
             ...override,
         } as Endpoint.Opts<M, E, S>);
     }
+
+    // /**
+    //  * Clone this endpoint, used to create a modified copy of the current endpoint.
+    //  * @param override Override specific endpoint options, note that this will be shallow merged.
+    //  * 
+    //  * @docs
+    //  */
+    // clone<
+    //     const M extends Endpoint.Method = "GET",
+    //     const E extends string | RegExp = string,
+    //     const S extends vlib.Schema.Entries.Opts = {}
+    // >(this: Endpoint<M, E, S>, override?: Partial<Endpoint.Opts<M, E, S>>): Endpoint<M, E, S> {
+    //     return new Endpoint({
+    //         ...vlib.Object.deep_copy({
+    //             method: this.route.method,
+    //             endpoint: this.route.endpoint,
+    //             authenticated: this.authenticated,
+    //             rate_limit: this.rate_limit_groups,
+    //             params: this.params_schema,
+    //             compress: this._compress,
+    //             cache: this._cache,
+    //             ip_whitelist: this.ip_whitelist,
+    //             sitemap: this.allow_sitemap,
+    //             robots: this.allow_robots,
+    //             allow_unknown_params: this.allow_unknown_params,
+    //             _is_static: this.is_static,
+    //             data: this.data,
+    //             file_path: this.file_path,
+    //             content_type: this.content_type,
+    //             callback: this.callback,
+    //         }),
+    //         view: this.view?.clone(),
+    //         ...override,
+    //     } as Endpoint.Opts<M, E, S>);
+    // }
 
     /**
      * Construct an endpoint.
