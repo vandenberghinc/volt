@@ -45,7 +45,7 @@ export interface RateLimitCacheData {
  * 
  * This class will be accessable under `Server` attribute `rate_limits`.
  * 
- * @nav Rate Limit
+ * @nav Endpoints
  * @docs
  */
 export namespace RateLimits {
@@ -386,7 +386,7 @@ export namespace RateLimitServer {
 
     /**
      * Constructor options.
-     * @nav Rate Limit
+     * @nav Endpoints
      * @docs
      */
     export interface Opts {
@@ -620,7 +620,7 @@ export namespace RateLimitClient {
 
     /**
      * Constructor options.
-     * @nav Rate Limit
+     * @nav Endpoints
      * @docs
      */
     export interface Opts {
