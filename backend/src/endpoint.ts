@@ -612,6 +612,12 @@ export namespace Endpoint {
 
     /**
      * Options for constructing an endpoint.
+     * For more information on the different options see the nested types:
+     * - {@link Opts.ByData}
+     * - {@link Opts.ByFilePath}
+     * - {@link Opts.ByCallback}
+     * - {@link Opts.ByAuthCallback}
+     * - {@link Opts.ByView}
      * @docs
      */
     export type Opts<
@@ -659,7 +665,16 @@ export namespace Endpoint {
              * When left undefined no rate limiting will be applied.
              */
             rate_limit?: string | RateLimitGroup | (string | RateLimitGroup)[],
+            /**
+             * The parameter schema for validating request parameters.
+             */
             params?: S,
+            /**
+             * Allow unknown parameters to be passed to the endpoint that are not
+             * defined in the parameter schema.
+             * @default false
+             */
+            allow_unknown_params?: boolean;
             /** Compress data, only available when initialized with one of the following parameters `view` or `data`. */
             compress?: "auto" | boolean,
             /**
@@ -687,12 +702,13 @@ export namespace Endpoint {
              * By default only endpoints with `view` enabled will be crawled, unless specified otherwise.
              */
             robots?: boolean,
+            /** System reserved property indicating whether the endpoint is from static files. */
             _is_static?: boolean,
-            allow_unknown_params?: boolean;
         }
 
         /**
          * Options for constructing an endpoint by data & content type.
+         * @docs
          */
         export interface ByData<
             M extends Method = Method,
@@ -701,87 +717,107 @@ export namespace Endpoint {
         > extends Base<M, E, S> {
             /** The data that will be returned as the response body. */
             data?: Buffer | string | any[] | Record<any, any>;
+            /** Not allowed in this variant. */
             file_path?: never;
+            /** Not allowed in this variant. */
             view?: never;
             /** Only allow authenticated requests. */
             authenticated?: boolean,
+            /** Not allowed in this variant. */
             callback?: never;
-            /** The content type for parameter `data` or `callback`. */
+            /** The content type. */
             content_type: string;
         }
 
         /**
          * Options for constructing an endpoint by file path & content type.
+         * @docs
          */
         export interface ByFilePath<
             M extends Method = Method,
             E extends string | RegExp = string,
             S extends vlib.Schema.Entries.Opts = {},
         > extends Base<M, E, S> {
+            /** Not allowed in this variant. */
             data?: never;
+            /** The file path to load the data from. */
             file_path: string | vlib.Path;
             /** Only allow authenticated requests. */
             authenticated?: boolean,
+            /** Not allowed in this variant. */
             callback?: never;
+            /** Not allowed in this variant. */
             view?: never;
-            /** The content type for parameter `data` or `callback`. */
+            /** The content type. */
             content_type: string;
         }
 
         /**
          * Options for constructing an endpoint by unauthenticated callback.
+         * @docs
          */
         export interface ByCallback<
             M extends Method = Method,
             E extends string | RegExp = string,
             S extends vlib.Schema.Entries.Opts = {},
         > extends Base<M, E, S> {
+            /** Not allowed in this variant. */
             data?: never;
+            /** Not allowed in this variant. */
             file_path?: never;
             /** Only allow authenticated requests. */
             authenticated?: false,
             /** The callback that will be executed when a client requests this endpoint. */
             callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any)
+            /** Not allowed in this variant. */
             view?: never;
-            /** The content type for parameter `data` or `callback`. */
+            /** The content type. */
             content_type: string;
         }
 
         /**
          * Options for constructing an endpoint by authenticated callback.
+         * @docs
          */
         export interface ByAuthCallback<
             M extends Method = Method,
             E extends string | RegExp = string,
             S extends vlib.Schema.Entries.Opts = {},
         > extends Base<M, E, S> {
+            /** Not allowed in this variant. */
             data?: never;
+            /** Not allowed in this variant. */
             file_path?: never;
             /** Only allow authenticated requests. */
             authenticated: true,
             /** The callback that will be executed when a client requests this endpoint. */
             callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any),
+            /** Not allowed in this variant. */
             view?: never;
-            /** The content type for parameter `data` or `callback`. */
+            /** The content type. */
             content_type: string;
         }
 
         /**
          * Options for constructing an endpoint by authenticated view.
+         * @docs
          */
         export interface ByView<
             M extends Method = Method,
             E extends string | RegExp = string,
             S extends vlib.Schema.Entries.Opts = {},
         > extends Base<M, E, S> {
+            /** Not allowed in this variant. */
             data?: never;
+            /** Not allowed in this variant. */
             file_path?: never;
             /** Only allow authenticated requests. */
             authenticated?: boolean,
+            /** Not allowed in this variant. */
             callback?: never;
             /** The JavaScript view that will be executed on the client side. */
             view: View | View.Opts;
-            /** The content type for parameter `data` or `callback`. */
+            /** The content type. */
             content_type?: string;
         }
     }
