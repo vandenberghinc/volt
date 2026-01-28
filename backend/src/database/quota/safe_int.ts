@@ -25,6 +25,7 @@
  * - Conversions are **exact by default**. Provide a {@link SafeInt.RoundingNode} `mode` to allow rounding.
  * - Arithmetic is **same-scale only**: pass raw integers or another `SafeInt<S>`.
  * 
+ * @nav Database
  * @docs
  */
 export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {

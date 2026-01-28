@@ -9,7 +9,7 @@ import { Collection } from "./database/collection.js";
 import { Request } from "../../frontend/src/modules/request.js";
 /**
  * The user object / document.
- * @nav Users
+ * @nav Server
  * @docs
  */
 export type User = {
@@ -40,7 +40,6 @@ export type User = {
 export declare namespace User {
     /**
      * The frontend representation of a user.
-     * @nav Users
      * @docs
      */
     type Frontend = {
@@ -87,7 +86,7 @@ export declare namespace User {
 /**
  * The users class, used for user management, authentication, and user data storage.
  * @note This class is accessible via `Server.users`.
- * @nav Users
+ * @nav Server
  * @docs
  */
 export declare class Users {
@@ -464,8 +463,6 @@ export declare class Users {
     /**
      * Insert new data into an EXISTING user.
      * @warning Does not upsert documents.
-     *
-     * @docs
      */
     private _sys_set;
     /**

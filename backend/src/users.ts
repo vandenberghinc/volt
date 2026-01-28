@@ -24,7 +24,7 @@ import { Request } from "../../frontend/src/modules/request.js";
 
 /**
  * The user object / document.
- * @nav Users
+ * @nav Server
  * @docs
  */
 export type User = {
@@ -57,7 +57,6 @@ export namespace User {
 
     /**
      * The frontend representation of a user.
-     * @nav Users
      * @docs
      */
     export type Frontend = {
@@ -111,7 +110,7 @@ export namespace User {
 /**
  * The users class, used for user management, authentication, and user data storage.
  * @note This class is accessible via `Server.users`.
- * @nav Users
+ * @nav Server
  * @docs
  */
 export class Users {

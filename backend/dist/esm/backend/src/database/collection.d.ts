@@ -18,6 +18,7 @@ import { FlattenToDotNotation } from "./flatten.js";
  *    ttl: 1000 * 60 * 60 * 24, // 1 day
  * });
  *
+ * @nav Database
  * @docs
  */
 export declare class Collection<Data extends mongodb.Document = mongodb.Document> {
@@ -1681,7 +1682,9 @@ export declare namespace Collection {
 /**
  * TransactionCollection extends Collection with transaction-specific methods.
  * This class provides commit and abort functionality for MongoDB transactions.
- * @warning The tranaction collection should only be initialized via {@link Collection.start_transaction}.
+ * @warning The transaction collection should only be initialized via {@link Collection.start_transaction}.
+ *
+ * @nav Database
  * @docs
  */
 export declare class TransactionCollection<Data extends mongodb.Document = mongodb.Document> extends Collection<Data> {

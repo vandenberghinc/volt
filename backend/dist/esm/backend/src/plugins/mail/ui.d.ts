@@ -33,21 +33,18 @@ export declare class Element {
      * @param value The color value to set.
      * @returns The current value when getting, or the element instance when setting.
      * @funcs 3
-     * @docs
      */
     background_color(): string | undefined;
     background_color(value: string): this;
     /**
      * Get or set the display property.
      * @funcs 3
-     * @docs
      */
     display(): string | undefined;
     display(value: string): this;
     /**
      * Get or set the background image.
      * @funcs 3
-     * @docs
      */
     background_image(): string | undefined;
     background_image(value: string): this;

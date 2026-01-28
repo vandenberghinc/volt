@@ -19,89 +19,7 @@ const { debug } = vlib;
 /**
  * The endpoint class.
  * @nav Endpoints
- *
- * @param method
- *   The method type.
- *
- * @param endpoint
- *   The endpoint sub url.
- *
- * @param authenticated
- *   Only allow authenticated requests.
- *
- * @param rate_limit
- *   The rate limit settings.
- *
- *   Rate limiting works by creating a rate limit per group of endpoints. Multiple
- *   rate limiting groups can be applied by defining an array with rate limit objects.
- *   A group's interval and limit only need to be defined once on a single endpoint.
- *   When defined again these values will override the initial group settings.
- *
- *   The rate limit parameter may be defined as three types:
- *   - `string`: Assign the rate limit group without any group parameters. Useful when the group is already defined.
- *   - `RateLimitGroup`: As a rate limit object.
- *   - An array with multiple rate limit objects.
- *
- *   When left undefined no rate limiting will be applied.
- *
- * @param callback
- *   The callback that will be executed when a client requests this endpoint.
- *   Parameter `callback` precedes over parameter `data` and parameter `view`.
- *   The callback can take parameter `stream` assigned with the `volt.Stream` object of the request.
- *
- * @param view
- *   The JavaScript view that will be executed on the client side.
- *   Parameter `view` precedes over parameter `data`.
- *
- * @param data
- *   The data that will be returned as the response body.
- *
- * @param content_type
- *   The content type for parameter `data` or `callback`.
- *
- * @param compress
- *   Compress data, only available when initialized with one of the following parameters `view` or `data`.
- *
- * @param cache
- *   Parameter cache can define the max age of the cached response in seconds or as a boolean `true`.
- *   Anything higher than zero enables caching.
- *
- *   When server production mode is enabled caching is done automatically unless `cache` is `false`.
- *   When production mode is disabled responses are never cached, even though the parameter is assigned.
- *   The response of an endpoint that uses parameter `callback` is never cached.
- *
- * @param sitemap
- *   A boolean indicating if the endpoint should show up in the sitemap.
- *   By default only when the attribute `view` is defined and the endpoint is unauthenticated,
- *   the endpoint will show up in sitemap.
- *
- * @param robots
- *   A boolean indicating if the endpoint should be crawled by search engines.
- *   By default only endpoints with `view` enabled will be crawled, unless specified otherwise.
- *
- * @param ip_whitelist
- *   An IP whitelist for the endpoint. When the parameter is defined with an Array,
- *   the whitelist will become active.
- *
- * @param _path
- *   Internal parameter (ignored).
- *
- * @param _is_static
- *   Internal parameter (ignored).
- *
- * @typedef RateLimitGroup
- * @property group
- *   The rate limit group.
- *
- * @property limit
- *   The maximum requests per rate limit interval. These settings will be cached per group
- *   and only have to be assigned once. The assigned attributes will be overridden when
- *   these attributes are reassigned for the same group.
- *
- * @property interval
- *   The rate limit interval in seconds. These settings will be cached per group
- *   and only have to be assigned once. The assigned attributes will be overridden when
- *   these attributes are reassigned for the same group.
+ * @docs
  */
 export class Endpoint {
     // Static attributes.
@@ -198,30 +116,64 @@ export class Endpoint {
      *
      * @docs
      */
-    clone(override) {
+    static clone(endpoint, override) {
         return new Endpoint({
             ...vlib.Object.deep_copy({
-                method: this.route.method,
-                endpoint: this.route.endpoint,
-                authenticated: this.authenticated,
-                rate_limit: this.rate_limit_groups,
-                params: this.params_schema,
-                compress: this._compress,
-                cache: this._cache,
-                ip_whitelist: this.ip_whitelist,
-                sitemap: this.allow_sitemap,
-                robots: this.allow_robots,
-                allow_unknown_params: this.allow_unknown_params,
-                _is_static: this.is_static,
-                data: this.data,
-                file_path: this.file_path,
-                content_type: this.content_type,
-                callback: this.callback,
+                method: endpoint.route.method,
+                endpoint: endpoint.route.endpoint,
+                authenticated: endpoint.authenticated,
+                rate_limit: endpoint.rate_limit_groups,
+                params: endpoint.params_schema,
+                compress: endpoint._compress,
+                cache: endpoint._cache,
+                ip_whitelist: endpoint.ip_whitelist,
+                sitemap: endpoint.allow_sitemap,
+                robots: endpoint.allow_robots,
+                allow_unknown_params: endpoint.allow_unknown_params,
+                _is_static: endpoint.is_static,
+                data: endpoint.data,
+                file_path: endpoint.file_path,
+                content_type: endpoint.content_type,
+                callback: endpoint.callback,
             }),
-            view: this.view?.clone(),
+            view: endpoint.view?.clone(),
             ...override,
         });
     }
+    // /**
+    //  * Clone this endpoint, used to create a modified copy of the current endpoint.
+    //  * @param override Override specific endpoint options, note that this will be shallow merged.
+    //  * 
+    //  * @docs
+    //  */
+    // clone<
+    //     const M extends Endpoint.Method = "GET",
+    //     const E extends string | RegExp = string,
+    //     const S extends vlib.Schema.Entries.Opts = {}
+    // >(this: Endpoint<M, E, S>, override?: Partial<Endpoint.Opts<M, E, S>>): Endpoint<M, E, S> {
+    //     return new Endpoint({
+    //         ...vlib.Object.deep_copy({
+    //             method: this.route.method,
+    //             endpoint: this.route.endpoint,
+    //             authenticated: this.authenticated,
+    //             rate_limit: this.rate_limit_groups,
+    //             params: this.params_schema,
+    //             compress: this._compress,
+    //             cache: this._cache,
+    //             ip_whitelist: this.ip_whitelist,
+    //             sitemap: this.allow_sitemap,
+    //             robots: this.allow_robots,
+    //             allow_unknown_params: this.allow_unknown_params,
+    //             _is_static: this.is_static,
+    //             data: this.data,
+    //             file_path: this.file_path,
+    //             content_type: this.content_type,
+    //             callback: this.callback,
+    //         }),
+    //         view: this.view?.clone(),
+    //         ...override,
+    //     } as Endpoint.Opts<M, E, S>);
+    // }
     /**
      * Construct an endpoint.
      * @docs

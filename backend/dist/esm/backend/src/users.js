@@ -18,7 +18,7 @@ import { Collection } from "./database/collection.js";
 /**
  * The users class, used for user management, authentication, and user data storage.
  * @note This class is accessible via `Server.users`.
- * @nav Users
+ * @nav Server
  * @docs
  */
 export class Users {
@@ -1786,8 +1786,6 @@ export class Users {
     /**
      * Insert new data into an EXISTING user.
      * @warning Does not upsert documents.
-     *
-     * @docs
      */
     async _sys_set(uid, data) {
         await this._users_db.set({ uid }, data, { upsert: false });

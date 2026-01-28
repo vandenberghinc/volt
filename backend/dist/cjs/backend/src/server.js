@@ -51,7 +51,7 @@ var import_users = require("./users.js");
 var import_paddle = require("./payments/paddle.js");
 var import_rate_limit = require("./rate_limit.js");
 var import_route = require("./route.js");
-var import_volt = require("@vandenberghinc/volt");
+var import_internal_external = require("./errors/internal_external.js");
 const import_meta = {};
 const __filename = (0, import_url.fileURLToPath)(import_meta.url);
 const __dirname = path.dirname(__filename);
@@ -1940,7 +1940,7 @@ ${this.company.street} ${this.company.house_number}, ${this.company.postal_code}
   /** Assert mail is configured. */
   assert_mail() {
     if (!this.mail) {
-      throw new import_volt.ExternalError({ message: "Mail is not configured." });
+      throw new import_internal_external.ExternalError({ message: "Mail is not configured." });
     }
   }
   /**

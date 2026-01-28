@@ -1664,8 +1664,6 @@ class Users {
   /**
    * Insert new data into an EXISTING user.
    * @warning Does not upsert documents.
-   *
-   * @docs
    */
   async _sys_set(uid, data) {
     await this._users_db.set({ uid }, data, { upsert: false });

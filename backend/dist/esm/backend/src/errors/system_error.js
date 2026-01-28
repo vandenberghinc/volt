@@ -8,6 +8,7 @@ import * as vlib from "@vandenberghinc/vlib";
  * The system error.
  * Used to indicate a fatal system error that should not occur and should be reported to developers.
  * When created, it is logged and (optionally) persisted to the configured collection.
+ * @nav Errors
  * @docs
  */
 export class SystemError extends Error {

@@ -20,6 +20,7 @@ import { InvalidUsageError } from '../errors/index.js';
  *    ttl: 1000 * 60 * 60 * 24, // 1 day
  * });
  *
+ * @nav Database
  * @docs
  */
 export class Collection {
@@ -3334,7 +3335,9 @@ export class Collection {
 /**
  * TransactionCollection extends Collection with transaction-specific methods.
  * This class provides commit and abort functionality for MongoDB transactions.
- * @warning The tranaction collection should only be initialized via {@link Collection.start_transaction}.
+ * @warning The transaction collection should only be initialized via {@link Collection.start_transaction}.
+ *
+ * @nav Database
  * @docs
  */
 export class TransactionCollection extends Collection {

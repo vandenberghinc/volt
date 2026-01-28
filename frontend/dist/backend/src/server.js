@@ -30,14 +30,14 @@ import { Users } from "./users.js";
 import { Paddle } from "./payments/paddle.js";
 import { RateLimits, RateLimitServer, RateLimitClient } from "./rate_limit.js";
 import { Route } from "./route.js";
-import { ExternalError } from '@vandenberghinc/volt';
+import { ExternalError } from './errors/internal_external.js';
 // @tdo implement 3D secure "requires_action" status for a refund and payment intent.
 // https://stripe.com/docs/payments/3d-secure
 /**
  * The server class.
  * @note Automatically runs on HTTP/HTTPS depending on the constructor options.
  *
- * @property users The initialized {@link Users} instance.
+ * @nav Server
  * @docs
  */
 export class Server {

@@ -72,6 +72,7 @@ export declare namespace RateLimits {
 export declare namespace RateLimitServer {
     /**
      * Constructor options.
+     * @nav Rate Limit
      * @docs
      */
     interface Opts {
@@ -111,6 +112,7 @@ export declare class RateLimitServer {
 export declare namespace RateLimitClient {
     /**
      * Constructor options.
+     * @nav Rate Limit
      * @docs
      */
     interface Opts {

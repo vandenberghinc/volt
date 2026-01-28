@@ -386,6 +386,7 @@ export namespace RateLimitServer {
 
     /**
      * Constructor options.
+     * @nav Rate Limit
      * @docs
      */
     export interface Opts {
@@ -619,6 +620,7 @@ export namespace RateLimitClient {
 
     /**
      * Constructor options.
+     * @nav Rate Limit
      * @docs
      */
     export interface Opts {

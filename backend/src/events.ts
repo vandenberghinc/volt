@@ -9,7 +9,7 @@ import { User } from "./users.js";
 
 /**
  * All events and their callback types.
- * @nav Events
+ * @nav Server
  * @docs
  */
 export type Events = {
@@ -63,28 +63,28 @@ export type Events = {
 
 /**
  * Event name.
- * @nav Events
+ * @nav Server
  * @docs
  */
 export type EventName = vlib.EventName<Events>;
 
 /**
  * Event callback.
- * @nav Events
+ * @nav Server
  * @docs
  */
 export type EventCallback<N extends EventName> = vlib.EventCallback<Events, N>
 
 /**
  * Event parameters.
- * @nav Events
+ * @nav Server
  * @docs
  */
 export type EventParams<N extends EventName> = vlib.EventParams<Events, N>
 
 /**
  * Event result type.
- * @nav Events
+ * @nav Server
  * @docs
  */
 export type EventResult<N extends EventName> = vlib.EventResult<Events, N>

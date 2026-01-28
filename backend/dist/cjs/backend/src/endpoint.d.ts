@@ -11,89 +11,7 @@ import { Route } from './route.js';
 /**
  * The endpoint class.
  * @nav Endpoints
- *
- * @param method
- *   The method type.
- *
- * @param endpoint
- *   The endpoint sub url.
- *
- * @param authenticated
- *   Only allow authenticated requests.
- *
- * @param rate_limit
- *   The rate limit settings.
- *
- *   Rate limiting works by creating a rate limit per group of endpoints. Multiple
- *   rate limiting groups can be applied by defining an array with rate limit objects.
- *   A group's interval and limit only need to be defined once on a single endpoint.
- *   When defined again these values will override the initial group settings.
- *
- *   The rate limit parameter may be defined as three types:
- *   - `string`: Assign the rate limit group without any group parameters. Useful when the group is already defined.
- *   - `RateLimitGroup`: As a rate limit object.
- *   - An array with multiple rate limit objects.
- *
- *   When left undefined no rate limiting will be applied.
- *
- * @param callback
- *   The callback that will be executed when a client requests this endpoint.
- *   Parameter `callback` precedes over parameter `data` and parameter `view`.
- *   The callback can take parameter `stream` assigned with the `volt.Stream` object of the request.
- *
- * @param view
- *   The JavaScript view that will be executed on the client side.
- *   Parameter `view` precedes over parameter `data`.
- *
- * @param data
- *   The data that will be returned as the response body.
- *
- * @param content_type
- *   The content type for parameter `data` or `callback`.
- *
- * @param compress
- *   Compress data, only available when initialized with one of the following parameters `view` or `data`.
- *
- * @param cache
- *   Parameter cache can define the max age of the cached response in seconds or as a boolean `true`.
- *   Anything higher than zero enables caching.
- *
- *   When server production mode is enabled caching is done automatically unless `cache` is `false`.
- *   When production mode is disabled responses are never cached, even though the parameter is assigned.
- *   The response of an endpoint that uses parameter `callback` is never cached.
- *
- * @param sitemap
- *   A boolean indicating if the endpoint should show up in the sitemap.
- *   By default only when the attribute `view` is defined and the endpoint is unauthenticated,
- *   the endpoint will show up in sitemap.
- *
- * @param robots
- *   A boolean indicating if the endpoint should be crawled by search engines.
- *   By default only endpoints with `view` enabled will be crawled, unless specified otherwise.
- *
- * @param ip_whitelist
- *   An IP whitelist for the endpoint. When the parameter is defined with an Array,
- *   the whitelist will become active.
- *
- * @param _path
- *   Internal parameter (ignored).
- *
- * @param _is_static
- *   Internal parameter (ignored).
- *
- * @typedef RateLimitGroup
- * @property group
- *   The rate limit group.
- *
- * @property limit
- *   The maximum requests per rate limit interval. These settings will be cached per group
- *   and only have to be assigned once. The assigned attributes will be overridden when
- *   these attributes are reassigned for the same group.
- *
- * @property interval
- *   The rate limit interval in seconds. These settings will be cached per group
- *   and only have to be assigned once. The assigned attributes will be overridden when
- *   these attributes are reassigned for the same group.
+ * @docs
  */
 export declare class Endpoint<const M extends Endpoint.Method = "GET", const E extends string | RegExp = string, const S extends vlib.Schema.Entries.Opts = {}> {
     static compressed_content_types: string[];
@@ -142,7 +60,7 @@ export declare class Endpoint<const M extends Endpoint.Method = "GET", const E e
      *
      * @docs
      */
-    clone<const M extends Endpoint.Method = "GET", const E extends string | RegExp = string, const S extends vlib.Schema.Entries.Opts = {}>(this: Endpoint<M, E, S>, override?: Partial<Endpoint.Opts<M, E, S>>): Endpoint<M, E, S>;
+    static clone<const M extends Endpoint.Method = "GET", const E extends string | RegExp = string, const S extends vlib.Schema.Entries.Opts = {}>(endpoint: Endpoint<M, E, S>, override?: Partial<Endpoint.Opts<M, E, S>>): Endpoint<M, E, S>;
     /**
      * Construct an endpoint.
      * @docs
@@ -178,58 +96,173 @@ export declare namespace Endpoint {
     type Method = "GET" | "POST" | "DELETE" | "PUT" | "PATCH" | "OPTIONS";
     /**
      * Options for constructing an endpoint.
+     * For more information on the different options see the nested types:
+     * - {@link Opts.ByData}
+     * - {@link Opts.ByFilePath}
+     * - {@link Opts.ByCallback}
+     * - {@link Opts.ByAuthCallback}
+     * - {@link Opts.ByView}
      * @docs
      */
-    type Opts<M extends Method = Method, E extends string | RegExp = string, S extends vlib.Schema.Entries.Opts = {}> = {
+    type Opts<M extends Method = Method, E extends string | RegExp = string, S extends vlib.Schema.Entries.Opts = {}> = Opts.ByData<M, E, S> | Opts.ByFilePath<M, E, S> | Opts.ByCallback<M, E, S> | Opts.ByAuthCallback<M, E, S> | Opts.ByView<M, E, S>;
+    /** Nested types for the {@link Opts} type. */
+    namespace Opts {
         /**
-         * The endpoint method.
-         * @default "GET"
+         * The base options for constructing an endpoint.
          */
-        method?: M extends undefined ? "GET" : M;
-        endpoint: E;
-        rate_limit?: string | RateLimitGroup | (string | RateLimitGroup)[];
-        params?: S;
-        compress?: "auto" | boolean;
-        cache?: boolean | number;
-        ip_whitelist?: string[];
-        sitemap?: boolean;
-        robots?: boolean;
-        _is_static?: boolean;
-        allow_unknown_params?: boolean;
-    } & ({
-        data?: Buffer | string | any[] | Record<any, any>;
-        file_path?: never;
-        view?: never;
-        authenticated?: boolean;
-        callback?: never;
-        content_type: string;
-    } | {
-        data?: never;
-        file_path: string | vlib.Path;
-        authenticated?: boolean;
-        callback?: never;
-        view?: never;
-        content_type: string;
-    } | {
-        data?: never;
-        file_path?: never;
-        authenticated?: false;
-        callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any);
-        view?: never;
-        content_type: string;
-    } | {
-        data?: never;
-        file_path?: never;
-        authenticated: true;
-        callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any);
-        view?: never;
-        content_type: string;
-    } | {
-        data?: never;
-        file_path?: never;
-        authenticated?: boolean;
-        callback?: never;
-        view: View | View.Opts;
-        content_type?: string;
-    });
+        interface Base<M extends Method = Method, E extends string | RegExp = string, S extends vlib.Schema.Entries.Opts = {}> {
+            /**
+             * The endpoint method.
+             * @default "GET"
+             */
+            method?: M extends undefined ? "GET" : M;
+            /** The endpoint sub url. */
+            endpoint: E;
+            /**
+             * The rate limit settings.
+             *
+             * Rate limiting works by creating a rate limit per group of endpoints. Multiple
+             * rate limiting groups can be applied by defining an array with rate limit objects.
+             * A group's interval and limit only need to be defined once on a single endpoint.
+             * When defined again these values will override the initial group settings.
+             *
+             * The rate limit parameter may be defined as three types:
+             * - `string`: Assign the rate limit group without any group parameters. Useful when the group is already defined.
+             * - `RateLimitGroup`: As a rate limit object.
+             * - An array with multiple rate limit objects.
+             *
+             * When left undefined no rate limiting will be applied.
+             */
+            rate_limit?: string | RateLimitGroup | (string | RateLimitGroup)[];
+            /**
+             * The parameter schema for validating request parameters.
+             */
+            params?: S;
+            /**
+             * Allow unknown parameters to be passed to the endpoint that are not
+             * defined in the parameter schema.
+             * @default false
+             */
+            allow_unknown_params?: boolean;
+            /** Compress data, only available when initialized with one of the following parameters `view` or `data`. */
+            compress?: "auto" | boolean;
+            /**
+             * Parameter cache can define the max age of the cached response in seconds or as a boolean `true`.
+             * Anything higher than zero enables caching.
+             *
+             * When server production mode is enabled caching is done automatically unless `cache` is `false`.
+             * When production mode is disabled responses are never cached, even though the parameter is assigned.
+             * The response of an endpoint that uses parameter `callback` is never cached.
+             */
+            cache?: boolean | number;
+            /**
+             * An IP whitelist for the endpoint. When the parameter is defined with an Array,
+             * the whitelist will become active.
+             */
+            ip_whitelist?: string[];
+            /**
+             * A boolean indicating if the endpoint should show up in the sitemap.
+             * By default only when the attribute `view` is defined and the endpoint is unauthenticated,
+             * the endpoint will show up in sitemap.
+             */
+            sitemap?: boolean;
+            /**
+             * A boolean indicating if the endpoint should be crawled by search engines.
+             * By default only endpoints with `view` enabled will be crawled, unless specified otherwise.
+             */
+            robots?: boolean;
+            /** System reserved property indicating whether the endpoint is from static files. */
+            _is_static?: boolean;
+        }
+        /**
+         * Options for constructing an endpoint by data & content type.
+         * @docs
+         */
+        interface ByData<M extends Method = Method, E extends string | RegExp = string, S extends vlib.Schema.Entries.Opts = {}> extends Base<M, E, S> {
+            /** The data that will be returned as the response body. */
+            data?: Buffer | string | any[] | Record<any, any>;
+            /** Not allowed in this variant. */
+            file_path?: never;
+            /** Not allowed in this variant. */
+            view?: never;
+            /** Only allow authenticated requests. */
+            authenticated?: boolean;
+            /** Not allowed in this variant. */
+            callback?: never;
+            /** The content type. */
+            content_type: string;
+        }
+        /**
+         * Options for constructing an endpoint by file path & content type.
+         * @docs
+         */
+        interface ByFilePath<M extends Method = Method, E extends string | RegExp = string, S extends vlib.Schema.Entries.Opts = {}> extends Base<M, E, S> {
+            /** Not allowed in this variant. */
+            data?: never;
+            /** The file path to load the data from. */
+            file_path: string | vlib.Path;
+            /** Only allow authenticated requests. */
+            authenticated?: boolean;
+            /** Not allowed in this variant. */
+            callback?: never;
+            /** Not allowed in this variant. */
+            view?: never;
+            /** The content type. */
+            content_type: string;
+        }
+        /**
+         * Options for constructing an endpoint by unauthenticated callback.
+         * @docs
+         */
+        interface ByCallback<M extends Method = Method, E extends string | RegExp = string, S extends vlib.Schema.Entries.Opts = {}> extends Base<M, E, S> {
+            /** Not allowed in this variant. */
+            data?: never;
+            /** Not allowed in this variant. */
+            file_path?: never;
+            /** Only allow authenticated requests. */
+            authenticated?: false;
+            /** The callback that will be executed when a client requests this endpoint. */
+            callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any);
+            /** Not allowed in this variant. */
+            view?: never;
+            /** The content type. */
+            content_type: string;
+        }
+        /**
+         * Options for constructing an endpoint by authenticated callback.
+         * @docs
+         */
+        interface ByAuthCallback<M extends Method = Method, E extends string | RegExp = string, S extends vlib.Schema.Entries.Opts = {}> extends Base<M, E, S> {
+            /** Not allowed in this variant. */
+            data?: never;
+            /** Not allowed in this variant. */
+            file_path?: never;
+            /** Only allow authenticated requests. */
+            authenticated: true;
+            /** The callback that will be executed when a client requests this endpoint. */
+            callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any);
+            /** Not allowed in this variant. */
+            view?: never;
+            /** The content type. */
+            content_type: string;
+        }
+        /**
+         * Options for constructing an endpoint by authenticated view.
+         * @docs
+         */
+        interface ByView<M extends Method = Method, E extends string | RegExp = string, S extends vlib.Schema.Entries.Opts = {}> extends Base<M, E, S> {
+            /** Not allowed in this variant. */
+            data?: never;
+            /** Not allowed in this variant. */
+            file_path?: never;
+            /** Only allow authenticated requests. */
+            authenticated?: boolean;
+            /** Not allowed in this variant. */
+            callback?: never;
+            /** The JavaScript view that will be executed on the client side. */
+            view: View | View.Opts;
+            /** The content type. */
+            content_type?: string;
+        }
+    }
 }

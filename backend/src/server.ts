@@ -279,7 +279,7 @@ export namespace Server {
  * The server class.
  * @note Automatically runs on HTTP/HTTPS depending on the constructor options.
  * 
- * @property users The initialized {@link Users} instance.
+ * @nav Server
  * @docs
  */
 export class Server {
