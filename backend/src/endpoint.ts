@@ -714,7 +714,7 @@ export namespace Endpoint {
             M extends Method = Method,
             E extends string | RegExp = string,
             S extends vlib.Schema.Entries.Opts = {},
-        > extends Base<M, E, S> {
+        > extends Base {
             /** The data that will be returned as the response body. */
             data?: Buffer | string | any[] | Record<any, any>;
             /** Not allowed in this variant. */
