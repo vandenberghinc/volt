@@ -16,6 +16,7 @@
  * }
  * ```
  *
+ * @nav Server
  * @docs
  */
 export var Status;

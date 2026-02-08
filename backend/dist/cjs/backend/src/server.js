@@ -60,154 +60,14 @@ class Server {
   // ---------------------------------------------------------
   // Static attributes.
   // ---------------------------------------------------------
-  /** Content type per mime. */
-  static content_type_mimes = /* @__PURE__ */ new Map([
-    [".html", "text/html"],
-    [".htm", "text/html"],
-    [".shtml", "text/html"],
-    [".css", "text/css"],
-    [".xml", "application/xml"],
-    [".gif", "image/gif"],
-    [".jpeg", "image/jpeg"],
-    [".jpg", "image/jpeg"],
-    [".js", "application/javascript"],
-    [".ts", "application/typescript"],
-    [".atom", "application/atom+xml"],
-    [".rss", "application/rss+xml"],
-    [".mml", "text/mathml"],
-    [".txt", "text/plain"],
-    [".jad", "text/vnd.sun.j2me.app-descriptor"],
-    [".wml", "text/vnd.wap.wml"],
-    [".htc", "text/x-component"],
-    [".png", "image/png"],
-    [".tif", "image/tiff"],
-    [".tiff", "image/tiff"],
-    [".wbmp", "image/vnd.wap.wbmp"],
-    [".ico", "image/x-icon"],
-    [".jng", "image/x-jng"],
-    [".bmp", "image/x-ms-bmp"],
-    [".svg", "image/svg+xml"],
-    [".svgz", "image/svg+xml"],
-    [".webp", "image/webp"],
-    [".woff", "font/woff"],
-    [".woff2", "font/woff2"],
-    [".jar", "application/java-archive"],
-    [".war", "application/java-archive"],
-    [".ear", "application/java-archive"],
-    [".json", "application/json"],
-    [".hqx", "application/mac-binhex40"],
-    [".doc", "application/msword"],
-    [".pdf", "application/pdf"],
-    [".ps", "application/postscript"],
-    [".eps", "application/postscript"],
-    [".ai", "application/postscript"],
-    [".rtf", "application/rtf"],
-    [".m3u8", "application/vnd.apple.mpegurl"],
-    [".xls", "application/vnd.ms-excel"],
-    [".eot", "application/vnd.ms-fontobject"],
-    [".ppt", "application/vnd.ms-powerpoint"],
-    [".wmlc", "application/vnd.wap.wmlc"],
-    [".kml", "application/vnd.google-earth.kml+xml"],
-    [".kmz", "application/vnd.google-earth.kmz"],
-    [".7z", "application/x-7z-compressed"],
-    [".cco", "application/x-cocoa"],
-    [".jardiff", "application/x-java-archive-diff"],
-    [".jnlp", "application/x-java-jnlp-file"],
-    [".run", "application/x-makeself"],
-    [".pl", "application/x-perl"],
-    [".pm", "application/x-perl"],
-    [".prc", "application/x-pilot"],
-    [".pdb", "application/x-pilot"],
-    [".rar", "application/x-rar-compressed"],
-    [".rpm", "application/x-redhat-package-manager"],
-    [".sea", "application/x-sea"],
-    [".swf", "application/x-shockwave-flash"],
-    [".sit", "application/x-stuffit"],
-    [".tcl", "application/x-tcl"],
-    [".tk", "application/x-tcl"],
-    [".der", "application/x-x509-ca-cert"],
-    [".pem", "application/x-x509-ca-cert"],
-    [".crt", "application/x-x509-ca-cert"],
-    [".xpi", "application/x-xpinstall"],
-    [".xhtml", "application/xhtml+xml"],
-    [".xspf", "application/xspf+xml"],
-    [".zip", "application/zip"],
-    [".bin", "application/octet-stream"],
-    [".exe", "application/octet-stream"],
-    [".dll", "application/octet-stream"],
-    [".deb", "application/octet-stream"],
-    [".dmg", "application/octet-stream"],
-    [".iso", "application/octet-stream"],
-    [".img", "application/octet-stream"],
-    [".msi", "application/octet-stream"],
-    [".msp", "application/octet-stream"],
-    [".msm", "application/octet-stream"],
-    [".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
-    [".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
-    [".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
-    [".mid", "audio/midi"],
-    [".midi", "audio/midi"],
-    [".kar", "audio/midi"],
-    [".mp3", "audio/mpeg"],
-    [".ogg", "audio/ogg"],
-    [".m4a", "audio/x-m4a"],
-    [".ra", "audio/x-realaudio"],
-    [".3gpp", "video/3gpp"],
-    [".3gp", "video/3gpp"],
-    // [".ts", "video/mp2t"],
-    [".mp4", "video/mp4"],
-    [".mpeg", "video/mpeg"],
-    [".mpg", "video/mpeg"],
-    [".mov", "video/quicktime"],
-    [".webm", "video/webm"],
-    [".flv", "video/x-flv"],
-    [".m4v", "video/x-m4v"],
-    [".mng", "video/x-mng"],
-    [".asx", "video/x-ms-asf"],
-    [".asf", "video/x-ms-asf"],
-    [".wmv", "video/x-ms-wmv"],
-    [".avi", "video/x-msvideo"]
-  ]);
-  /** All file path extensions that are already compressed. */
-  static compressed_extensions = /* @__PURE__ */ new Set([
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".webp",
-    ".bmp",
-    ".tiff",
-    ".ico",
-    // ".svg",
-    ".svgz",
-    ".mng",
-    ".apng",
-    ".jfif",
-    ".jp2",
-    ".jpx",
-    ".j2k",
-    ".jpm",
-    ".jpf",
-    ".heif",
-    ".mp3",
-    ".ogg",
-    ".wav",
-    ".flac",
-    ".m4a",
-    ".aac",
-    ".wma",
-    ".ra",
-    ".mid",
-    ".mp4",
-    ".webm",
-    ".mkv",
-    ".mov",
-    ".avi",
-    ".wmv",
-    ".mpg",
-    ".mpeg",
-    ".flv"
-  ]);
+  /**
+   * A temporary directory which holds the cached endpoint data.
+   * For instance if we bundle JS then we save it to file and serve it from the file,
+   * similar for transformed image endpoints.
+   *
+   * Note that upon each server start, we should clear this cache and remove all files inside this dir.
+   */
+  endpoint_cache_dir;
   // ---------------------------------------------------------
   // Attributes.
   // ---------------------------------------------------------
@@ -386,6 +246,7 @@ class Server {
     while (this.full_domain.endsWith("/")) {
       this.full_domain = this.full_domain.slice(0, -1);
     }
+    this.endpoint_cache_dir = new vlib.Path("/tmp/volt_server_endpoint_cache/" + this.hash(this.domain));
     this.statics = statics;
     this.statics_aspect_ratios = /* @__PURE__ */ new Map();
     const volt_assets_path = new vlib.Path(`${__dirname}/../../../../../frontend/src/assets/`);
@@ -541,7 +402,7 @@ class Server {
    * @docs
    */
   get_content_type(extension) {
-    return Server.content_type_mimes.get(extension.toLowerCase()) ?? "application/octet-stream";
+    return import_utils.Utils.mime_type(extension) ?? "application/octet-stream";
   }
   /**
    * Set the logging verbosity level.
@@ -913,11 +774,9 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     const static_paths = [];
     const add_static_file = async (path2, endpoint, cache = true) => {
       static_paths.push(path2.str());
-      const content_type = this.get_content_type(path2.extension());
-      if (import_image_endpoint.ImageEndpoint.supported_images.includes(path2.extension())) {
+      if (import_image_endpoint.ImageEndpoint.supported_images.has(path2.extension())) {
         const e = new import_image_endpoint.ImageEndpoint({
           endpoint,
-          content_type,
           path: path2,
           cache,
           rate_limit: "global",
@@ -932,8 +791,6 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         this.endpoint(new import_endpoint.Endpoint({
           method: "GET",
           endpoint,
-          content_type,
-          compress: !Server.compressed_extensions.has(path2.extension().toLowerCase()),
           cache,
           rate_limit: "global",
           file_path: path2,
@@ -1143,7 +1000,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         } else {
           const err_endpoint = this.err_endpoints.get(status_code);
           try {
-            await err_endpoint._serve(stream, status_code);
+            await err_endpoint.serve({ stream, status: status_code });
           } catch (err) {
             this.log.error(`Error endpoint ${status_code}: `, err);
             stream.send(default_response);
@@ -1251,7 +1108,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
         }
       }
       try {
-        await endpoint._serve(stream);
+        await endpoint.serve({ stream });
       } catch (err) {
         this.log.error(`${method}:${endpoint_url}: `, err);
         if (!stream.destroyed && !stream.finished) {
@@ -1275,12 +1132,18 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
   // Server (private).
   /** The promise of database initialization and connecting. */
   _db_init_promise;
+  /** Is initialized. */
+  _initialized = false;
   /**
    * Initialize the server.
    * @returns A promise that resolves when the server has been initialized.
    * @docs
    */
   async initialize({ worker = false } = {}) {
+    if (this._initialized) {
+      return;
+    }
+    this._initialized = true;
     this.log(1, "Initializing server.");
     const initialize_start = Date.now();
     this.performance.start();
@@ -1292,6 +1155,10 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       await this.db.connect();
       this.performance.end("connect-db", start);
     })();
+    if (this.endpoint_cache_dir.exists()) {
+      await this.endpoint_cache_dir.del({ recursive: true });
+    }
+    await this.endpoint_cache_dir.mkdir({ recursive: true });
     if (!worker) {
       if (this.tls) {
         this.https = http2.createSecureServer({
@@ -1542,6 +1409,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
   }
   /**
    * Stop the server.
+   * @note After stopping the server we can no longer restart the server.
    *
    * @example
    * {Stop}
@@ -1572,6 +1440,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       this.http.close();
     await this.db.close();
     this.log.stop();
+    this._initialized = false;
   }
   // ---------------------------------------------------------
   // Events.

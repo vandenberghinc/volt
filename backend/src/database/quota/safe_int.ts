@@ -1,13 +1,13 @@
 /**
- * @author Daan …
- * @copyright …
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 
 /* ============================================================================
    SafeInt — a single, generic, integer-only amount class
    ----------------------------------------------------------------------------
    - **No derived classes.** A single generic class parameterized by its scale `S`.
-   - **Exact-by-default.** No silent rounding anywhere; rounding only when `mode` is provided.
+   - **Exact-by-default.** No silent rounding anywhere; rounding only when `round` is provided.
    - **Same-scale arithmetic only.** Operations accept raw numbers or the same generic `SafeInt<S>`.
    - **Strong typing for rescaling.** `to_scale<T>()` and helpers (`base/milli/micro/nano/pico`)
      return `SafeInt<T>` with the correct type at compile time.
@@ -22,7 +22,7 @@
  * @remarks
  * - The stored value is always a **safe JavaScript integer** (may be negative) measured in units of `S`.
  * - Instances are **immutable**; all arithmetic returns new `SafeInt` instances.
- * - Conversions are **exact by default**. Provide a {@link SafeInt.RoundingNode} `mode` to allow rounding.
+ * - Conversions are **exact by default**. Provide a {@link SafeInt.Rounding} `round` to allow rounding.
  * - Arithmetic is **same-scale only**: pass raw integers or another `SafeInt<S>`.
  * 
  * @nav Database
@@ -52,20 +52,20 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Construct by converting from `opts.from_scale` to `opts.to_scale`. **Exact by default**.
      *
      * @param value The numeric input at `opts.from_scale`.
-     *              - If `from_scale === Base`, `value` may be a float. When `mode` is omitted,
-     *                `value * to_scale` must be an integer. If `mode` is provided, that rounding is applied.
+     *              - If `from_scale === Base`, `value` may be a float. When `round` is omitted,
+     *                `value * to_scale` must be an integer. If `round` is provided, that rounding is applied.
      *              - If `from_scale !== Base`, `value` must be a safe integer.
      * @param opts  The canonical scale or scale options.
      * @param opts.to_scale   The target scale for storage (the resulting instance type is `SafeInt<opts.to_scale>`).
      * @param opts.from_scale The source scale of {@link value}, defaults to {@link SafeInt.Scale.Base}.
-     * @param opts.mode       Optional rounding mode for non-exact conversions (default: `"exact"`).
+     * @param opts.round       Optional rounding mode for non-exact conversions (default: `"exact"`).
      *
      * @example
      * new SafeInt(123_000, SafeInt.Scale.Nano)
      * @example
      * new SafeInt(123_000, "nano")
      * @example
-     * new SafeInt(1.5, { from_scale: SafeInt.Scale.Base, to_scale: SafeInt.Scale.Milli, mode: "round" }) // 1500
+     * new SafeInt(1.5, { from_scale: SafeInt.Scale.Base, to_scale: SafeInt.Scale.Milli, round: "round" }) // 1500
      *
      * @throws
      * Error If inputs are invalid, conversion overflows, or exactness is required but not met.
@@ -74,7 +74,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      */
     constructor(
         value: number,
-        opts: S | SafeInt.ScaleToString<S> | { to_scale: S | SafeInt.ScaleToString<S>; from_scale?: SafeInt.Scale | SafeInt.StringScale; mode?: SafeInt.RoundingNode },
+        opts: S | SafeInt.ScaleToString<S> | { to_scale: S | SafeInt.ScaleToString<S>; from_scale?: SafeInt.Scale | SafeInt.StringScale; round?: SafeInt.Rounding },
     ) {
 
         // Already-at-scale (exact)
@@ -96,7 +96,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
         }
 
         // Convert from -> to (exact by default; optional rounding)
-        let { to_scale, from_scale = SafeInt.Scale.Base, mode = "exact" } = opts;
+        let { to_scale, from_scale = SafeInt.Scale.Base, round = "exact" } = opts;
         if (typeof to_scale === "string") {
             to_scale = SafeInt.str_to_scale(to_scale);
         }
@@ -114,13 +114,13 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
         let converted: number;
         if (from_scale === to_scale) {
             if (to_scale === SafeInt.Scale.Base) {
-                if (mode === "exact") {
+                if (round === "exact") {
                     if (!Number.isSafeInteger(value)) {
                         throw new Error(`Exact constructor requires integer at base scale, got ${value}`);
                     }
                     converted = value;
                 } else {
-                    const rounded = SafeInt.apply_round(value, mode);
+                    const rounded = SafeInt.apply_round(value, round);
                     if (!Number.isSafeInteger(rounded)) {
                         throw new Error(`Rounding produced non-integer at base scale: ${rounded}`);
                     }
@@ -135,7 +135,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
         } else if (from_scale === SafeInt.Scale.Base) {
             // base -> integer scale
             const product = value * to_scale;
-            if (mode === "exact") {
+            if (round === "exact") {
                 if (!Number.isFinite(product) || !Number.isInteger(product)) {
                     throw new Error(`Exact conversion failed: ${value} * ${to_scale} is not an integer`);
                 }
@@ -144,7 +144,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
                 }
                 converted = product;
             } else {
-                const rounded = SafeInt.apply_round(product, mode);
+                const rounded = SafeInt.apply_round(product, round);
                 if (!Number.isSafeInteger(rounded)) {
                     throw new Error(`Overflow/invalid rounding converting base->${to_scale}: ${product} -> ${rounded}`);
                 }
@@ -155,13 +155,13 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
             if (!Number.isSafeInteger(value)) {
                 throw new Error(`Invalid value: expected safe integer at scale=${from_scale}, got ${value}`);
             }
-            converted = SafeInt.div_to_base(value, from_scale, mode);
+            converted = SafeInt.div_to_base(value, from_scale, round);
         } else {
             // integer-scale -> integer-scale
             if (!Number.isSafeInteger(value)) {
                 throw new Error(`Invalid value: expected safe integer at scale=${from_scale}, got ${value}`);
             }
-            converted = SafeInt.convert_int_scale(value, from_scale, to_scale, mode);
+            converted = SafeInt.convert_int_scale(value, from_scale, to_scale, round);
         }
 
         this.int_value = converted;
@@ -227,17 +227,17 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
     /**
      * Convert this instance to another integer scale.
-     * **Exact by default** — provide a {@link SafeInt.RoundingNode} to allow rounding.
+     * **Exact by default** — provide a {@link SafeInt.Rounding} to allow rounding.
      *
      * @typeParam T - Target scale (see {@link SafeInt.Scale}).
      * @param to_scale The target canonical scale.
-     * @param mode     Rounding mode for non-exact ratios (default `"exact"`).
+     * @param round     Rounding mode for non-exact ratios (default `"exact"`).
      *
      * @returns A new {@link SafeInt} typed as `SafeInt<T>`, storing an integer at `to_scale`.
      * 
      * @docs
      */
-    to_scale<T extends SafeInt.Scale>(to_scale: T, mode: SafeInt.RoundingNode = "exact"): SafeInt<T> {
+    to_scale<T extends SafeInt.Scale>(to_scale: T, round: SafeInt.Rounding = "exact"): SafeInt<T> {
         // validate target scale
         if (!Number.isSafeInteger(to_scale) || to_scale <= 0) {
             throw new Error(`Invalid to_scale: expected positive safe integer, got ${to_scale}`);
@@ -249,7 +249,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
         }
 
         if (to_scale === SafeInt.Scale.Base) {
-            const base_int = SafeInt.div_to_base(this.int_value, this.int_scale, mode);
+            const base_int = SafeInt.div_to_base(this.int_value, this.int_scale, round);
             return new SafeInt<T>(base_int, SafeInt.Scale.Base as T);
         }
 
@@ -261,7 +261,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
             return new SafeInt<T>(product, to_scale);
         }
 
-        const n = SafeInt.convert_int_scale(this.int_value, this.int_scale, to_scale, mode);
+        const n = SafeInt.convert_int_scale(this.int_value, this.int_scale, to_scale, round);
         return new SafeInt<T>(n, to_scale);
     }
 
@@ -394,19 +394,19 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Divide by a positive integer divisor at the same scale.
      *
      * @param divisor Positive safe integer or `SafeInt<S>` divisor.
-     * @param mode    Rounding mode. Default `"exact"` requires no remainder.
-     * @returns       A new `SafeInt<S>` with the integer quotient (per {@link mode}).
+     * @param round    Rounding mode. Default `"exact"` requires no remainder.
+     * @returns       A new `SafeInt<S>` with the integer quotient (per {@link round}).
      *
-     * @throws Error If the divisor is invalid, division by zero, non-exact remainder in `"exact"` mode, or overflow.
+     * @throws Error If the divisor is invalid, division by zero, non-exact remainder in `"exact"` round, or overflow.
      * 
      * @docs
      */
-    div(divisor: number | SafeInt<S>, mode: SafeInt.RoundingNode = "exact"): SafeInt<S> {
+    div(divisor: number | SafeInt<S>, round: SafeInt.Rounding = "exact"): SafeInt<S> {
         const d = typeof divisor === "number" ? divisor : divisor.int_value;
         if (!Number.isSafeInteger(d) || d === 0) {
             throw new Error(`Invalid 'divisor': expected a non-zero safe integer, got ${d}`);
         }
-        const q = SafeInt.div_int_checked(this.int_value, d, mode);
+        const q = SafeInt.div_int_checked(this.int_value, d, round);
         return new SafeInt<S>(q, this.int_scale);
     }
 
@@ -538,19 +538,19 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
     // ----------------------------------------------------------------
 
     /**
-     * Apply a rounding mode to a floating value.
+     * Apply a rounding to a floating value.
      *
      * @param v    Floating value to round.
-     * @param mode Rounding mode.
+     * @param round Rounding mode.
      * @returns    Rounded integer (validated by the caller).
      * @internal
      */
-    protected static apply_round(v: number, mode: SafeInt.RoundingNode): number {
+    protected static apply_round(v: number, round: SafeInt.Rounding): number {
         if (!Number.isFinite(v)) throw new Error(`Invalid value for rounding: ${v}`);
-        if (mode === "floor") return Math.floor(v);
-        if (mode === "ceil") return Math.ceil(v);
-        if (mode === "round") return Math.round(v);
-        throw new Error(`apply_round() called with mode='exact' which forbids rounding`);
+        if (round === "floor") return Math.floor(v);
+        if (round === "ceil") return Math.ceil(v);
+        if (round === "round") return Math.round(v);
+        throw new Error(`apply_round() called with round='exact' which forbids rounding`);
     }
 
     /**
@@ -558,18 +558,18 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      *
      * @param value      Safe integer at `from_scale` (may be negative).
      * @param from_scale Source scale.
-     * @param mode       Rounding (default exact).
+     * @param round       Rounding (default exact).
      * @returns          Base-scale integer.
      * @internal
      */
-    protected static div_to_base(value: number, from_scale: number, mode: SafeInt.RoundingNode): number {
-        if (mode === "exact") {
+    protected static div_to_base(value: number, from_scale: number, round: SafeInt.Rounding): number {
+        if (round === "exact") {
             if (value % from_scale !== 0) {
                 throw new Error(`Exact conversion to base failed: ${value} % ${from_scale} !== 0`);
             }
             return value / from_scale;
         }
-        return SafeInt.div_int_checked(value, from_scale, mode);
+        return SafeInt.div_int_checked(value, from_scale, round);
     }
     
     /**
@@ -577,8 +577,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      *
      * @param numerator   Safe integer (may be negative).
      * @param denominator Positive safe integer.
-     * @param mode        Rounding mode (default `"exact"`).
-     * @returns           Integer quotient as per {@link mode}.
+     * @param round        Rounding mode (default `"exact"`).
+     * @returns           Integer quotient as per {@link round}.
      *
      * @throws Error On invalid inputs, division by zero, non-exact remainder in `"exact"`, or overflow.
      * @internal
@@ -586,7 +586,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
     protected static div_int_checked(
         numerator: number,
         denominator: number,
-        mode: SafeInt.RoundingNode = "exact",
+        round: SafeInt.Rounding = "exact",
     ): number {
         if (!Number.isSafeInteger(numerator)) throw new Error(`Invalid numerator: ${numerator}`);
         if (!Number.isSafeInteger(denominator) || denominator <= 0) throw new Error(`Invalid denominator: ${denominator}`);
@@ -594,18 +594,18 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
         const prod = q * denominator;
         if (!Number.isSafeInteger(prod)) throw new Error(`Overflow computing remainder`);
         const rem = numerator - prod;
-        if (mode === "exact") {
+        if (round === "exact") {
             if (rem !== 0) throw new Error(`Non-exact division: ${numerator} / ${denominator} leaves remainder ${rem}`);
             return q;
         }
-        if (mode === "floor") return q; // truncate toward zero by design
-        if (mode === "ceil") return rem === 0 ? q : (q + 1);
-        if (mode === "round") {
+        if (round === "floor") return q; // truncate toward zero by design
+        if (round === "ceil") return rem === 0 ? q : (q + 1);
+        if (round === "round") {
             const twice = rem * 2;
             if (!Number.isSafeInteger(twice)) throw new Error(`Overflow computing rounding threshold`);
             return twice >= denominator ? (q + 1) : q;
         }
-        throw new Error(`Invalid mode: ${mode as string}`);
+        throw new Error(`Invalid round: ${round as string}`);
     }
 
     /**
@@ -614,7 +614,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @param value       Safe integer at {@link from_scale} (may be negative).
      * @param from_scale  Integer source scale.
      * @param to_scale    Integer target scale.
-     * @param mode        Rounding mode (default exact).
+     * @param round        Rounding mode (default exact).
      * @returns           Safe integer at `to_scale`.
      *
      * @throws Error On invalid inputs or overflow.
@@ -624,7 +624,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
         value: number,
         from_scale: number,
         to_scale: number,
-        mode: SafeInt.RoundingNode,
+        round: SafeInt.Rounding,
     ): number {
         if (!Number.isSafeInteger(value)) {
             throw new Error(`Invalid value: expected safe integer, got ${value}`);
@@ -641,7 +641,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
         // exact divisor path
         if (from_scale % to_scale === 0) {
             const divisor = Math.trunc(from_scale / to_scale);
-            return SafeInt.div_int_checked(value, divisor, mode);
+            return SafeInt.div_int_checked(value, divisor, round);
         }
         // exact multiplier path
         if (to_scale % from_scale === 0) {
@@ -658,7 +658,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
         if (!Number.isSafeInteger(numerator)) {
             throw new Error(`Overflow computing numerator in convert_int_scale(${value}, ${from_scale} -> ${to_scale})`);
         }
-        return SafeInt.div_int_checked(numerator, from_scale, mode);
+        return SafeInt.div_int_checked(numerator, from_scale, round);
     }
 }
 
@@ -677,7 +677,7 @@ export namespace SafeInt {
      * 
      * @docs
      */
-    export type RoundingNode = "exact" | "floor" | "ceil" | "round";
+    export type Rounding = "exact" | "floor" | "ceil" | "round";
 
     /**
      * Canonical integer scales (units-per-base).

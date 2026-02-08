@@ -2,6 +2,7 @@
  * @author Daan van den Bergh
  * @copyright © 2025 - 2025 Daan van den Bergh. All rights reserved.
  */
+import * as vlib from "@vandenberghinc/vlib";
 import { IncomingMessage, ServerResponse } from 'http';
 import { ServerHttp2Stream, IncomingHttpHeaders, Http2ServerRequest, Http2ServerResponse } from 'http2';
 /** A generic map of request parameters. */
@@ -196,24 +197,36 @@ export declare class Stream {
     get uid(): string | undefined;
     set uid(value: string | undefined);
     /**
+     * Apply templates to an in-memory body.
+     * Only applies to string bodies to avoid corrupting binary payloads.
+     */
+    private _apply_templates_to_body;
+    /**
+     * Create a transform stream that applies templates across chunk boundaries.
+     * This avoids missing replacements when a template key is split between chunks.
+     */
+    private _create_template_replace_transform;
+    /**
      * Send a response.
-     *
-     * @param options The response options.
-     * @param options.status The response status.
-     * @param options.headers The response headers.
-     * @param options.data The data of the response body to send.
-     * @param options.compress Whether the response should be gzip-compressed.
      * @example
      * ```ts
      * stream.send({status: 200, data: "Hello World!"});
      * ```
      * @docs
      */
-    send<Data extends ResponseBody = ResponseBody>({ status, headers, data, compress, }?: {
+    send<Data extends ResponseBody = ResponseBody>({ status, headers, data, compress, from_file, templates, }: {
+        /** The response status. */
         status?: number;
+        /** The response headers. */
         headers?: ResponseHeaders;
+        /** The data of the response body to send. */
         data?: Data;
+        /** Whether the response should be gzip-compressed. */
         compress?: boolean;
+        /** Load data from a file, using a cached path will have a slight performance improvement */
+        from_file?: string | vlib.Path;
+        /** Apply template replacements (e.g. { "{{__VOLT_NONCE__}}": nonce }) */
+        templates?: Record<string, any>;
     }): this;
     /**
      * Send a response
@@ -229,11 +242,12 @@ export declare class Stream {
      * ```
      * @docs
      */
-    success<Data extends ResponseBody = ResponseBody>({ status, headers, data, compress }?: {
+    success<Data extends ResponseBody = ResponseBody>({ status, headers, data, from_file, compress }?: {
         status?: number;
         headers?: ResponseHeaders;
         data?: Data;
         compress?: boolean;
+        from_file?: string | vlib.Path;
     }): this;
     /**
      * Send an error response

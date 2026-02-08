@@ -32,7 +32,7 @@ export interface RateLimitCacheData {
  *
  * This class will be accessable under `Server` attribute `rate_limits`.
  *
- * @nav Rate Limit
+ * @nav Endpoints
  * @docs
  */
 export declare namespace RateLimits {
@@ -72,8 +72,6 @@ export declare namespace RateLimits {
 export declare namespace RateLimitServer {
     /**
      * Constructor options.
-     * @nav Rate Limit
-     * @docs
      */
     interface Opts {
         /** The port to which the rate limiting server will bind. The default is `51234`. */
@@ -112,8 +110,6 @@ export declare class RateLimitServer {
 export declare namespace RateLimitClient {
     /**
      * Constructor options.
-     * @nav Rate Limit
-     * @docs
      */
     interface Opts {
         /** The port to which the rate limiting server will bind. The default is `51234`. */

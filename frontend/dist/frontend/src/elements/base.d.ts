@@ -90,6 +90,7 @@ export declare abstract class VElement extends HTMLElement {
             callback: (query: MediaQueryList) => any;
         };
     };
+    /** Resize query manager queries (allows same predicate for multiple targets). */
     constructor();
     /**
      * @warning This method should only be used by the direct types declared in this file e.g. VSpanElement.
@@ -1298,6 +1299,42 @@ export declare abstract class VElement extends HTMLElement {
     fade_out_right(size?: number): this;
     fade_out_bottom(size?: number): this;
     fade_out_left(size?: number): this;
+    /**
+     * {On Resize}
+     * Manages callbacks for the resize event. Can retrieve existing callbacks or add new ones.
+     * @parameter callback The callback function to be executed on resize events.
+     * @returns When a callback is provided, returns the instance for chaining. Otherwise, returns the list of existing resize callbacks.
+     * @docs
+     */
+    on_resize(): (ElementCallback<this>)[];
+    on_resize(callback: ElementCallback<this>): this;
+    /**
+     * {Remove on Resize}
+     * Removes a callback from the resize event listeners. If no callbacks remain, it stops observing resize events.
+     * @parameter callback The callback function to remove from the resize event listeners.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
+     */
+    remove_on_resize(callback: ElementCallback<this>): this;
+    /**
+     * {Remove on Resizes}
+     * Removes all resize callbacks and stops observing resize events for this element.
+     * @parameter callback A callback function to be removed from the resize callbacks.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
+     */
+    remove_on_resizes(): this;
+    /**
+     * {On Resize Rule}
+     * Adds an on resize rule event that executes callbacks based on evaluation changes during a resize event.
+     * @note This function adds an `on_resize` callback.
+     * @parameter evaluation The function to evaluate if the statement is true, the element node is passed as the first argument.
+     * @parameter on_true The callback executed if the statement is true, the element node is passed as the first argument.
+     * @parameter on_false The callback executed if the statement is false, the element node is passed as the first argument.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
+     */
+    on_resize_rule(evaluation: (element: this) => boolean, on_true?: ElementCallback<this>, on_false?: ElementCallback<this>): this;
     on(type: keyof HTMLElementEventMap, callback: (element: this, event: HTMLElementEventMap[keyof HTMLElementEventMap]) => any, options?: boolean | AddEventListenerOptions): this;
     on_event_listener<K extends keyof HTMLElementEventMap>(type: K, callback: (element: this, event: HTMLElementEventMap[K]) => any, options?: boolean | AddEventListenerOptions): this;
     /**
@@ -1575,42 +1612,6 @@ export declare abstract class VElement extends HTMLElement {
      * @docs
      */
     remove_on_loads(): this;
-    /**
-     * {On Resize}
-     * Manages callbacks for the resize event. Can retrieve existing callbacks or add new ones.
-     * @parameter callback The callback function to be executed on resize events.
-     * @returns When a callback is provided, returns the instance for chaining. Otherwise, returns the list of existing resize callbacks.
-     * @docs
-     */
-    on_resize(): (ElementCallback<this>)[];
-    on_resize(callback: ElementCallback<this>): this;
-    /**
-     * {Remove on Resize}
-     * Removes a callback from the resize event listeners. If no callbacks remain, it stops observing resize events.
-     * @parameter callback The callback function to remove from the resize event listeners.
-     * @returns Returns the instance of the element for chaining.
-     * @docs
-     */
-    remove_on_resize(callback: ElementCallback<this>): this;
-    /**
-     * {Remove on Resizes}
-     * Removes all resize callbacks and stops observing resize events for this element.
-     * @parameter callback A callback function to be removed from the resize callbacks.
-     * @returns Returns the instance of the element for chaining.
-     * @docs
-     */
-    remove_on_resizes(): this;
-    /**
-     * {On Resize Rule}
-     * Adds an on resize rule event that executes callbacks based on evaluation changes during a resize event.
-     * @note This function adds an `on_resize` callback.
-     * @parameter evaluation The function to evaluate if the statement is true, the element node is passed as the first argument.
-     * @parameter on_true The callback executed if the statement is true, the element node is passed as the first argument.
-     * @parameter on_false The callback executed if the statement is false, the element node is passed as the first argument.
-     * @returns Returns the instance of the element for chaining.
-     * @docs
-     */
-    on_resize_rule(evaluation: (element: this) => boolean, on_true?: ElementCallback<this>, on_false?: ElementCallback<this>): this;
     /**
      * {On Shortcut}
      * Create key shortcuts for the element. This function takes an array of shortcut objects that define the key combinations and their associated actions.

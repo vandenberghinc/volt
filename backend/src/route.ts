@@ -208,7 +208,7 @@ export class Route {
                 this.params.forEach((k, i) => {
                     out[k.name] = m[i + 1];
                 });
-                console.log("OUT:", out)
+                // console.log("OUT:", out)
                 return out;
             },
         };

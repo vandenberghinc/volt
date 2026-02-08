@@ -18,6 +18,7 @@ import type { PseudoElement } from "../ui/pseudo.js"
 
 import type { None, BorderOpts } from "./types.js"
 import { Attachment } from "../modules/attachment.js"
+// import { ResizeQueryManager } from "./resize_query_manager.js"
 
 // Vars.
 const elements_with_width_attribute = new Set<String>([ // elements that use the "width" etc attribute instead of the "style.width".
@@ -337,6 +338,12 @@ export abstract class VElement extends HTMLElement {
         },
     };
 
+    /** Resize query manager queries (allows same predicate for multiple targets). */
+    // private _resize_query_queries!: Map<
+    //     ResizeQueryManager.Predicate<this>,
+    //     Set<ResizeQueryManager.Subscription<this>>
+    // >;
+
     // private _checked: any;// {get(x: any): void, set(x: any, y: any): void};
     // private _disabled: any;// {get(x: any): void, set(x: any, y: any): void};
     // private _selected: any;// {get(x: any): void, set(x: any, y: any): void};
@@ -403,6 +410,7 @@ export abstract class VElement extends HTMLElement {
         this._on_escape_callback = undefined;
         this._on_appear_callbacks = [];
         this._media_queries = {};
+        // this._resize_query_queries = new Map();
 
         // Constructed by html code.
         if (this.hasAttribute !== undefined && this.hasAttribute("created_by_html")) {
@@ -3256,6 +3264,94 @@ export abstract class VElement extends HTMLElement {
     }
 
     // ---------------------------------------------------------
+    // Container query functions using a global ResizeObserver.
+
+    // /**
+    //  * Subscribe a on resize query predicate.
+    //  * The predicate is called if the target element or container resizes.
+    //  *
+    //  * @param predicate predicate callback (no strings required).
+    //  * @param true_handler fired when predicate becomes true.
+    //  * @param false_handler fired when predicate becomes false.
+    //  * @param container_target optional container element or VElement; defaults to this element's HTMLElement.
+    //  */
+    // resize_query(
+    //     predicate: ResizeQueryManager.Predicate<AnyElement>,
+    //     true_handler?: ResizeQueryManager.Callback<AnyElement>,
+    //     false_handler?: ResizeQueryManager.Callback<AnyElement>,
+    //     container_target?: AnyElement,
+    // ): this {
+    //     const target = container_target || this;
+
+    //     const record: ResizeQueryManager.Record<this> = {
+    //         owner: this,
+    //         predicate,
+    //         on_true: true_handler,
+    //         on_false: false_handler,
+    //         last_match: undefined,
+    //     };
+
+    //     // Register with the global manager.
+    //     ResizeQueryManager.observe_target(target, record);
+
+    //     // Create a subscription handle so we can remove later.
+    //     const subscription: ResizeQueryManager.Subscription<this> = {
+    //         target,
+    //         record,
+    //         remove: () => ResizeQueryManager.unobserve_target(target, record),
+    //     };
+
+    //     // Store by predicate to support remove_container(predicate).
+    //     let set = this._resize_query_queries.get(predicate);
+    //     if (set === undefined) {
+    //         set = new Set();
+    //         this._resize_query_queries.set(predicate, set);
+    //     }
+
+    //     // Prevent duplicates for the same predicate+target pair.
+    //     for (const existing of set) {
+    //         if (existing.target === target) {
+    //             existing.remove();
+    //             set.delete(existing);
+    //             break;
+    //         }
+    //     }
+
+    //     set.add(subscription);
+    //     return this;
+    // }
+
+    // /**
+    //  * Remove all subscriptions for a predicate (across any targets).
+    //  */
+    // remove_resize_query(predicate: ResizeQueryManager.Predicate<AnyElement>): this {
+    //     const set = this._resize_query_queries.get(predicate);
+    //     if (set === undefined) return this;
+
+    //     for (const sub of set) sub.remove();
+    //     this._resize_query_queries.delete(predicate);
+    //     return this;
+    // }
+
+    // /**
+    //  * Remove all container subscriptions for this element.
+    //  */
+    // remove_resize_queries(): this {
+    //     for (const set of this._resize_query_queries.values()) {
+    //         for (const sub of set) sub.remove();
+    //     }
+    //     this._resize_query_queries.clear();
+    //     return this;
+    // }
+
+    // /**
+    //  * Alias for remove_resize_queries().
+    //  */
+    // remove_all_resize_queries(): this {
+    //     return this.remove_resize_queries();
+    // }
+
+    // ---------------------------------------------------------
     // Animations.
 
     /**
@@ -3781,6 +3877,92 @@ export abstract class VElement extends HTMLElement {
     }
     fade_out_left(size: number = 0.05) {
         this.mask_image(`linear-gradient(270deg, #000 ${100.0 - size*100}%, transparent)`);
+        return this;
+    }
+
+    // ---------------------------------------------------------
+    // On resize rules.
+
+
+    /**
+     * {On Resize}
+     * Manages callbacks for the resize event. Can retrieve existing callbacks or add new ones.
+     * @parameter callback The callback function to be executed on resize events.
+     * @returns When a callback is provided, returns the instance for chaining. Otherwise, returns the list of existing resize callbacks.
+     * @docs
+     */
+    on_resize(): (ElementCallback<this>)[];
+    on_resize(callback: ElementCallback<this>): this;
+    on_resize(callback?: ElementCallback<this>): (ElementCallback<this>)[] | this {
+        if (callback == null) {
+            return this._on_resize_callbacks;
+        }
+        this._on_resize_callbacks.push(callback);
+        if (!this._observing_on_resize) {
+            this._observing_on_resize = true;
+            on_resize_observer.observe(this as any);
+        }
+        return this;
+    }
+
+    /**
+     * {Remove on Resize}
+     * Removes a callback from the resize event listeners. If no callbacks remain, it stops observing resize events.
+     * @parameter callback The callback function to remove from the resize event listeners.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
+     */
+    remove_on_resize(callback: ElementCallback<this>): this {
+        this._on_resize_callbacks = vlib.Array.drop(this._on_resize_callbacks, callback);
+        if (this._on_resize_callbacks.length === 0) {
+            on_resize_observer.unobserve(this as any);
+            this._observing_on_resize = false;
+        }
+        return this;
+    }
+
+    /**
+     * {Remove on Resizes}
+     * Removes all resize callbacks and stops observing resize events for this element.
+     * @parameter callback A callback function to be removed from the resize callbacks.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
+     */
+    remove_on_resizes(): this {
+        this._on_resize_callbacks = [];
+        on_resize_observer.unobserve(this as any);
+        this._observing_on_resize = false;
+        return this;
+    }
+
+    /**
+     * {On Resize Rule}
+     * Adds an on resize rule event that executes callbacks based on evaluation changes during a resize event.
+     * @note This function adds an `on_resize` callback.
+     * @parameter evaluation The function to evaluate if the statement is true, the element node is passed as the first argument.
+     * @parameter on_true The callback executed if the statement is true, the element node is passed as the first argument.
+     * @parameter on_false The callback executed if the statement is false, the element node is passed as the first argument.
+     * @returns Returns the instance of the element for chaining.
+     * @docs
+     */
+    on_resize_rule(
+        evaluation: (element: this) => boolean,
+        on_true?: ElementCallback<this>,
+        on_false?: ElementCallback<this>,
+    ): this {
+        const eval_index = this._on_resize_rule_evals.length;
+        this._on_resize_rule_evals[eval_index] = null;
+        this.on_resize(() => {
+            const result = evaluation(this);
+            if (result !== this._on_resize_rule_evals[eval_index]) {
+                this._on_resize_rule_evals[eval_index] = result;
+                if (result && on_true) {
+                    on_true(this);
+                } else if (!result && on_false) {
+                    on_false(this);
+                }
+            }
+        })
         return this;
     }
 
@@ -4524,88 +4706,6 @@ export abstract class VElement extends HTMLElement {
      */
     remove_on_loads(): this {
         Events.remove("volt.on_load", this);
-        return this;
-    }
-
-    /**
-     * {On Resize}
-     * Manages callbacks for the resize event. Can retrieve existing callbacks or add new ones.
-     * @parameter callback The callback function to be executed on resize events.
-     * @returns When a callback is provided, returns the instance for chaining. Otherwise, returns the list of existing resize callbacks.
-     * @docs
-     */
-    on_resize(): (ElementCallback<this>)[];
-    on_resize(callback: ElementCallback<this>): this;
-    on_resize(callback?: ElementCallback<this>): (ElementCallback<this>)[] | this {
-        if (callback == null) {
-            return this._on_resize_callbacks;
-        }
-        this._on_resize_callbacks.push(callback);
-        if (!this._observing_on_resize) {
-            this._observing_on_resize = true;
-            on_resize_observer.observe(this as any);
-        }
-        return this;
-    }
-
-    /**
-     * {Remove on Resize}
-     * Removes a callback from the resize event listeners. If no callbacks remain, it stops observing resize events.
-     * @parameter callback The callback function to remove from the resize event listeners.
-     * @returns Returns the instance of the element for chaining.
-     * @docs
-     */
-    remove_on_resize(callback: ElementCallback<this>): this {
-        this._on_resize_callbacks = vlib.Array.drop(this._on_resize_callbacks, callback);
-        if (this._on_resize_callbacks.length === 0) {
-            on_resize_observer.unobserve(this as any);
-            this._observing_on_resize = false;
-        }
-        return this;
-    }
-
-    /**
-     * {Remove on Resizes}
-     * Removes all resize callbacks and stops observing resize events for this element.
-     * @parameter callback A callback function to be removed from the resize callbacks.
-     * @returns Returns the instance of the element for chaining.
-     * @docs
-     */
-    remove_on_resizes(): this {
-        this._on_resize_callbacks = [];
-        on_resize_observer.unobserve(this as any);
-        this._observing_on_resize = false;
-        return this;
-    }
-
-    /**
-     * {On Resize Rule}
-     * Adds an on resize rule event that executes callbacks based on evaluation changes during a resize event.
-     * @note This function adds an `on_resize` callback.
-     * @parameter evaluation The function to evaluate if the statement is true, the element node is passed as the first argument.
-     * @parameter on_true The callback executed if the statement is true, the element node is passed as the first argument.
-     * @parameter on_false The callback executed if the statement is false, the element node is passed as the first argument.
-     * @returns Returns the instance of the element for chaining.
-     * @docs
-     */
-    on_resize_rule(
-        evaluation: (element: this) => boolean,
-        on_true?: ElementCallback<this>,
-        on_false?: ElementCallback<this>,
-    ): this {
-        const eval_index = this._on_resize_rule_evals.length;
-        this._on_resize_rule_evals[eval_index] = null;
-        this.on_resize(() => {
-            const result = evaluation(this);
-            if (result !== this._on_resize_rule_evals[eval_index]) {
-                this._on_resize_rule_evals[eval_index] = result;
-                if (result && on_true) {
-                    on_true(this);
-                } else if (!result && on_false) {
-                    on_false(this);
-                }
-            }
-        })
         return this;
     }
 

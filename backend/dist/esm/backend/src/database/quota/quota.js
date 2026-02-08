@@ -1119,14 +1119,14 @@ export class QuotaManager {
          *
          * @docs
          */
-        function to_nano(q) {
+        function to_nano(q, opts) {
             if (q == null)
                 return undefined;
             else if (typeof q === "number") {
-                return new SafeInt(q, { from_scale: 1, to_scale: SafeInt.Scale.Nano }).value();
+                return new SafeInt(q, { from_scale: 1, to_scale: SafeInt.Scale.Nano, round: opts?.round }).value();
             }
             return {
-                max: new SafeInt(q.max, { from_scale: 1, to_scale: SafeInt.Scale.Nano }).value(),
+                max: new SafeInt(q.max, { from_scale: 1, to_scale: SafeInt.Scale.Nano, round: opts?.round }).value(),
                 interval: q.interval,
             };
         }

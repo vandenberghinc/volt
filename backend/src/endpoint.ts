@@ -6,17 +6,16 @@
 // ---------------------------------------------------------
 // Imports.
 
-import CleanCSS from 'clean-css';
-import zlib from 'zlib';
 import { View } from './view.js';
 import * as vlib from "@vandenberghinc/vlib";
 import { ExternalError, InternalError } from "./errors/internal_external.js";
 import { Status } from "./status.js";
 import { RateLimits, RateLimitGroup, RateLimitData } from "./rate_limit.js";
 import { Stream, AuthStream } from "./stream.js";
-import type { Server } from "./server.js";
+import { Server } from "./server.js";
 import { Route } from './route.js';
 import Meta from './meta.js';
+import { Utils } from './utils.js';
 
 const { debug } = vlib;
 
@@ -35,59 +34,6 @@ export class Endpoint<
     const E extends string | RegExp = string,
     const S extends vlib.Schema.Entries.Opts = {}
 > {
-
-    // Static attributes.
-    static compressed_content_types: string[] = [
-        // Image formats (often already compressed)
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-        "image/bmp",
-        "image/tiff",
-        "image/vnd.microsoft.icon", // ICO
-        // Audio formats (usually compressed)
-        "audio/mpeg",     // MP3
-        "audio/mp3",
-        "audio/ogg",
-        "audio/wav",
-        "audio/x-wav",
-        "audio/flac",
-        "audio/aac",
-        "audio/midi",
-        // Video formats (typically compressed)
-        "video/mp4",
-        "video/mpeg",
-        "video/ogg",
-        "video/webm",
-        "video/x-msvideo", // AVI
-        "video/quicktime", // MOV
-        // Archive / Compressed file formats
-        "application/zip",
-        "application/x-7z-compressed",
-        "application/x-rar-compressed",
-        "application/x-tar",
-        "application/gzip",
-        "application/x-gzip",
-        "application/x-bzip",
-        "application/x-bzip2",
-        "application/x-xz",
-        // Documents that are usually compressed internally
-        "application/pdf",
-        "application/vnd.ms-powerpoint",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        // Font files
-        "font/woff",
-        "font/woff2",
-        "application/font-sfnt",
-        "application/vnd.ms-fontobject",
-        // Other binary data
-        "application/octet-stream",
-    ];
 
     /** Route attributes */
     id: string;
@@ -119,7 +65,6 @@ export class Endpoint<
     file_path?: vlib.Path;
 
     /** Content length & type */
-    content_length?: number;
     content_type?: string;
 
     /** Booleans */
@@ -135,7 +80,7 @@ export class Endpoint<
     private _compress: boolean;
     private _cache: boolean | number;
     private ip_whitelist?: string[];
-    private _is_compressed?: boolean;
+    // private _is_compressed?: boolean;
 
     private _dynamic_initialized = false;
 
@@ -222,7 +167,7 @@ export class Endpoint<
         authenticated = false,
         rate_limit = undefined,
         params = undefined,
-        compress = "auto",
+        compress = true,
         cache = true,
         ip_whitelist = undefined,
         sitemap = undefined,
@@ -265,19 +210,6 @@ export class Endpoint<
             });
         }
 
-        // Set compress.
-        if (compress === "auto" || typeof compress !== "boolean") {
-            compress = Endpoint.compressed_content_types.includes(this.content_type??"")
-        } else if (compress === true && this.content_type != null && Endpoint.compressed_content_types.includes(this.content_type)) {
-            debug(4, this.route.id, ": ", `Overriding parameter "compress", disabling compression.`)
-            compress = false;
-        }
-        this._compress = compress;
-        this._compress = false;
-        if (this._compress) {
-            debug(3, this.route.id, ": ", "Compression enabled.", { content_type: this.content_type })
-        }
-
         // Argument `view` may also be passed as an object instead of class View.
         if (view == null) {
             this.view = undefined;
@@ -285,6 +217,26 @@ export class Endpoint<
             this.view = view;
         } else {
             this.view = new View(view);
+        }
+
+        // Set content type from file path.
+        if (this.file_path != null && this.content_type == null) {
+            this.content_type = Utils.mime_type(this.file_path.extension()) ?? "application/octet-stream";
+        }
+        // Set content type from defined view after view is defined.
+        else if (this.view != null) {
+            this.content_type = "text/html";
+        }
+
+        // Set compression after content type is defined.
+        if (compress === false) {
+            this._compress = false;
+        } else if (this.file_path) {
+            this._compress = !(Utils.is_compressed_extension(this.file_path.extension()) ?? false);
+        } else if (this.content_type != null) {
+            this._compress = !Utils.is_compressed_content_type(this.content_type);
+        } else {
+            this._compress = true;
         }
 
         // Set default visible in sitemap.
@@ -360,15 +312,115 @@ export class Endpoint<
      */
     async serve({
         stream,
-        status = 200,
-        templates = undefined,
+        status: status_code = 200,
+        templates,
     }: {
         stream: Stream;
-        status: number;
-        /** Add new templates when rendering a `View`, overriding the default `View` templates. */
+        status?: number;
         templates?: Record<string, any>;
     }): Promise<void> {
-        return await this._serve(stream, status, { templates });
+        if (!this._dynamic_initialized) {
+            await this._dynamic_initialize();
+        }
+        try {
+            // Check IP whitelist.
+            if (this.ip_whitelist && !this.ip_whitelist.includes(stream.ip)) {
+                this.server?.log(2, this.route.id, ": ", "Blocking ip ", stream.ip, " per ip whitelist.");
+                stream.send({
+                    status: Status.unauthorized,
+                    data: "Unauthorized.",
+                });
+                return;
+            }
+
+            // Set headers.
+            this._set_headers(stream);
+
+            // Callback.
+            if (this.callback != null) {
+                this.server?.log(3, this.route.id, ": ", "Serving endpoint in callback mode.");
+                if (this.params_validator != null) {
+                    const { error, invalid_fields } = this.params_validator.validate(stream.params ?? {});
+                    if (error) {
+                        stream.send({
+                            status: Status.bad_request,
+                            headers: { "Content-Type": "application/json" },
+                            data: {
+                                error,
+                                invalid_fields,
+                            }
+                        });
+                        return;
+                    }
+                }
+                try {
+                    let promise;
+                    if (this.params_validator != null) {
+                        promise = this.callback(stream, (stream.params ?? {}) as any);
+                    } else {
+                        promise = this.callback(stream, {} as any);
+                    }
+                    if (promise instanceof Promise) {
+                        await promise;
+                    }
+                } catch (err: any) {
+                    if (err instanceof ExternalError || err instanceof InternalError) {
+                        err.serve(stream);
+                    } else {
+                        stream.error({
+                            status: Status.internal_server_error,
+                            headers: { "Content-Type": "application/json" },
+                            message: "Internal Server Error",
+                            type: "InternalServerError",
+                        });
+                    }
+                    this.server?.log.error(`${this.id}: `, err); // after sending the response since this edits the error.
+                }
+                return;
+            }
+
+            // View.
+            else if (this.view != null) {
+                this.server?.log(3, this.route.id, ": ", "Serving endpoint in view mode.");
+                await this.view._serve(
+                    stream,
+                    status_code,
+                    { compress: this._compress, templates: templates },
+                );
+                return;
+            }
+
+            // Load from file.
+            else if (this.file_path != null) {
+                this.server?.log(3, this.route.id, ": ", "Serving endpoint in file mode.");
+                stream.send({
+                    status: status_code,
+                    from_file: this.file_path,
+                    compress: this._compress,
+                    templates: templates,
+                });
+                return;
+            }
+
+            // Data.
+            else if (this.data != null) {
+                this.server?.log(3, this.route.id, ": ", "Serving endpoint in data mode.");
+                stream.send({
+                    status: status_code,
+                    data: this.data,
+                    compress: this._compress,
+                    templates: templates,
+                });
+                return;
+            }
+
+            // Undefined.
+            else {
+                throw new Error(`${this.id}: Undefined behaviour, define one of the following endpoint attributes [callback, view, data].`);
+            }
+        } catch (err) {
+            throw err; // must have another catch block here otherwise when an error occurs in here it is somehow not catched by the try and catch block from Server._serve which will cause the program to crash.
+        }
     }
 
     // ----------------------------------------------------------
@@ -407,40 +459,11 @@ export class Endpoint<
             throw new Error(`Endpoint "${this.id}" is not initialized by the server yet.`);
         }
 
-        /**
-         * Load data by file path
-         * @todo in the future we should not load all of the data but just send it to the client in chunks
-         *       but we need to account for compression and content length when implementing this.
-         */
-        if (this.file_path != null) {
-            this._load_data_by_path(this.server);
-        }
-
-        // Compression enabled.
-        if (this.server.production && this.callback == null && this._compress) {
-            this._is_compressed = true;
-            if (this.data != null && (this.data instanceof Buffer || typeof this.data === "string")) {
-                this.raw_data = this.data;
-                this.data = zlib.gzipSync(this.data, {level: zlib.constants.Z_BEST_COMPRESSION});
-                this.content_length = this.data.length;
-            }
-            // cant compress view html here since it contains unique nonces.
-            // else if (this.view != null) {
-            //     this.view.raw_html = this.view.html;
-            //     this.view.html = zlib.gzipSync(this.view.html as any, {level: zlib.constants.Z_BEST_COMPRESSION});
-            //     this.content_length = this.view.html.length;
-            // }
-            debug(2, this.route.id, ": ", "Compressed - content_length:",this.content_length)
-        }
-
         // Set cache headers.
         if (!this.server.production) {
            this._cache = false; // @todo @tmp
         }
-        if (
-            // (this.callback == null || this.is_image_endpoint) &&
-            (typeof this._cache === "number" || this._cache === true)
-        ) {
+        if (typeof this._cache === "number" || this._cache === true) {
             if (this._cache === 1 || this._cache === true) {
                 this.headers.push(["Cache-Control", "max-age=86400"]);
             } else {
@@ -448,23 +471,9 @@ export class Endpoint<
             }
         }
 
-        // Set compression headers.
-        if (this._is_compressed) {
-            this.headers.push(["Content-Encoding", "gzip"]);
-            this.headers.push(["Vary", "Accept-Encoding"]);
-        }
-
-        // Set content length.
-        if (this.content_length != null) {
-            this.headers.push(["Content-Length", this.content_length.toString()]);
-        }
-
         // Set content type.
         if (this.content_type != null) {
             this.headers.push(["Content-Type", this.content_type]);
-        }
-        if (this._is_compressed) {
-            debug(2, this.route.id,": ", "Compressed headers:", this.headers)
         }
 
         this._dynamic_initialized = true;
@@ -497,11 +506,6 @@ export class Endpoint<
             // Set headers.
             this._set_headers(stream);
 
-            // Compute content length on view & when not defined.
-            if (this.content_length == null && this.view != null) {
-                stream.set_header("Content-Length", (await this.view.content_length()).toString());
-            }
-
             // Send.
             stream.send({ status: Status.no_content });
             
@@ -509,133 +513,6 @@ export class Endpoint<
             throw err; // must have another catch block here otherwise when an error occurs in here it is somehow not catched by the try and catch block from Server._serve which will cause the program to crash.
         }
     }
-    async _serve(stream: Stream, status_code: number = 200, opts?: {
-        /** Add new templates when rendering a `View`, overriding the default `View` templates. */
-        templates?: Record<string, any>
-    }): Promise<void> {
-        if (!this._dynamic_initialized) {
-            await this._dynamic_initialize();
-        }
-        try {
-            // Check IP whitelist.
-            if (this.ip_whitelist && !this.ip_whitelist.includes(stream.ip)) {
-                this.server?.log(2, this.route.id, ": ", "Blocking ip ", stream.ip, " per ip whitelist.");
-                stream.send({
-                    status: Status.unauthorized, 
-                    data: "Unauthorized.",
-                });
-                return;
-            }
-
-            // Set headers.
-            this._set_headers(stream);
-
-            // Callback.
-            if (this.callback != null) {
-                this.server?.log(3, this.route.id, ": ", "Serving endpoint in callback mode.");
-                if (this.params_validator != null) {
-                    const { error, invalid_fields } = this.params_validator.validate(stream.params ?? {});
-                    if (error) {
-                        stream.send({
-                            status: Status.bad_request, 
-                            headers: {"Content-Type": "application/json"},
-                            data: {
-                                error,
-                                invalid_fields,
-                            }
-                        });
-                        return;
-                    }
-                }
-                try {
-                    let promise;
-                    if (this.params_validator != null) {
-                        promise = this.callback(stream, (stream.params ?? {}) as any);
-                    } else {
-                        promise = this.callback(stream, {} as any);
-                    }
-                    if (promise instanceof Promise) {
-                        await promise;
-                    }
-                } catch (err: any) {
-                    if (err instanceof ExternalError || err instanceof InternalError) { 
-                        err.serve(stream);
-                    } else {
-                        stream.error({
-                            status: Status.internal_server_error, 
-                            headers: {"Content-Type": "application/json"},
-                            message: "Internal Server Error",
-                            type: "InternalServerError",
-                        });
-                    }
-                    this.server?.log.error(`${this.id}: `, err); // after sending the response since this edits the error.
-                }
-                return;
-            }
-
-            // View.
-            else if (this.view != null) {
-                this.server?.log(3, this.route.id, ": ", "Serving endpoint in view mode.");
-                await this.view._serve(stream, status_code, { compress: this._compress, templates: opts?.templates });
-                return;
-            }
-
-            // Data.
-            else if (this.data != null) {
-                this.server?.log(3, this.route.id, ": ", "Serving endpoint in data mode.");
-                stream.send({
-                    status: status_code, 
-                    data: this.data,
-                });
-                return;
-            }
-
-            // Undefined.
-            else {
-                throw new Error(`${this.id}: Undefined behaviour, define one of the following endpoint attributes [callback, view, data].`);
-            }
-        } catch (err) {
-            throw err; // must have another catch block here otherwise when an error occurs in here it is somehow not catched by the try and catch block from Server._serve which will cause the program to crash.
-        }
-    }
-
-    // Load data by path.
-    private _load_data_by_path(server: Server): this {
-        if (!this.file_path) {
-            throw new Error(`Endpoint "${this.id}" has no file path assigned.`);
-        }
-        
-        // Load data.
-        const path = new vlib.Path(this.file_path);
-        let data: string | Buffer;
-        if (path.extension() === ".js") {
-            data = path.load_sync();
-        }
-        else if (path.extension() === ".css") {
-            const minifier = new CleanCSS();
-            data = minifier.minify(path.load_sync()).styles;
-        }
-        else {
-            data = path.load_sync({type: "buffer"});
-        }
-
-        // Assign.
-        this.data = data;
-        return this;
-    }
-
-    // Refresh for file watcher.
-    // async _refresh(server: Server): Promise<void> {
-    //     // Not in production.
-    //     if (server.production) {
-    //         throw new Error("This function is not designed for production mode.");
-    //     }
-
-    //     // Build html code of view.
-    //     if (this.view != null) {
-    //         await this.view._build_html();
-    //     }
-    // }
 }
 export namespace Endpoint {
 
@@ -710,8 +587,8 @@ export namespace Endpoint {
              * @default false
              */
             allow_unknown_params?: boolean;
-            /** Compress data, only available when initialized with one of the following parameters `view` or `data`. */
-            compress?: "auto" | boolean,
+            /** Compress data sent body. */
+            compress?: boolean,
             /**
              * Parameter cache can define the max age of the cached response in seconds or as a boolean `true`.
              * Anything higher than zero enables caching.
@@ -751,7 +628,7 @@ export namespace Endpoint {
             S extends vlib.Schema.Entries.Opts = {},
         > extends Base<M, E, S> {
             /** The data that will be returned as the response body. */
-            data?: Buffer | string | any[] | Record<any, any>;
+            data: Buffer | string | any[] | Record<any, any>;
             /** Not allowed in this variant. */
             file_path?: never;
             /** Not allowed in this variant. */
@@ -784,7 +661,7 @@ export namespace Endpoint {
             /** Not allowed in this variant. */
             view?: never;
             /** The content type. */
-            content_type: string;
+            content_type?: never;
         }
 
         /**
@@ -806,8 +683,11 @@ export namespace Endpoint {
             callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any)
             /** Not allowed in this variant. */
             view?: never;
-            /** The content type. */
-            content_type: string;
+            /**
+             * The content type.
+             * Not required since a callback could have multiple different content types.
+             */
+            content_type?: string;
         }
 
         /**
@@ -853,28 +733,7 @@ export namespace Endpoint {
             /** The JavaScript view that will be executed on the client side. */
             view: View | View.Opts;
             /** The content type. */
-            content_type?: string;
+            content_type?: never;
         }
     }
 }
-
-// const e = new Endpoint({
-//     method: "POST",
-//     endpoint: "/api/docs/feedback",
-//     content_type: "application/json",
-//     params: {
-//         /** The user id. */
-//         uid: "string",
-//         /** The project name. */
-//         project: "string",
-//         /** The project version. */
-//         version: "string",
-//         /** The document id. */
-//         id: "string",
-//         /** Whether the feedback is positive or negative. */
-//         positive: "boolean",
-//     },
-//     rate_limit: "global",
-//     async callback(stream, params) {
-//     }
-// })

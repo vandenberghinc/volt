@@ -44,7 +44,8 @@
         "nodemailer": "^7.0.11",
         "pdfkit": "^0.14.0",
         "playwright": "^1.57.0",
-        "sharp": "^0.33.5"
+        "sharp": "^0.33.5",
+        "stripe": "^20.3.1"
     },
     "devDependencies": {
         "@types/node": "^22.19.1",

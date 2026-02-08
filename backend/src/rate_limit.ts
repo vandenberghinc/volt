@@ -386,8 +386,6 @@ export namespace RateLimitServer {
 
     /**
      * Constructor options.
-     * @nav Endpoints
-     * @docs
      */
     export interface Opts {
         /** The port to which the rate limiting server will bind. The default is `51234`. */
@@ -620,8 +618,6 @@ export namespace RateLimitClient {
 
     /**
      * Constructor options.
-     * @nav Endpoints
-     * @docs
      */
     export interface Opts {
         /** The port to which the rate limiting server will bind. The default is `51234`. */

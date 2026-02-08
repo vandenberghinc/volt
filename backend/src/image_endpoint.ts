@@ -36,10 +36,10 @@ import Stream from './stream.js';
 class ImageEndpoint extends Endpoint implements Endpoint {
 
     // Cache the original and transformed image data in memory.
-    static cache_in_memory = false;
+    // static cache_in_memory = false;
 
     // Supported image extensions.
-    static supported_images: string[] = [
+    static supported_images: Set<string> = new Set([
         ".jpg",
         ".jpeg",
         ".png",
@@ -50,13 +50,19 @@ class ImageEndpoint extends Endpoint implements Endpoint {
         ".svg",
         ".heif",
         ".avif"
-    ];
+    ]);
 
     private i_path: vlib.Path;
     private i_type: string;
-    private i_data?: Buffer;
-    private i_cache: Map<string, Buffer>;
+    // private i_data?: Buffer;
     public is_image_endpoint: boolean;
+
+    /**
+     * A cache of all transformed image paths, mapped by cache id.
+     * We use a cached path since `stat` will be used inside the Stream.send() method.
+     * Since this is cached in the Path object, it will be efficient.
+     */
+    private transformed_cache: Map<string, vlib.Path> = new Map();
 
     /**
      * Construct an image endpoint.
@@ -65,14 +71,12 @@ class ImageEndpoint extends Endpoint implements Endpoint {
     constructor({
         endpoint,
         path,
-        content_type,
         cache = true,
         _is_static = true,
         rate_limit = undefined,
     }: {
         endpoint: string,
         path: vlib.Path,
-        content_type: string,
         cache?: boolean | number,
         _is_static?: boolean,
         rate_limit?: string | RateLimitGroup,
@@ -81,7 +85,6 @@ class ImageEndpoint extends Endpoint implements Endpoint {
         super({
             method: "GET",
             endpoint,
-            content_type,
             compress: false,
             cache,
             params: {
@@ -98,10 +101,9 @@ class ImageEndpoint extends Endpoint implements Endpoint {
         // Attributes.
         this.i_path = path.abs();
         this.i_type = this.i_path.extension().substr(1)
-        this.i_cache = new Map();
-        if (ImageEndpoint.cache_in_memory) {
-            this.i_data = this.i_path.load_sync({type: "buffer"});
-        }
+        // if (ImageEndpoint.cache_in_memory) {
+        //     this.i_data = this.i_path.load_sync({type: "buffer"});
+        // }
 
         // Attribute for Endpoint.
         this.is_image_endpoint = true;
@@ -113,20 +115,6 @@ class ImageEndpoint extends Endpoint implements Endpoint {
             height: number | string | null,
             aspect_ratio: string | null,
         }) => {
-            // const buff = await fs.readFile(this.i_path.str())
-            const buff = await this.i_path.load({type: "buffer"});
-            // const buff = await sharp(this.i_path.str())
-            //     // .png()
-            //     .toBuffer();
-            // stream.set_header("Content-Length", datax.length.toString());
-            return stream.send({
-                status: 200, 
-                data: buff,
-                headers: {
-                    "Content-Length": buff.length.toString(),
-                }
-
-            });
             
             // No params.
             if (
@@ -136,7 +124,28 @@ class ImageEndpoint extends Endpoint implements Endpoint {
             ) {
                 return stream.send({
                     status: 200, 
-                    data: ImageEndpoint.cache_in_memory ? this.i_data : this.i_path.load_sync({type: "buffer"}),
+                    from_file: this.i_path.str(),
+                });
+            }
+
+            // Cache id.
+            const cache_id = (
+                `${this.route.method}:${this.route.endpoint_str}` + 
+                `:${params.width == null ? "" : params.width}.${params.height == null ? "" : params.height}.${params.type == null ? this.i_type : params.type}`
+            ).replaceAll("/", "_");
+            let cache_path: vlib.Path;
+            if (this.transformed_cache.has(cache_id)) {
+                cache_path = this.transformed_cache.get(cache_id)!;
+            } else {
+                cache_path = this.server!.endpoint_cache_dir.join(cache_id);
+                this.transformed_cache.set(cache_id, cache_path);
+            }
+
+            // Fast path from cached transformation.
+            if (cache_path.exists()) {
+                return stream.send({
+                    status: 200, 
+                    from_file: cache_path,
                 });
             }
 
@@ -145,26 +154,14 @@ class ImageEndpoint extends Endpoint implements Endpoint {
                 params.type = null;
             }
 
-            // Check cache.
-            let cache_id: string;
-            if (ImageEndpoint.cache_in_memory) {
-                cache_id = `${params.width == null ? "" : params.width}.${params.height == null ? "" : params.height}.${params.type == null ? "" : params.type}`;
-                if (this.i_cache.has(cache_id)) {
-                    return stream.send({
-                        status: 200, 
-                        data: this.i_cache.get(cache_id),
-                    });
-                }
-            }
-
-            // Transform image.
+            // Transform image & save to cache.
             const data = await this.transform(params.type, params.width, params.height, params.aspect_ratio);
-            if (ImageEndpoint.cache_in_memory && cache_id!) {
-                this.i_cache.set(cache_id, data)
-            }
+            await cache_path.save(data);
+
+            // Send data.
             return stream.send({
                 status: 200, 
-                data,
+                from_file: cache_path,
             });
         }
     }
@@ -242,13 +239,6 @@ class ImageEndpoint extends Endpoint implements Endpoint {
         } catch (err: unknown) {
             this.server?.log.error(`Unable to determine the aspect ratio of image ${this.file_path}: `, err);
             return null;
-        }
-    }
-
-    // Clear cache.
-    private _clear_cache(): void {
-        if (ImageEndpoint.cache_in_memory) {
-            this.i_cache.clear()
         }
     }
 }

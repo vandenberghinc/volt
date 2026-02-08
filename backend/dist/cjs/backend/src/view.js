@@ -33,12 +33,10 @@ module.exports = __toCommonJS(stdin_exports);
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var vts = __toESM(require("@vandenberghinc/vlib/vts"));
 var vhighlight = __toESM(require("@vandenberghinc/vhighlight"));
-var import_zlib = __toESM(require("zlib"));
 var import_meta = require("./meta.js");
 var import_route = require("./route.js");
 var import_frontend = require("./frontend.js");
 var crypto = __toESM(require("crypto"));
-var import_utils = require("./utils.js");
 const { debug } = vlib;
 class View {
   // Global settings.
@@ -54,7 +52,7 @@ class View {
   // Attributes.
   source;
   source_path;
-  callback;
+  // callback: Function | null;
   includes;
   links;
   templates;
@@ -67,21 +65,19 @@ class View {
   mangle;
   _src;
   _embedded_sources;
-  is_js_ts_view;
-  _html;
-  raw_html;
-  _bundle;
-  payments;
   min_device_width;
   server;
   endpoint;
   /**
+   * The file path of a pre-bundled source, that can be sent from file instead of in-memory data.
+   */
+  cached_html_path;
+  // private html_nonce_split?: string[];
+  /**
    * Clone this view, used to create a modified copy of the current view.
    * @note
    * The following attributes are not deep copied, but just referenced:
-   * - `callback`
    * - `params`
-   * - `data`
    * @param override Override specific endpoint options, note that this will be shallow merged.
    *
    * @docs
@@ -90,7 +86,7 @@ class View {
     return new View({
       ...vlib.Object.deep_copy({
         source: this.source,
-        callback: this.callback,
+        // callback: this.callback,
         includes: this.includes,
         links: this.links,
         templates: this.templates,
@@ -111,9 +107,23 @@ class View {
    * Options for constructing a {@link View} instance.
    * @docs
    */
-  constructor({ source = null, callback = null, includes = [], links = [], templates = {}, meta = new import_meta.Meta(), jquery = false, lang = "en", body_style = null, splash_screen = void 0, tree_shaking = false, mangle = false, min_device_width = 600, _src }) {
+  constructor({
+    source,
+    // callback = null,
+    includes = [],
+    links = [],
+    templates = {},
+    meta = new import_meta.Meta(),
+    jquery = false,
+    lang = "en",
+    body_style = null,
+    splash_screen = void 0,
+    tree_shaking = false,
+    mangle = false,
+    min_device_width = 600,
+    _src
+  }) {
     this.source = source;
-    this.callback = callback;
     this.includes = [...View.includes, ...includes];
     this.links = [...View.links, ...links];
     this.templates = templates;
@@ -127,21 +137,16 @@ class View {
     this.min_device_width = min_device_width;
     this._src = _src;
     this._embedded_sources = [];
-    if (this.source != null) {
-      this.source_path = new vlib.Path(this.source);
-      if (!this.source_path.exists()) {
-        throw new Error(`Defined source path "${this.source}" does not exist.`);
-      }
-      this.source_path = this.source_path.abs();
-      this.source = this.source_path.str();
+    this.source_path = new vlib.Path(this.source);
+    if (!this.source_path.exists()) {
+      throw new Error(`Defined source path "${this.source}" does not exist.`);
     }
-    this.is_js_ts_view = this.source_path != null && /\.(jsx?|tsx?)/.test(this.source_path.extension());
-    if (typeof source !== "string" && typeof callback !== "function") {
-      throw Error('Invalid usage, define either parameter "source" or "callback".');
+    this.source_path = this.source_path.abs();
+    this.source = this.source_path.str();
+    if (!/\.(jsx?|tsx?)$/.test(this.source_path.extension())) {
+      throw new Error(`Invalid view source extension "${this.source_path.extension()}", only ".js", ".ts", ".jsx" and ".tsx" are supported.`);
     }
     this.includes = vlib.Array.drop_duplicates(this.includes);
-    this._html = void 0;
-    this._bundle = void 0;
   }
   // Initialize.
   initialize(server, endpoint) {
@@ -154,39 +159,13 @@ class View {
     this.server = server;
     this.endpoint = endpoint;
   }
-  /** Production initialization. */
+  /**
+   * Production initialization.
+   * This will bundle the source code and prepare the view for production use.
+   * Instead of bundling on demand in the request which is used for development mode.
+   */
   async production_initialize() {
-    await this.ensure_bundle();
-    await this._build_html();
-  }
-  // Bundle the compiled typescript / javascript dynamically on demand to optimize server startup for development purposes.
-  async _dynamic_bundle() {
-    if (this.server === void 0 || this.endpoint === void 0) {
-      throw Error('View has not been initialized with "View._initialize()" yet.');
-    }
-    debug(3, this.endpoint?.route?.id, `: Bundling entry path "${this.source_path?.str()}".`);
-    this._bundle = await vts.bundle({
-      include: this.source_path ? [this.source_path?.str()] : [],
-      output: `/tmp/${this.endpoint.route.method}_${this.source_path.str().replace(/\//g, "_")}.js`,
-      // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
-      minify: false,
-      //this._server.production,
-      platform: "browser",
-      format: "esm",
-      // format: "iife", // can causes issues with node_modules imports.
-      target: "es2022",
-      // sourcemap: this.server.production ? false : "inline",
-      extract_inputs: true,
-      // since bundle.inputs is used by server.js.
-      tree_shaking: true
-    });
-    this.payments = this._bundle.inputs.find((path) => path.endsWith("/modules/paddle.js"));
-  }
-  /** Ensure the view is bundled when required. */
-  async ensure_bundle() {
-    if (this.is_js_ts_view && !this._bundle) {
-      return this._dynamic_bundle();
-    }
+    await this._create_html_file();
   }
   /** Create an error HTML file when errors are encountered during the bundle process. */
   async _build_bundle_err_html() {
@@ -209,8 +188,9 @@ class View {
     this.server?.log.error(this.endpoint?.route?.id, `: Encountered an error while bundling "${this.source}".
 ${bundle.debug({ limit: 25 })}`);
     const escape_html = (str) => vlib.Color.to_html(str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"));
+    let html;
     if (this.server?.production) {
-      this._html = `
+      html = `
                 <!DOCTYPE html>
                 <html lang='${this.lang}'>
                 <head>
@@ -240,7 +220,7 @@ ${bundle.debug({ limit: 25 })}`);
     } else {
       const formatted_import_chains = bundle.format_import_chains();
       const formatted_errors = bundle.format_errors();
-      this._html = `
+      html = `
                 <!DOCTYPE html>
                 <html lang='${this.lang}'>
                 <head>
@@ -312,7 +292,7 @@ ${bundle.debug({ limit: 25 })}`);
                 </html>
                 `.dedent(false);
     }
-    this.html_nonce_split = this._html.split(nonce_identifier);
+    return html;
   }
   // Build html.
   async _build_html() {
@@ -320,21 +300,35 @@ ${bundle.debug({ limit: 25 })}`);
     if (this.server == null || this.endpoint == null) {
       throw Error('View has not been initialized with "View._initialize()" yet.');
     }
-    if (this.is_js_ts_view && !this._bundle) {
-      await this._dynamic_bundle();
-    }
-    if (this._bundle != null && this._bundle.errors.length > 0) {
+    if (debug.on(3))
+      debug(this.endpoint?.route?.id, `: Bundling entry path "${this.source_path?.str()}".`);
+    const bundle = await vts.bundle({
+      include: this.source_path ? [this.source_path?.str()] : [],
+      output: `/tmp/${this.endpoint.route.method}_${this.source_path.str().replace(/\//g, "_")}.js`,
+      // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
+      minify: false,
+      //this._server.production,
+      platform: "browser",
+      format: "esm",
+      // format: "iife", // can causes issues with node_modules imports.
+      target: "es2022",
+      // sourcemap: this.server.production ? false : "inline",
+      extract_inputs: true,
+      // since bundle.inputs is used by server.js.
+      tree_shaking: true
+    });
+    const add_payments_module = bundle.inputs.find((path) => path.endsWith("/modules/paddle.js"));
+    if (bundle.errors.length > 0) {
       return this._build_bundle_err_html();
     }
     const line_break = this.server.production ? "\n" : "\n";
-    const has_bundle = this._bundle != null && typeof this._bundle === "object";
-    this._html = "";
-    this._html += `<!DOCTYPE html><html lang='${this.lang}'>${line_break}`;
-    this._html += `<head>${line_break}`;
+    let html = "";
+    html += `<!DOCTYPE html><html lang='${this.lang}'>${line_break}`;
+    html += `<head>${line_break}`;
     if (this.meta) {
-      this._html += this.meta.build_html(this.server.full_domain) + line_break;
+      html += this.meta.build_html(this.server.full_domain) + line_break;
     }
-    this._html += `<style nonce="${nonce_identifier}">html { min-width:100%;min-height:100%; }body { width:100vw;height:100vh;margin:0;padding:0;${this.body_style ?? ""} }</style>${line_break}`;
+    html += `<style nonce="${nonce_identifier}">html { min-width:100%;min-height:100%; }body { width:100vw;height:100vh;margin:0;padding:0;${this.body_style ?? ""} }</style>${line_break}`;
     const embed_stylesheet = (url, embed) => {
       if (embed == null && url != null && url.charAt(0) === "/") {
         for (const endpoint of this.server.endpoints.values()) {
@@ -349,7 +343,7 @@ ${bundle.debug({ limit: 25 })}`);
         }
       }
       if (embed) {
-        this._html += `<style nonce="${nonce_identifier}">${line_break}${embed}${line_break}</style>${line_break}`;
+        html += `<style nonce="${nonce_identifier}">${line_break}${embed}${line_break}</style>${line_break}`;
         if (url) {
           this._embedded_sources.push(url);
         }
@@ -376,7 +370,7 @@ ${bundle.debug({ limit: 25 })}`);
     embed_stylesheet(void 0, View._volt_css);
     embed_stylesheet(void 0, View._vhighlight_css);
     if (this.min_device_width != null) {
-      this._html += `
+      html += `
                 <script nonce="${nonce_identifier}">
                 let has_min_width = false;
                 const viewport = document.querySelector('meta[name="viewport"]');
@@ -405,20 +399,20 @@ ${bundle.debug({ limit: 25 })}`);
     }
     this.links.forEach((url) => {
       if (typeof url === "string") {
-        this._html += `<link rel="stylesheet" href="${url}">`;
+        html += `<link rel="stylesheet" href="${url}">`;
       } else if (typeof url === "object") {
         if (typeof url === "object" && url.rel === "stylesheet" && url.embed !== true && typeof url.href === "string" && embed_stylesheet(import_route.Route.clean_endpoint(url.href))) {
         } else {
           if (url.async) {
             include_link_async(url);
           } else {
-            this._html += "<link";
+            html += "<link";
             Object.keys(url).forEach((key) => {
               if (key !== "embed") {
-                this._html += ` ${key}="${url[key]}"`;
+                html += ` ${key}="${url[key]}"`;
               }
             });
-            this._html += ">" + line_break;
+            html += ">" + line_break;
           }
         }
       } else {
@@ -426,12 +420,12 @@ ${bundle.debug({ limit: 25 })}`);
       }
     });
     if (include_links_script) {
-      this._html += `<script nonce="${nonce_identifier}">${line_break}${include_links_script}${line_break}</script>${line_break}`;
+      html += `<script nonce="${nonce_identifier}">${line_break}${include_links_script}${line_break}</script>${line_break}`;
     }
-    this._html += "</head>" + line_break;
-    this._html += "<body id='body'>";
+    html += "</head>" + line_break;
+    html += "<body id='body'>";
     if (this.splash_screen != null) {
-      this._html += this.splash_screen.html + line_break;
+      html += this.splash_screen.html + line_break;
     }
     const embed_script = (url) => {
       let embed;
@@ -442,9 +436,9 @@ ${bundle.debug({ limit: 25 })}`);
       }
       if (embed && (embed.raw_data || embed.data)) {
         if (embed.content_type === "application/javascript") {
-          this._html += `<script nonce="${nonce_identifier}">${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
+          html += `<script nonce="${nonce_identifier}">${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
         } else {
-          this._html += `<script nonce="${nonce_identifier}" type='${embed.content_type}'>${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
+          html += `<script nonce="${nonce_identifier}" type='${embed.content_type}'>${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
         }
         this._embedded_sources.push(url);
         return true;
@@ -453,102 +447,76 @@ ${bundle.debug({ limit: 25 })}`);
     };
     let include_js_script = `async function __volt_incl_js(url, async = true) {var script=document.createElement('script');if(async){script.async = true;}script.src=url;document.head.appendChild(script);};${line_break}`;
     if (this.jquery) {
-      this._html += `<script nonce="${nonce_identifier}" src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js'></script>${line_break}`;
+      html += `<script nonce="${nonce_identifier}" src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js'></script>${line_break}`;
     }
     if (this.server.google_tag !== void 0) {
       include_js_script += `__volt_incl_js("https://www.googletagmanager.com/gtag/js?id=${this.server.google_tag}");${line_break}`;
     }
-    this._html += `<script nonce="${nonce_identifier}">${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this.server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
+    html += `<script nonce="${nonce_identifier}">${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this.server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
     if (this.server.payments) {
       if (this.server.payments.type === "paddle") {
-        if (this.payments) {
+        if (add_payments_module) {
           include_js_script += `__volt_incl_js("https://cdn.paddle.com/paddle/v2/paddle.js");${line_break}`;
         }
       }
     }
-    this._html += `<script nonce="${nonce_identifier}">${line_break}${include_js_script.trimEnd()}${line_break}</script>${line_break}`;
+    html += `<script nonce="${nonce_identifier}">${line_break}${include_js_script.trimEnd()}${line_break}</script>${line_break}`;
     this.includes.forEach((url) => {
       if (typeof url === "string" && embed_script(url)) {
       } else {
         if (typeof url === "string") {
-          this._html += `<script nonce="${nonce_identifier}" src='${url}'></script>${line_break}`;
+          html += `<script nonce="${nonce_identifier}" src='${url}'></script>${line_break}`;
         } else if (typeof url === "object") {
-          this._html += `<script nonce="${nonce_identifier}"`;
+          html += `<script nonce="${nonce_identifier}"`;
           Object.keys(url).forEach((key) => {
             if (key !== "embed") {
-              this._html += ` ${key}="${url[key]}"`;
+              html += ` ${key}="${url[key]}"`;
             }
           });
-          this._html += "></script>" + line_break;
+          html += "></script>" + line_break;
         } else {
           throw Error('Invalid type for a js include, the valid value types are "string" and "object".');
         }
       }
     });
-    if (has_bundle && this._bundle != null && typeof this._bundle.code === "string") {
-      this._html += `<script nonce="${nonce_identifier}" type='module'>${line_break}${this._bundle.code}${line_break}</script>${line_break}`;
+    if (typeof bundle.code === "string") {
+      html += `<script nonce="${nonce_identifier}" type='module'>${line_break}${bundle.code}${line_break}</script>${line_break}`;
     } else if (typeof this.source === "string") {
-      this._html += `<script nonce="${nonce_identifier}">${line_break}${await new vlib.Path(this.source).load()}${line_break}</script>${line_break}`;
-    } else if (this.callback != null) {
-      let code = this.callback.toString();
-      this._html += `<script nonce="${nonce_identifier}">${line_break}(${code})()${line_break}</script>${line_break}`;
+      html += `<script nonce="${nonce_identifier}">${line_break}${await new vlib.Path(this.source).load()}${line_break}</script>${line_break}`;
     }
-    this._html += "</body>" + line_break;
-    this._html += "</html>" + line_break;
-    this.html_nonce_split = this._html.split(nonce_identifier);
+    html += "</body>" + line_break;
+    html += "</html>" + line_break;
+    return html;
   }
-  /** Retrieve the content length of the built html. */
-  async content_length() {
-    const nonce = crypto.randomBytes(16).toString("base64");
-    if (!this._html) {
-      await this._build_html();
+  /** Create the cached HTML file if it doesn't exist. */
+  async _create_html_file() {
+    const cache_id = `${this.endpoint?.route.method}_${this.source_path?.str()}.html`.replaceAll("/", "_");
+    if (!this.cached_html_path) {
+      this.cached_html_path = this.server.endpoint_cache_dir.join(cache_id);
     }
-    let html = this.html_nonce_split.join(nonce);
-    return html.length;
-  }
-  /** Retrieve the HTML. */
-  async html(opts) {
-    const nonce = crypto.randomBytes(16).toString("base64");
-    if (!this._html) {
-      await this._build_html();
+    if (!this.cached_html_path.exists()) {
+      const html = await this._build_html();
+      await this.cached_html_path.save(html);
     }
-    let html = this.html_nonce_split.join(nonce);
-    const templates = { ...this.templates, ...opts?.templates ?? {} };
-    if (Object.keys(templates).length) {
-      html = import_utils.Utils.fill_templates(
-        html,
-        templates,
-        true
-        /** curly style */
-      );
-    }
-    const content_length = Buffer.byteLength(html, "utf-8");
-    if (opts?.compress) {
-      html = import_zlib.default.gzipSync(html, { level: import_zlib.default.constants.Z_BEST_COMPRESSION });
-    }
-    return {
-      html,
-      content_length,
-      nonce
-    };
+    return this.cached_html_path;
   }
   // Serve a client.
   async _serve(stream, status_code = 200, opts) {
-    debug(2, this.endpoint?.route?.id, ": Serving HTML ", this._html?.slice(0, 50), "...");
-    const html = await this.html(opts);
-    stream.set_header("Content-Length", html.content_length.toString());
+    const html_file = await this._create_html_file();
+    const nonce = crypto.randomBytes(16).toString("base64");
     const csp = stream.get_header("Content-Security-Policy");
     if (typeof csp === "string") {
-      const new_csp = csp.replace(/(script-src|style-src)([^;]*)/g, (_, g1, g2) => `${g1}${g2} 'nonce-${html.nonce}'`);
+      const new_csp = csp.replace(/(script-src|style-src)([^;]*)/g, (_, g1, g2) => `${g1}${g2} 'nonce-${nonce}'`);
       stream.set_header("Content-Security-Policy", new_csp);
     }
     stream.send({
       status: status_code,
       headers: { "Content-Type": "text/html" },
-      data: html.html
+      from_file: html_file,
+      templates: { ...this.templates, ...opts?.templates ?? {}, "__VOLT_NONCE__": nonce },
+      compress: opts?.compress
     });
   }
-  html_nonce_split;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

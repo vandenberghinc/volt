@@ -227,7 +227,7 @@ export interface ActiveSubscription {
  * @deprecated Using stripe from now on.
  */
 export class Paddle {
-    type: string;
+    type: "paddle" = "paddle";
     private client_key: string;
     private sandbox: boolean;
     private inclusive_tax: boolean;
@@ -286,7 +286,6 @@ export class Paddle {
         });
 
         // Attributes.
-        this.type = "paddle";
         this.client_key = client_key;
         this.sandbox = sandbox;
         this.inclusive_tax = inclusive_tax;
@@ -1039,7 +1038,7 @@ export class Paddle {
         // Check registered products.
         const last_products = await this._last_products_db.load({ production: this.server.production, version: 1 }, { throw: false });
         if (last_products instanceof Error && !(last_products instanceof Collection.NotFoundError)) throw last_products;
-        if (!(last_products instanceof Collection.NotFoundError) && vlib.Object.eq(last_products.last_products, this.products)) {
+        if (!(last_products instanceof Collection.NotFoundError) && vlib.Object.deep_eq(last_products.last_products, this.products)) {
             for (const item of last_products.product_ids) {
                 const product = this.get_product_sync(item.id);
                 if (product != null) {

@@ -1,0 +1,10 @@
+/**
+ * @author Daan van den Bergh
+ * @copyright © 2026 - 2026 Daan van den Bergh. All rights reserved
+ */
+
+/**
+ * @WARNING
+ * WHEN HANDLING NEW SUBSCRIPTION EVENTS OF A HIGHER OR LOWER PLAN
+ * DONT FORGET TO CANCEL THE OTHER SUBSCRIBED PLANS FROM THE PARENT SUBSCRIPTION
+ */

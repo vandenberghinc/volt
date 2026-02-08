@@ -210,10 +210,14 @@ export declare namespace Server {
  * @docs
  */
 export declare class Server {
-    /** Content type per mime. */
-    static content_type_mimes: Map<string, string>;
-    /** All file path extensions that are already compressed. */
-    static compressed_extensions: Set<string>;
+    /**
+     * A temporary directory which holds the cached endpoint data.
+     * For instance if we bundle JS then we save it to file and serve it from the file,
+     * similar for transformed image endpoints.
+     *
+     * Note that upon each server start, we should clear this cache and remove all files inside this dir.
+     */
+    endpoint_cache_dir: vlib.Path;
     /** The binded ip address. */
     ip: string;
     /** The binded http port. */
@@ -328,6 +332,10 @@ export declare class Server {
     private _serve;
     /** The promise of database initialization and connecting. */
     private _db_init_promise;
+    /** Is initialized. */
+    private _initialized;
+    /** Is initialized by a worker. */
+    private _initialized_by_worker;
     /**
      * Initialize the server.
      * @returns A promise that resolves when the server has been initialized.
@@ -367,6 +375,7 @@ export declare class Server {
     start(): Promise<void>;
     /**
      * Stop the server.
+     * @note After stopping the server we can no longer restart the server.
      *
      * @example
      * {Stop}

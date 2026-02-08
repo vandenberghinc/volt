@@ -50,7 +50,7 @@ export declare class Meta {
     constructor({ author, title, description, image, robots, charset, viewport, favicon, }?: Meta.Opts);
     /**
      * Create a copy of the current meta object without any references.
-     * @param override - The <Type>Meta</Type> constructor arguments to override.
+     * @param override - The meta constructor arguments to override.
      * @docs
      */
     copy(override?: Partial<Meta.Opts>): Meta;

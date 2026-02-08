@@ -1012,14 +1012,14 @@ class QuotaManager {
       }
       Opts2.validate = validate;
     })(Opts = Quota2.Opts || (Quota2.Opts = {}));
-    function to_nano(q) {
+    function to_nano(q, opts) {
       if (q == null)
         return void 0;
       else if (typeof q === "number") {
-        return new import_safe_int.SafeInt(q, { from_scale: 1, to_scale: import_safe_int.SafeInt.Scale.Nano }).value();
+        return new import_safe_int.SafeInt(q, { from_scale: 1, to_scale: import_safe_int.SafeInt.Scale.Nano, round: opts?.round }).value();
       }
       return {
-        max: new import_safe_int.SafeInt(q.max, { from_scale: 1, to_scale: import_safe_int.SafeInt.Scale.Nano }).value(),
+        max: new import_safe_int.SafeInt(q.max, { from_scale: 1, to_scale: import_safe_int.SafeInt.Scale.Nano, round: opts?.round }).value(),
         interval: q.interval
       };
     }

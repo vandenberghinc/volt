@@ -12,7 +12,7 @@ import * as vlib from "@vandenberghinc/vlib";
  *
  * This class will be accessable under `Server` attribute `rate_limits`.
  *
- * @nav Rate Limit
+ * @nav Endpoints
  * @docs
  */
 export var RateLimits;

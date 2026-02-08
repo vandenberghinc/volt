@@ -17,27 +17,28 @@ import { RateLimitGroup } from "./rate_limit.js";
  * @nav Endpoints
  */
 declare class ImageEndpoint extends Endpoint implements Endpoint {
-    static cache_in_memory: boolean;
-    static supported_images: string[];
+    static supported_images: Set<string>;
     private i_path;
     private i_type;
-    private i_data?;
-    private i_cache;
     is_image_endpoint: boolean;
+    /**
+     * A cache of all transformed image paths, mapped by cache id.
+     * We use a cached path since `stat` will be used inside the Stream.send() method.
+     * Since this is cached in the Path object, it will be efficient.
+     */
+    private transformed_cache;
     /**
      * Construct an image endpoint.
      * @docs
      */
-    constructor({ endpoint, path, content_type, cache, _is_static, rate_limit, }: {
+    constructor({ endpoint, path, cache, _is_static, rate_limit, }: {
         endpoint: string;
         path: vlib.Path;
-        content_type: string;
         cache?: boolean | number;
         _is_static?: boolean;
         rate_limit?: string | RateLimitGroup;
     });
     transform(type?: string | null, width?: number | string | null, height?: number | string | null, aspect_ratio?: string | boolean | null): Promise<Buffer>;
     get_aspect_ratio(): Promise<string | null>;
-    private _clear_cache;
 }
 export { ImageEndpoint };

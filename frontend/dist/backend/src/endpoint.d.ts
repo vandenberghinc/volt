@@ -6,7 +6,7 @@ import { View } from './view.js';
 import * as vlib from "@vandenberghinc/vlib";
 import { RateLimitGroup, RateLimitData } from "./rate_limit.js";
 import { Stream, AuthStream } from "./stream.js";
-import type { Server } from "./server.js";
+import { Server } from "./server.js";
 import { Route } from './route.js';
 /**
  * The endpoint class.
@@ -14,7 +14,6 @@ import { Route } from './route.js';
  * @docs
  */
 export declare class Endpoint<const M extends Endpoint.Method = "GET", const E extends string | RegExp = string, const S extends vlib.Schema.Entries.Opts = {}> {
-    static compressed_content_types: string[];
     /** Route attributes */
     id: string;
     route: Route;
@@ -37,7 +36,6 @@ export declare class Endpoint<const M extends Endpoint.Method = "GET", const E e
     /** Option 4 Data endpoint by file path. */
     file_path?: vlib.Path;
     /** Content length & type */
-    content_length?: number;
     content_type?: string;
     /** Booleans */
     is_static: boolean;
@@ -50,7 +48,6 @@ export declare class Endpoint<const M extends Endpoint.Method = "GET", const E e
     private _compress;
     private _cache;
     private ip_whitelist?;
-    private _is_compressed?;
     private _dynamic_initialized;
     /** A reference to the server. */
     server?: Server;
@@ -71,10 +68,9 @@ export declare class Endpoint<const M extends Endpoint.Method = "GET", const E e
      * This can for instance be used to serve a HTML `/error` endpoint from within a callback.
      * @docs
      */
-    serve({ stream, status, templates, }: {
+    serve({ stream, status: status_code, templates, }: {
         stream: Stream;
-        status: number;
-        /** Add new templates when rendering a `View`, overriding the default `View` templates. */
+        status?: number;
         templates?: Record<string, any>;
     }): Promise<void>;
     /** Initialize with server. */
@@ -82,11 +78,6 @@ export declare class Endpoint<const M extends Endpoint.Method = "GET", const E e
     _dynamic_initialize(): Promise<void>;
     _set_headers(stream: Stream): void;
     _serve_options(stream: Stream): Promise<void>;
-    _serve(stream: Stream, status_code?: number, opts?: {
-        /** Add new templates when rendering a `View`, overriding the default `View` templates. */
-        templates?: Record<string, any>;
-    }): Promise<void>;
-    private _load_data_by_path;
 }
 export declare namespace Endpoint {
     /**
@@ -144,8 +135,8 @@ export declare namespace Endpoint {
              * @default false
              */
             allow_unknown_params?: boolean;
-            /** Compress data, only available when initialized with one of the following parameters `view` or `data`. */
-            compress?: "auto" | boolean;
+            /** Compress data sent body. */
+            compress?: boolean;
             /**
              * Parameter cache can define the max age of the cached response in seconds or as a boolean `true`.
              * Anything higher than zero enables caching.
@@ -180,7 +171,7 @@ export declare namespace Endpoint {
          */
         interface ByData<M extends Method = Method, E extends string | RegExp = string, S extends vlib.Schema.Entries.Opts = {}> extends Base<M, E, S> {
             /** The data that will be returned as the response body. */
-            data?: Buffer | string | any[] | Record<any, any>;
+            data: Buffer | string | any[] | Record<any, any>;
             /** Not allowed in this variant. */
             file_path?: never;
             /** Not allowed in this variant. */
@@ -208,7 +199,7 @@ export declare namespace Endpoint {
             /** Not allowed in this variant. */
             view?: never;
             /** The content type. */
-            content_type: string;
+            content_type?: never;
         }
         /**
          * Options for constructing an endpoint by unauthenticated callback.
@@ -225,8 +216,11 @@ export declare namespace Endpoint {
             callback: ((stream: Stream, params: vlib.Schema.Entries.Infer<S>) => any);
             /** Not allowed in this variant. */
             view?: never;
-            /** The content type. */
-            content_type: string;
+            /**
+             * The content type.
+             * Not required since a callback could have multiple different content types.
+             */
+            content_type?: string;
         }
         /**
          * Options for constructing an endpoint by authenticated callback.
@@ -262,7 +256,7 @@ export declare namespace Endpoint {
             /** The JavaScript view that will be executed on the client side. */
             view: View | View.Opts;
             /** The content type. */
-            content_type?: string;
+            content_type?: never;
         }
     }
 }

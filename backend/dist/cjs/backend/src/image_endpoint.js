@@ -34,9 +34,9 @@ var import_sharp = __toESM(require("sharp"));
 var import_endpoint = require("./endpoint.js");
 class ImageEndpoint extends import_endpoint.Endpoint {
   // Cache the original and transformed image data in memory.
-  static cache_in_memory = false;
+  // static cache_in_memory = false;
   // Supported image extensions.
-  static supported_images = [
+  static supported_images = /* @__PURE__ */ new Set([
     ".jpg",
     ".jpeg",
     ".png",
@@ -47,21 +47,25 @@ class ImageEndpoint extends import_endpoint.Endpoint {
     ".svg",
     ".heif",
     ".avif"
-  ];
+  ]);
   i_path;
   i_type;
-  i_data;
-  i_cache;
+  // private i_data?: Buffer;
   is_image_endpoint;
+  /**
+   * A cache of all transformed image paths, mapped by cache id.
+   * We use a cached path since `stat` will be used inside the Stream.send() method.
+   * Since this is cached in the Path object, it will be efficient.
+   */
+  transformed_cache = /* @__PURE__ */ new Map();
   /**
    * Construct an image endpoint.
    * @docs
    */
-  constructor({ endpoint, path, content_type, cache = true, _is_static = true, rate_limit = void 0 }) {
+  constructor({ endpoint, path, cache = true, _is_static = true, rate_limit = void 0 }) {
     super({
       method: "GET",
       endpoint,
-      content_type,
       compress: false,
       cache,
       params: {
@@ -76,46 +80,36 @@ class ImageEndpoint extends import_endpoint.Endpoint {
     });
     this.i_path = path.abs();
     this.i_type = this.i_path.extension().substr(1);
-    this.i_cache = /* @__PURE__ */ new Map();
-    if (ImageEndpoint.cache_in_memory) {
-      this.i_data = this.i_path.load_sync({ type: "buffer" });
-    }
     this.is_image_endpoint = true;
     this.callback = async (stream, params) => {
-      const buff = await this.i_path.load({ type: "buffer" });
-      return stream.send({
-        status: 200,
-        data: buff,
-        headers: {
-          "Content-Length": buff.length.toString()
-        }
-      });
       if ((params.type == null || this.i_type === params.type) && params.width == null && params.height == null) {
         return stream.send({
           status: 200,
-          data: ImageEndpoint.cache_in_memory ? this.i_data : this.i_path.load_sync({ type: "buffer" })
+          from_file: this.i_path.str()
+        });
+      }
+      const cache_id = `${this.route.method}:${this.route.endpoint_str}:${params.width == null ? "" : params.width}.${params.height == null ? "" : params.height}.${params.type == null ? this.i_type : params.type}`.replaceAll("/", "_");
+      let cache_path;
+      if (this.transformed_cache.has(cache_id)) {
+        cache_path = this.transformed_cache.get(cache_id);
+      } else {
+        cache_path = this.server.endpoint_cache_dir.join(cache_id);
+        this.transformed_cache.set(cache_id, cache_path);
+      }
+      if (cache_path.exists()) {
+        return stream.send({
+          status: 200,
+          from_file: cache_path
         });
       }
       if (this.i_type === params.type) {
         params.type = null;
       }
-      let cache_id;
-      if (ImageEndpoint.cache_in_memory) {
-        cache_id = `${params.width == null ? "" : params.width}.${params.height == null ? "" : params.height}.${params.type == null ? "" : params.type}`;
-        if (this.i_cache.has(cache_id)) {
-          return stream.send({
-            status: 200,
-            data: this.i_cache.get(cache_id)
-          });
-        }
-      }
       const data = await this.transform(params.type, params.width, params.height, params.aspect_ratio);
-      if (ImageEndpoint.cache_in_memory && cache_id) {
-        this.i_cache.set(cache_id, data);
-      }
+      await cache_path.save(data);
       return stream.send({
         status: 200,
-        data
+        from_file: cache_path
       });
     };
   }
@@ -182,12 +176,6 @@ class ImageEndpoint extends import_endpoint.Endpoint {
     } catch (err) {
       this.server?.log.error(`Unable to determine the aspect ratio of image ${this.file_path}: `, err);
       return null;
-    }
-  }
-  // Clear cache.
-  _clear_cache() {
-    if (ImageEndpoint.cache_in_memory) {
-      this.i_cache.clear();
     }
   }
 }

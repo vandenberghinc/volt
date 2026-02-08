@@ -4,8 +4,6 @@
  */
 // ---------------------------------------------------------
 // Imports.
-import CleanCSS from 'clean-css';
-import zlib from 'zlib';
 import { View } from './view.js';
 import * as vlib from "@vandenberghinc/vlib";
 import { ExternalError, InternalError } from "./errors/internal_external.js";
@@ -13,6 +11,7 @@ import { Status } from "./status.js";
 import { RateLimits } from "./rate_limit.js";
 import { Route } from './route.js';
 import Meta from './meta.js';
+import { Utils } from './utils.js';
 const { debug } = vlib;
 // ---------------------------------------------------------
 // Endpoint
@@ -22,58 +21,6 @@ const { debug } = vlib;
  * @docs
  */
 export class Endpoint {
-    // Static attributes.
-    static compressed_content_types = [
-        // Image formats (often already compressed)
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-        "image/bmp",
-        "image/tiff",
-        "image/vnd.microsoft.icon", // ICO
-        // Audio formats (usually compressed)
-        "audio/mpeg", // MP3
-        "audio/mp3",
-        "audio/ogg",
-        "audio/wav",
-        "audio/x-wav",
-        "audio/flac",
-        "audio/aac",
-        "audio/midi",
-        // Video formats (typically compressed)
-        "video/mp4",
-        "video/mpeg",
-        "video/ogg",
-        "video/webm",
-        "video/x-msvideo", // AVI
-        "video/quicktime", // MOV
-        // Archive / Compressed file formats
-        "application/zip",
-        "application/x-7z-compressed",
-        "application/x-rar-compressed",
-        "application/x-tar",
-        "application/gzip",
-        "application/x-gzip",
-        "application/x-bzip",
-        "application/x-bzip2",
-        "application/x-xz",
-        // Documents that are usually compressed internally
-        "application/pdf",
-        "application/vnd.ms-powerpoint",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        // Font files
-        "font/woff",
-        "font/woff2",
-        "application/font-sfnt",
-        "application/vnd.ms-fontobject",
-        // Other binary data
-        "application/octet-stream",
-    ];
     /** Route attributes */
     id;
     route;
@@ -93,7 +40,6 @@ export class Endpoint {
     /** Option 4 Data endpoint by file path. */
     file_path;
     /** Content length & type */
-    content_length;
     content_type;
     /** Booleans */
     is_static;
@@ -106,7 +52,7 @@ export class Endpoint {
     _compress;
     _cache;
     ip_whitelist;
-    _is_compressed;
+    // private _is_compressed?: boolean;
     _dynamic_initialized = false;
     /** A reference to the server. */
     server;
@@ -178,7 +124,7 @@ export class Endpoint {
      * Construct an endpoint.
      * @docs
      */
-    constructor({ method, endpoint, authenticated = false, rate_limit = undefined, params = undefined, compress = "auto", cache = true, ip_whitelist = undefined, sitemap = undefined, robots = undefined, allow_unknown_params = false, _is_static = false, 
+    constructor({ method, endpoint, authenticated = false, rate_limit = undefined, params = undefined, compress = true, cache = true, ip_whitelist = undefined, sitemap = undefined, robots = undefined, allow_unknown_params = false, _is_static = false, 
     // mode options.
     callback = undefined, view = undefined, data = undefined, file_path = undefined, content_type, // = "text/plain",
      }) {
@@ -208,19 +154,6 @@ export class Endpoint {
                 }
             });
         }
-        // Set compress.
-        if (compress === "auto" || typeof compress !== "boolean") {
-            compress = Endpoint.compressed_content_types.includes(this.content_type ?? "");
-        }
-        else if (compress === true && this.content_type != null && Endpoint.compressed_content_types.includes(this.content_type)) {
-            debug(4, this.route.id, ": ", `Overriding parameter "compress", disabling compression.`);
-            compress = false;
-        }
-        this._compress = compress;
-        this._compress = false;
-        if (this._compress) {
-            debug(3, this.route.id, ": ", "Compression enabled.", { content_type: this.content_type });
-        }
         // Argument `view` may also be passed as an object instead of class View.
         if (view == null) {
             this.view = undefined;
@@ -230,6 +163,27 @@ export class Endpoint {
         }
         else {
             this.view = new View(view);
+        }
+        // Set content type from file path.
+        if (this.file_path != null && this.content_type == null) {
+            this.content_type = Utils.mime_type(this.file_path.extension()) ?? "application/octet-stream";
+        }
+        // Set content type from defined view after view is defined.
+        else if (this.view != null) {
+            this.content_type = "text/html";
+        }
+        // Set compression after content type is defined.
+        if (compress === false) {
+            this._compress = false;
+        }
+        else if (this.file_path) {
+            this._compress = !(Utils.is_compressed_extension(this.file_path.extension()) ?? false);
+        }
+        else if (this.content_type != null) {
+            this._compress = !Utils.is_compressed_content_type(this.content_type);
+        }
+        else {
+            this._compress = true;
         }
         // Set default visible in sitemap.
         if (this.allow_sitemap == null) {
@@ -300,130 +254,7 @@ export class Endpoint {
      * This can for instance be used to serve a HTML `/error` endpoint from within a callback.
      * @docs
      */
-    async serve({ stream, status = 200, templates = undefined, }) {
-        return await this._serve(stream, status, { templates });
-    }
-    // ----------------------------------------------------------
-    // System methods.
-    /** Initialize with server. */
-    _initialize(server) {
-        // Already initialized.
-        if (this.server != null) {
-            return this;
-        }
-        // Assign attribute.
-        this.server = server;
-        // Initialize view.
-        if (this.view != null) {
-            this.view.initialize(server, this);
-        }
-        // Init view meta.
-        if (this.view != null) {
-            if (this.view.meta == null) {
-                this.view.meta = server.meta.copy();
-            }
-            else if (typeof this.view.meta === "object" && !(this.view.meta instanceof Meta)) {
-                this.view.meta = new Meta(this.view.meta);
-            }
-        }
-        return this;
-    }
-    // Initialize.
-    async _dynamic_initialize() {
-        if (!this.server) {
-            throw new Error(`Endpoint "${this.id}" is not initialized by the server yet.`);
-        }
-        /**
-         * Load data by file path
-         * @todo in the future we should not load all of the data but just send it to the client in chunks
-         *       but we need to account for compression and content length when implementing this.
-         */
-        if (this.file_path != null) {
-            this._load_data_by_path(this.server);
-        }
-        // Compression enabled.
-        if (this.server.production && this.callback == null && this._compress) {
-            this._is_compressed = true;
-            if (this.data != null && (this.data instanceof Buffer || typeof this.data === "string")) {
-                this.raw_data = this.data;
-                this.data = zlib.gzipSync(this.data, { level: zlib.constants.Z_BEST_COMPRESSION });
-                this.content_length = this.data.length;
-            }
-            // cant compress view html here since it contains unique nonces.
-            // else if (this.view != null) {
-            //     this.view.raw_html = this.view.html;
-            //     this.view.html = zlib.gzipSync(this.view.html as any, {level: zlib.constants.Z_BEST_COMPRESSION});
-            //     this.content_length = this.view.html.length;
-            // }
-            debug(2, this.route.id, ": ", "Compressed - content_length:", this.content_length);
-        }
-        // Set cache headers.
-        if (!this.server.production) {
-            this._cache = false; // @todo @tmp
-        }
-        if (
-        // (this.callback == null || this.is_image_endpoint) &&
-        (typeof this._cache === "number" || this._cache === true)) {
-            if (this._cache === 1 || this._cache === true) {
-                this.headers.push(["Cache-Control", "max-age=86400"]);
-            }
-            else {
-                this.headers.push(["Cache-Control", `max-age=${this._cache}`]);
-            }
-        }
-        // Set compression headers.
-        if (this._is_compressed) {
-            this.headers.push(["Content-Encoding", "gzip"]);
-            this.headers.push(["Vary", "Accept-Encoding"]);
-        }
-        // Set content length.
-        if (this.content_length != null) {
-            this.headers.push(["Content-Length", this.content_length.toString()]);
-        }
-        // Set content type.
-        if (this.content_type != null) {
-            this.headers.push(["Content-Type", this.content_type]);
-        }
-        if (this._is_compressed) {
-            debug(2, this.route.id, ": ", "Compressed headers:", this.headers);
-        }
-        this._dynamic_initialized = true;
-    }
-    // Set default headers.
-    _set_headers(stream) {
-        this.headers.forEach((item) => {
-            stream.set_header(item[0], item[1]);
-        });
-    }
-    // Serve a client.
-    async _serve_options(stream) {
-        if (!this._dynamic_initialized) {
-            await this._dynamic_initialize();
-        }
-        try {
-            // Check IP whitelist.
-            if (this.ip_whitelist && !this.ip_whitelist.includes(stream.ip)) {
-                stream.error({
-                    status: Status.unauthorized,
-                    type: "Unauthorized",
-                    message: "Unauthorized.",
-                });
-                return;
-            }
-            // Set headers.
-            this._set_headers(stream);
-            // Compute content length on view & when not defined.
-            if (this.content_length == null && this.view != null) {
-                stream.set_header("Content-Length", (await this.view.content_length()).toString());
-            }
-            // Send.
-            stream.send({ status: Status.no_content });
-        }
-        catch (err) {
-            throw err; // must have another catch block here otherwise when an error occurs in here it is somehow not catched by the try and catch block from Server._serve which will cause the program to crash.
-        }
-    }
-    async _serve(stream, status_code = 200, opts) {
+    async serve({ stream, status: status_code = 200, templates, }) {
         if (!this._dynamic_initialized) {
             await this._dynamic_initialize();
         }
@@ -487,7 +318,18 @@ export class Endpoint {
             // View.
             else if (this.view != null) {
                 this.server?.log(3, this.route.id, ": ", "Serving endpoint in view mode.");
-                await this.view._serve(stream, status_code, { compress: this._compress, templates: opts?.templates });
+                await this.view._serve(stream, status_code, { compress: this._compress, templates: templates });
+                return;
+            }
+            // Load from file.
+            else if (this.file_path != null) {
+                this.server?.log(3, this.route.id, ": ", "Serving endpoint in file mode.");
+                stream.send({
+                    status: status_code,
+                    from_file: this.file_path,
+                    compress: this._compress,
+                    templates: templates,
+                });
                 return;
             }
             // Data.
@@ -496,6 +338,8 @@ export class Endpoint {
                 stream.send({
                     status: status_code,
                     data: this.data,
+                    compress: this._compress,
+                    templates: templates,
                 });
                 return;
             }
@@ -508,46 +352,82 @@ export class Endpoint {
             throw err; // must have another catch block here otherwise when an error occurs in here it is somehow not catched by the try and catch block from Server._serve which will cause the program to crash.
         }
     }
-    // Load data by path.
-    _load_data_by_path(server) {
-        if (!this.file_path) {
-            throw new Error(`Endpoint "${this.id}" has no file path assigned.`);
+    // ----------------------------------------------------------
+    // System methods.
+    /** Initialize with server. */
+    _initialize(server) {
+        // Already initialized.
+        if (this.server != null) {
+            return this;
         }
-        // Load data.
-        const path = new vlib.Path(this.file_path);
-        let data;
-        if (path.extension() === ".js") {
-            data = path.load_sync();
+        // Assign attribute.
+        this.server = server;
+        // Initialize view.
+        if (this.view != null) {
+            this.view.initialize(server, this);
         }
-        else if (path.extension() === ".css") {
-            const minifier = new CleanCSS();
-            data = minifier.minify(path.load_sync()).styles;
+        // Init view meta.
+        if (this.view != null) {
+            if (this.view.meta == null) {
+                this.view.meta = server.meta.copy();
+            }
+            else if (typeof this.view.meta === "object" && !(this.view.meta instanceof Meta)) {
+                this.view.meta = new Meta(this.view.meta);
+            }
         }
-        else {
-            data = path.load_sync({ type: "buffer" });
-        }
-        // Assign.
-        this.data = data;
         return this;
     }
+    // Initialize.
+    async _dynamic_initialize() {
+        if (!this.server) {
+            throw new Error(`Endpoint "${this.id}" is not initialized by the server yet.`);
+        }
+        // Set cache headers.
+        if (!this.server.production) {
+            this._cache = false; // @todo @tmp
+        }
+        if (typeof this._cache === "number" || this._cache === true) {
+            if (this._cache === 1 || this._cache === true) {
+                this.headers.push(["Cache-Control", "max-age=86400"]);
+            }
+            else {
+                this.headers.push(["Cache-Control", `max-age=${this._cache}`]);
+            }
+        }
+        // Set content type.
+        if (this.content_type != null) {
+            this.headers.push(["Content-Type", this.content_type]);
+        }
+        this._dynamic_initialized = true;
+    }
+    // Set default headers.
+    _set_headers(stream) {
+        this.headers.forEach((item) => {
+            stream.set_header(item[0], item[1]);
+        });
+    }
+    // Serve a client.
+    async _serve_options(stream) {
+        if (!this._dynamic_initialized) {
+            await this._dynamic_initialize();
+        }
+        try {
+            // Check IP whitelist.
+            if (this.ip_whitelist && !this.ip_whitelist.includes(stream.ip)) {
+                stream.error({
+                    status: Status.unauthorized,
+                    type: "Unauthorized",
+                    message: "Unauthorized.",
+                });
+                return;
+            }
+            // Set headers.
+            this._set_headers(stream);
+            // Send.
+            stream.send({ status: Status.no_content });
+        }
+        catch (err) {
+            throw err; // must have another catch block here otherwise when an error occurs in here it is somehow not catched by the try and catch block from Server._serve which will cause the program to crash.
+        }
+    }
 }
-// const e = new Endpoint({
-//     method: "POST",
-//     endpoint: "/api/docs/feedback",
-//     content_type: "application/json",
-//     params: {
-//         /** The user id. */
-//         uid: "string",
-//         /** The project name. */
-//         project: "string",
-//         /** The project version. */
-//         version: "string",
-//         /** The document id. */
-//         id: "string",
-//         /** Whether the feedback is positive or negative. */
-//         positive: "boolean",
-//     },
-//     rate_limit: "global",
-//     async callback(stream, params) {
-//     }
-// })

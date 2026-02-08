@@ -4,9 +4,13 @@
  */
 // ---------------------------------------------------------
 // Imports.
-import zlib from 'zlib';
 import * as vlib from "@vandenberghinc/vlib";
+import { Transform } from "node:stream";
+import * as fs from "node:fs";
+import { pipeline } from "node:stream";
+import * as zlib from "node:zlib";
 import RateLimits from './rate_limit.js';
+import { Utils } from "./utils.js";
 const { debug } = vlib;
 // ---------------------------------------------------------
 // Request object.
@@ -679,133 +683,586 @@ export class Stream {
     set uid(value) {
         this._uid = value;
     }
-    // Send a response.
+    /**
+     * Apply templates to an in-memory body.
+     * Only applies to string bodies to avoid corrupting binary payloads.
+     */
+    apply_templates_to_body(input, templates) {
+        // Skip when there are no templates.
+        if (templates == null || Object.keys(templates).length === 0) {
+            return input;
+        }
+        // Only apply templates to string bodies.
+        if (typeof input !== "string") {
+            return input;
+        }
+        // Replace all template keys with their stringified values.
+        let out = input;
+        for (const key of Object.keys(templates)) {
+            const value = templates[key];
+            // Convert non-string template values to a string.
+            const value_str = typeof value === "string" ? value : JSON.stringify(value);
+            // Replace all occurrences of the key.
+            out = out.split(`{{${key}}}`).join(value_str);
+        }
+        return out;
+    }
+    /**
+     * Create a transform stream that applies templates across chunk boundaries.
+     * This avoids missing replacements when a template key is split between chunks.
+     */
+    create_template_replace_transform(templates) {
+        // Precompute keys and the longest key length for boundary-safe streaming.
+        const keys = Object.keys(templates);
+        const max_key_len = keys.reduce((max, k) => Math.max(max, k.length), 0);
+        // Keep enough tail bytes to cover a key split between chunks.
+        const keep_len = Math.max(0, max_key_len - 1);
+        // Carry tail across chunks.
+        let carry = "";
+        return new Transform({
+            transform(chunk, _enc, cb) {
+                try {
+                    // Merge with carry to handle split keys across chunks.
+                    const str = carry + chunk.toString("utf8");
+                    // Keep a tail so we don't split a key.
+                    const cut_idx = Math.max(0, str.length - keep_len);
+                    const safe_head = str.slice(0, cut_idx);
+                    // Persist the tail for the next chunk.
+                    carry = str.slice(cut_idx);
+                    // Replace templates in the safe head.
+                    let out = safe_head;
+                    for (const key of keys) {
+                        const value = templates[key];
+                        const value_str = typeof value === "string" ? value : JSON.stringify(value);
+                        out = out.split(`{{${key}}}`).join(value_str);
+                    }
+                    cb(null, out);
+                }
+                catch (err) {
+                    cb(err);
+                }
+            },
+            flush(cb) {
+                try {
+                    // Flush remaining carry.
+                    let out = carry;
+                    for (const key of keys) {
+                        const value = templates[key];
+                        const value_str = typeof value === "string" ? value : JSON.stringify(value);
+                        out = out.split(`{{${key}}}`).join(value_str);
+                    }
+                    cb(null, out);
+                }
+                catch (err) {
+                    cb(err);
+                }
+            },
+        });
+    }
+    /** Remove content length header from headers. */
+    remove_content_length_header(headers) {
+    }
+    /** Create output headers for http2. */
+    create_http2_headers(status, new_headers) {
+        // Convert ResponseHeaderValue to Node-compatible header values.
+        const normalize_header_value = (v) => {
+            if (v == null)
+                return undefined;
+            if (typeof v === "boolean")
+                return v ? "true" : "false";
+            if (typeof v === "number")
+                return v;
+            if (typeof v === "string")
+                return v;
+            return String(v);
+        };
+        // Start with any headers set earlier via set_header/set_headers.
+        const out_headers = {
+            ":status": status,
+        };
+        // Merge previously queued headers for http2.
+        if (!Array.isArray(this.res_headers)) {
+            for (const [k, v] of Object.entries(this.res_headers)) {
+                const nv = normalize_header_value(v);
+                if (nv !== undefined)
+                    out_headers[k] = nv;
+            }
+        }
+        // Merge call-specific headers last so they win.
+        for (const [k, v] of Object.entries(new_headers)) {
+            const nv = normalize_header_value(v);
+            if (nv !== undefined)
+                out_headers[k] = nv;
+        }
+        // Attach any cookies staged via set_cookie/set_cookies.
+        if (this.res_cookies.length > 0) {
+            out_headers["set-cookie"] = this.res_cookies;
+        }
+        return out_headers;
+    }
+    /** Assign http headers to response. */
+    set_http1_headers(status, headers) {
+        if (!this.res) {
+            throw new Error("HTTP/1.1 response is missing.");
+        }
+        // Set status code.
+        this.res.statusCode = status;
+        // Set headers.
+        for (let i = 0; i < this.res_headers.length; i++) {
+            this.res.setHeader(this.res_headers[i][0], this.res_headers[i][1]);
+        }
+        Object.keys(headers).forEach((key) => {
+            const v = headers[key];
+            if (v != null) {
+                this.res?.setHeader(key, typeof v === "boolean" ? v.toString() : v);
+            }
+        });
+    }
     /**
      * Send a response.
-     *
-     * @param options The response options.
-     * @param options.status The response status.
-     * @param options.headers The response headers.
-     * @param options.data The data of the response body to send.
-     * @param options.compress Whether the response should be gzip-compressed.
      * @example
      * ```ts
      * stream.send({status: 200, data: "Hello World!"});
      * ```
      * @docs
      */
-    send({ status = 200, headers = {}, data, compress = false, } = {}) {
+    send({ status = 200, headers = {}, data, compress = false, from_file, templates, }) {
         // Assign sent status code.
         this.status_code = status;
         // The body to send as non `ResponseBody` type.
         let body = data;
         // Convert body primitivies to string.
-        if (typeof body === 'boolean' || typeof body === 'number') {
+        if (typeof body === "boolean" || typeof body === "number") {
             body = body.toString();
         }
-        // HTTP2.
+        // -----------------------------------------
+        // Helpers.
+        /** Get the accept-encoding header from the request. */
+        const get_accept_encoding = () => {
+            // Prefer the cached request headers on the stream wrapper.
+            // For http2 these are the real pseudo/header map; for http1 this is req.headers.
+            const accept_encoding = this.headers?.["accept-encoding"];
+            if (typeof accept_encoding === "string") {
+                return accept_encoding;
+            }
+            // Node can sometimes provide a string[] header shape.
+            if (Array.isArray(accept_encoding) && accept_encoding.length > 0) {
+                return accept_encoding.join(", ");
+            }
+            // Fallback to the raw http1 request headers if present.
+            const req_accept_encoding = this.req?.headers?.["accept-encoding"];
+            if (typeof req_accept_encoding === "string") {
+                return req_accept_encoding;
+            }
+            if (Array.isArray(req_accept_encoding) && req_accept_encoding.length > 0) {
+                return req_accept_encoding.join(", ");
+            }
+            // Default when header is absent.
+            return "";
+        };
+        // Apply templates to in-memory bodies before any compression.
+        body = this.apply_templates_to_body(body, templates);
+        // -----------------------------------------
+        // HTTP2
+        // -----------------------------------------
         if (this.http2) {
             const stream = this.s;
-            // Headers.
-            this.res_headers[":status"] = status;
-            this.set_headers(headers);
-            if (this.res_cookies.length > 0) {
-                this.res_headers["set-cookie"] = this.res_cookies;
-            }
-            if (compress && body) {
-                this.res_headers["Content-Encoding"] = "gzip";
-                this.res_headers["Vary"] = "Accept-Encoding";
-            }
-            // Is json.
-            if (body && typeof body === 'object' && Buffer.isBuffer(body) === false && (body instanceof Uint8Array) === false) {
-                this.res_headers["Content-Type"] = "application/json";
-                body = JSON.stringify(body);
-            }
-            // Compress.
-            if (body
-                && typeof body === "object"
-                && !(body instanceof Buffer)
-                && !(body instanceof Uint8Array)) {
-                // Convert to string.
-                body = JSON.stringify(body);
-            }
-            if (compress
-                && body) {
-                if (typeof body === 'string'
-                    || Buffer.isBuffer(body)
-                    || body instanceof Uint8Array) {
-                    body = zlib.gzipSync(body, { level: zlib.constants.Z_BEST_COMPRESSION });
+            // Create http headers.
+            const out_headers = this.create_http2_headers(status, headers);
+            // -------------------------------------------------------
+            // From_file fast path (http2)
+            // -------------------------------------------------------
+            if (from_file) {
+                const from_path = from_file instanceof vlib.Path ? from_file : new vlib.Path(from_file);
+                // Only apply templates when defined.
+                const needs_template_replace = templates != null && Object.keys(templates).length > 0;
+                const should_gzip = compress
+                    && get_accept_encoding().includes("gzip")
+                    && !(Utils.is_compressed_extension(from_path.extension()) ?? false);
+                // Add content type.
+                const content_type = Utils.mime_type(from_path.extension());
+                if (content_type && out_headers["Content-Type"] == null && out_headers["content-type"] == null) {
+                    out_headers["content-type"] = content_type;
                 }
-                else {
-                    body = zlib.gzipSync(JSON.stringify(body), { level: zlib.constants.Z_BEST_COMPRESSION });
+                // Only apply templates to text-like responses.
+                const is_text_response = typeof content_type === "string"
+                    && (content_type.startsWith("text/")
+                        || content_type === "application/javascript"
+                        || content_type === "application/json"
+                        || content_type === "image/svg+xml"
+                        || content_type === "application/xml"
+                        || content_type === "text/xml");
+                const should_apply_templates = needs_template_replace && is_text_response;
+                // Only set gzip headers if we actually gzip.
+                if (should_gzip) {
+                    out_headers["content-encoding"] = "gzip";
+                    out_headers["vary"] = "Accept-Encoding";
+                    // Do not set content-length when streaming gzip.
+                    delete out_headers["content-length"];
+                    delete out_headers["Content-Length"];
                 }
+                // Do not set content-length when template replacement is enabled.
+                if (should_apply_templates) {
+                    delete out_headers["content-length"];
+                    delete out_headers["Content-Length"];
+                }
+                // If we are NOT gzipping and NOT replacing, use respondWithFile for best performance.
+                if (!should_gzip && !should_apply_templates && typeof stream.respondWithFile === "function") {
+                    // respondWithFile handles opening/streaming internally.
+                    stream.respondWithFile(from_path.toString(), out_headers, {});
+                    if (debug.on(3))
+                        debug("Sending http2 file response: ", status, " - file: ", from_path.toString());
+                    this.finished = true;
+                    return this;
+                }
+                // Manual stream for gzip and/or template replacement.
+                stream.respond(out_headers);
+                const file_read_stream = fs.createReadStream(from_path.toString());
+                const transforms = [];
+                // Replace templates on-the-fly for text-like responses.
+                if (should_apply_templates) {
+                    transforms.push(this.create_template_replace_transform(templates));
+                }
+                // Stream gzip to avoid blocking the event loop.
+                if (should_gzip) {
+                    transforms.push(zlib.createGzip({ level: zlib.constants.Z_BEST_COMPRESSION }));
+                }
+                // Pipe: file -> (template_replace?) -> (gzip?) -> http2 stream.
+                pipeline(file_read_stream, ...transforms, stream, (err) => {
+                    if (err) {
+                        // Close the stream to avoid leaking resources on pipeline error.
+                        try {
+                            stream.close();
+                        }
+                        catch { }
+                    }
+                });
+                if (debug.on(3))
+                    debug("Sending http2 streamed file response: ", status, " - file: ", from_path.toString());
+                this.finished = true;
+                return this;
             }
-            // Respond.
-            stream.respond(this.res_headers);
-            // End.
-            debug(3, "Sending response: ", status, " - has body: ", !!body);
-            if (body) {
-                if (Buffer.isBuffer(body) || body instanceof Uint8Array) {
-                    stream.end(body);
-                }
-                else {
-                    stream.end(Buffer.from(body));
-                }
-                // stream.end(body); // do not use toString() here or it will cause issues with writing binary data.
-            }
+            // -------------------------------------------------------
+            // Normal body path (http2)
+            // -------------------------------------------------------
             else {
-                stream.end();
+                // Is json.
+                if (body && typeof body === "object" && Buffer.isBuffer(body) === false && (body instanceof Uint8Array) === false) {
+                    out_headers["content-type"] = "application/json";
+                    body = JSON.stringify(body);
+                    // Apply templates after stringify, since body just became a string.
+                    body = this.apply_templates_to_body(body, templates);
+                }
+                // Convert objects to string (kept from your logic).
+                if (body
+                    && typeof body === "object"
+                    && !(body instanceof Buffer)
+                    && !(body instanceof Uint8Array)) {
+                    body = JSON.stringify(body);
+                    // Apply templates after stringify.
+                    body = this.apply_templates_to_body(body, templates);
+                }
+                const should_gzip_body = compress
+                    && !!body
+                    && get_accept_encoding().includes("gzip");
+                if (should_gzip_body) {
+                    out_headers["content-encoding"] = "gzip";
+                    out_headers["vary"] = "Accept-Encoding";
+                    // No content-length if we compress asynchronously.
+                    delete out_headers["content-length"];
+                    delete out_headers["Content-Length"];
+                }
+                // Respond.
+                stream.respond(out_headers);
+                // End.
+                if (debug.on(3))
+                    debug("Sending response: ", status, " - has body: ", !!body);
+                if (!body) {
+                    stream.end();
+                    this.finished = true;
+                    return this;
+                }
+                // gzip async (non-blocking) for in-memory bodies.
+                else if (should_gzip_body) {
+                    const raw_buffer = (typeof body === "string")
+                        ? Buffer.from(body)
+                        : (Buffer.isBuffer(body) || body instanceof Uint8Array)
+                            ? Buffer.from(body)
+                            : Buffer.from(JSON.stringify(body));
+                    zlib.gzip(raw_buffer, { level: zlib.constants.Z_BEST_COMPRESSION }, (err, gz_buffer) => {
+                        if (err) {
+                            // Fallback: send uncompressed if gzip fails.
+                            stream.end(raw_buffer);
+                            return;
+                        }
+                        stream.end(gz_buffer);
+                    });
+                    this.finished = true;
+                    return this;
+                }
+                // Non-gzipped body path.
+                else {
+                    if (Buffer.isBuffer(body) || body instanceof Uint8Array) {
+                        stream.end(body);
+                    }
+                    else {
+                        stream.end(Buffer.from(body));
+                    }
+                    this.finished = true;
+                    return this;
+                }
             }
         }
-        // HTTP1.
+        // -----------------------------------------
+        // HTTP1
+        // -----------------------------------------
         else {
             const req = this.req;
             const res = this.res;
-            // Set status code.
-            res.statusCode = status;
-            // Set headers.
-            for (let i = 0; i < this.res_headers.length; i++) {
-                res.setHeader(this.res_headers[i][0], this.res_headers[i][1]);
-            }
-            Object.keys(headers).forEach((key) => {
-                const v = headers[key];
-                if (v != null) {
-                    if (typeof v === "boolean") {
-                        res.setHeader(key, v.toString());
+            // Set http1 headers.
+            this.set_http1_headers(status, headers);
+            // -------------------------------------------------------
+            // From_file path (http1)
+            // -------------------------------------------------------
+            if (from_file) {
+                // Ensure we dont create a new path if not needed, to use caching.
+                const from_path = from_file instanceof vlib.Path ? from_file : new vlib.Path(from_file);
+                // Add content type.
+                const content_type = Utils.mime_type(from_path.extension());
+                if (content_type) {
+                    res.setHeader("Content-Type", content_type);
+                }
+                // Only apply templates when defined.
+                const needs_template_replace = templates != null && Object.keys(templates).length > 0;
+                // Only apply templates to text-like responses.
+                const is_text_response = typeof content_type === "string"
+                    && (content_type.startsWith("text/")
+                        || content_type === "application/javascript"
+                        || content_type === "application/json"
+                        || content_type === "image/svg+xml"
+                        || content_type === "application/xml"
+                        || content_type === "text/xml");
+                const should_apply_templates = needs_template_replace && is_text_response;
+                const should_gzip = compress
+                    && get_accept_encoding().includes("gzip")
+                    && !(Utils.is_compressed_extension(from_path.extension()) ?? false);
+                // If we gzip, do not set content-length (streaming).
+                if (should_gzip) {
+                    res.setHeader("Content-Encoding", "gzip");
+                    res.setHeader("Vary", "Accept-Encoding");
+                    res.removeHeader("Content-Length");
+                }
+                else if (!should_apply_templates) {
+                    // Only set content-length when no transforms are applied.
+                    try {
+                        if (from_path.is_file()) {
+                            res.setHeader("Content-Length", from_path.size);
+                        }
                     }
-                    else {
-                        res.setHeader(key, v);
+                    catch {
+                        // Ignore stat errors, stream will error if file missing.
                     }
                 }
-            });
-            // Set cookies.
-            if (this.cookies.length > 0) {
-                res.setHeader('Set-Cookie', this.res_cookies);
+                // If we replace templates, content-length is not reliable.
+                if (should_apply_templates) {
+                    res.removeHeader("Content-Length");
+                }
+                const file_read_stream = fs.createReadStream(from_path.toString());
+                const transforms = [];
+                // Replace templates on-the-fly for text-like responses.
+                if (should_apply_templates) {
+                    transforms.push(this.create_template_replace_transform(templates));
+                }
+                // Stream gzip to avoid blocking event loop.
+                if (should_gzip) {
+                    transforms.push(zlib.createGzip({ level: zlib.constants.Z_BEST_COMPRESSION }));
+                }
+                // Pipe: file -> (template_replace?) -> (gzip?) -> http1 response.
+                pipeline(file_read_stream, ...transforms, res, (err) => {
+                    if (err) {
+                        // Destroy the response to stop work on error.
+                        try {
+                            res.destroy(err);
+                        }
+                        catch { }
+                    }
+                });
+                if (debug.on(3))
+                    debug("Sending http1 streamed file response: ", status, " - file: ", from_path.toString());
+                this.finished = true;
+                return this;
             }
-            // Convert data.
-            if (body && typeof body === 'object' && Buffer.isBuffer(body) === false && (body instanceof Uint8Array) === false) {
-                res.setHeader("Content-Type", "application/json");
-                body = JSON.stringify(body);
-            }
-            // @todo compress.
-            if (compress && body) {
-                res.setHeader("Content-Encoding", "gzip");
-                res.setHeader("Vary", "Accept-Encoding");
-                body = zlib.gzipSync(body, { level: zlib.constants.Z_BEST_COMPRESSION });
-            }
-            // Set data.
-            if (body) {
-                res.end(body); // do not use toString() here or it will cause issues with writing binary data.
-            }
-            // End.
+            // -------------------------------------------------------
+            // Normal body path (http1)
+            // -------------------------------------------------------
             else {
-                res.end();
+                // Convert data.
+                if (body && typeof body === "object" && Buffer.isBuffer(body) === false && (body instanceof Uint8Array) === false) {
+                    res.setHeader("Content-Type", "application/json");
+                    body = JSON.stringify(body);
+                    // Apply templates after stringify.
+                    body = this.apply_templates_to_body(body, templates);
+                }
+                const should_gzip_body = compress
+                    && !!body
+                    && get_accept_encoding().includes("gzip");
+                // gzip async (non-blocking)
+                if (should_gzip_body) {
+                    res.setHeader("Content-Encoding", "gzip");
+                    res.setHeader("Vary", "Accept-Encoding");
+                    res.removeHeader("Content-Length");
+                    const raw_buffer = (typeof body === "string")
+                        ? Buffer.from(body)
+                        : (Buffer.isBuffer(body) || body instanceof Uint8Array)
+                            ? Buffer.from(body)
+                            : Buffer.from(JSON.stringify(body));
+                    zlib.gzip(raw_buffer, { level: zlib.constants.Z_BEST_COMPRESSION }, (err, gz_buffer) => {
+                        if (err) {
+                            res.end(raw_buffer);
+                            return;
+                        }
+                        res.end(gz_buffer);
+                    });
+                    if (debug.on(3))
+                        debug("Sending http1 response: ", status, " - has body: ", !!body, " - gzip: true");
+                }
+                // Set data.
+                else if (body) {
+                    res.end(body); // Do not use toString() here or it will cause issues with writing binary data.
+                }
+                else {
+                    res.end();
+                }
+                // Set as finished.
+                this.finished = true;
+                return this;
             }
         }
-        // Set as finished.
-        this.finished = true;
-        return this;
     }
+    // send<Data extends ResponseBody = ResponseBody>({
+    //     status = 200,
+    //     headers = {},
+    //     data,
+    //     compress = false,
+    // }: {
+    //     status?: number,
+    //     headers?: ResponseHeaders,
+    //     data?: Data,
+    //     compress?: boolean
+    // } = {}): this {
+    //     // Assign sent status code.
+    //     this.status_code = status;
+    //     // The body to send as non `ResponseBody` type.
+    //     let body = data as ResponseBody;
+    //     // Convert body primitivies to string.
+    //     if (typeof body === 'boolean' || typeof body === 'number') {
+    //         body = body.toString();
+    //     }
+    //     // HTTP2.
+    //     if (this.http2) {
+    //         const stream = this.s as ServerHttp2Stream;
+    //         // Headers.
+    //         this.res_headers[":status"] = status;
+    //         this.set_headers(headers);
+    //         if (this.res_cookies.length > 0) {
+    //             this.res_headers["set-cookie"] = this.res_cookies;
+    //         }
+    //         if (compress && body) {
+    //             this.res_headers["Content-Encoding"] = "gzip";
+    //             this.res_headers["Vary"] = "Accept-Encoding";
+    //         }
+    //         // Is json.
+    //         if (body && typeof body === 'object' && Buffer.isBuffer(body) === false && (body instanceof Uint8Array) === false) {
+    //             this.res_headers["Content-Type"] = "application/json";
+    //             body = JSON.stringify(body);
+    //         }
+    //         // Compress.
+    //         if (
+    //             body
+    //             && typeof body === "object"
+    //             && !(body instanceof Buffer)
+    //             && !(body instanceof Uint8Array)
+    //         ) {
+    //             // Convert to string.
+    //             body = JSON.stringify(body);
+    //         }
+    //         if (
+    //             compress
+    //             && body
+    //         ) {
+    //             if (
+    //                 typeof body === 'string'
+    //                 || Buffer.isBuffer(body)
+    //                 || body instanceof Uint8Array
+    //             ) {
+    //                 body = zlib.gzipSync(body, { level: zlib.constants.Z_BEST_COMPRESSION });
+    //             } else {
+    //                 body = zlib.gzipSync(JSON.stringify(body), { level: zlib.constants.Z_BEST_COMPRESSION });
+    //             }
+    //         }
+    //         // Respond.
+    //         stream.respond(this.res_headers as any)
+    //         // End.
+    //         debug(3, "Sending response: ", status, " - has body: ", !!body);
+    //         if (body) {
+    //             if (Buffer.isBuffer(body) || body instanceof Uint8Array) {
+    //                 stream.end(body);
+    //             } else {
+    //                 stream.end(Buffer.from(body as any));
+    //             }
+    //             // stream.end(body); // do not use toString() here or it will cause issues with writing binary data.
+    //         } else {
+    //             stream.end();
+    //         }
+    //     }
+    //     // HTTP1.
+    //     else {
+    //         const req = this.req as IncomingMessage;
+    //         const res = this.res as ServerResponse;
+    //         // Set status code.
+    //         res.statusCode = status;
+    //         // Set headers.
+    //         for (let i = 0; i < this.res_headers.length; i++) {
+    //             res.setHeader(this.res_headers[i][0], this.res_headers[i][1]);
+    //         }
+    //         Object.keys(headers).forEach((key) => {
+    //             const v = headers[key];
+    //             if (v != null) {
+    //                 if (typeof v === "boolean") {
+    //                     res.setHeader(key, v.toString());
+    //                 } else {
+    //                     res.setHeader(key, v);
+    //                 }
+    //             }
+    //         });
+    //         // Set cookies.
+    //         if (this.cookies.length > 0) {
+    //             res.setHeader('Set-Cookie', this.res_cookies);
+    //         }
+    //         // Convert data.
+    //         if (body && typeof body === 'object' && Buffer.isBuffer(body) === false && (body instanceof Uint8Array) === false) {
+    //             res.setHeader("Content-Type", "application/json");
+    //             body = JSON.stringify(body);
+    //         }
+    //         // @todo compress.
+    //         if (compress && body) {
+    //             res.setHeader("Content-Encoding", "gzip");
+    //             res.setHeader("Vary", "Accept-Encoding");
+    //             body = zlib.gzipSync(body, { level: zlib.constants.Z_BEST_COMPRESSION });
+    //         }
+    //         // Set data.
+    //         if (body) {
+    //             res.end(body); // do not use toString() here or it will cause issues with writing binary data.
+    //         }
+    //         // End.
+    //         else {
+    //             res.end();
+    //         }
+    //     }
+    //     // Set as finished.
+    //     this.finished = true;
+    //     return this;
+    // }
     // Send a successs response.
     /**
      * Send a response
@@ -821,9 +1278,10 @@ export class Stream {
      * ```
      * @docs
      */
-    success({ status = 200, headers = {}, data, compress = false } = {}) {
-        debug(3, "Sending [success] response: ", status, " - body: ", data);
-        return this.send({ status, headers, data, compress });
+    success({ status = 200, headers = {}, data, from_file, compress = false } = {}) {
+        if (debug.on(3))
+            debug("Sending [success] response: ", status, " - body: ", data);
+        return this.send({ status, headers, data, compress, from_file });
     }
     // Send an error response.
     /**
@@ -844,7 +1302,8 @@ export class Stream {
      * @docs
      */
     error({ message, type = "APIError", invalid_fields = {}, status = 500, headers = {}, compress = false, data, }) {
-        debug(3, "Sending [error] response: ", status, " - message: ", message);
+        if (debug.on(3))
+            debug("Sending [error] response: ", status, " - message: ", message);
         const api_error = {
             error: {
                 type,
@@ -855,6 +1314,151 @@ export class Stream {
             data,
         };
         return this.send({ status, headers, compress, data: api_error });
+    }
+    /**
+     * Stream a response through a transform pipeline with an optional gzip step and a hard byte limit.
+     *
+     * @param options Pipeline options.
+     * @param options.status The HTTP status code to send.
+     * @param options.headers The response headers to send.
+     * @param options.body The readable stream to pipe into the response.
+     * @param options.transforms Optional transform streams applied in order.
+     * @param options.compress When true, gzip-compresses the streamed response if the client supports it.
+     * @param options.max_bytes The maximum number of bytes allowed to be written to the client.
+     *                          Set to `-1` for unlimited (use with caution).
+     */
+    pipeline({ status = 200, headers = {}, body, transforms = [], compress = false, max_bytes = 10 * 1024 * 1024, }) {
+        // Prevent double-sending on the same stream wrapper.
+        if (this.finished) {
+            throw new Error("Cannot pipeline a response that has already been finished.");
+        }
+        // Validate the status code early for predictable responses.
+        if (!Number.isInteger(status) || status < 100 || status > 599) {
+            throw new Error("Invalid status code.");
+        }
+        // Validate the max_bytes limit to prevent unbounded streaming.
+        if (!Number.isFinite(max_bytes)) {
+            throw new Error("Invalid max_bytes value.");
+        }
+        // Validate transform list to avoid accidental misuse and runaway pipelines.
+        if (!Array.isArray(transforms) || transforms.length > 32) {
+            throw new Error("Invalid transforms configuration.");
+        }
+        // Assign the sent status code for bookkeeping.
+        this.status_code = status;
+        // Mark as finished once we start writing headers and streaming.
+        this.finished = true;
+        // Create all streams list in the order they should be applied.
+        const all_streams = [body, ...transforms];
+        // Resolve accept-encoding from request headers for gzip negotiation.
+        const accept_encoding_header = this.headers?.["accept-encoding"];
+        const accept_encoding = typeof accept_encoding_header === "string"
+            ? accept_encoding_header
+            : Array.isArray(accept_encoding_header)
+                ? accept_encoding_header.join(", ")
+                : "";
+        // Detect if a content-encoding is already set to avoid double-compressing.
+        const has_content_encoding = (() => {
+            for (const k of Object.keys(headers ?? {})) {
+                if (k.toLowerCase() === "content-encoding")
+                    return true;
+            }
+            const existing = this.get_header("Content-Encoding") ?? this.get_header("content-encoding");
+            return existing != null;
+        })();
+        // Decide whether to gzip based on client support and existing encoding.
+        const should_gzip = compress === true && accept_encoding.includes("gzip") && !has_content_encoding;
+        // Append gzip as a transform so we stream-compress without buffering.
+        if (should_gzip) {
+            all_streams.push(zlib.createGzip({ level: zlib.constants.Z_BEST_COMPRESSION }));
+        }
+        // Create a hard byte limiter to protect memory/bandwidth and stop abuse.
+        if (max_bytes >= 0) {
+            let written = 0;
+            const limiter = new Transform({
+                transform(chunk, _enc, cb) {
+                    written += chunk.length;
+                    if (written > max_bytes) {
+                        cb(new Error("Response exceeded max_bytes."));
+                        return;
+                    }
+                    cb(null, chunk);
+                },
+            });
+            all_streams.push(limiter);
+        }
+        // Prepare a cleanup routine to stop work when the client disconnects or a stream errors.
+        const cleanup = (err) => {
+            for (const s of all_streams) {
+                if ("destroy" in s && typeof s.destroy === "function") {
+                    s.destroy(err);
+                }
+            }
+        };
+        // Send headers and start piping depending on protocol.
+        if (this.http2) {
+            // Ensure the underlying HTTP/2 stream exists.
+            const h2 = this.s;
+            if (!h2) {
+                throw new Error("HTTP/2 stream is missing.");
+            }
+            // Start with any headers set earlier via set_header/set_headers.
+            const out_headers = this.create_http2_headers(status, headers);
+            // Set gzip headers only when we actually gzip.
+            if (should_gzip) {
+                out_headers["content-encoding"] = "gzip";
+                out_headers["vary"] = "Accept-Encoding";
+            }
+            // Strip content-length because streaming/transforms make it unreliable.
+            delete out_headers["content-length"];
+            delete out_headers["Content-Length"];
+            // Write headers once, before streaming data.
+            h2.respond(out_headers);
+            // Abort work when the client disconnects.
+            h2.once("close", () => { cleanup(new Error("Client disconnected.")); });
+            // Pipe: body -> transforms... -> (gzip?) -> (limiter?) -> http2 stream.
+            pipeline(...all_streams, h2, (err) => {
+                if (err) {
+                    // Destroy the stream to stop further writes on error.
+                    cleanup(err instanceof Error ? err : new Error("Pipeline failed."));
+                    try {
+                        h2.close();
+                    }
+                    catch { }
+                }
+            });
+            return this;
+        }
+        else {
+            // HTTP/1.1 response path.
+            const res = this.res;
+            if (!res) {
+                throw new Error("HTTP/1.1 response is missing.");
+            }
+            // Set http1 headers.
+            this.set_http1_headers(status, headers);
+            // Set gzip headers only when we actually gzip.
+            if (should_gzip) {
+                res.setHeader("Content-Encoding", "gzip");
+                res.setHeader("Vary", "Accept-Encoding");
+            }
+            // Strip content-length because streaming/transforms make it unreliable.
+            res.removeHeader("Content-Length");
+            // Abort work when the client disconnects.
+            res.once("close", () => { cleanup(new Error("Client disconnected.")); });
+            // Pipe: body -> transforms... -> (gzip?) -> (limiter?) -> http1 response.
+            pipeline(...all_streams, res, (err) => {
+                if (err) {
+                    // Destroy the response to stop further writes on error.
+                    cleanup(err instanceof Error ? err : new Error("Pipeline failed."));
+                    try {
+                        res.destroy();
+                    }
+                    catch { }
+                }
+            });
+        }
+        return this;
     }
     // Set headers.
     /**

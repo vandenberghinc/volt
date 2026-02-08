@@ -7,6 +7,7 @@ import { SystemError } from "../../errors/system_error.js";
 import { Collection, TransactionCollection } from "../collection.js";
 import type { Server } from "../../server.js";
 import { InvalidUsageError } from "../../errors/index.js";
+import { SafeInt } from "./safe_int.js";
 /**
  * The quota manager.
  * This manager can be used to manage and enforce usage quotas for different resources,
@@ -343,15 +344,21 @@ export declare namespace QuotaManager {
         /**
          * Convert `null | undefined` to `undefined` (no-op).
          */
-        function to_nano(q: null | undefined): undefined;
+        function to_nano(q: null | undefined, opts?: {
+            round?: SafeInt.Rounding;
+        }): undefined;
         /**
          * Convert a numeric amount to its nano-scale integer.
          */
-        function to_nano(q: number): number;
+        function to_nano(q: number, opts?: {
+            round?: SafeInt.Rounding;
+        }): number;
         /**
          * Convert quota options to nano-scale by scaling `max`; `interval` is preserved.
          */
-        function to_nano(q: Quota.Opts): Quota.Opts;
+        function to_nano(q: Quota.Opts, opts?: {
+            round?: SafeInt.Rounding;
+        }): Quota.Opts;
     }
     /** The OpenAIQuery quota document. */
     type Document = Quota & Query;

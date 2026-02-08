@@ -14,6 +14,7 @@
  * }
  * ```
  *
+ * @nav Server
  * @docs
  */
 export declare enum Status {

@@ -117,7 +117,7 @@ export class Database {
             }
             catch (error) {
                 this.server.log.error(error);
-                reject(new Error('Error connecting to the database'));
+                reject(new Error('Error connecting to the database', { cause: error }));
             }
         });
     }

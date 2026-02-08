@@ -8,8 +8,7 @@
 
 import * as vlib from "@vandenberghinc/vlib";
 import * as vts from "@vandenberghinc/vlib/vts";
-import * as vhighlight from "@vandenberghinc/vhighlight";
-import zlib from 'zlib';    
+import * as vhighlight from "@vandenberghinc/vhighlight";   
 import { Meta } from "./meta.js";
 import { Route } from './route.js';
 import { Frontend } from './frontend.js';
@@ -45,9 +44,9 @@ export class View {
     private static _vhighlight_css?: string;
 
     // Attributes.
-    source: string | null;
-    source_path?: vlib.Path;
-    callback: Function | null;
+    source: string;
+    source_path: vlib.Path;
+    // callback: Function | null;
     includes: Array<string | Record<string, any>>;
     links: Array<string | Record<string, any>>;
     templates: Record<string, any>;
@@ -60,22 +59,22 @@ export class View {
     mangle: boolean;
     _src?: string;
     _embedded_sources: Array<string>;
-    is_js_ts_view: boolean;
-    private _html?: string;
-    raw_html?: string | Buffer;
-    _bundle?: vts.BundleResult;
-    payments?: string | undefined;
     min_device_width?: number;
     server?: Server;
     endpoint?: Endpoint;
 
     /**
+     * The file path of a pre-bundled source, that can be sent from file instead of in-memory data.
+     */
+    private cached_html_path: undefined | vlib.Path;
+
+    // private html_nonce_split?: string[];
+
+    /**
      * Clone this view, used to create a modified copy of the current view.
      * @note
      * The following attributes are not deep copied, but just referenced:
-     * - `callback`
      * - `params`
-     * - `data`
      * @param override Override specific endpoint options, note that this will be shallow merged.
      * 
      * @docs
@@ -84,7 +83,7 @@ export class View {
         return new View({
             ...vlib.Object.deep_copy({
                 source: this.source,
-                callback: this.callback,
+                // callback: this.callback,
                 includes: this.includes,
                 links: this.links,
                 templates: this.templates,
@@ -107,8 +106,8 @@ export class View {
      * @docs
      */
     constructor({
-        source = null,
-        callback = null,
+        source,
+        // callback = null,
         includes = [],
         links = [],
         templates = {},
@@ -123,12 +122,12 @@ export class View {
         _src,
     }: {
         /** The file path to the client side JavaScript source code. */
-        source?: string | null;
-        /**
-         * The client side callback function; this function will be executed at the client side.
-         * For this feature the `Content-Security-Policy: script-src` must be updated with, for example, `unsafe-inline`.
-         */
-        callback?: Function | null;
+        source: string;
+        // /**
+        //  * The client side callback function; this function will be executed at the client side.
+        //  * For this feature the `Content-Security-Policy: script-src` must be updated with, for example, `unsafe-inline`.
+        //  */
+        // callback?: Function | null;
         /**
          * The included static JS files.
          * By default, the local includes will be embedded into the HTML page. However, this behaviour can be disabled by passing an object of type `IncludeObject` with the attribute `embed = false`.
@@ -140,8 +139,8 @@ export class View {
          */
         links?: (string | Record<string, any>)[];
         /**
-         * Templates that will replace the `callback` code. Templates can be created using the `$TEMPLATE` template style.
-         * However, templates will only be used on the code of the `callback` attribute.
+         * Templates that will be filled in the bundled source code.
+         * Templates can be created through a {{template_name}} syntax.
          */
         templates?: Record<string, any>;
         /** The meta information object. */
@@ -162,7 +161,7 @@ export class View {
     }) {
         // Arguments.
         this.source = source;
-        this.callback = callback;
+        // this.callback = callback;
         this.includes = [...View.includes, ...includes];
         this.links = [...View.links, ...links];
         this.templates = templates;
@@ -180,29 +179,20 @@ export class View {
         this._embedded_sources = [];
 
         // Clean source, required to match against endpoint's.
-        if (this.source != null) {
-            this.source_path = new vlib.Path(this.source);
-            if (!this.source_path.exists()) {
-                throw new Error(`Defined source path "${this.source}" does not exist.`);
-            }
-            this.source_path = this.source_path.abs();
-            this.source = this.source_path.str();
+        this.source_path = new vlib.Path(this.source);
+        if (!this.source_path.exists()) {
+            throw new Error(`Defined source path "${this.source}" does not exist.`);
         }
+        this.source_path = this.source_path.abs();
+        this.source = this.source_path.str();
 
         // Is js/ts bundle view.
-        this.is_js_ts_view = this.source_path != null && /\.(jsx?|tsx?)/.test(this.source_path.extension());
-
-        // Check args.
-        if (typeof source !== "string" && typeof callback !== "function") {
-            throw Error("Invalid usage, define either parameter \"source\" or \"callback\".");
+        if (!/\.(jsx?|tsx?)$/.test(this.source_path.extension())) {
+            throw new Error(`Invalid view source extension "${this.source_path.extension()}", only ".js", ".ts", ".jsx" and ".tsx" are supported.`);
         }
 
         // Drop duplicate includes.
         this.includes = vlib.Array.drop_duplicates(this.includes);
-
-        // Attributes.
-        this._html = undefined;
-        this._bundle = undefined;
     }
 
     // Initialize.
@@ -213,46 +203,17 @@ export class View {
         this.endpoint = endpoint;
     }
 
-    /** Production initialization. */
+    /**
+     * Production initialization.
+     * This will bundle the source code and prepare the view for production use.
+     * Instead of bundling on demand in the request which is used for development mode.
+     */
     async production_initialize(): Promise<void> {
-        await this.ensure_bundle();
-        await this._build_html();
-    }
-
-    // Bundle the compiled typescript / javascript dynamically on demand to optimize server startup for development purposes.
-    private async _dynamic_bundle(): Promise<void> {
-
-        // Server & endpoint.
-        if (this.server === undefined || this.endpoint === undefined) { throw Error("View has not been initialized with \"View._initialize()\" yet."); }
-
-        // Bundle.
-        debug(3, this.endpoint?.route?.id, `: Bundling entry path "${this.source_path?.str()}".`)
-        this._bundle = await vts.bundle({
-            include: this.source_path ? [this.source_path?.str()] : [],
-            output: `/tmp/${this.endpoint.route.method}_${this.source_path!.str().replace(/\//g, "_")}.js`, // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
-            minify: false,//this._server.production,
-            platform: "browser",
-            format: "esm",
-            // format: "iife", // can causes issues with node_modules imports.
-            target: "es2022",
-            // sourcemap: this.server.production ? false : "inline",
-            extract_inputs: true, // since bundle.inputs is used by server.js.
-            tree_shaking: true,
-        })
-
-        // Set options based on inputs.
-        this.payments = this._bundle.inputs.find((path: string) => path.endsWith("/modules/paddle.js"));
-    }
-
-    /** Ensure the view is bundled when required. */
-    async ensure_bundle() {
-        if (this.is_js_ts_view && !this._bundle) {
-            return this._dynamic_bundle();
-        }
+        await this._create_html_file();
     }
 
     /** Create an error HTML file when errors are encountered during the bundle process. */
-    private async _build_bundle_err_html(): Promise<void> {
+    private async _build_bundle_err_html(): Promise<string> {
 
         // Dont show in production.
         if (this.server?.production) {
@@ -287,8 +248,10 @@ export class View {
             .replace(/'/g, '&#39;')
         );
 
+        // Build html.
+        let html: string;
         if (this.server?.production) {
-            this._html = `
+            html = `
                 <!DOCTYPE html>
                 <html lang='${this.lang}'>
                 <head>
@@ -319,7 +282,7 @@ export class View {
             // Development mode - show full debug info
             const formatted_import_chains = bundle.format_import_chains();
             const formatted_errors = bundle.format_errors();
-            this._html = `
+            html = `
                 <!DOCTYPE html>
                 <html lang='${this.lang}'>
                 <head>
@@ -395,12 +358,14 @@ export class View {
                 `.dedent(false);
         }
 
-        this.html_nonce_split = this._html.split(nonce_identifier);
+        // this.html_nonce_split = html.split(nonce_identifier);
+
+        return html;
     }
 
 
     // Build html.
-    private async _build_html(): Promise<void> {
+    private async _build_html(): Promise<string> {
 
         // A nonce identifier.
         const nonce_identifier = "{{__VOLT_NONCE__}}";
@@ -408,31 +373,44 @@ export class View {
         // Server & endpoint.
         if (this.server == null || this.endpoint == null) { throw Error("View has not been initialized with \"View._initialize()\" yet."); }
 
+        // Bundle.
+        if (debug.on(3)) debug(this.endpoint?.route?.id, `: Bundling entry path "${this.source_path?.str()}".`)
+        const bundle = await vts.bundle({
+            include: this.source_path ? [this.source_path?.str()] : [],
+            output: `/tmp/${this.endpoint.route.method}_${this.source_path!.str().replace(/\//g, "_")}.js`, // esbuild requires an output path to resolve .css and .ttf files etc which can be imported by libraries (such as monaco-editor).
+            minify: false,//this._server.production,
+            platform: "browser",
+            format: "esm",
+            // format: "iife", // can causes issues with node_modules imports.
+            target: "es2022",
+            // sourcemap: this.server.production ? false : "inline",
+            extract_inputs: true, // since bundle.inputs is used by server.js.
+            tree_shaking: true,
+        });
+
+        // Set options based on inputs.
+        const add_payments_module = bundle.inputs.find((path: string) => path.endsWith("/modules/paddle.js"));
+
         // Bundle js files automatically.
-        if (this.is_js_ts_view && !this._bundle) {
-            await this._dynamic_bundle();
-        }
-        if (this._bundle != null && this._bundle.errors.length > 0) {
+        if (bundle.errors.length > 0) {
             return this._build_bundle_err_html();
         }
 
         // Vars.
         const line_break = this.server.production ? "\n" : "\n";
-        const has_bundle = this._bundle != null && typeof this._bundle === "object";
-        // console.log("Bundle:", this._bundle)
 
         // Initialize html.
-        this._html = "";
+        let html = "";
 
         // Doctype.
-        this._html += `<!DOCTYPE html><html lang='${this.lang}'>${line_break}`;
+        html += `<!DOCTYPE html><html lang='${this.lang}'>${line_break}`;
         
         // Headers.
-        this._html += `<head>${line_break}`;
+        html += `<head>${line_break}`;
         
         // Meta.
         if (this.meta) {
-            this._html += this.meta.build_html(this.server.full_domain) + line_break;
+            html += this.meta.build_html(this.server.full_domain) + line_break;
         }
 
         // this.html = "Hello World!";
@@ -442,7 +420,7 @@ export class View {
         // Stylesheets & links.
         
         // Default stylesheet to avoid inline `style=""`.
-        this._html += `<style nonce="${nonce_identifier}">` +
+        html += `<style nonce="${nonce_identifier}">` +
             `html { min-width:100%;min-height:100%; }` +
             `body { width:100vw;height:100vh;margin:0;padding:0;${this.body_style ?? ""} }` +
             `</style>${line_break}`;
@@ -466,7 +444,7 @@ export class View {
                 }
             }
             if (embed) {
-                this._html += `<style nonce="${nonce_identifier}">${line_break}${embed}${line_break}</style>${line_break}`;
+                html += `<style nonce="${nonce_identifier}">${line_break}${embed}${line_break}</style>${line_break}`;
                 if (url) { this._embedded_sources.push(url); }
                 return true;
             }
@@ -497,7 +475,7 @@ export class View {
 
         // Add custom stylesheet for minimum device width on smaller screens.
         if (this.min_device_width != null) {
-            this._html += `
+            html += `
                 <script nonce="${nonce_identifier}">
                 let has_min_width = false;
                 const viewport = document.querySelector('meta[name="viewport"]');
@@ -525,47 +503,10 @@ export class View {
             `.dedent();
         }
 
-        // this.html += `<script nonce="${nonce_identifier}">
-        
-        // // This version prevents the infinite loop
-        // let resizeTimeout;
-        // let viewportChangeInProgress = false;
-        // const viewport = document.querySelector('meta[name="viewport"]');
-        // const originalContent = viewport.getAttribute('content');
-
-        // function set_min_width() {
-        //     // Don't run if we're already processing a viewport change
-        //     if (viewportChangeInProgress) return;
-            
-        //     // Clear any pending resize timeouts
-        //     clearTimeout(resizeTimeout);
-            
-        //     // Set a small delay to prevent rapid successive calls
-        //     resizeTimeout = setTimeout(() => {
-        //         viewportChangeInProgress = true;
-                
-        //         if (window.innerWidth < 400) {
-        //             // Only update if needed
-        //             viewport.setAttribute('content', \`width = 400, initial - scale\${ window.innerWidth / 400 }, maximum - scale=1\`);
-        //         } else {
-        //             // Restore original viewport
-        //             viewport.setAttribute('content', originalContent);
-        //         }
-                
-        //         // Allow future updates after a delay
-        //         setTimeout(() => {
-        //             viewportChangeInProgress = false;
-        //         }, 300);
-        //     }, 200);
-        // }
-        // window.addEventListener('DOMContentLoaded', set_min_width);
-        // window.addEventListener('orientationchange', set_min_width);
-        // </script>`
-
         // Custom links.
         this.links.forEach((url: string | Record<string, any>) => {
             if (typeof url === "string") {
-                this._html += `<link rel="stylesheet" href="${url}">`;
+                html += `<link rel="stylesheet" href="${url}">`;
             } else if (typeof url === "object") {
 
                 // Embed content.
@@ -579,13 +520,13 @@ export class View {
                     if (url.async) {
                         include_link_async(url);
                     } else {
-                        this._html += "<link";
+                        html += "<link";
                         Object.keys(url).forEach((key) => {
                             if (key !== "embed") {
-                                this._html += ` ${key}="${url[key]}"`;
+                                html += ` ${key}="${url[key]}"`;
                             }
                         })
-                        this._html += ">" + line_break;
+                        html += ">" + line_break;
                     }
                 }
             } else {
@@ -595,21 +536,21 @@ export class View {
 
         // Add include links script.
         if (include_links_script) {
-            this._html += `<script nonce="${nonce_identifier}">${line_break}${include_links_script}${line_break}</script>${line_break}`;
+            html += `<script nonce="${nonce_identifier}">${line_break}${include_links_script}${line_break}</script>${line_break}`;
         }
         
         // End headers.
-        this._html += "</head>" + line_break;
+        html += "</head>" + line_break;
 
         // ------------------------------------------------------------------------------------------
         // Body.
 
         // Body.
-        this._html +=  "<body id='body'>";
+        html +=  "<body id='body'>";
 
         // Create splash screen.
         if (this.splash_screen != null) {
-            this._html += this.splash_screen.html + line_break;
+            html += this.splash_screen.html + line_break;
         }
 
         // ------------------------------------------------------------------------------------------
@@ -633,9 +574,9 @@ export class View {
 
                 // Dont embed code.
                 if (embed.content_type === "application/javascript") {
-                    this._html += `<script nonce="${nonce_identifier}">${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
+                    html += `<script nonce="${nonce_identifier}">${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
                 } else {
-                    this._html += `<script nonce="${nonce_identifier}" type='${embed.content_type}'>${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
+                    html += `<script nonce="${nonce_identifier}" type='${embed.content_type}'>${line_break}${embed.raw_data || embed.data}${line_break}</script>${line_break}`;
                 }
                 this._embedded_sources.push(url);
                 return true;
@@ -649,34 +590,28 @@ export class View {
         // 3rd party js includes.
         if (this.jquery) {
             // Keep first since it needs to be included before volt.
-            this._html += `<script nonce="${nonce_identifier}" src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js'></script>${line_break}`;
+            html += `<script nonce="${nonce_identifier}" src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js'></script>${line_break}`;
         }
         if (this.server.google_tag !== undefined) {
-            // this.html += `<script async src="https://www.googletagmanager.com/gtag/js?id=${this._server.google_tag}" onload='volt.google._initialize()'></script>`;
             include_js_script += `__volt_incl_js("https://www.googletagmanager.com/gtag/js?id=${this.server.google_tag}");${line_break}`;
         }
 
-        // Primary volt includes do not add them to cached_code since they need to be included before any other includes.
-        // Otherwise when including several files, most of them embedded and one not, then the not embedded will not have access to volt.
-        // Since volt is 
-        // embed_script("/volt/api/v1/volt.js", false);
-
         // Add volt static aspect ratios.
         // @todo volt.static
-        this._html += `<script nonce="${nonce_identifier}">${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this.server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
+        html += `<script nonce="${nonce_identifier}">${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this.server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
 
         // Embed other scripts.
         if (this.server.payments) {
             if (this.server.payments.type === "paddle") {
                 // embed_script("/volt/api/v1/payments/paddle.js", false); // no longer required due to auto imports.
-                if (this.payments) {
+                if (add_payments_module) {
                     include_js_script += `__volt_incl_js("https://cdn.paddle.com/paddle/v2/paddle.js");${line_break}`;
                 }
             }
         }
 
         // Add the include js script.
-        this._html += `<script nonce="${nonce_identifier}">${line_break}${include_js_script.trimEnd()}${line_break}</script>${line_break}`
+        html += `<script nonce="${nonce_identifier}">${line_break}${include_js_script.trimEnd()}${line_break}</script>${line_break}`
 
         // Additional js includes.
         this.includes.forEach((url: string | Record<string, any>) => {
@@ -686,16 +621,16 @@ export class View {
             // Include.
             else {
                 if (typeof url === "string") {
-                    this._html += `<script nonce="${nonce_identifier}" src='${url}'></script>${line_break}`;
+                    html += `<script nonce="${nonce_identifier}" src='${url}'></script>${line_break}`;
                 }
                 else if (typeof url === "object") {
-                    this._html += `<script nonce="${nonce_identifier}"`;
+                    html += `<script nonce="${nonce_identifier}"`;
                     Object.keys(url).forEach((key) => {
                         if (key !== "embed") {
-                            this._html += ` ${key}="${url[key]}"`;
+                            html += ` ${key}="${url[key]}"`;
                         }
                     })
-                    this._html += "></script>" + line_break;
+                    html += "></script>" + line_break;
                 }
                 else {
                     throw Error("Invalid type for a js include, the valid value types are \"string\" and \"object\".");
@@ -704,118 +639,74 @@ export class View {
         })
 
         // Add direct source code.
-        if (has_bundle && this._bundle != null && typeof this._bundle.code === "string") {
-            this._html += `<script nonce="${nonce_identifier}" type='module'>${line_break}${this._bundle.code}${line_break}</script>${line_break}`;
+        if (typeof bundle.code === "string") {
+            html += `<script nonce="${nonce_identifier}" type='module'>${line_break}${bundle.code}${line_break}</script>${line_break}`;
         }
 
         // Include the source.
         else if (typeof this.source === "string") {
-            this._html += `<script nonce="${nonce_identifier}">${line_break}${await new vlib.Path(this.source).load()}${line_break}</script>${line_break}`;
+            html += `<script nonce="${nonce_identifier}">${line_break}${await new vlib.Path(this.source).load()}${line_break}</script>${line_break}`;
         }
 
         // JS code.
-        else if (this.callback != null) {
-            let code = this.callback.toString();
+        // else if (this.callback != null) {
+        //     let code = this.callback.toString();
 
-            // Add.
-            this._html += `<script nonce="${nonce_identifier}">${line_break}(${code})()${line_break}</script>${line_break}`
-            // cached_code += `;(${code})();`;
-        }
+        //     // Add.
+        //     html += `<script nonce="${nonce_identifier}">${line_break}(${code})()${line_break}</script>${line_break}`
+        //     // cached_code += `;(${code})();`;
+        // }
 
         // Close body.
-        this._html += "</body>" + line_break;
+        html += "</body>" + line_break;
         
         // End.
-        this._html +=  "</html>" + line_break;
-
-        // Split by nonce.
-        this.html_nonce_split = this._html.split(nonce_identifier);
+        html +=  "</html>" + line_break;
 
         // console.log("Built HTML for endpoint", this.endpoint?.route?.endpoint_str + "\n" +this.html.slice(0, 25_000) + (this.html.length > 25_000 ? "..." : ""));
+
+        return html;
     }
 
-    /** Retrieve the content length of the built html. */
-    async content_length(): Promise<number> {
-
-        // Create nonce.
-        const nonce = crypto.randomBytes(16).toString('base64');
+    /** Create the cached HTML file if it doesn't exist. */
+    private async _create_html_file(): Promise<vlib.Path> {
         
-        // Build html if needed.
-        if (!this._html) {
-            await this._build_html();
+        // Check cache.
+        const cache_id = `${this.endpoint?.route.method}_${this.source_path?.str()}.html`.replaceAll("/", "_");
+        if (!this.cached_html_path) {
+            // Use a cached path for slight performance increase when used with stream.send()
+            this.cached_html_path = this.server!.endpoint_cache_dir.join(cache_id);
+        }
+        if (!this.cached_html_path.exists()) {
+            
+            // Create html.
+            const html = await this._build_html();
+
+            // Save html to a local file path.
+            await this.cached_html_path.save(html);
         }
 
-        // Create html.
-        let html: string | Buffer = this.html_nonce_split!.join(nonce);
-
-        // Return.
-        return html.length;
-    }
-
-    /** Retrieve the HTML. */
-    async html(opts?: {
-        /** Compress content. */
-        compress?: boolean;
-        /** Add new templates, overriding the default `View` templates. */
-        templates?: Record<string, any>;
-    }): Promise<{
-        html: string | Buffer;
-        content_length: number;
-        nonce: string;
-    }> {
-
-        // Create nonce.
-        const nonce = crypto.randomBytes(16).toString('base64');
-
-        // Build html if needed.
-        if (!this._html) {
-            await this._build_html();
-        }
-
-        // Create html.
-        let html: string | Buffer = this.html_nonce_split!.join(nonce);
-
-        // Apply templates.
-        const templates = { ...this.templates, ...opts?.templates ?? {} };
-        if (Object.keys(templates).length) {
-            html = Utils.fill_templates(html, templates, true /** curly style */);
-        }
-
-        // Content length.
-        const content_length = Buffer.byteLength(html, 'utf-8');
-
-        // Compress.
-        if (opts?.compress) {
-            html = zlib.gzipSync(html, { level: zlib.constants.Z_BEST_COMPRESSION });
-        }
-
-        // Return.
-        return {
-            html,
-            content_length,
-            nonce,
-        }
+        return this.cached_html_path;
     }
     
     // Serve a client.
     async _serve(stream: Stream, status_code: number = 200, opts?: {
         /** Compress. */
         compress?: boolean;
-        /** Add new templates, overriding the default `View` templates. */
-        templates?: Record<string, any>;
+        /** Template replacements. */
+        templates?: Record<string, string>;
     }): Promise<void> {
-        debug(2, this.endpoint?.route?.id, ": Serving HTML ", this._html?.slice(0, 50), "...");
 
-        // Create html.
-        const html = await this.html(opts);
-        
-        // Compute content length on view & when not defined.
-        stream.set_header("Content-Length", html.content_length.toString());
+        // Check cache.
+        const html_file = await this._create_html_file();
+
+        // Create nonce.
+        const nonce = crypto.randomBytes(16).toString("base64");
 
         // Set nonce.
         const csp = stream.get_header("Content-Security-Policy");
         if (typeof csp === "string") {
-            const new_csp = csp.replace(/(script-src|style-src)([^;]*)/g, (_, g1, g2) => `${g1}${g2} 'nonce-${html.nonce}'`)
+            const new_csp = csp.replace(/(script-src|style-src)([^;]*)/g, (_, g1, g2) => `${g1}${g2} 'nonce-${nonce}'`)
             stream.set_header("Content-Security-Policy", new_csp);
         }
 
@@ -823,10 +714,11 @@ export class View {
         stream.send({
             status: status_code, 
             headers: { "Content-Type": "text/html" }, 
-            data: html.html,
+            from_file: html_file,
+            templates: { ...this.templates, ...(opts?.templates ?? {}), "__VOLT_NONCE__": nonce },
+            compress: opts?.compress,
         });
     }
-    private html_nonce_split?: string[];
 }
 export namespace View {
     export type Opts = ConstructorParameters<typeof View>[0];

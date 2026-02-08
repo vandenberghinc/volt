@@ -1,6 +1,6 @@
 /**
- * @author Daan …
- * @copyright …
+ * @author Daan van den Bergh
+ * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 /**
  * Scaled, integer-only amount with explicit, type-safe scale semantics.
@@ -10,7 +10,7 @@
  * @remarks
  * - The stored value is always a **safe JavaScript integer** (may be negative) measured in units of `S`.
  * - Instances are **immutable**; all arithmetic returns new `SafeInt` instances.
- * - Conversions are **exact by default**. Provide a {@link SafeInt.RoundingNode} `mode` to allow rounding.
+ * - Conversions are **exact by default**. Provide a {@link SafeInt.Rounding} `round` to allow rounding.
  * - Arithmetic is **same-scale only**: pass raw integers or another `SafeInt<S>`.
  *
  * @nav Database
@@ -29,20 +29,20 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Construct by converting from `opts.from_scale` to `opts.to_scale`. **Exact by default**.
      *
      * @param value The numeric input at `opts.from_scale`.
-     *              - If `from_scale === Base`, `value` may be a float. When `mode` is omitted,
-     *                `value * to_scale` must be an integer. If `mode` is provided, that rounding is applied.
+     *              - If `from_scale === Base`, `value` may be a float. When `round` is omitted,
+     *                `value * to_scale` must be an integer. If `round` is provided, that rounding is applied.
      *              - If `from_scale !== Base`, `value` must be a safe integer.
      * @param opts  The canonical scale or scale options.
      * @param opts.to_scale   The target scale for storage (the resulting instance type is `SafeInt<opts.to_scale>`).
      * @param opts.from_scale The source scale of {@link value}, defaults to {@link SafeInt.Scale.Base}.
-     * @param opts.mode       Optional rounding mode for non-exact conversions (default: `"exact"`).
+     * @param opts.round       Optional rounding mode for non-exact conversions (default: `"exact"`).
      *
      * @example
      * new SafeInt(123_000, SafeInt.Scale.Nano)
      * @example
      * new SafeInt(123_000, "nano")
      * @example
-     * new SafeInt(1.5, { from_scale: SafeInt.Scale.Base, to_scale: SafeInt.Scale.Milli, mode: "round" }) // 1500
+     * new SafeInt(1.5, { from_scale: SafeInt.Scale.Base, to_scale: SafeInt.Scale.Milli, round: "round" }) // 1500
      *
      * @throws
      * Error If inputs are invalid, conversion overflows, or exactness is required but not met.
@@ -52,7 +52,7 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
     constructor(value: number, opts: S | SafeInt.ScaleToString<S> | {
         to_scale: S | SafeInt.ScaleToString<S>;
         from_scale?: SafeInt.Scale | SafeInt.StringScale;
-        mode?: SafeInt.RoundingNode;
+        round?: SafeInt.Rounding;
     });
     /**
      * Retrieve the underlying integer (measured in {@link scale} units).
@@ -88,17 +88,17 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
     to_base_float(): number;
     /**
      * Convert this instance to another integer scale.
-     * **Exact by default** — provide a {@link SafeInt.RoundingNode} to allow rounding.
+     * **Exact by default** — provide a {@link SafeInt.Rounding} to allow rounding.
      *
      * @typeParam T - Target scale (see {@link SafeInt.Scale}).
      * @param to_scale The target canonical scale.
-     * @param mode     Rounding mode for non-exact ratios (default `"exact"`).
+     * @param round     Rounding mode for non-exact ratios (default `"exact"`).
      *
      * @returns A new {@link SafeInt} typed as `SafeInt<T>`, storing an integer at `to_scale`.
      *
      * @docs
      */
-    to_scale<T extends SafeInt.Scale>(to_scale: T, mode?: SafeInt.RoundingNode): SafeInt<T>;
+    to_scale<T extends SafeInt.Scale>(to_scale: T, round?: SafeInt.Rounding): SafeInt<T>;
     /**
      * Rescale to base (1).
      *
@@ -176,14 +176,14 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * Divide by a positive integer divisor at the same scale.
      *
      * @param divisor Positive safe integer or `SafeInt<S>` divisor.
-     * @param mode    Rounding mode. Default `"exact"` requires no remainder.
-     * @returns       A new `SafeInt<S>` with the integer quotient (per {@link mode}).
+     * @param round    Rounding mode. Default `"exact"` requires no remainder.
+     * @returns       A new `SafeInt<S>` with the integer quotient (per {@link round}).
      *
-     * @throws Error If the divisor is invalid, division by zero, non-exact remainder in `"exact"` mode, or overflow.
+     * @throws Error If the divisor is invalid, division by zero, non-exact remainder in `"exact"` round, or overflow.
      *
      * @docs
      */
-    div(divisor: number | SafeInt<S>, mode?: SafeInt.RoundingNode): SafeInt<S>;
+    div(divisor: number | SafeInt<S>, round?: SafeInt.Rounding): SafeInt<S>;
     /**
      * Compare with another `SafeInt<S>`.
      *
@@ -251,49 +251,49 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      */
     static assert_negative(value: number, label: string): void;
     /**
-     * Apply a rounding mode to a floating value.
+     * Apply a rounding to a floating value.
      *
      * @param v    Floating value to round.
-     * @param mode Rounding mode.
+     * @param round Rounding mode.
      * @returns    Rounded integer (validated by the caller).
      * @internal
      */
-    protected static apply_round(v: number, mode: SafeInt.RoundingNode): number;
+    protected static apply_round(v: number, round: SafeInt.Rounding): number;
     /**
      * Convert integer-scale value → base **integer** using a rounding policy.
      *
      * @param value      Safe integer at `from_scale` (may be negative).
      * @param from_scale Source scale.
-     * @param mode       Rounding (default exact).
+     * @param round       Rounding (default exact).
      * @returns          Base-scale integer.
      * @internal
      */
-    protected static div_to_base(value: number, from_scale: number, mode: SafeInt.RoundingNode): number;
+    protected static div_to_base(value: number, from_scale: number, round: SafeInt.Rounding): number;
     /**
      * Integer division helper with selectable rounding semantics.
      *
      * @param numerator   Safe integer (may be negative).
      * @param denominator Positive safe integer.
-     * @param mode        Rounding mode (default `"exact"`).
-     * @returns           Integer quotient as per {@link mode}.
+     * @param round        Rounding mode (default `"exact"`).
+     * @returns           Integer quotient as per {@link round}.
      *
      * @throws Error On invalid inputs, division by zero, non-exact remainder in `"exact"`, or overflow.
      * @internal
      */
-    protected static div_int_checked(numerator: number, denominator: number, mode?: SafeInt.RoundingNode): number;
+    protected static div_int_checked(numerator: number, denominator: number, round?: SafeInt.Rounding): number;
     /**
      * Integer-only scale converter with rounding policy.
      *
      * @param value       Safe integer at {@link from_scale} (may be negative).
      * @param from_scale  Integer source scale.
      * @param to_scale    Integer target scale.
-     * @param mode        Rounding mode (default exact).
+     * @param round        Rounding mode (default exact).
      * @returns           Safe integer at `to_scale`.
      *
      * @throws Error On invalid inputs or overflow.
      * @internal
      */
-    protected static convert_int_scale(value: number, from_scale: number, to_scale: number, mode: SafeInt.RoundingNode): number;
+    protected static convert_int_scale(value: number, from_scale: number, to_scale: number, round: SafeInt.Rounding): number;
 }
 export declare namespace SafeInt {
     /**
@@ -306,7 +306,7 @@ export declare namespace SafeInt {
      *
      * @docs
      */
-    type RoundingNode = "exact" | "floor" | "ceil" | "round";
+    type Rounding = "exact" | "floor" | "ceil" | "round";
     /**
      * Canonical integer scales (units-per-base).
      *

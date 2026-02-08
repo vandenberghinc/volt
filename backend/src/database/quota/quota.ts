@@ -1424,15 +1424,15 @@ export namespace QuotaManager {
         /**
          * Convert `null | undefined` to `undefined` (no-op).
          */
-        export function to_nano(q: null | undefined): undefined;
+        export function to_nano(q: null | undefined, opts?: { round?: SafeInt.Rounding }): undefined;
         /**
          * Convert a numeric amount to its nano-scale integer.
          */
-        export function to_nano(q: number): number;
+        export function to_nano(q: number, opts?: { round?: SafeInt.Rounding }): number;
         /**
          * Convert quota options to nano-scale by scaling `max`; `interval` is preserved.
          */
-        export function to_nano(q: Quota.Opts): Quota.Opts;
+        export function to_nano(q: Quota.Opts, opts?: { round?: SafeInt.Rounding }): Quota.Opts;
         /**
          * Helper function to convert a number or quota scales to a nano integer.
          * For `Quota` options it only updates the `max` attribute.
@@ -1447,13 +1447,16 @@ export namespace QuotaManager {
          * 
          * @docs
          */
-        export function to_nano(q: null | undefined | number | Quota.Opts): undefined | number | Quota.Opts {
+        export function to_nano(
+            q: null | undefined | number | Quota.Opts,
+            opts?: { round?: SafeInt.Rounding }
+        ): undefined | number | Quota.Opts {
             if (q == null) return undefined
             else if (typeof q === "number") {
-                return new SafeInt(q, { from_scale: 1, to_scale: SafeInt.Scale.Nano }).value()
+                return new SafeInt(q, { from_scale: 1, to_scale: SafeInt.Scale.Nano, round: opts?.round }).value()
             }
             return {
-                max: new SafeInt(q.max, { from_scale: 1, to_scale: SafeInt.Scale.Nano }).value(),
+                max: new SafeInt(q.max, { from_scale: 1, to_scale: SafeInt.Scale.Nano, round: opts?.round }).value(),
                 interval: q.interval,
             };
         }

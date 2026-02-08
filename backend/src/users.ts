@@ -17,6 +17,7 @@ import { Stream, AuthStream } from "./stream.js"
 import { Server } from "./server.js"
 import { Collection } from "./database/collection.js"
 import { Request } from "../../frontend/src/modules/request.js";
+import { delete_stripe_customer } from "./payments/stripe/customers.js";
 
 // ---------------------------------------------------------
 // Types.
@@ -1873,7 +1874,11 @@ export class Users {
         await this.protected.delete_many({ uid });
         await this.private.delete_many({ uid });
         if (this.server.payments !== undefined) {
-            await this.server.payments._delete_user(uid);
+            if (this.server.payments.type === "stripe") {
+                await this.server.payments.delete_user(uid);
+            } else {
+                await this.server.payments._delete_user(uid);
+            }
         }
 
         // Execute event callbacks.

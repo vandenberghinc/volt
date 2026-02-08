@@ -580,6 +580,7 @@ export class ExtendedInputElement extends (VStackElement as any as VElementBaseS
 			.box_shadow(`0 0 0 0px transparent`)
 			.transition("background 200ms ease-in-out")
             .pointer_events("none")
+            .parent(this);
         if (this.input_opts.border.type === "bottom") {
             this.input_border.hide()
         }

@@ -18,9 +18,14 @@ export var Events;
         if (callbacks == null) {
             return;
         }
-        callbacks.forEach((i) => {
-            i[1](i[0], args);
-        });
+        for (const i of callbacks) {
+            try {
+                i[1](i[0], args);
+            }
+            catch (e) {
+                console.error(`Error in event callback for event '${id}':`, e);
+            }
+        }
     }
     Events.emit = emit;
     // On event.

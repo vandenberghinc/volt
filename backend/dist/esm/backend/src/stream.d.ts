@@ -2,8 +2,10 @@
  * @author Daan van den Bergh
  * @copyright © 2025 - 2025 Daan van den Bergh. All rights reserved.
  */
+import * as vlib from "@vandenberghinc/vlib";
 import { IncomingMessage, ServerResponse } from 'http';
 import { ServerHttp2Stream, IncomingHttpHeaders, Http2ServerRequest, Http2ServerResponse } from 'http2';
+import { Transform } from "node:stream";
 /** A generic map of request parameters. */
 export type Params = Record<string, any>;
 /** Alias for {@link Params}. */
@@ -196,24 +198,42 @@ export declare class Stream {
     get uid(): string | undefined;
     set uid(value: string | undefined);
     /**
+     * Apply templates to an in-memory body.
+     * Only applies to string bodies to avoid corrupting binary payloads.
+     */
+    private apply_templates_to_body;
+    /**
+     * Create a transform stream that applies templates across chunk boundaries.
+     * This avoids missing replacements when a template key is split between chunks.
+     */
+    private create_template_replace_transform;
+    /** Remove content length header from headers. */
+    private remove_content_length_header;
+    /** Create output headers for http2. */
+    private create_http2_headers;
+    /** Assign http headers to response. */
+    private set_http1_headers;
+    /**
      * Send a response.
-     *
-     * @param options The response options.
-     * @param options.status The response status.
-     * @param options.headers The response headers.
-     * @param options.data The data of the response body to send.
-     * @param options.compress Whether the response should be gzip-compressed.
      * @example
      * ```ts
      * stream.send({status: 200, data: "Hello World!"});
      * ```
      * @docs
      */
-    send<Data extends ResponseBody = ResponseBody>({ status, headers, data, compress, }?: {
+    send<Data extends ResponseBody = ResponseBody>({ status, headers, data, compress, from_file, templates, }: {
+        /** The response status. */
         status?: number;
+        /** The response headers. */
         headers?: ResponseHeaders;
+        /** The data of the response body to send. */
         data?: Data;
+        /** Whether the response should be gzip-compressed. */
         compress?: boolean;
+        /** Load data from a file, using a cached path will have a slight performance improvement */
+        from_file?: string | vlib.Path;
+        /** Apply template replacements (e.g. { "{{__VOLT_NONCE__}}": nonce }) */
+        templates?: Record<string, any>;
     }): this;
     /**
      * Send a response
@@ -229,11 +249,12 @@ export declare class Stream {
      * ```
      * @docs
      */
-    success<Data extends ResponseBody = ResponseBody>({ status, headers, data, compress }?: {
+    success<Data extends ResponseBody = ResponseBody>({ status, headers, data, from_file, compress }?: {
         status?: number;
         headers?: ResponseHeaders;
         data?: Data;
         compress?: boolean;
+        from_file?: string | vlib.Path;
     }): this;
     /**
      * Send an error response
@@ -260,6 +281,26 @@ export declare class Stream {
         headers?: ResponseHeaders;
         compress?: boolean;
         data?: ErrorData;
+    }): this;
+    /**
+     * Stream a response through a transform pipeline with an optional gzip step and a hard byte limit.
+     *
+     * @param options Pipeline options.
+     * @param options.status The HTTP status code to send.
+     * @param options.headers The response headers to send.
+     * @param options.body The readable stream to pipe into the response.
+     * @param options.transforms Optional transform streams applied in order.
+     * @param options.compress When true, gzip-compresses the streamed response if the client supports it.
+     * @param options.max_bytes The maximum number of bytes allowed to be written to the client.
+     *                          Set to `-1` for unlimited (use with caution).
+     */
+    pipeline({ status, headers, body, transforms, compress, max_bytes, }: {
+        status?: number;
+        headers?: ResponseHeaders;
+        body: NodeJS.ReadableStream;
+        transforms?: Transform[];
+        compress?: boolean;
+        max_bytes?: number;
     }): this;
     /**
      * Add a new header to the response data.
