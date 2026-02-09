@@ -11,6 +11,7 @@ import {
     type InitializedOneTimeProduct,
     type InitializedProduct,
     type InitializedSubscriptionPlan,
+    type InitializedMeterProduct,
     resolve_plan_to_parent_subscription,
 } from "./products.js";
 import { ensure_stripe_customer } from "./customers.js";
@@ -30,6 +31,7 @@ import { Collection } from "src/database/collection.js";
 
 // ----------------------------------------------------------------------------------
 // Types.
+
 /**
  * A checkout line item input accepted by our API.
  */
@@ -77,6 +79,51 @@ export interface CreatedCheckoutSession {
     mode: "payment" | "subscription";
     /** Currency used for the session. */
     currency: string;
+}
+
+/**
+ * Options for creating a metered Stripe Subscription (MeterProduct).
+ *
+ * This is intentionally separate from Checkout because Stripe Checkout is not always
+ * a good fit for usage-based billing flows where you want to subscribe a customer
+ * immediately and bill later based on meter events.
+ */
+export interface CreateMeterSubscriptionOpts {
+    /** The internal user id, used to resolve/ensure Stripe customer. */
+    uid: string;
+    /**
+     * A caller-provided idempotency key.
+     * Re-using the same subscription_id makes `create_meter_subscription` idempotent across retries.
+     */
+    subscription_id: string;
+    /** The meter product reference: initialized object OR an id string. */
+    meter_product: InitializedMeterProduct | string;
+    /** All initialized products, used to resolve string ids to objects. */
+    all_products: InitializedProduct[];
+    /** Optional: attach extra safe metadata to the subscription (never secrets). */
+    metadata?: Record<string, string>;
+}
+
+/**
+ * A minimal response payload for a created metered subscription.
+ */
+export interface CreatedMeterSubscription {
+    /** The Stripe Subscription id. */
+    id: string;
+    /**
+     * The Stripe Subscription status.
+     * Note: We only return "active" or "trialing" for success; "incomplete" can be returned when action is required.
+     */
+    status: Stripe.Subscription.Status;
+    /**
+     * When action is required, Stripe returns a PaymentIntent client_secret.
+     * This is safe to return to the client to complete SCA/3DS flows.
+     */
+    latest_invoice_payment_intent_client_secret?: string;
+    /** The subscribed meter product id (our internal product id). */
+    product_id: string;
+    /** The Stripe price id used by the subscription item. */
+    stripe_price_id: string;
 }
 
 /**
@@ -203,15 +250,15 @@ export function create_session_id(uid: string): string {
  * Start a Stripe Checkout Session for the provided items.
  *
  * Stripe docs:
- * - Create session: https://docs.stripe.com/api/checkout/sessions/create :contentReference[oaicite:4]{index=4}
- * - Mixed cart (subscription + one-time): https://docs.stripe.com/payments/checkout/how-checkout-works :contentReference[oaicite:5]{index=5}
- * - Stripe Tax for Checkout: https://docs.stripe.com/tax/checkout :contentReference[oaicite:6]{index=6}
+ * - Create session: https://docs.stripe.com/api/checkout/sessions/create
+ * - Mixed cart (subscription + one-time): https://docs.stripe.com/payments/checkout/how-checkout-works
+ * - Stripe Tax for Checkout: https://docs.stripe.com/tax/checkout
  *
  * @warning Only one subscription plan per checkout session is supported, due to later subscription cancellation restrictions.
  * @warning If subscription mode is used, subscription-level settings (`billing_anchor`, `trial_days`) must be unambiguous.
  */
 export async function start_checkout_session(
-    stripe: Stripe,
+    client: Stripe,
     server: Server,
     opts: CreateCheckoutSessionOpts,
 ): Promise<CreatedCheckoutSession> {
@@ -286,7 +333,7 @@ export async function start_checkout_session(
     // Reason: Stripe Checkout creates exactly one Subscription per session in `mode="subscription"`,
     // and every recurring line item becomes a Subscription Item on that single Subscription.
     // Therefore, multiple `subscription_plan` items would create a multi-item subscription, which we forbid.
-    // Since we need to cancel a subscription as a whole in Stripe, allowing multiple plans would also 
+    // Since we need to cancel a subscription as a whole in Stripe, allowing multiple plans would also
     // cancel multiple plans when the user only meant to cancel one, which would be a bad experience.
     //
     // Stripe docs: https://docs.stripe.com/api/checkout/sessions/create
@@ -317,7 +364,7 @@ export async function start_checkout_session(
         );
     }
 
-    // Determine mode (Stripe requires subscription mode if any recurring item is present). :contentReference[oaicite:7]{index=7}
+    // Determine mode (Stripe requires subscription mode if any recurring item is present).
     const has_subscription_item = resolved_items.some((item) => item.product.type === "subscription_plan");
     const mode: "payment" | "subscription" = has_subscription_item ? "subscription" : "payment";
 
@@ -343,13 +390,13 @@ export async function start_checkout_session(
     const currency = Array.from(currencies.values())[0];
     assert(currency !== undefined, "checkout_mixed_currency", "Missing currency after currency validation.");
 
-    // Ensure Stripe customer exists (required for subscription mode). :contentReference[oaicite:8]{index=8}
-    const stripe_customer_id = await ensure_stripe_customer(stripe, opts.uid);
+    // Ensure Stripe customer exists (required for subscription mode).
+    const stripe_customer_id = await ensure_stripe_customer(client, opts.uid);
 
     // Build Stripe line items.
     const stripe_line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = resolved_items.map((item) => {
         // We only use pre-created Price ids to avoid “inline price” pitfalls and keep tax behavior stable.
-        // Stripe docs: line_items.price https://docs.stripe.com/api/checkout/sessions/create :contentReference[oaicite:9]{index=9}
+        // Stripe docs: line_items.price https://docs.stripe.com/api/checkout/sessions/create
         return {
             price: item.product.stripe_price_id,
             quantity: item.quantity,
@@ -405,7 +452,7 @@ export async function start_checkout_session(
 
         subscription_data = {};
 
-        // Apply trial days, if configured. :contentReference[oaicite:10]{index=10}
+        // Apply trial days, if configured.
         if (trial_days !== undefined) {
             subscription_data.trial_period_days = trial_days;
         }
@@ -414,7 +461,7 @@ export async function start_checkout_session(
         if (billing_anchor === "first_of_month") {
             // We anchor to the first day of the next month *after the trial ends* (or after “now” if no trial).
             // This avoids Stripe rejecting an anchor that is earlier than the first invoice timing in practice.
-            // Stripe docs: subscription_data.billing_cycle_anchor and proration_behavior. :contentReference[oaicite:11]{index=11}
+            // Stripe docs: subscription_data.billing_cycle_anchor and proration_behavior.
             const now = new Date();
             const trial_end_reference = trial_days !== undefined ? add_days_utc(now, trial_days) : now;
             const anchor_date = first_day_of_next_month_utc(trial_end_reference);
@@ -441,14 +488,15 @@ export async function start_checkout_session(
 
     // Build Checkout Session request.
     const create_params: Stripe.Checkout.SessionCreateParams = {
-        // Docs: https://docs.stripe.com/api/checkout/sessions/create :contentReference[oaicite:12]{index=12}
+        // Docs: https://docs.stripe.com/api/checkout/sessions/create
         mode,
         customer: stripe_customer_id,
         success_url: opts.success_url,
         cancel_url: opts.cancel_url,
         line_items: stripe_line_items,
 
-        // Stripe Tax: collect address automatically for tax calculation. :contentReference[oaicite:13]{index=13}
+        // Stripe Tax: collect address automatically for tax calculation.
+        // Docs: https://docs.stripe.com/tax/checkout
         automatic_tax: { enabled: true },
 
         // Optional: tax id collection is helpful for B2B scenarios (e.g. VAT).
@@ -503,7 +551,7 @@ export async function start_checkout_session(
     // Compare the existing session's create_params and currency with the current ones to ensure idempotency.
     else {
         if (
-            loaded_session.currency !== currency 
+            loaded_session.currency !== currency
             || !vlib.Object.deep_eq(loaded_session.create_params, create_params)
         ) {
             throw new ExternalStripeError(
@@ -517,10 +565,10 @@ export async function start_checkout_session(
 
     // Create session.
     // We use stripe_api_call to consistently throw InternalStripeError on Stripe API failures.
-    // Docs: https://docs.stripe.com/api/checkout/sessions/create :contentReference[oaicite:14]{index=14}
+    // Docs: https://docs.stripe.com/api/checkout/sessions/create
     const session = await stripe_api_call(
         () =>
-            stripe.checkout.sessions.create(pinned_session.create_params, {
+            client.checkout.sessions.create(pinned_session.create_params, {
                 idempotencyKey: pinned_session.session_id,
             }),
         { operation: "checkout.sessions.create" },

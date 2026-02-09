@@ -7,17 +7,10 @@ import { ExternalError, InternalError } from "src/errors/internal_external.js";
 
 /** The available stripe error code. */
 export type StripeErrorCode = (
-    /** An error code indicating a generic failure. */
-    | "generic_error"
-    /** An error code indicating a failure to create a Stripe customer. */
-    | "customer_create_error"
-    /** An error code indicating a failure to find a Stripe customer. */
-    | "customer_not_found"
     /** An error code indicating a failure to delete a Stripe customer. */
-    | "customer_delete_failed"
     | "customer_delete_error"
-    /** An error code indicating a failure to search for a Stripe customer. */
-    | "customer_search_error"
+    /** An error code indicating a Stripe customer was not found. */
+    | "customer_not_found"
     /** Invalid argument error code. */
     | "invalid_argument"
     /** Error code for an invalid product. */
@@ -34,8 +27,16 @@ export type StripeErrorCode = (
     | "checkout_subscription_plan_ambiguous"
     /** An error code indicating an invalid quantity during checkout session creation. */
     | "checkout_invalid_quantity"
-    /** An error code indicating an invalid mode during checkout session creation. */
-    | "checkout_invalid_mode"
+    /** An error code indicating a subscription is not active and can not be billed. */
+    | "subscription_not_active"
+    /** An error code indicating a failure during subscription creation. */
+    | "subscription_create_error"
+    /** An error code indicating a subscription payment action is required. */
+    | "subscription_payment_action_required"
+    /** An error code indicating a missing payment method. */
+    | "payment_method_missing"
+    /** An error code indicating a subscription resolution error */
+    | "subscription_resolution_error"
 );
 
 

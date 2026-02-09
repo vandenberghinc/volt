@@ -7,7 +7,7 @@ import StripeClient from "stripe";
 import { delete_stripe_customer, ensure_stripe_customer, find_stripe_customer_id } from "./customers.js";
 import { initialize_products, InitializedMeterProduct, InitializedOneTimeProduct, InitializedProduct, InitializedSubscriptionPlan, InitializedSubscriptionProduct, Product, ProductId, SubscriptionPlan, SubscriptionPlanId } from "./products.js";
 import { assert } from "./utils.js";
-import { is_user_subscribed_to } from "./subscriptions.js";
+import { cancel_user_subscription, delete_subscription_caches, is_user_subscribed_to, list_subscribed_plans } from "./subscriptions.js";
 
 /**
  * The stripe payments class.
@@ -58,6 +58,7 @@ export class Stripe {
      */
     async delete_user(uid: string): Promise<void> {
         await delete_stripe_customer(this.client, uid);
+        delete_subscription_caches(uid);
     }
 
     /**
@@ -183,8 +184,9 @@ export class Stripe {
 
     /**
      * Check if a user is subscribed to a subscription (plan).
+     * @returns `true` if the user has an active subscription to the plan or subscription product, `false` otherwise.
      */
-    async is_user_subscribed(uid: string, opts: {
+    async is_subscribed(opts: {
         /** The user id */
         uid: string;
         /** The subcription (plan) or its id to check. */
@@ -205,5 +207,53 @@ export class Stripe {
             all_products: this.products,
         });
     }
+
+    /**
+     * Fetch all active subscription plan id's for a user.
+     * @returns An array of active subscription plan id's the user is subscribed to.
+     */
+    async get_active_subscription_plans(opts: {
+        /** The user id */
+        uid: string;
+        /** The user's customer id, can be provided for optimization. */
+        customer_id?: string;
+    }): Promise<SubscriptionPlanId[]> {
+        return await list_subscribed_plans(this.client, {
+            uid: opts.uid,
+            customer_id: opts.customer_id,
+            all_products: this.products,
+        });
+    }
+
+    /**
+     * Cancel a user's subscription to a plan.
+     * @warning This will cancel all of the user's subscriptions containing the plan's price id, use with caution.
+     * @warning This will cancel the entire subscription containing the plan, even if the subscription contains multiple plans.
+     *          However, during checkout its not allowed to checkout multiple subscription plans, therefore this should not be an issue.
+     */
+    async cancel_subscription(opts: {
+        /** The user id (uid) to cancel the subscription for. */
+        uid: string;
+        /** The specific plan to cancel (cancels subscriptions containing this plan price id). */
+        plan: InitializedSubscriptionPlan;
+        /** The stripe customer id, can be provided to avoid resolving it again. */
+        customer_id?: string;
+        /** Whether to cancel at period end (default true). */
+        cancel_at_period_end?: boolean;
+    }): Promise<void> {
+        await cancel_user_subscription(this.client, {
+            uid: opts.uid,
+            plan: opts.plan,
+            customer_id: opts.customer_id,
+            cancel_at_period_end: opts.cancel_at_period_end,
+        });
+    }
+
+
     
+}
+export namespace Stripe {
+
+    /** Constructor options. */
+    export type Opts = ConstructorParameters<typeof Stripe>[0];
 }

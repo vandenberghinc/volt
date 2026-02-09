@@ -35,9 +35,9 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
     // ----------------------------------------------------------------
 
     /**
-     * The stored safe integer (may be negative) measured at {@link int_scale}.
+     * The stored integer (may be negative) measured at {@link int_scale}.
      */
-    protected readonly int_value: number;
+    protected readonly int_value: bigint;
 
     /**
      * The canonical integer scale for {@link int_value}.
@@ -73,7 +73,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @docs
      */
     constructor(
-        value: number,
+        value: number | bigint,
         opts: S | SafeInt.ScaleToString<S> | { to_scale: S | SafeInt.ScaleToString<S>; from_scale?: SafeInt.Scale | SafeInt.StringScale; round?: SafeInt.Rounding },
     ) {
 
@@ -86,11 +86,17 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
             if (!Number.isSafeInteger(scale) || scale <= 0) {
                 throw new Error(`Invalid scale: expected positive safe integer, got ${scale}`);
             }
-            // value can be any safe integer (negative allowed)
-            if (!Number.isSafeInteger(value)) {
-                throw new Error(`Invalid value: expected safe integer, got ${value}`);
+
+            // value can be any integer (negative allowed); validate number inputs are safe integers
+            if (typeof value === "number") {
+                if (!Number.isSafeInteger(value)) {
+                    throw new Error(`Invalid value: expected safe integer, got ${value}`);
+                }
+                this.int_value = BigInt(value);
+            } else {
+                this.int_value = value;
             }
-            this.int_value = value;
+
             this.int_scale = scale;
             return;
         }
@@ -111,57 +117,73 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
             throw new Error(`Invalid to_scale: expected positive safe integer, got ${to_scale}`);
         }
 
-        let converted: number;
+        // Conversions that involve base-scale floats must operate on number input only.
+        if (typeof value === "bigint" && (from_scale === SafeInt.Scale.Base || to_scale === SafeInt.Scale.Base)) {
+            throw new Error(`Invalid value: bigint input is not supported for base-scale float conversions`);
+        }
+
+        let converted: bigint;
         if (from_scale === to_scale) {
             if (to_scale === SafeInt.Scale.Base) {
+                const n = value as number; // NOTE: this is safe because bigint base conversions were rejected above.
                 if (round === "exact") {
-                    if (!Number.isSafeInteger(value)) {
-                        throw new Error(`Exact constructor requires integer at base scale, got ${value}`);
+                    if (!Number.isSafeInteger(n)) {
+                        throw new Error(`Exact constructor requires integer at base scale, got ${n}`);
                     }
-                    converted = value;
+                    converted = BigInt(n);
                 } else {
-                    const rounded = SafeInt.apply_round(value, round);
+                    const rounded = SafeInt.apply_round(n, round);
                     if (!Number.isSafeInteger(rounded)) {
                         throw new Error(`Rounding produced non-integer at base scale: ${rounded}`);
                     }
-                    converted = rounded;
+                    converted = BigInt(rounded);
                 }
             } else {
-                if (!Number.isSafeInteger(value)) {
-                    throw new Error(`Invalid value: expected safe integer at scale=${to_scale}, got ${value}`);
+                if (typeof value === "number") {
+                    if (!Number.isSafeInteger(value)) {
+                        throw new Error(`Invalid value: expected safe integer at scale=${to_scale}, got ${value}`);
+                    }
+                    converted = BigInt(value);
+                } else {
+                    converted = value;
                 }
-                converted = value;
             }
         } else if (from_scale === SafeInt.Scale.Base) {
             // base -> integer scale
-            const product = value * to_scale;
+            const n = value as number; // NOTE: this is safe because bigint base conversions were rejected above.
+            const product = n * to_scale;
             if (round === "exact") {
                 if (!Number.isFinite(product) || !Number.isInteger(product)) {
-                    throw new Error(`Exact conversion failed: ${value} * ${to_scale} is not an integer`);
+                    throw new Error(`Exact conversion failed: ${n} * ${to_scale} is not an integer`);
                 }
                 if (!Number.isSafeInteger(product)) {
                     throw new Error(`Overflow converting base->${to_scale}: ${product}`);
                 }
-                converted = product;
+                converted = BigInt(product);
             } else {
                 const rounded = SafeInt.apply_round(product, round);
                 if (!Number.isSafeInteger(rounded)) {
                     throw new Error(`Overflow/invalid rounding converting base->${to_scale}: ${product} -> ${rounded}`);
                 }
-                converted = rounded;
+                converted = BigInt(rounded);
             }
         } else if (to_scale === SafeInt.Scale.Base) {
             // integer scale -> base integer, possibly rounded
-            if (!Number.isSafeInteger(value)) {
-                throw new Error(`Invalid value: expected safe integer at scale=${from_scale}, got ${value}`);
+            if (typeof value === "number") {
+                if (!Number.isSafeInteger(value)) {
+                    throw new Error(`Invalid value: expected safe integer at scale=${from_scale}, got ${value}`);
+                }
+                converted = SafeInt.div_to_base(BigInt(value), from_scale, round);
+            } else {
+                converted = SafeInt.div_to_base(value, from_scale, round);
             }
-            converted = SafeInt.div_to_base(value, from_scale, round);
         } else {
             // integer-scale -> integer-scale
-            if (!Number.isSafeInteger(value)) {
+            const v = typeof value === "number" ? BigInt(value) : value;
+            if (typeof value === "number" && !Number.isSafeInteger(value)) {
                 throw new Error(`Invalid value: expected safe integer at scale=${from_scale}, got ${value}`);
             }
-            converted = SafeInt.convert_int_scale(value, from_scale, to_scale, round);
+            converted = SafeInt.convert_int_scale(v, from_scale, to_scale, round);
         }
 
         this.int_value = converted;
@@ -175,22 +197,39 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
     /**
      * Retrieve the underlying integer (measured in {@link scale} units).
      *
-     * @returns The stored safe integer.
+     * @returns The stored integer.
      * 
      * @docs
      */
-    value(): number {
+    value(): bigint {
         return this.int_value;
+    }
+
+    /**
+     * Conver the stored integer to a `number`.
+     * 
+     * @returns The amount in stored integer units as `number` instead of `bigint`.
+     * @throws Error if the stored integer cannot be represented safely as a `number`.
+     * 
+     * @docs
+     */
+    to_number(): number {
+        // Convert to number only when the stored integer can be represented safely as a JS number.
+        const max_safe = BigInt(Number.MAX_SAFE_INTEGER);
+        if (this.int_value > max_safe || this.int_value < -max_safe) {
+            throw new Error(`Cannot represent value as number safely for to_number(): ${this.int_value.toString()}`);
+        }
+        return Number(this.int_value);
     }
 
     /**
      * Alias of {@link value}. Provided for JavaScript numeric coercion.
      *
-     * @returns The stored safe integer.
+     * @returns The stored integer.
      * 
      * @docs
      */
-    valueOf(): number {
+    valueOf(): bigint {
         return this.int_value;
     }
 
@@ -217,8 +256,15 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @docs
      */
     to_base_float(): number {
-        if (this.int_scale === SafeInt.Scale.Base) return this.int_value;
-        return this.int_value / this.int_scale;
+        // Convert to number only when the stored integer can be represented safely as a JS number.
+        const max_safe = BigInt(Number.MAX_SAFE_INTEGER);
+        if (this.int_value > max_safe || this.int_value < -max_safe) {
+            throw new Error(`Cannot represent value as number safely for to_base_float(): ${this.int_value.toString()}`);
+        }
+
+        const n = Number(this.int_value);
+        if (this.int_scale === SafeInt.Scale.Base) return n;
+        return n / this.int_scale;
     }
 
     // ----------------------------------------------------------------
@@ -243,7 +289,7 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
             throw new Error(`Invalid to_scale: expected positive safe integer, got ${to_scale}`);
         }
 
-        if (this.int_scale as SafeInt.Scale === to_scale) {
+        if (this.int_scale === to_scale as SafeInt.Scale) {
             // Preserve type at call-site
             return new SafeInt<T>(this.int_value, to_scale);
         }
@@ -254,10 +300,8 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
         }
 
         if (this.int_scale === SafeInt.Scale.Base) {
-            const product = this.int_value * to_scale;
-            if (!Number.isSafeInteger(product)) {
-                throw new Error(`Overflow converting base->${to_scale}`);
-            }
+            // base-scale values are stored as integers; multiplying by `to_scale` stays integer-safe in bigint space
+            const product = this.int_value * BigInt(to_scale);
             return new SafeInt<T>(product, to_scale);
         }
 
@@ -330,19 +374,16 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @param other The addend, as a raw safe integer or a `SafeInt<S>`.
      * @returns     A new `SafeInt<S>` with the sum.
      *
-     * @throws Error If the operand is invalid or the sum overflows.
+     * @throws Error If the operand is invalid.
      * 
      * @docs
      */
-    add(other: number | SafeInt<S>): SafeInt<S> {
-        const b = typeof other === "number" ? other : other.int_value;
-        if (!Number.isSafeInteger(b)) {
-            throw new Error(`Invalid 'addend': expected a safe integer, got ${b}`);
-        }
+    add(other: number | bigint | SafeInt<S>): SafeInt<S> {
+        const b = typeof other === "number"
+            ? (Number.isSafeInteger(other) ? BigInt(other) : (() => { throw new Error(`Invalid 'addend': expected a safe integer, got ${other}`); })())
+            : (typeof other === "bigint" ? other : other.int_value);
+
         const sum = this.int_value + b;
-        if (!Number.isSafeInteger(sum)) {
-            throw new Error(`Overflow in add(): ${this.int_value} + ${b} = ${sum}`);
-        }
         return new SafeInt<S>(sum, this.int_scale);
     }
 
@@ -352,19 +393,16 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @param other The subtrahend, as a raw safe integer or a `SafeInt<S>`.
      * @returns     A new `SafeInt<S>` with the difference.
      *
-     * @throws Error If the operand is invalid or subtraction overflows.
+     * @throws Error If the operand is invalid.
      * 
      * @docs
      */
-    sub(other: number | SafeInt<S>): SafeInt<S> {
-        const b = typeof other === "number" ? other : other.int_value;
-        if (!Number.isSafeInteger(b)) {
-            throw new Error(`Invalid 'subtrahend': expected a safe integer, got ${b}`);
-        }
+    sub(other: number | bigint | SafeInt<S>): SafeInt<S> {
+        const b = typeof other === "number"
+            ? (Number.isSafeInteger(other) ? BigInt(other) : (() => { throw new Error(`Invalid 'subtrahend': expected a safe integer, got ${other}`); })())
+            : (typeof other === "bigint" ? other : other.int_value);
+
         const diff = this.int_value - b;
-        if (!Number.isSafeInteger(diff)) {
-            throw new Error(`Overflow in sub(): ${this.int_value} - ${b} = ${diff}`);
-        }
         return new SafeInt<S>(diff, this.int_scale);
     }
 
@@ -374,19 +412,16 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @param factor The factor as a raw safe integer or a `SafeInt<S>`.
      * @returns      A new `SafeInt<S>` with the product.
      *
-     * @throws Error If the factor is invalid or the product overflows.
+     * @throws Error If the factor is invalid.
      * 
      * @docs
      */
-    mul(factor: number | SafeInt<S>): SafeInt<S> {
-        const f = typeof factor === "number" ? factor : factor.int_value;
-        if (!Number.isSafeInteger(f)) {
-            throw new Error(`Invalid 'factor': expected a safe integer, got ${f}`);
-        }
+    mul(factor: number | bigint | SafeInt<S>): SafeInt<S> {
+        const f = typeof factor === "number"
+            ? (Number.isSafeInteger(factor) ? BigInt(factor) : (() => { throw new Error(`Invalid 'factor': expected a safe integer, got ${factor}`); })())
+            : (typeof factor === "bigint" ? factor : factor.int_value);
+
         const product = this.int_value * f;
-        if (!Number.isSafeInteger(product)) {
-            throw new Error(`Overflow in mul(): ${this.int_value} * ${f} = ${product}`);
-        }
         return new SafeInt<S>(product, this.int_scale);
     }
 
@@ -397,15 +432,19 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @param round    Rounding mode. Default `"exact"` requires no remainder.
      * @returns       A new `SafeInt<S>` with the integer quotient (per {@link round}).
      *
-     * @throws Error If the divisor is invalid, division by zero, non-exact remainder in `"exact"` round, or overflow.
+     * @throws Error If the divisor is invalid, division by zero, or non-exact remainder in `"exact"` round.
      * 
      * @docs
      */
-    div(divisor: number | SafeInt<S>, round: SafeInt.Rounding = "exact"): SafeInt<S> {
-        const d = typeof divisor === "number" ? divisor : divisor.int_value;
-        if (!Number.isSafeInteger(d) || d === 0) {
-            throw new Error(`Invalid 'divisor': expected a non-zero safe integer, got ${d}`);
+    div(divisor: number | bigint | SafeInt<S>, round: SafeInt.Rounding = "exact"): SafeInt<S> {
+        const d = typeof divisor === "number"
+            ? (Number.isSafeInteger(divisor) ? BigInt(divisor) : (() => { throw new Error(`Invalid 'divisor': expected a non-zero safe integer, got ${divisor}`); })())
+            : (typeof divisor === "bigint" ? divisor : divisor.int_value);
+
+        if (d === 0n) {
+            throw new Error(`Invalid 'divisor': expected a non-zero safe integer, got 0`);
         }
+
         const q = SafeInt.div_int_checked(this.int_value, d, round);
         return new SafeInt<S>(q, this.int_scale);
     }
@@ -446,46 +485,46 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
     // ----------------------------------------------------------------
 
     /**
-     * Assert `value` is a `>=0` safe integer.
+     * Assert `value` is a `>=0` integer.
      * 
      * @docs
      */
     assert_non_negative(): void {
-        if (!Number.isSafeInteger(this.int_value) || this.int_value < 0) {
-            throw new Error(`Invalid value: expected non-negative safe integer, got ${this.int_value}`);
+        if (this.int_value < 0n) {
+            throw new Error(`Invalid value: expected non-negative integer, got ${this.int_value.toString()}`);
         }
     }
 
     /**
-     * Assert `value` is a `>0` safe integer.
+     * Assert `value` is a `>0` integer.
      * 
      * @docs
      */
     assert_positive(): void {
-        if (!Number.isSafeInteger(this.int_value) || this.int_value <= 0) {
-            throw new Error(`Invalid value: expected positive safe integer, got ${this.int_value}`);
+        if (this.int_value <= 0n) {
+            throw new Error(`Invalid value: expected positive integer, got ${this.int_value.toString()}`);
         }
     }
 
     /**
-     * Assert `value` is a `<=0` safe integer.
+     * Assert `value` is a `<=0` integer.
      * 
      * @docs
      */
     assert_non_positive(): void {
-        if (!Number.isSafeInteger(this.int_value) || this.int_value > 0) {
-            throw new Error(`Invalid value: expected non-positive safe integer, got ${this.int_value}`);
+        if (this.int_value > 0n) {
+            throw new Error(`Invalid value: expected non-positive integer, got ${this.int_value.toString()}`);
         }
     }
 
     /**
-     * Assert `value` is a `<0` safe integer.
+     * Assert `value` is a `<0` integer.
      * 
      * @docs
      */
     assert_negative(): void {
-        if (!Number.isSafeInteger(this.int_value) || this.int_value >= 0) {
-            throw new Error(`Invalid value: expected negative safe integer, got ${this.int_value}`);
+        if (this.int_value >= 0n) {
+            throw new Error(`Invalid value: expected negative integer, got ${this.int_value.toString()}`);
         }
     }
 
@@ -556,79 +595,80 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
     /**
      * Convert integer-scale value → base **integer** using a rounding policy.
      *
-     * @param value      Safe integer at `from_scale` (may be negative).
+     * @param value      Integer at `from_scale` (may be negative).
      * @param from_scale Source scale.
      * @param round       Rounding (default exact).
      * @returns          Base-scale integer.
      * @internal
      */
-    protected static div_to_base(value: number, from_scale: number, round: SafeInt.Rounding): number {
+    protected static div_to_base(value: bigint, from_scale: number, round: SafeInt.Rounding): bigint {
+        const denom = BigInt(from_scale);
+
         if (round === "exact") {
-            if (value % from_scale !== 0) {
-                throw new Error(`Exact conversion to base failed: ${value} % ${from_scale} !== 0`);
+            if (value % denom !== 0n) {
+                throw new Error(`Exact conversion to base failed: ${value.toString()} % ${from_scale} !== 0`);
             }
-            return value / from_scale;
+            return value / denom;
         }
-        return SafeInt.div_int_checked(value, from_scale, round);
+
+        return SafeInt.div_int_checked(value, denom, round);
     }
-    
+
     /**
      * Integer division helper with selectable rounding semantics.
      *
-     * @param numerator   Safe integer (may be negative).
-     * @param denominator Positive safe integer.
+     * @param numerator   Integer (may be negative).
+     * @param denominator Positive integer.
      * @param round        Rounding mode (default `"exact"`).
      * @returns           Integer quotient as per {@link round}.
      *
-     * @throws Error On invalid inputs, division by zero, non-exact remainder in `"exact"`, or overflow.
+     * @throws Error On invalid inputs, division by zero, or non-exact remainder in `"exact"`.
      * @internal
      */
     protected static div_int_checked(
-        numerator: number,
-        denominator: number,
+        numerator: bigint,
+        denominator: bigint,
         round: SafeInt.Rounding = "exact",
-    ): number {
-        if (!Number.isSafeInteger(numerator)) throw new Error(`Invalid numerator: ${numerator}`);
-        if (!Number.isSafeInteger(denominator) || denominator <= 0) throw new Error(`Invalid denominator: ${denominator}`);
-        const q = Math.trunc(numerator / denominator);
-        const prod = q * denominator;
-        if (!Number.isSafeInteger(prod)) throw new Error(`Overflow computing remainder`);
-        const rem = numerator - prod;
+    ): bigint {
+        if (denominator <= 0n) throw new Error(`Invalid denominator: ${denominator.toString()}`);
+
+        // BigInt division truncates toward zero, matching Math.trunc behavior for integers.
+        const q = numerator / denominator;
+        const rem = numerator % denominator;
+
         if (round === "exact") {
-            if (rem !== 0) throw new Error(`Non-exact division: ${numerator} / ${denominator} leaves remainder ${rem}`);
+            if (rem !== 0n) throw new Error(`Non-exact division: ${numerator.toString()} / ${denominator.toString()} leaves remainder ${rem.toString()}`);
             return q;
         }
+
         if (round === "floor") return q; // truncate toward zero by design
-        if (round === "ceil") return rem === 0 ? q : (q + 1);
+        if (round === "ceil") return rem === 0n ? q : (q + 1n);
         if (round === "round") {
-            const twice = rem * 2;
-            if (!Number.isSafeInteger(twice)) throw new Error(`Overflow computing rounding threshold`);
-            return twice >= denominator ? (q + 1) : q;
+            const twice = rem * 2n;
+            return twice >= denominator ? (q + 1n) : q;
         }
+
         throw new Error(`Invalid round: ${round as string}`);
     }
 
     /**
      * Integer-only scale converter with rounding policy.
      *
-     * @param value       Safe integer at {@link from_scale} (may be negative).
+     * @param value       Integer at {@link from_scale} (may be negative).
      * @param from_scale  Integer source scale.
      * @param to_scale    Integer target scale.
      * @param round        Rounding mode (default exact).
-     * @returns           Safe integer at `to_scale`.
+     * @returns           Integer at `to_scale`.
      *
-     * @throws Error On invalid inputs or overflow.
+     * @throws Error On invalid inputs.
      * @internal
      */
     protected static convert_int_scale(
-        value: number,
+        value: bigint,
         from_scale: number,
         to_scale: number,
         round: SafeInt.Rounding,
-    ): number {
-        if (!Number.isSafeInteger(value)) {
-            throw new Error(`Invalid value: expected safe integer, got ${value}`);
-        }
+    ): bigint {
         if (!Number.isSafeInteger(from_scale) || from_scale <= 0) {
             throw new Error(`Invalid from_scale: expected positive safe integer, got ${from_scale}`);
         }
@@ -640,25 +680,19 @@ export class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
 
         // exact divisor path
         if (from_scale % to_scale === 0) {
-            const divisor = Math.trunc(from_scale / to_scale);
+            const divisor = BigInt(Math.trunc(from_scale / to_scale));
             return SafeInt.div_int_checked(value, divisor, round);
         }
+
         // exact multiplier path
         if (to_scale % from_scale === 0) {
-            const multiplier = Math.trunc(to_scale / from_scale);
-            const product = value * multiplier;
-            if (!Number.isSafeInteger(product)) {
-                throw new Error(`Overflow in multiplication: ${value} * ${multiplier} = ${product}`);
-            }
-            return product;
+            const multiplier = BigInt(Math.trunc(to_scale / from_scale));
+            return value * multiplier;
         }
 
         // general ratio: (value * to_scale) / from_scale with chosen rounding
-        const numerator = value * to_scale;
-        if (!Number.isSafeInteger(numerator)) {
-            throw new Error(`Overflow computing numerator in convert_int_scale(${value}, ${from_scale} -> ${to_scale})`);
-        }
-        return SafeInt.div_int_checked(numerator, from_scale, round);
+        const numerator = value * BigInt(to_scale);
+        return SafeInt.div_int_checked(numerator, BigInt(from_scale), round);
     }
 }
 

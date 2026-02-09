@@ -4,14 +4,14 @@
  */
 
 import * as vlib from "@vandenberghinc/vlib";
-import StripeClient from "stripe";
+import Stripe from "stripe";
 import { InternalStripeError, type StripeErrorCode } from "./error.js";
 import { stripe_api_call } from "./utils.js";
 
 /**
  * A cache for resolving Stripe customer ids from our internal user IDs (`uid`).
  */
-const stripe_customer_cache = new vlib.Cache<string>({
+const stripe_customer_cache = new vlib.Cache<string, string>({
     max_size: 10_000,
     ttl: {
         sliding: false,
@@ -38,7 +38,7 @@ function escape_stripe_search_value(value: string): string {
  * @see https://docs.stripe.com/api/customers/search
  */
 export async function find_stripe_customer_id(
-    client: StripeClient,
+    client: Stripe,
     uid: string,
 ): Promise<string | null> {
     // Search by metadata so we never rely on PII like email for identity mapping.
@@ -67,7 +67,7 @@ export async function find_stripe_customer_id(
  * @returns The Stripe customer ID. If a customer already exists for the `uid`, it is returned. Otherwise, a new customer is created and its ID is returned.
  */
 export async function ensure_stripe_customer(
-    client: StripeClient,
+    client: Stripe,
     uid: string,
 ): Promise<string> {
     // Check cache first.
@@ -106,7 +106,7 @@ export async function ensure_stripe_customer(
  * @see https://docs.stripe.com/api/customers/delete
  */
 export async function delete_stripe_customer(
-    client: StripeClient,
+    client: Stripe,
     uid: string,
 ): Promise<void> {
     // Delete from cache first to avoid serving stale ids in concurrent flows.
@@ -136,4 +136,32 @@ export async function delete_stripe_customer(
             { uid, customer_id },
         );
     }
+}
+
+/**
+ * Retrieve a Stripe customer and ensure it is not deleted.
+ * @throws InternalStripeError with code "customer_not_found" if the customer does not exist or is deleted.
+ */
+export async function retrieve_active_customer(
+    client: Stripe,
+    stripe_customer_id: string,
+    context: Record<string, unknown>,
+): Promise<Stripe.Customer> {
+    
+    // Stripe docs: https://docs.stripe.com/api/customers/retrieve
+    const customer = await stripe_api_call(
+        () => client.customers.retrieve(stripe_customer_id),
+        { ...context, operation: "customers.retrieve", stripe_customer_id },
+    );
+
+    // Stripe can return a DeletedCustomer object; treat that as "not found".
+    if ("deleted" in customer && customer.deleted === true) {
+        throw new InternalStripeError(
+            "customer_not_found",
+            "Stripe customer was deleted.",
+            { ...context, stripe_customer_id },
+        );
+    }
+
+    return customer;
 }

@@ -109,7 +109,14 @@ export interface SubscriptionProduct extends BaseProduct {
      * @default "immediately"
      */
     billing_anchor?: "immediately" | "first_of_month";
-    /** The subscription plans. */
+    /**
+     * The subscription plans.
+     * @warning
+     * A user can only be subscribed to a single plan per subscription product,
+     * even if multiple plans are defined here.
+     * When a user subscribes to a subscription plan while it is already subscribed to another
+     * plan of the same product, then the old plan is cancelled.
+     */
     plans: SubscriptionPlan[];
 }
 
@@ -208,7 +215,9 @@ export interface InitializedSubscriptionProduct extends SubscriptionProduct {
     plans: InitializedSubscriptionPlan[];
 }
 
-/** An initialized meter product. */
+/**
+ * An initialized meter product.
+ */
 export interface InitializedMeterProduct extends MeterProduct {
     /** The product type. */
     type: "meter";
@@ -362,14 +371,14 @@ function make_price_app_id(product_id: ProductId, plan_id: SubscriptionPlanId | 
  *
  * Docs: https://docs.stripe.com/api/products/list
  */
-async function list_all_stripe_products(stripe: Stripe): Promise<Stripe.Product[]> {
+async function list_all_stripe_products(client: Stripe): Promise<Stripe.Product[]> {
     const all_products: Stripe.Product[] = [];
     let starting_after: string | undefined;
 
     for (; ;) {
         const page = await stripe_api_call(
             () =>
-                stripe.products.list({
+                client.products.list({
                     limit: stripe_list_page_size,
                     starting_after,
                 }),
@@ -398,14 +407,14 @@ async function list_all_stripe_products(stripe: Stripe): Promise<Stripe.Product[
  *
  * Docs: https://docs.stripe.com/api/prices/list
  */
-async function list_all_stripe_prices(stripe: Stripe): Promise<Stripe.Price[]> {
+async function list_all_stripe_prices(client: Stripe): Promise<Stripe.Price[]> {
     const all_prices: Stripe.Price[] = [];
     let starting_after: string | undefined;
 
     for (; ;) {
         const page = await stripe_api_call(
             () =>
-                stripe.prices.list({
+                client.prices.list({
                     limit: stripe_list_page_size,
                     // We list only active prices because inactive ones are not usable for new purchases,
                     // and we only need active ones for initialization comparisons.
@@ -437,7 +446,7 @@ async function list_all_stripe_prices(stripe: Stripe): Promise<Stripe.Price[]> {
  *
  * Docs: https://docs.stripe.com/api/billing/meter/list
  */
-async function list_all_stripe_meters(stripe: Stripe): Promise<Array<Stripe.Billing.Meter>> {
+async function list_all_stripe_meters(client: Stripe): Promise<Array<Stripe.Billing.Meter>> {
     const all_meters: Array<Stripe.Billing.Meter> = [];
     let starting_after: string | undefined;
 
@@ -445,7 +454,7 @@ async function list_all_stripe_meters(stripe: Stripe): Promise<Array<Stripe.Bill
         // Stripe docs: https://docs.stripe.com/api/billing/meter/list
         const page = await stripe_api_call(
             () =>
-                stripe.billing.meters.list({
+                client.billing.meters.list({
                     limit: stripe_list_page_size,
                     starting_after,
                 }),
@@ -556,7 +565,7 @@ function find_matching_active_price(
  * Docs: https://docs.stripe.com/api/prices/update
  */
 async function deactivate_stale_prices_for_app_price_id(
-    stripe: Stripe,
+    client: Stripe,
     active_prices: Stripe.Price[],
     app_price_id: string,
     expected_signature: string,
@@ -571,7 +580,7 @@ async function deactivate_stale_prices_for_app_price_id(
         stale_prices.map((p) =>
             stripe_api_call(
                 () =>
-                    stripe.prices.update(
+                    client.prices.update(
                         p.id,
                         { active: false },
                         { idempotencyKey: `init_price_deactivate_${app_price_id}_${p.id}` },
@@ -589,12 +598,12 @@ async function deactivate_stale_prices_for_app_price_id(
  * Tax code docs: https://docs.stripe.com/tax/tax-codes
  */
 async function create_stripe_product(
-    stripe: Stripe,
+    client: Stripe,
     product: Product,
 ): Promise<Stripe.Product> {
     return await stripe_api_call(
         () =>
-            stripe.products.create(
+            client.products.create(
                 {
                     name: product.name,
                     description: product.description,
@@ -616,7 +625,7 @@ async function create_stripe_product(
  * Docs: https://docs.stripe.com/api/products/update
  */
 async function update_stripe_product_if_needed(
-    stripe: Stripe,
+    client: Stripe,
     stripe_product: Stripe.Product,
     product: Product,
 ): Promise<Stripe.Product> {
@@ -639,7 +648,7 @@ async function update_stripe_product_if_needed(
 
     return await stripe_api_call(
         () =>
-            stripe.products.update(
+            client.products.update(
                 stripe_product.id,
                 {
                     name: product.name,
@@ -659,7 +668,7 @@ async function update_stripe_product_if_needed(
  * Docs: https://docs.stripe.com/api/prices/create
  */
 async function create_one_time_price(
-    stripe: Stripe,
+    client: Stripe,
     opts: {
         stripe_product_id: string;
         app_price_id: string;
@@ -671,7 +680,7 @@ async function create_one_time_price(
 ): Promise<Stripe.Price> {
     return await stripe_api_call(
         () =>
-            stripe.prices.create(
+            client.prices.create(
                 {
                     product: opts.stripe_product_id,
                     currency: opts.currency,
@@ -700,7 +709,7 @@ async function create_one_time_price(
  * Docs: https://docs.stripe.com/api/prices/create
  */
 async function create_recurring_price(
-    stripe: Stripe,
+    client: Stripe,
     opts: {
         stripe_product_id: string;
         app_price_id: string;
@@ -739,7 +748,7 @@ async function create_recurring_price(
 
     return await stripe_api_call(
         () =>
-            stripe.prices.create(
+            client.prices.create(
                 {
                     product: opts.stripe_product_id,
                     currency: opts.currency,
@@ -765,7 +774,7 @@ async function create_recurring_price(
  * Docs: https://docs.stripe.com/api/billing/meter/create
  */
 async function create_stripe_meter(
-    stripe: Stripe,
+    client: Stripe,
     product: MeterProduct,
 ): Promise<Stripe.Billing.Meter> {
     const aggregation_formula = product.aggregation_formula ?? "sum";
@@ -774,7 +783,7 @@ async function create_stripe_meter(
 
     return await stripe_api_call(
         () =>
-            stripe.billing.meters.create(
+            client.billing.meters.create(
                 {
                     display_name: product.name,
                     event_name: product.meter_event_name,
@@ -859,7 +868,7 @@ async function map_with_concurrency<T_in, T_out>(
  * Initialize a product using pre-fetched Stripe products/prices indexes.
  */
 async function initialize_product(
-    stripe: Stripe,
+    client: Stripe,
     product: Product,
     stripe_products_by_app_id: Map<string, Stripe.Product>,
     active_prices_by_stripe_product_id: Map<string, Stripe.Price[]>,
@@ -872,6 +881,7 @@ async function initialize_product(
 
     validate_images(product.images);
 
+    // Normalize currency code to lowercase for consistent matching and Stripe API usage.
     const normalized_currency = product.currency.trim().toLowerCase();
     assert(
         /^[a-z]{3}$/.test(normalized_currency),
@@ -922,6 +932,7 @@ async function initialize_product(
         }
     }
     else if (product.type === "meter") {
+
         validate_unit_amount(product.price, "MeterProduct.price");
 
         assert(
@@ -1001,7 +1012,7 @@ async function initialize_product(
     if (product.type === "meter") {
         stripe_meter = stripe_meters_by_event_name.get(product.meter_event_name) ?? null;
         if (!stripe_meter) {
-            stripe_meter = await create_stripe_meter(stripe, product);
+            stripe_meter = await create_stripe_meter(client, product);
             stripe_meters_by_event_name.set(product.meter_event_name, stripe_meter);
         }
     }
@@ -1009,10 +1020,10 @@ async function initialize_product(
     // 1) Ensure Stripe Product exists (or create it), linked by metadata.
     let stripe_product = stripe_products_by_app_id.get(product.id) ?? null;
     if (!stripe_product) {
-        stripe_product = await create_stripe_product(stripe, product);
+        stripe_product = await create_stripe_product(client, product);
         stripe_products_by_app_id.set(product.id, stripe_product);
     } else {
-        stripe_product = await update_stripe_product_if_needed(stripe, stripe_product, product);
+        stripe_product = await update_stripe_product_if_needed(client, stripe_product, product);
         stripe_products_by_app_id.set(product.id, stripe_product);
     }
 
@@ -1029,9 +1040,9 @@ async function initialize_product(
 
         let stripe_price = find_matching_active_price(active_prices, app_price_id, signature);
         if (!stripe_price) {
-            await deactivate_stale_prices_for_app_price_id(stripe, active_prices, app_price_id, signature);
+            await deactivate_stale_prices_for_app_price_id(client, active_prices, app_price_id, signature);
 
-            stripe_price = await create_one_time_price(stripe, {
+            stripe_price = await create_one_time_price(client, {
                 stripe_product_id: stripe_product.id,
                 app_price_id,
                 currency: normalized_currency,
@@ -1047,7 +1058,7 @@ async function initialize_product(
         if (stripe_product.default_price !== stripe_price.id) {
             stripe_product = await stripe_api_call(
                 () =>
-                    stripe.products.update(
+                    client.products.update(
                         stripe_product!.id,
                         { default_price: stripe_price.id },
                         { idempotencyKey: `init_product_default_price_${product.id}_${stripe_price.id}` },
@@ -1079,9 +1090,9 @@ async function initialize_product(
 
             let stripe_price = find_matching_active_price(active_prices, app_price_id, signature);
             if (!stripe_price) {
-                await deactivate_stale_prices_for_app_price_id(stripe, active_prices, app_price_id, signature);
+                await deactivate_stale_prices_for_app_price_id(client, active_prices, app_price_id, signature);
 
-                stripe_price = await create_recurring_price(stripe, {
+                stripe_price = await create_recurring_price(client, {
                     stripe_product_id: stripe_product.id,
                     app_price_id,
                     currency: normalized_currency,
@@ -1131,9 +1142,9 @@ async function initialize_product(
 
         let stripe_price = find_matching_active_price(active_prices, app_price_id, signature);
         if (!stripe_price) {
-            await deactivate_stale_prices_for_app_price_id(stripe, active_prices, app_price_id, signature);
+            await deactivate_stale_prices_for_app_price_id(client, active_prices, app_price_id, signature);
 
-            stripe_price = await create_recurring_price(stripe, {
+            stripe_price = await create_recurring_price(client, {
                 stripe_product_id: stripe_product.id,
                 app_price_id,
                 currency: normalized_currency,
@@ -1152,7 +1163,7 @@ async function initialize_product(
         if (stripe_product.default_price !== stripe_price.id) {
             stripe_product = await stripe_api_call(
                 () =>
-                    stripe.products.update(
+                    client.products.update(
                         stripe_product!.id,
                         { default_price: stripe_price.id },
                         { idempotencyKey: `init_product_default_price_${product.id}_${stripe_price.id}` },
@@ -1215,7 +1226,7 @@ export function resolve_plan_to_parent_subscription(opts: {
  * of Stripe products and prices which is then reused for all initializations.
  */
 export async function initialize_products(
-    stripe: Stripe,
+    client: Stripe,
     products: Product[],
 ): Promise<InitializedProduct[]> {
     assert(Array.isArray(products), "invalid_argument", "Products must be an array");
@@ -1247,9 +1258,9 @@ export async function initialize_products(
 
     // High-performance: list all products, prices, and meters once, then reuse indexes.
     const [all_stripe_products, all_active_stripe_prices, all_stripe_meters] = await Promise.all([
-        list_all_stripe_products(stripe),
-        list_all_stripe_prices(stripe),
-        list_all_stripe_meters(stripe),
+        list_all_stripe_products(client),
+        list_all_stripe_prices(client),
+        list_all_stripe_meters(client),
     ]);
 
     const stripe_products_by_app_id = index_stripe_products_by_app_id(all_stripe_products);
@@ -1260,7 +1271,7 @@ export async function initialize_products(
     const concurrency = 5;
     const initialized_products = await map_with_concurrency(products, concurrency, async (product) => {
         return await initialize_product(
-            stripe,
+            client,
             product,
             stripe_products_by_app_id,
             active_prices_by_stripe_product_id,

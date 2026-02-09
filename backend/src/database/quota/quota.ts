@@ -1453,10 +1453,10 @@ export namespace QuotaManager {
         ): undefined | number | Quota.Opts {
             if (q == null) return undefined
             else if (typeof q === "number") {
-                return new SafeInt(q, { from_scale: 1, to_scale: SafeInt.Scale.Nano, round: opts?.round }).value()
+                return new SafeInt(q, { from_scale: 1, to_scale: SafeInt.Scale.Nano, round: opts?.round }).to_number()
             }
             return {
-                max: new SafeInt(q.max, { from_scale: 1, to_scale: SafeInt.Scale.Nano, round: opts?.round }).value(),
+                max: new SafeInt(q.max, { from_scale: 1, to_scale: SafeInt.Scale.Nano, round: opts?.round }).to_number(),
                 interval: q.interval,
             };
         }
