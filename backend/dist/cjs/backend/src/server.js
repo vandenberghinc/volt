@@ -40,7 +40,6 @@ var os = __toESM(require("os"));
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var import_utils = require("./utils.js");
 var import_meta2 = require("./meta.js");
-var MailUI = __toESM(require("./plugins/mail/ui.js"));
 var import_mail = require("./plugins/mail/mail.js");
 var import_status = require("./status.js");
 var import_endpoint = require("./endpoint.js");
@@ -48,10 +47,10 @@ var import_image_endpoint = require("./image_endpoint.js");
 var import_stream = require("./stream.js");
 var import_database = require("./database/database.js");
 var import_users = require("./users.js");
-var import_paddle = require("./payments/paddle.js");
 var import_rate_limit = require("./rate_limit.js");
 var import_route = require("./route.js");
 var import_internal_external = require("./errors/internal_external.js");
+var import_stripe = require("./payments/stripe/stripe.js");
 const import_meta = {};
 const __filename = (0, import_url.fileURLToPath)(import_meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,8 +122,11 @@ class Server {
   google_tag;
   rate_limit_api_key;
   performance;
+  https_enabled;
   /** The events map @internal */
-  events = new vlib.Events();
+  events = new vlib.Events({
+    single_events: ["2fa_mail"]
+  });
   // Private.
   favicon;
   statics;
@@ -211,6 +213,7 @@ class Server {
     this._user_keys_opts = keys;
     this.additional_sitemap_endpoints = additional_sitemap_endpoints;
     this.tls = tls;
+    this.https_enabled = tls != null;
     if (typeof threading === "boolean") {
       this.threading = {
         enabled: threading,
@@ -327,11 +330,8 @@ class Server {
       delete this.default_headers["Strict-Transport-Security"];
     }
     if (payments) {
-      if (payments.type === "paddle") {
-        this.payments = new import_paddle.Paddle({
-          _server: this,
-          ...payments
-        });
+      if (payments.type === "stripe") {
+        this.payments = new import_stripe.Stripe(this, payments);
       } else {
         throw Error(`Invalid payment processor type "${payments.type}", valid types are ["paddle"].`);
       }
@@ -1129,11 +1129,13 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     }
   }
   // ---------------------------------------------------------
-  // Server (private).
+  // Utilities.
   /** The promise of database initialization and connecting. */
   _db_init_promise;
   /** Is initialized. */
   _initialized = false;
+  /** Is initialized by a worker. */
+  _initialized_by_worker = false;
   /**
    * Initialize the server.
    * @returns A promise that resolves when the server has been initialized.
@@ -1144,6 +1146,7 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       return;
     }
     this._initialized = true;
+    this._initialized_by_worker = worker;
     this.log(1, "Initializing server.");
     const initialize_start = Date.now();
     this.performance.start();
@@ -1206,7 +1209,12 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     this.performance.start();
     promises.push(this.users._initialize({ worker }));
     if (this.payments !== void 0) {
-      promises.push(this.payments._initialize({ worker }));
+      if (this.payments.type === "stripe") {
+        promises.push(this.payments.initialize({ worker }));
+      } else {
+        this.payments.type.toString();
+        throw Error(`Unsupported payments provider "${this.payments.type}".`);
+      }
     }
     if (!worker) {
       if (this.find_endpoint("/sitemap.xml") == null) {
@@ -1270,6 +1278,12 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
     }
     return result;
   }
+  /** Assert mail is configured. */
+  assert_mail() {
+    if (!this.mail) {
+      throw new import_internal_external.ExternalError({ message: "Mail is not configured." });
+    }
+  }
   // ---------------------------------------------------------
   // Server.
   /**
@@ -1285,6 +1299,9 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
    * @docs
    */
   async start() {
+    if (this._initialized_by_worker) {
+      throw Error("Cannot start the server when it is initialized as a worker by 'Server.initialize({ worker: true })'.");
+    }
     await this.initialize();
     if (this.production) {
       for (const endpoint of this.endpoints.values()) {
@@ -1688,365 +1705,6 @@ Sitemap: ${this.full_domain}/sitemap.xml`;
       throw Error(`Encountered an error while generating the CSR [${proc.exit_status}]: ${proc.err}`);
     }
     this.log(0, `Generated the tls key with CSR for domain "${this.domain}".`);
-  }
-  // ---------------------------------------------------------
-  // DEPRECATED 
-  // these will all be removed and replaced when using stripe instead of paddle.
-  /** Called for each product in a successful one-time payment. Override to implement your logic. */
-  async on_payment({ product, payment }) {
-  }
-  /** Called for each product in a successful subscription. Override to implement your logic. */
-  async on_subscription({ product, payment }) {
-  }
-  // On failed one-time or recurring payment.
-  // async on_failed_payment({ payment }: { payment: any }): Promise<void> {}
-  /** Called when a cancellation succeeds. Override to implement your logic. */
-  async on_cancellation({ payment, line_items }) {
-  }
-  // On failed cancellation.
-  // async on_failed_cancellation({ payment, line_items }: { payment: any; line_items: any[] }): Promise<void> {}
-  /** Called when a refund succeeds. The line items array are the items that were refunded. */
-  async on_refund({ payment, line_items }) {
-  }
-  /** Called when a refund fails. The line items array are the items where the refund failed. */
-  async on_failed_refund({ payment, line_items }) {
-  }
-  /** Called when a chargeback occurs. The line items array are the items that were charged back. */
-  async on_chargeback({ payment, line_items }) {
-  }
-  /** Called when a chargeback fails. The line items array are the items where the chargeback failed. */
-  async on_failed_chargeback({ payment, line_items }) {
-  }
-  // Mail template.
-  /** Build the base email layout used by the various transactional email builders. */
-  _mail_template({ max_width = 400, children = [] }) {
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
-    let header;
-    if (this.company.stroke_icon != null) {
-      header = [
-        Image(`${this.full_domain}${this.company.stroke_icon ?? ""}`).height(16)
-      ];
-    } else if (this.company.icon != null) {
-      header = [
-        Image(`${this.full_domain}${this.company.icon ?? ""}`).frame(20, 40)
-      ];
-    }
-    if (header) {
-      header = Table(TableRow(...header).wrap(true).center().center_vertical()).margin_bottom(15);
-    }
-    return MailUI.Mail(Table(TableData(Table(
-      // Header.
-      header,
-      // Widget.
-      Table(...children).background_color(style.widget_bg ?? "").border(`1px solid ${style.widget_border ?? ""}`).border_radius("10px").padding(40, 25, 25, 25).margin(0),
-      // Copyright.
-      Table(TableRow(Text(`Copyright \xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} ${this.company.name}, ${this.company.legal_name} All Rights Included.
-${this.company.street} ${this.company.house_number}, ${this.company.postal_code}, ${this.company.city}, ${this.company.province}, ${this.company.country}.
-` + (this.company.tax_id == null ? "" : `VAT ID ${this.company.tax_id}`)).white_space("pre").display("inline-block").font_size(11).color(style.footer_fg).margin(0)).center().center_vertical()).margin(0, 0, 10, 0)
-    ).max_width(max_width)).center()).padding(25, 20, 25, 20)).font_family(style.font).background(style.bg);
-  }
-  // Render payment line items.
-  /** Helper that renders a list of payment line items for use in transactional emails. */
-  _render_mail_payment_line_items({ payment, line_items, show_total_due = false }) {
-    if (!this.payments)
-      throw new Error("Payments not initialized");
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
-    const _render_mail_payment_line_item = ({ name, desc, unit_cost, quantity, total_cost, font_weight = "normal", divider = true, color = style.text_fg }) => {
-      return [
-        Table(TableRow(TableData(Text(name).color(color).font_size(14).text_wrap("wrap").overflow_wrap("break-word").word_wrap("break-word").font_weight(font_weight)).width("25%").margin_right(10), TableData(Text(desc).color(color).font_size(14).text_wrap("wrap").overflow_wrap("break-word").word_wrap("break-word").font_weight(font_weight)).width("35%").margin_right(10), TableData(Text(unit_cost).color(color).font_size(14).text_wrap("wrap").overflow_wrap("break-word").word_wrap("break-word").font_weight(font_weight)).fixed_width("13.32%").margin_right(10), TableData(Text(quantity).color(color).font_size(14).text_wrap("wrap").overflow_wrap("break-word").word_wrap("break-word").font_weight(font_weight)).fixed_width("13.32%").margin_right(10), TableData(Text(total_cost).color(color).font_size(14).text_wrap("wrap").overflow_wrap("break-word").word_wrap("break-word").font_weight(font_weight)).fixed_width("13.32%")).width("100%").styles({ "vertical-align": "baseline" })).width("100%"),
-        !divider ? null : TableRow(TableData(VStack().background_color(style.text_fg).frame("100%", 1).margin(5, 0, 10, 0)).frame("100%", 1)).width("100%")
-      ];
-    };
-    const render_divider = () => {
-      return TableRow(TableData(VStack().background_color(style.divider_bg).frame("100%", 1).margin(5, 0, 10, 0)).frame("100%", 1)).width("100%");
-    };
-    let currency;
-    let subtotal = 0;
-    let subtotal_tax = 0;
-    let total = 0;
-    payment.line_items.walk((item) => {
-      if (!this.payments)
-        throw new Error("Payments not initialized");
-      if (typeof item.product === "string") {
-        item.product = this.payments.get_product_sync(item.product);
-      }
-      if (currency == null) {
-        const c = import_utils.Utils.get_currency_symbol(item.product.currency);
-        if (c == null) {
-          this.log.error(`Failed to create a payment mail: `, new Error(`Unable to determine the currency of payment "${payment.id}".`));
-        }
-        currency = c ?? "?";
-      }
-      subtotal += item.subtotal;
-      subtotal_tax += item.tax;
-      total += item.total;
-    });
-    let total_due = payment.status === "open" ? total : 0;
-    return [
-      render_divider(),
-      line_items.map((item, index) => {
-        return Table(TableRow(TableData(Image(item.product.icon).frame(35, 35).margin_right(15)).width("auto"), TableData(Table(Text(item.product.name).color(style.title_fg).font_size(14).font_weight("bold").margin(0).ellipsis_overflow(true), Text(item.product.description).color(style.text_fg).font_size(14).margin(0).ellipsis_overflow(true))).width("100%"), TableData(Text(`${currency} ${item.subtotal.toFixed(2)}`).color(style.title_fg).font_size(14).font_weight("bold").margin(0).white_space("nowrap")).width("100%")).wrap(true).leading_vertical().width("100%")).width("100%");
-      }),
-      render_divider(),
-      Table([
-        ["Subtotal:", `${currency} ${subtotal.toFixed(2)}`],
-        ["Tax:", `${currency} ${subtotal_tax.toFixed(2)}`],
-        ["Total:", `${currency} ${total.toFixed(2)}`]
-      ].map((item) => {
-        return TableRow(
-          TableData().width("100%"),
-          TableData(Text(item[0]).color(style.title_fg).font_size(14).ellipsis_overflow(true).font_weight("bold")).min_width(75),
-          TableData(Text(item[1]).color(style.title_fg).font_size(14).white_space("nowrap").font_weight("bold"))
-          // .min_width(50)
-        ).wrap(true);
-      }))
-    ];
-  }
-  /** Assert mail is configured. */
-  assert_mail() {
-    if (!this.mail) {
-      throw new import_internal_external.ExternalError({ message: "Mail is not configured." });
-    }
-  }
-  /**
-   * Build the 2FA verification email content.
-   */
-  on_2fa_mail({ code, username, email, date, ip, device }) {
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
-    return this._mail_template({
-      max_width: 400,
-      children: [
-        // Title.
-        TableRow(Title("Verification Required").color(style.title_fg).width("fit-content").font_size(26)).center(),
-        // Text.
-        TableRow(Text("Please confirm your request with this 2FA code.").center().margin(10, 0, 20, 0).color(style.text_fg).font_size(18)),
-        // Auth info.
-        [
-          ["Username", username],
-          ["Email", email],
-          ["Date", date],
-          ["Ip Address", ip],
-          ["Device", device]
-        ].map((item) => {
-          return [
-            TableRow(VStack().margin_right(7.5).background_color(style.text_fg).border_radius("50%").frame(5, 5), Text(`<span style='font-weight: 600'>${item[0]}:</span> ${item[1]}`).color(style.text_fg).font_size(16).text_wrap("wrap").overflow_wrap("break-word").word_wrap("break-word")).wrap(true).center_vertical(),
-            TableRow().fixed_frame(5, 5)
-          ];
-        }),
-        // 2FA code.
-        TableRow(Text(code).background(style.button_bg).border_radius("10px").padding(10, 15).center().color(style.button_fg).width("100%").margin(20, 0, 0, 0)),
-        // Text.
-        TableRow(Text("This 2FA code will be valid for 5 minutes.").color(style.text_fg).font_style("italic").font_size(12).margin_top(20).center())
-      ]
-    });
-  }
-  /**
-   * Build the successful payment email content.
-   */
-  on_payment_mail({ payment }) {
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
-    return this._mail_template({
-      max_width: 600,
-      children: [
-        // Title.
-        TableRow(Title("Successful Payment").color(style.title_fg).width("fit-content").font_size(26)).center(),
-        // Text.
-        TableRow(Text("We're delighted to inform you that your payment has been successfully processed. Thank you for your purchase.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()),
-        // Image.
-        TableRow(Image(`${this.full_domain}/volt/assets/payments/party.png`).frame(60, 60).margin(0, 0, 30, 0)).center(),
-        // Title.
-        TableRow(Title("Order Summary").color(style.subtitle_fg).font_size(18).margin(0)),
-        TableRow(Text("A summary of your order can be found below or in the attached invoice PDF.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
-        // Line items.
-        this._render_mail_payment_line_items({ payment, line_items: payment.line_items, show_total_due: true }),
-        // Bottom spacing.
-        VStack().margin_bottom(15)
-      ]
-    });
-  }
-  /**
-   * Build the failed payment email content.
-   */
-  on_failed_payment_mail({ payment }) {
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = MailUI;
-    return this._mail_template({
-      max_width: 800,
-      children: [
-        // Title.
-        TableRow(Title("Payment Failed").color(style.title_fg).width("fit-content").font_size(26)).center(),
-        // Text.
-        TableRow(Text("We regret to inform you that your payment could not be processed successfully. We understand the inconvenience this may cause. Please try again, or contact customer support if the problem persists.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()),
-        // Image.
-        TableRow(ImageMask(`${this.full_domain}/volt/assets/payments/error.png`).frame(40, 40).mask_color("#E8454E").margin(0, 0, 30, 0)).center(),
-        // Title.
-        TableRow(Title("Order Summary").color(style.subtitle_fg).font_size(18).margin(0)),
-        TableRow(Text("A summary of your failed order can be found below.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
-        // Line items.
-        this._render_mail_payment_line_items({ payment, line_items: payment.line_items }),
-        // Bottom spacing.
-        VStack().margin_bottom(15)
-      ]
-    });
-  }
-  // On cancellation mail.
-  /** Build the successful cancellation email content. */
-  on_cancellation_mail({ payment, line_items }) {
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
-    return this._mail_template({
-      max_width: 800,
-      children: [
-        // Title.
-        TableRow(Title("Successful Cancellation").color(style.title_fg).width("fit-content").font_size(26)).center(),
-        // Text.
-        TableRow(Text("Your recent cancellation request has been successfully processed.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()),
-        // Image.
-        TableRow(Image(`${this.full_domain}/volt/assets/payments/check.png`).frame(40, 40).margin(0, 0, 30, 0)).center(),
-        // Title.
-        TableRow(Title("Cancelled Summary").color(style.subtitle_fg).font_size(18).margin(0)),
-        TableRow(Text("A summary of your cancelled products.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
-        // Line items.
-        this._render_mail_payment_line_items({ payment, line_items }),
-        // Bottom spacing.
-        VStack().margin_bottom(15)
-      ]
-    });
-  }
-  // On refund mail.
-  /** Build the failed cancellation email content. */
-  on_failed_cancellation_mail({ payment }) {
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = MailUI;
-    return this._mail_template({
-      max_width: 800,
-      children: [
-        // Title.
-        TableRow(Title("Cancellation Failed").color(style.title_fg).width("fit-content").font_size(26)).center(),
-        // Text.
-        TableRow(Text("We regret to inform you that your recent cancellation request has encountered an issue and could not be processed successfully. We understand the inconvenience this may cause. If you believe you are eligible for a cancellation, please try again or contact customer support.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()).center(),
-        // Image.
-        TableRow(ImageMask(`${this.full_domain}/volt/assets/payments/error.png`).frame(40, 40).mask_color("#E8454E").margin(0, 0, 30, 0)).center(),
-        // Title.
-        TableRow(Title("Cancellation Summary").color(style.subtitle_fg).font_size(18).margin(0)),
-        TableRow(Text("A summary of your cancellation request.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
-        // Line items.
-        this._render_mail_payment_line_items({ payment, line_items: payment.line_items }),
-        // Bottom spacing.
-        VStack().margin_bottom(15)
-      ]
-    });
-  }
-  // On refund mail.
-  /** Build the successful refund email content. */
-  on_refund_mail({ payment, line_items }) {
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
-    return this._mail_template({
-      max_width: 800,
-      children: [
-        // Title.
-        TableRow(Title("Chargeback Successful").color(style.title_fg).width("fit-content").font_size(26)).center(),
-        // Text.
-        TableRow(Text("We're delighted to inform you that your recent refund request has been successfully processed. The charged amount will soon be credited back to your account.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()),
-        // Image.
-        TableRow(Image(`${this.full_domain}/volt/assets/payments/party.png`).frame(60, 60).margin(0, 0, 30, 0)).center(),
-        // Title.
-        TableRow(Title("Refund Summary").color(style.subtitle_fg).font_size(18).margin(0)),
-        TableRow(Text("A summary of your refunded products.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
-        // Line items.
-        this._render_mail_payment_line_items({ payment, line_items }),
-        // Bottom spacing.
-        VStack().margin_bottom(15)
-      ]
-    });
-  }
-  // On refund mail.
-  /** Build the failed refund email content. */
-  on_failed_refund_mail({ payment, line_items }) {
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = MailUI;
-    return this._mail_template({
-      max_width: 800,
-      children: [
-        // Title.
-        TableRow(Title("Refund Failed").color(style.title_fg).width("fit-content").font_size(26)).center(),
-        // Text.
-        TableRow(Text("We regret to inform you that your recent refund request has encountered an issue and could not be processed successfully. We understand the inconvenience this may cause. If you believe you are eligible for a refund, please try again or contact customer support.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()).center(),
-        // Image.
-        TableRow(ImageMask(`${this.full_domain}/volt/assets/payments/error.png`).frame(40, 40).mask_color("#E8454E").margin(0, 0, 30, 0)).center(),
-        // Title.
-        TableRow(Title("Refund Summary").color(style.subtitle_fg).font_size(18).margin(0)),
-        TableRow(Text("A summary of your refund request.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
-        // Line items.
-        this._render_mail_payment_line_items({ payment, line_items }),
-        // Bottom spacing.
-        VStack().margin_bottom(15)
-      ]
-    });
-  }
-  // On refund mail.
-  /** Build the successful chargeback email content. */
-  on_chargeback_mail({ payment, line_items }) {
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
-    return this._mail_template({
-      max_width: 800,
-      children: [
-        // Title.
-        TableRow(Title("Successful Refund").color(style.title_fg).width("fit-content").font_size(26)).center(),
-        // Text.
-        TableRow(Text("We're delighted to inform you that your recent chargeback request has been successfully processed. The charged amount will soon be credited back to your account.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()),
-        // Image.
-        TableRow(Image(`${this.full_domain}/volt/assets/payments/party.png`).frame(60, 60).margin(0, 0, 30, 0)).center(),
-        // Title.
-        TableRow(Title("Chargeback Summary").color(style.subtitle_fg).font_size(18).margin(0)),
-        TableRow(Text("A summary of the items charged back.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
-        // Line items.
-        this._render_mail_payment_line_items({ payment, line_items }),
-        // Bottom spacing.
-        VStack().margin_bottom(15)
-      ]
-    });
-  }
-  // On refund mail.
-  /** Build the failed chargeback email content. */
-  on_failed_chargeback_mail({ payment, line_items }) {
-    this.assert_mail();
-    const style = this.mail.style;
-    const { Title, Text, Image, ImageMask, Table, TableRow, TableData, VStack } = MailUI;
-    return this._mail_template({
-      max_width: 800,
-      children: [
-        // Title.
-        TableRow(Title("Chargeback Failed").color(style.title_fg).width("fit-content").font_size(26)).center(),
-        // Text.
-        TableRow(Text("We regret to inform you that your recent chargeback request has been declined.").margin(10, 0, 20, 0).color(style.text_fg).font_size(16).center()).center(),
-        // Image.
-        TableRow(ImageMask(`${this.full_domain}/volt/assets/payments/error.png`).frame(40, 40).mask_color("#E8454E").margin(0, 0, 30, 0)).center(),
-        // Title.
-        TableRow(Title("Chargeback Summary").color(style.subtitle_fg).font_size(18).margin(0)),
-        TableRow(Text("A summary of your chargeback request.").margin(5, 0, 20, 0).color(style.text_fg).font_size(16)),
-        // Line items.
-        this._render_mail_payment_line_items({ payment, line_items }),
-        // Bottom spacing.
-        VStack().margin_bottom(15)
-      ]
-    });
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

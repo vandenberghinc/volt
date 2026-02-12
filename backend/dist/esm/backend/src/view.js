@@ -490,12 +490,12 @@ export class View {
         html += `<script nonce="${nonce_identifier}">${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this.server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
         // Embed other scripts.
         if (this.server.payments) {
-            if (this.server.payments.type === "paddle") {
-                // embed_script("/volt/api/v1/payments/paddle.js", false); // no longer required due to auto imports.
-                if (add_payments_module) {
-                    include_js_script += `__volt_incl_js("https://cdn.paddle.com/paddle/v2/paddle.js");${line_break}`;
-                }
-            }
+            // if (this.server.payments.type === "paddle") {
+            //     // embed_script("/volt/api/v1/payments/paddle.js", false); // no longer required due to auto imports.
+            //     if (add_payments_module) {
+            //         include_js_script += `__volt_incl_js("https://cdn.paddle.com/paddle/v2/paddle.js");${line_break}`;
+            //     }
+            // }
         }
         // Add the include js script.
         html += `<script nonce="${nonce_identifier}">${line_break}${include_js_script.trimEnd()}${line_break}</script>${line_break}`;

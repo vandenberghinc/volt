@@ -280,6 +280,12 @@ export declare class Users {
      * @param stream The request stream.
      */
     _reset_cookies(stream: Stream): void;
+    /** Build the base email layout used by the various transactional email builders. */
+    private _2fa_mail_template;
+    /**
+     * Build the 2FA verification email content.
+     */
+    private set_default_2fa_event;
     /**
      * Initialize default authentication, user, and support endpoints.
      */

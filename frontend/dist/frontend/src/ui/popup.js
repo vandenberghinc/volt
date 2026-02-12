@@ -132,7 +132,7 @@ let YesNoPopupElement = (() => {
                 .stretch(true)
                 .wrap(true);
             // Text.
-            this.text = Text(text) // never user inner html instead use append incase of links or code lines.
+            this.text = Text(typeof text === "string" ? text : "") // never user inner html instead use append incase of links or code lines.
                 .font_family("inherit")
                 .font_size(16)
                 .line_height(22)
@@ -141,6 +141,9 @@ let YesNoPopupElement = (() => {
                 .wrap(true)
                 .abs_parent(this)
                 .parent(this);
+            if (Array.isArray(text)) {
+                this.text.append(...text);
+            }
             // No button.
             this.no_button = LoaderButton(no)
                 .padding(10, 10, 10, 10)
@@ -327,7 +330,12 @@ let YesNoPopupElement = (() => {
                 this.title.remove_children().append(title); // never inner html
             }
             if (text != null) {
-                this.text.remove_children().append(text); // never inner html
+                if (typeof text === "string") {
+                    this.text.text(text);
+                }
+                else if (Array.isArray(text)) {
+                    this.text.remove_children().append(text);
+                }
             }
             if (typeof image === "string") {
                 this.image.src(image);

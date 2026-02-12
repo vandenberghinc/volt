@@ -374,6 +374,7 @@ export class Server {
     public google_tag?: string;
     public rate_limit_api_key: string | undefined;
     public performance: vlib.Performance;
+    public https_enabled: boolean;
     
     /** The events map @internal */
     public events: vlib.Events<Events> = new vlib.Events({
@@ -602,6 +603,7 @@ export class Server {
         this._user_keys_opts = keys;
         this.additional_sitemap_endpoints = additional_sitemap_endpoints;
         this.tls = tls;
+        this.https_enabled = tls != null;
         // this.admin = admin as AdminConfig;
 
         // Set threading.
@@ -764,9 +766,11 @@ export class Server {
             //         _server: this,
             //         ...payments,
             //     })
-            // } else {
+            if (payments.type === "stripe") {
+                this.payments = new Stripe(this, payments)
+            } else {
                 throw Error(`Invalid payment processor type "${payments.type}", valid types are ["paddle"].`)
-            // }
+            }
         }
 
         // Initialize the service daemon.
@@ -1896,7 +1900,7 @@ export class Server {
         // Payments.
         if (this.payments !== undefined) {
             if (this.payments.type === "stripe") {
-                promises.push(this.payments.initialize());
+                promises.push(this.payments.initialize({ worker }));
             }
             // else if (this.payments.type === "paddle") {
             //     promises.push(this.payments._initialize({ worker }));

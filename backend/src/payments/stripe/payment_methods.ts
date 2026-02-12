@@ -6,7 +6,8 @@
 import Stripe from "stripe";
 import { ensure_stripe_customer } from "./customers.js";
 import { ExternalStripeError, InternalStripeError } from "./error.js";
-import { assert, public_assert, stripe_api_call, is_non_empty_string } from "./utils.js";
+import { assert, public_assert, stripe_api_call, is_non_empty_string, stable_idempotency_key } from "./utils.js";
+import { Server } from "../../server.js";
 
 // -------------------------------------------------------------------------------------------------
 // Internal helpers.
@@ -31,7 +32,15 @@ function resolve_payment_method_id_from_setup_intent(setup_intent: Stripe.SetupI
     }
 
     // If expanded, it is a PaymentMethod object with an id.
-    return payment_method.id;
+    const id = payment_method.id;
+    if (!is_non_empty_string(id)) {
+        throw new ExternalStripeError(
+            "payment_method_missing",
+            "No payment method was provided. Please try again.",
+            { setup_intent_id: setup_intent.id, status: setup_intent.status },
+        );
+    }
+    return id;
 }
 
 /**
@@ -83,11 +92,12 @@ function assert_setup_intent_belongs_to_customer(opts: {
  */
 export async function create_payment_method_setup_intent(
     client: Stripe,
+    server: Server,
     opts: {
         /** The internal user id, used to resolve/ensure Stripe customer. */
         uid: string;
-        /** Optional: attach safe metadata to the SetupIntent (never secrets). */
-        metadata?: Record<string, string>;
+        /** An optional idempotency key. */
+        idempotency_key?: string;
     },
 ): Promise<{
     /** The SetupIntent id. */
@@ -100,7 +110,7 @@ export async function create_payment_method_setup_intent(
     public_assert(is_non_empty_string(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
 
     // Ensure a Stripe customer exists for this user.
-    const stripe_customer_id = await ensure_stripe_customer(client, opts.uid);
+    const stripe_customer_id = await ensure_stripe_customer(client, server, opts.uid);
 
     // Create a SetupIntent for off-session usage so the resulting payment method can be used for subscriptions/invoices.
     // Stripe docs: https://docs.stripe.com/api/setup_intents/create
@@ -113,13 +123,10 @@ export async function create_payment_method_setup_intent(
                         customer: stripe_customer_id,
                         // off_session indicates we plan to charge when the customer is not actively in-session.
                         usage: "off_session",
-                        // Attach safe metadata only.
-                        metadata: {
-                            ...(opts.metadata ?? {}),
-                            __volt_uid: opts.uid,
-                        },
                     },
-                    // Idempotency here is optional; if you want, you can pass your own idempotency key upstream.
+                    {
+                        idempotencyKey: opts.idempotency_key,
+                    }
                 ),
             { operation: "setupIntents.create", uid: opts.uid, stripe_customer_id },
         );
@@ -160,6 +167,7 @@ export async function create_payment_method_setup_intent(
  */
 export async function finalize_payment_method_setup(
     client: Stripe,
+    server: Server,
     opts: {
         /** The internal user id, used to resolve/ensure Stripe customer. */
         uid: string;
@@ -168,10 +176,8 @@ export async function finalize_payment_method_setup(
          * The client should send this to the backend once confirmation succeeded.
          */
         setup_intent_id: string;
-        /**
-         * The stripe customer id.
-         */
-        stripe_customer_id: string;
+        /** Optional idempotency key. */
+        idempotency_key?: string;
     },
 ): Promise<{
     /** The Stripe customer id. */
@@ -188,8 +194,8 @@ export async function finalize_payment_method_setup(
         "Property 'setup_intent_id' must be a non-empty string.",
     );
 
-    // // Ensure customer exists and retrieve to verify it is active.
-    // const stripe_customer_id = await ensure_stripe_customer(stripe, opts.uid);
+    // Always derive the customer from uid on the server.
+    const stripe_customer_id = await ensure_stripe_customer(client, server, opts.uid);
 
     // Retrieve the SetupIntent (expand payment_method to avoid extra round-trips if needed).
     // Stripe docs: https://docs.stripe.com/api/setup_intents/retrieve
@@ -204,7 +210,7 @@ export async function finalize_payment_method_setup(
     // Security: ensure this SetupIntent is for the expected customer.
     assert_setup_intent_belongs_to_customer({
         setup_intent,
-        expected_customer_id: opts.stripe_customer_id,
+        expected_customer_id: stripe_customer_id,
         uid: opts.uid,
     });
 
@@ -225,17 +231,20 @@ export async function finalize_payment_method_setup(
     await stripe_api_call(
         () =>
             client.customers.update(
-                opts.stripe_customer_id,
+                stripe_customer_id,
                 {
                     invoice_settings: {
                         default_payment_method: payment_method_id,
                     },
                 },
+                {
+                    idempotencyKey: opts.idempotency_key ?? stable_idempotency_key(`finalize_payment_method_setup:${opts.uid}:${setup_intent.id}`),
+                }
             ),
         {
             operation: "customers.update",
             uid: opts.uid,
-            stripe_customer_id: opts.stripe_customer_id,
+            stripe_customer_id: stripe_customer_id,
             setup_intent_id: setup_intent.id,
             payment_method_id,
             action: "set_default_payment_method",
@@ -243,7 +252,7 @@ export async function finalize_payment_method_setup(
     );
 
     return {
-        stripe_customer_id: opts.stripe_customer_id,
+        stripe_customer_id: stripe_customer_id,
         payment_method_id,
         setup_intent_id: setup_intent.id,
     };

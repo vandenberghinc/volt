@@ -46,7 +46,7 @@ type AllFieldPaths<T extends MongoDocument> = DotPaths<WithId<T>> | KnownKeys<Wi
 export type FieldRef<T extends MongoDocument> = `$${AllFieldPaths<T> & string}`;
 type StrictExprString<T extends MongoDocument> = FieldRef<T> | (string extends infer S ? S extends `${string}` ? S extends FieldRef<T> ? S : never : S : never);
 type NonStrictExprString<T extends MongoDocument, S> = S extends `$${infer Path}` ? Path extends AllFieldPaths<T> ? S : never : S;
-type ExprValue<T extends MongoDocument> = number | boolean | null | Date | StrictExprString<T>;
+type ExprValue<T extends MongoDocument> = number | boolean | bigint | null | Date | StrictExprString<T>;
 /** Strict expression tree for `$expr`. */
 export type Expr<T extends MongoDocument> = ExprValue<T> | Expr<T>[] | {
     $add?: Expr<T>[];

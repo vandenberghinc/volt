@@ -72,7 +72,7 @@ var Payment;
   Payment2.anonymize = anonymize;
 })(Payment || (Payment = {}));
 class Paddle {
-  type;
+  type = "paddle";
   client_key;
   sandbox;
   inclusive_tax;
@@ -104,7 +104,6 @@ class Paddle {
         _server: "object"
       }
     });
-    this.type = "paddle";
     this.client_key = client_key;
     this.sandbox = sandbox;
     this.inclusive_tax = inclusive_tax;
@@ -712,7 +711,7 @@ class Paddle {
     const last_products = await this._last_products_db.load({ production: this.server.production, version: 1 }, { throw: false });
     if (last_products instanceof Error && !(last_products instanceof import_collection.Collection.NotFoundError))
       throw last_products;
-    if (!(last_products instanceof import_collection.Collection.NotFoundError) && vlib.Object.eq(last_products.last_products, this.products)) {
+    if (!(last_products instanceof import_collection.Collection.NotFoundError) && vlib.Object.deep_eq(last_products.last_products, this.products)) {
       for (const item of last_products.product_ids) {
         const product = this.get_product_sync(item.id);
         if (product != null) {

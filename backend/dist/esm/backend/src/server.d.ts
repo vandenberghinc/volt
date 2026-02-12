@@ -4,16 +4,15 @@
  */
 import * as vlib from "@vandenberghinc/vlib";
 import { Meta } from './meta.js';
-import * as MailUI from './plugins/mail/ui.js';
 import { Mail } from "./plugins/mail/mail.js";
 import { Status } from "./status.js";
 import { Endpoint } from "./endpoint.js";
 import { Database } from "./database/database.js";
 import { Users } from "./users.js";
-import { Paddle, Payment } from "./payments/paddle.js";
 import { RateLimits, RateLimitServer, RateLimitClient } from "./rate_limit.js";
 import { Route } from "./route.js";
 import { EventCallback, EventName, Events } from './events.js';
+import { Stripe } from "./payments/stripe/stripe.js";
 /** Nested types for the {@link Server} class. */
 export declare namespace Server {
     /**
@@ -197,9 +196,9 @@ export declare namespace Server {
      * The payment options.
      * @docs
      */
-    type PaymentOpts = (Paddle.Opts & {
+    type PaymentOpts = (Stripe.Opts & {
         /** The payment provider type. */
-        type: "paddle";
+        type: "stripe";
     });
 }
 /**
@@ -259,7 +258,7 @@ export declare class Server {
     /** The users instance. */
     users: Users;
     /** The payments instance. */
-    payments?: Paddle;
+    payments?: Stripe;
     /** Daemon instance to manage a live daemon. */
     daemon?: vlib.Daemon;
     /** The mail instance. */
@@ -269,6 +268,7 @@ export declare class Server {
     google_tag?: string;
     rate_limit_api_key: string | undefined;
     performance: vlib.Performance;
+    https_enabled: boolean;
     /** The events map @internal */
     events: vlib.Events<Events>;
     private favicon?;
@@ -360,6 +360,10 @@ export declare class Server {
      */
     find_endpoint(route: Route): Endpoint | undefined;
     find_endpoint(endpoint: string, method?: string): Endpoint | undefined;
+    /** Assert mail is configured. */
+    assert_mail(): asserts this is {
+        mail: Mail;
+    };
     /**
      * Start the server.
      *
@@ -495,99 +499,4 @@ export declare class Server {
         province: string;
         city: string;
     }): Promise<void>;
-    /** Called for each product in a successful one-time payment. Override to implement your logic. */
-    on_payment({ product, payment }: {
-        product: any;
-        payment: any;
-    }): Promise<void>;
-    /** Called for each product in a successful subscription. Override to implement your logic. */
-    on_subscription({ product, payment }: {
-        product: any;
-        payment: any;
-    }): Promise<void>;
-    /** Called when a cancellation succeeds. Override to implement your logic. */
-    on_cancellation({ payment, line_items }: {
-        payment: any;
-        line_items: any[];
-    }): Promise<void>;
-    /** Called when a refund succeeds. The line items array are the items that were refunded. */
-    on_refund({ payment, line_items }: {
-        payment: any;
-        line_items: any[];
-    }): Promise<void>;
-    /** Called when a refund fails. The line items array are the items where the refund failed. */
-    on_failed_refund({ payment, line_items }: {
-        payment: any;
-        line_items: any[];
-    }): Promise<void>;
-    /** Called when a chargeback occurs. The line items array are the items that were charged back. */
-    on_chargeback({ payment, line_items }: {
-        payment: any;
-        line_items: any[];
-    }): Promise<void>;
-    /** Called when a chargeback fails. The line items array are the items where the chargeback failed. */
-    on_failed_chargeback({ payment, line_items }: {
-        payment: any;
-        line_items: any[];
-    }): Promise<void>;
-    /** Build the base email layout used by the various transactional email builders. */
-    private _mail_template;
-    /** Helper that renders a list of payment line items for use in transactional emails. */
-    private _render_mail_payment_line_items;
-    /** Assert mail is configured. */
-    assert_mail(): asserts this is {
-        mail: Mail;
-    };
-    /**
-     * Build the 2FA verification email content.
-     */
-    on_2fa_mail({ code, username, email, date, ip, device }: {
-        code: string;
-        username: string;
-        email: string;
-        date: string;
-        ip: string;
-        device: string;
-    }): any;
-    /**
-     * Build the successful payment email content.
-     */
-    on_payment_mail({ payment }: {
-        payment: Payment;
-    }): MailUI.MailElement;
-    /**
-     * Build the failed payment email content.
-     */
-    on_failed_payment_mail({ payment }: {
-        payment: Payment;
-    }): MailUI.MailElement;
-    /** Build the successful cancellation email content. */
-    on_cancellation_mail({ payment, line_items }: {
-        payment: any;
-        line_items: any[];
-    }): any;
-    /** Build the failed cancellation email content. */
-    on_failed_cancellation_mail({ payment }: {
-        payment: any;
-    }): any;
-    /** Build the successful refund email content. */
-    on_refund_mail({ payment, line_items }: {
-        payment: any;
-        line_items: any[];
-    }): any;
-    /** Build the failed refund email content. */
-    on_failed_refund_mail({ payment, line_items }: {
-        payment: any;
-        line_items: any[];
-    }): any;
-    /** Build the successful chargeback email content. */
-    on_chargeback_mail({ payment, line_items }: {
-        payment: any;
-        line_items: any[];
-    }): any;
-    /** Build the failed chargeback email content. */
-    on_failed_chargeback_mail({ payment, line_items }: {
-        payment: any;
-        line_items: any[];
-    }): any;
 }

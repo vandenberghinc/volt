@@ -15,7 +15,7 @@ import { Frontend } from './frontend.js';
 import { Endpoint } from "./endpoint.js";
 import { Server } from "./server.js";
 import { SplashScreen } from "./splash_screen.js";
-import Stream from "./stream.js";
+import { Stream } from "./stream.js";
 import * as crypto from "crypto";
 import { Utils } from "./utils.js";
 

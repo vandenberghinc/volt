@@ -7,7 +7,7 @@ import { Meta } from "./meta.js";
 import { Endpoint } from "./endpoint.js";
 import { Server } from "./server.js";
 import { SplashScreen } from "./splash_screen.js";
-import Stream from "./stream.js";
+import { Stream } from "./stream.js";
 /**
  * The view class can be used to create HTML pages through JavaScript or TypeScript source code.
  * The view instance or constructor options can be passed to an {@link Endpoint} to serve the view at a specific route.

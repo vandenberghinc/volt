@@ -5,6 +5,7 @@
 import * as vlib from "@vandenberghinc/vlib";
 import { IncomingMessage, ServerResponse } from 'http';
 import { ServerHttp2Stream, IncomingHttpHeaders, Http2ServerRequest, Http2ServerResponse } from 'http2';
+import { Transform } from "node:stream";
 /** A generic map of request parameters. */
 export type Params = Record<string, any>;
 /** Alias for {@link Params}. */
@@ -24,12 +25,29 @@ type ResponseBody = undefined | string | boolean | number | any[] | Record<strin
  * @docs
  */
 export declare class Stream {
-    private s?;
+    /** The request headers. */
     headers: IncomingHttpHeaders | IncomingMessage['headers'];
+    /** Whether this stream is an HTTP/2 stream. */
+    http2: boolean;
+    /** Whether this stream is an HTTP/1.1 stream (when false, it's an HTTP/2 stream). */
+    http1: boolean;
+    /** The status code of the sent response. */
+    status_code: number | undefined;
+    /** Whether the response has been finished. */
+    finished: boolean;
+    /** The received body potentially decompressed as string. */
+    body: string;
+    /** The raw body as a Buffer, potentially decompressed. */
+    raw_body: Buffer;
+    /** The body wired exactly as is, not decompressed etc. */
+    wire_body: Buffer;
+    /** The internal promise that resolves when the body is fully received. */
+    private promise;
+    /** The cached value of {@link normalize_ip} */
+    private _normalized_ip;
+    private s?;
     private req?;
     private res?;
-    http2: boolean;
-    http1: boolean;
     private _ip;
     private _port;
     private _method;
@@ -39,14 +57,8 @@ export declare class Stream {
     private _query_string;
     private _cookies;
     private _uid;
-    status_code: number | undefined;
-    finished: boolean;
     private res_cookies;
     private res_headers;
-    body: string;
-    private promise;
-    /** The cached value of {@link normalize_ip} */
-    private _normalized_ip;
     /**
      * Create a new Stream wrapper for HTTP/1.1 or HTTP/2.
      *
@@ -59,7 +71,6 @@ export declare class Stream {
     /**
      * Receive and buffer the request body, handling optional gzip/deflate decompression.
      * Sets {@link body} and resolves the internal promise used by {@link join}.
-     * @private
      */
     private _recv_body;
     /**
@@ -200,12 +211,16 @@ export declare class Stream {
      * Apply templates to an in-memory body.
      * Only applies to string bodies to avoid corrupting binary payloads.
      */
-    private _apply_templates_to_body;
+    private apply_templates_to_body;
     /**
      * Create a transform stream that applies templates across chunk boundaries.
      * This avoids missing replacements when a template key is split between chunks.
      */
-    private _create_template_replace_transform;
+    private create_template_replace_transform;
+    /** Create output headers for http2. */
+    private create_http2_headers;
+    /** Assign http headers to response. */
+    private set_http1_headers;
     /**
      * Send a response.
      * @example
@@ -276,6 +291,26 @@ export declare class Stream {
         data?: ErrorData;
     }): this;
     /**
+     * Stream a response through a transform pipeline with an optional gzip step and a hard byte limit.
+     *
+     * @param options Pipeline options.
+     * @param options.status The HTTP status code to send.
+     * @param options.headers The response headers to send.
+     * @param options.body The readable stream to pipe into the response.
+     * @param options.transforms Optional transform streams applied in order.
+     * @param options.compress When true, gzip-compresses the streamed response if the client supports it.
+     * @param options.max_bytes The maximum number of bytes allowed to be written to the client.
+     *                          Set to `-1` for unlimited (use with caution).
+     */
+    pipeline({ status, headers, body, transforms, compress, max_bytes, }: {
+        status?: number;
+        headers?: ResponseHeaders;
+        body: NodeJS.ReadableStream;
+        transforms?: Transform[];
+        compress?: boolean;
+        max_bytes?: number;
+    }): this;
+    /**
      * Add a new header to the response data.
      *
      * @param name The header name.
@@ -299,7 +334,7 @@ export declare class Stream {
      */
     set_headers(headers?: ResponseHeaders): this;
     /**
-     * Get an added header.
+     * Get an added response header.
      *
      * @param name The header name.
      * @example
@@ -404,4 +439,4 @@ export interface APIErrorResult<ErrorData extends RequestDataBase = unknown> {
  * @docs
  */
 export type APIResult<SuccessData extends RequestDataBase = unknown, ErrorData extends RequestDataBase = unknown> = APIErrorResult<ErrorData> | SuccessData;
-export default Stream;
+export {};

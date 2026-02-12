@@ -51,6 +51,24 @@ export declare class QuotaManager {
      */
     private format_quota_id;
     /**
+     * Clamp a bigint to a minimum of 0n.
+     */
+    private static clamp_min0;
+    /**
+     * Compute remaining capacity, clamped to [0, +inf).
+     */
+    private static remaining;
+    /**
+     * Compute percentage used in [0, 100] (2 decimals), based on bigint usage/max.
+     */
+    private static percentage_used;
+    /**
+     * Multiply a bigint by a floating ratio, returning a bigint.
+     * - For positive values, rounds up (ceil) to avoid underestimation.
+     * - For negative values, rounds down (floor).
+     */
+    private static mul_bigint_ratio;
+    /**
      * Get current quota status without modifying it.
      *
      * @note The `opts.retry` field defaults to `25`.
@@ -307,9 +325,9 @@ export declare namespace QuotaManager {
     interface Quota {
         /**
          * The maximum amount of usage allowed.
-         * Allowed: positive finite floating number (decimals supported).
+         * Allowed: bigint integer (recommended nano-scale integer accounting).
          */
-        max: number;
+        max: bigint;
         /**
          * The time interval in SECONDS for the quota; when this interval has passed the usage will be reset.
          * Recommended to be an integer number of seconds.
@@ -323,9 +341,9 @@ export declare namespace QuotaManager {
         start: number;
         /**
          * The current amount of usage.
-         * Allowed: finite floating number (decimals supported). Never persisted below 0.
+         * Allowed: bigint integer. Never persisted below 0.
          */
-        usage: number;
+        usage: bigint;
     }
     /** Nested types for the {@link Quota} interface. */
     namespace Quota {
@@ -350,9 +368,9 @@ export declare namespace QuotaManager {
         /**
          * Convert a numeric amount to its nano-scale integer.
          */
-        function to_nano(q: number, opts?: {
+        function to_nano(q: number | bigint, opts?: {
             round?: SafeInt.Rounding;
-        }): number;
+        }): bigint;
         /**
          * Convert quota options to nano-scale by scaling `max`; `interval` is preserved.
          */
@@ -384,7 +402,7 @@ export declare namespace QuotaManager {
         /** The listed quota. */
         quota: QuotaManager.Document;
         /** The remaining usage left for this quota. */
-        remaining: number;
+        remaining: bigint;
         /** Percentage used for the quota. */
         percentage_used: number;
         /** Quota needs a reset, interval has expired. */
@@ -410,7 +428,7 @@ export declare namespace QuotaManager {
         /** The current quota (or a virtual reset view if the window expired). */
         quota: QuotaManager.Document;
         /** Remaining capacity in the active window (never negative). */
-        remaining: number;
+        remaining: bigint;
         /** Percentage of the window used, clamped to [0, 100]. */
         percentage_used: number;
         /** Whether the interval needs a reset (i.e., has expired). */
@@ -426,8 +444,8 @@ export declare namespace QuotaManager {
     interface LimitOpts {
         /** The quota identifier arguments. */
         query: Query;
-        /** The amount of usage to increment, this may be a negative amount, must it must be a finite number. */
-        requested_usage: number;
+        /** The amount of usage to increment, this may be a negative amount. */
+        requested_usage: bigint;
         /** The quota document to create if it doesn't exist, if left undefined, the quota document must exist in the collection, or the validation will fail. */
         upsert?: Quota.Opts;
         /**
@@ -460,7 +478,7 @@ export declare namespace QuotaManager {
         /** The quota document, if available. */
         quota?: QuotaManager.Document;
         /** The remaining quota usage. */
-        remaining?: number;
+        remaining?: bigint;
     }
     /**
      * The allowed response of {@link limit}.
@@ -475,7 +493,7 @@ export declare namespace QuotaManager {
         /** The returned quota document. */
         quota: QuotaManager.Document;
         /** The remaining quota usage. */
-        remaining: number;
+        remaining: bigint;
         /** Whether the quota was reset. */
         was_reset: boolean;
     }
@@ -488,7 +506,7 @@ export declare namespace QuotaManager {
         /** The query identifying the quota */
         query: Query;
         /** The requested usage amount */
-        requested_usage: number;
+        requested_usage: bigint;
         /**
          * The usage validation safety ratio, used to prevent over-usage, defaults to `1.0`.
          *

@@ -16,7 +16,10 @@ import { StripeResolvedSubscriptionItem } from "./webhooks.js";
 export type StripeEvents = {
     /**
      * Fired when a Stripe Checkout Session is completed.
+     * 
      * Docs: https://docs.stripe.com/api/events/types#event_types-checkout.session.completed
+     * 
+     * @note The defined events are executed in parallel and are awaited inside the webhook handler.
      */
     "stripe.checkout_session_completed": (opts: {
         /** The internal user id resolved from metadata. */
@@ -24,7 +27,7 @@ export type StripeEvents = {
         /** Stripe checkout session id. */
         stripe_session_id: string;
         /** Stripe checkout mode. */
-        mode: "payment" | "subscription";
+        mode: "payment" | "subscription" | "setup";
         /** Stripe customer id. */
         stripe_customer_id: string;
         /** Stripe subscription id (only for mode="subscription"). */
@@ -32,12 +35,14 @@ export type StripeEvents = {
         /** Currency if available on the session. */
         currency?: string;
         /** Session metadata (safe). */
-        metadata: Record<string, string>;
+        metadata: Stripe.Metadata;
     }) => void | Promise<void>;
 
     /**
      * Fired when a Stripe subscription is created.
      * Docs: https://docs.stripe.com/api/events/types#event_types-customer.subscription.created
+     * 
+     * @note The defined events are executed in parallel and are awaited inside the webhook handler.
      */
     "stripe.subscription_created": (opts: {
         /** The internal user id. */
@@ -58,6 +63,8 @@ export type StripeEvents = {
     /**
      * Fired when a Stripe subscription is updated.
      * Docs: https://docs.stripe.com/api/events/types#event_types-customer.subscription.updated
+     * 
+     * @note The defined events are executed in parallel and are awaited inside the webhook handler.
      */
     "stripe.subscription_updated": (opts: {
         uid: string;
@@ -71,6 +78,8 @@ export type StripeEvents = {
     /**
      * Fired when a Stripe subscription is deleted/canceled.
      * Docs: https://docs.stripe.com/api/events/types#event_types-customer.subscription.deleted
+     * 
+     * @note The defined events are executed in parallel and are awaited inside the webhook handler.
      */
     "stripe.subscription_deleted": (opts: {
         uid: string;
@@ -83,6 +92,8 @@ export type StripeEvents = {
     /**
      * Fired when an invoice is paid successfully.
      * Docs: https://docs.stripe.com/api/events/types#event_types-invoice.paid
+     * 
+     * @note The defined events are executed in parallel and are awaited inside the webhook handler.
      */
     "stripe.invoice_paid": (opts: {
         uid: string;
@@ -96,6 +107,8 @@ export type StripeEvents = {
     /**
      * Fired when an invoice payment fails.
      * Docs: https://docs.stripe.com/api/events/types#event_types-invoice.payment_failed
+     * 
+     * @note The defined events are executed in parallel and are awaited inside the webhook handler.
      */
     "stripe.invoice_payment_failed": (opts: {
         uid: string;
@@ -109,6 +122,8 @@ export type StripeEvents = {
     /**
      * Fired when a PaymentIntent succeeds (covers one-time and some subscription flows).
      * Docs: https://docs.stripe.com/api/events/types#event_types-payment_intent.succeeded
+     * 
+     * @note The defined events are executed in parallel and are awaited inside the webhook handler.
      */
     "stripe.payment_succeeded": (opts: {
         uid: string;
@@ -116,12 +131,14 @@ export type StripeEvents = {
         stripe_customer_id?: string;
         amount_received: number;
         currency: string;
-        metadata: Record<string, string>;
+        metadata: Stripe.Metadata;
     }) => void | Promise<void>;
 
     /**
      * Fired when a PaymentIntent fails.
      * Docs: https://docs.stripe.com/api/events/types#event_types-payment_intent.payment_failed
+     * 
+     * @note The defined events are executed in parallel and are awaited inside the webhook handler.
      */
     "stripe.payment_failed": (opts: {
         uid: string;
@@ -130,12 +147,14 @@ export type StripeEvents = {
         amount: number;
         currency: string;
         last_payment_error_message?: string;
-        metadata: Record<string, string>;
+        metadata: Stripe.Metadata;
     }) => void | Promise<void>;
 
     /**
      * Fired when a SetupIntent succeeds and we (best-effort) set the default payment method.
      * Docs: https://docs.stripe.com/api/events/types#event_types-setup_intent.succeeded
+     * 
+     * @note The defined events are executed in parallel and are awaited inside the webhook handler.
      */
     "stripe.payment_method_ready": (opts: {
         uid: string;

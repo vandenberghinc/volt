@@ -48,7 +48,7 @@ type SetFields<TSchema> = Exact<{
  * Strict numeric fields for math operations
  */
 type NumericFields<TSchema> = Exact<{
-    [K in Paths<TSchema> as PathValue<TSchema, K> extends number | undefined ? K : never]?: number;
+    [K in Paths<TSchema> as PathValue<TSchema, K> extends (number | bigint | undefined) ? K : never]?: Exclude<PathValue<TSchema, K>, undefined>;
 }>;
 /**
  * Strict unset fields

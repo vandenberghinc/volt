@@ -4,7 +4,6 @@
  */
 
 // Imports.
-import { Utils } from "./utils.js"
 import { Cookies } from "./cookies"
 
 import type {

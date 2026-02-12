@@ -4,8 +4,10 @@
  */
 
 import Stripe from "stripe";
+import * as vlib from "@vandenberghinc/vlib";
 import { InternalStripeError } from "./error.js";
-import { assert, stripe_api_call } from "./utils.js";
+import { assert, generate_random_idempotency_key, stable_idempotency_key, stripe_api_call } from "./utils.js";
+import { Server } from "../../server.js";
 
 // ----------------------------------------------------------------------------
 // Product types.
@@ -22,11 +24,15 @@ export type TaxBehavior = "inclusive" | "exclusive" | "unspecified";
 
 /**
  * An internal product id, simple type alias for clarity.
+ * 
+ * @docs
  */
 export type ProductId = string;
 
 /**
  * An internal subscription plan id, simple type alias for clarity.
+ * 
+ * @docs
  */
 export type SubscriptionPlanId = string;
 
@@ -59,6 +65,10 @@ interface BaseProduct {
 
 /**
  * The one-time payment product interface.
+ * @warning
+ * A product is a public type and is accessible in the frontend,
+ * through the default Volt Rest API.
+ * @docs
  */
 export interface OneTimePaymentProduct extends BaseProduct {
     /** The product type. */
@@ -76,6 +86,12 @@ export interface OneTimePaymentProduct extends BaseProduct {
 
 /**
  * A subscription plan.
+ * 
+ * @warning
+ * A subscription plan is a public type and is accessible in the frontend,
+ * through the default Volt Rest API.
+ * 
+ * @docs
  */
 export interface SubscriptionPlan {
     /**
@@ -98,6 +114,12 @@ export interface SubscriptionPlan {
 
 /**
  * A subscription based product interface.
+ * 
+ * @warning
+ * A subscription product is a public type and is accessible in the frontend,
+ * through the default Volt Rest API.
+ * 
+ * @docs
  */
 export interface SubscriptionProduct extends BaseProduct {
     /** The product type. */
@@ -127,9 +149,9 @@ export interface SubscriptionProduct extends BaseProduct {
 export type MeterAggregationFormula = "count" | "sum" | "last";
 
 /**
- * A meter product.
+ * Nested types for the meter product definition.
  *
- * This defines:
+ * A meter product defines:
  * - a Stripe Billing Meter (usage aggregation definition)
  * - a Stripe Product + recurring metered Price attached to that meter
  *
@@ -138,46 +160,349 @@ export type MeterAggregationFormula = "count" | "sum" | "last";
  * - Create meter: https://docs.stripe.com/api/billing/meter/create
  * - Prices (recurring.meter): https://docs.stripe.com/api/prices/create
  */
-export interface MeterProduct extends BaseProduct {
-    /** The product type. */
-    type: "meter";
-    /** The price per usage unit in the smallest currency unit (e.g., cents). */
-    price: number;
-    /** The billing interval for the usage price (typically "month"). */
-    interval: RecurringInterval;
-    /** The recurring interval count. */
-    interval_count: number;
+export namespace MeterProduct {
+
     /**
-     * The Stripe meter event name.
-     * This must be stable and unique across your Stripe account.
-     * @see https://docs.stripe.com/api/billing/meter/create
+     * The meter product kind.
      */
-    meter_event_name: string;
+    export type Kind = "units" | "money";
+
+    /** Unit price, either by integer (smallest currency unit) or decimal string. */
+    export type UnitPrice =
+        | number
+        | { decimals: string };
+
     /**
-     * The meter's default aggregation formula.
-     * @default "sum"
-     * @see https://docs.stripe.com/api/billing/meter/create
+     * A **unit-based** metered billing product backed by a Stripe Billing Meter and a **metered recurring Price**.
+     *
+     * Use this when:
+     * - you measure usage as **integer units** (requests, tokens, bytes, seconds, etc.)
+     * - and you want Stripe to bill based on aggregated usage over a billing interval
+     *
+     * Pricing:
+     * - `price: number` uses Stripe Price `unit_amount` (integer, smallest currency unit — e.g., cents)
+     * - `price: { decimals: string }` uses Stripe Price `unit_amount_decimal` (string, smallest currency unit — up to 12 decimals)
+     *
+     * Recording usage:
+     * - Call `record_meter_usage(..., { value })` with an **integer** `value`.
+     * - The meter's `aggregation_formula` controls how events are aggregated (e.g., `"sum"`, `"count"`, `"last"`).
+     *
+     * Stripe docs:
+     * - Meters: https://docs.stripe.com/api/billing/meter
+     * - Create meter: https://docs.stripe.com/api/billing/meter/create
+     * - Create price (recurring.meter): https://docs.stripe.com/api/prices/create
+     * 
+     * @warning
+     * A meter product is a public type and is accessible in the frontend,
+     * through the default Volt Rest API.
+     *
+     * @example
+     * {Charge 1 cent per request}
+     * ```ts
+     * const products: Product[] = [{
+     *   id: "api_requests",
+     *   type: "meter",
+     *   kind: "units",
+     *   name: "API Requests",
+     *   description: "Usage-based billing per request.",
+     *   currency: "usd",
+     *   tax_code: "txcd_10103000",
+     *   tax_behavior: "unspecified",
+     *   interval: "month",
+     *   interval_count: 1,
+     *   meter_event_name: "api_requests_v1",
+     *   price: 1, // 1 cent per unit
+     * }];
+     *
+     * await record_meter_usage(stripe, {
+     *   uid,
+     *   product: initialized.api_requests,
+     *   value: 1,
+     *   all_products: initialized_all,
+     * });
+     * ```
+     *
+     * @example
+     * {Charge fractional cents per token}
+     * ```ts
+     * const products: Product[] = [{
+     *   id: "tokens",
+     *   type: "meter",
+     *   kind: "units",
+     *   name: "Tokens",
+     *   description: "Charged per token with fractional cents.",
+     *   currency: "usd",
+     *   tax_code: "txcd_10103000",
+     *   tax_behavior: "unspecified",
+     *   interval: "month",
+     *   interval_count: 1,
+     *   meter_event_name: "tokens_v1",
+     *   price: { decimals: "0.000001" }, // cents; $0.00000001 per token
+     * }];
+     * ```
+     *
+     * @docs
      */
-    aggregation_formula?: MeterAggregationFormula;
+    export interface UnitsMeter extends BaseProduct {
+        /** The product type. */
+        type: "meter";
+
+        /**
+         * Meter kind:
+         * - `"units"` means you report integer usage units with `value`,
+         *   and configure the price per unit here.
+         * @dev_note Keep this required and not defaulted to "units"
+         *           this makes code easier to maintain and avoids type casting / runtime code mistakes.
+         */
+        kind: "units";
+
+        /**
+         * Unit price in the smallest currency unit (e.g., cents).
+         * - If number: must be an integer (Stripe `unit_amount`).
+         * - If object: decimals string up to 12 decimals (Stripe `unit_amount_decimal`).
+         */
+        price: UnitPrice;
+
+        /** The billing interval for the usage price (typically `"month"`). */
+        interval: RecurringInterval;
+
+        /** The recurring interval count. */
+        interval_count: number;
+
+        /**
+         * The Stripe meter event name.
+         * This must be stable and unique across your Stripe account.
+         * @see https://docs.stripe.com/api/billing/meter/create
+         */
+        meter_event_name: string;
+
+        /**
+         * The meter's default aggregation formula.
+         * @default "sum"
+         * @see https://docs.stripe.com/api/billing/meter/create
+         */
+        aggregation_formula?: MeterAggregationFormula;
+
+        /**
+         * The payload key used to map usage events to a Stripe customer id.
+         * Stripe currently requires customer_mapping.type="by_id".
+         * @default "stripe_customer_id"
+         * @see https://docs.stripe.com/api/billing/meter/create
+         */
+        customer_mapping_event_payload_key?: string;
+
+        /**
+         * The payload key used as the numeric value for the meter.
+         * @default "value"
+         * @see https://docs.stripe.com/api/billing/meter/create
+         */
+        value_settings_event_payload_key?: string;
+
+        /**
+         * Optional pre-aggregation time window.
+         * @see https://docs.stripe.com/api/billing/meter/create
+         */
+        event_time_window?: "hour" | "day";
+    }
+
+
     /**
-     * The payload key used to map usage events to a Stripe customer id.
-     * Stripe currently requires customer_mapping.type="by_id".
-     * @default "stripe_customer_id"
-     * @see https://docs.stripe.com/api/billing/meter/create
+     * A **money-based** meter product for charging *arbitrary per-event currency amounts*.
+     *
+     * Use this when:
+     * - you compute a currency cost per request (e.g. OpenAI usage cost),
+     * - and you want to record **that exact amount** (to supported precision) per event,
+     * - without maintaining token pricing tables in Stripe.
+     *
+     * How it works internally:
+     * - The Stripe recurring Price is created with a **fixed** `unit_amount_decimal`:
+     *   `"0.000000000001"` **in cents** (10^-12 cents per unit).
+     * - When you call `record_meter_usage(..., { amount })`, your library converts the
+     *   major-unit amount (e.g. USD) into an integer number of these pico-cent units
+     *   and records that integer as the meter event value.
+     *
+     * Important constraints:
+     * - You must NOT set `price` on this meter.
+     * - Amounts can be passed as string or number.
+     * - Conversion supports up to 14 decimals in major units (because we convert to 10^14 units),
+     *   and you can choose rounding behavior via `round`.
+     * 
+     * @warning
+     * A meter product is a public type and is accessible in the frontend,
+     * through the default Volt Rest API.
+     *
+     * @example
+     * {Charge exact per-request OpenAI spend}
+     * You compute the request cost in USD and report it directly.
+     * ```ts
+     * const products: Product[] = [{
+     *   id: "ai_usage",
+     *   type: "meter",
+     *   kind: "money",
+     *   name: "AI Usage",
+     *   description: "Billed by actual AI spend per request.",
+     *   currency: "usd",
+     *   tax_code: "txcd_10103000",
+     *   tax_behavior: "unspecified",
+     *   interval: "month",
+     *   interval_count: 1,
+     *   meter_event_name: "ai_usage_v1",
+     * }];
+     *
+     * // Later, when a request costs $0.007463:
+     * await record_meter_usage(stripe, {
+     *   uid,
+     *   product: initialized.ai_usage,
+     *   amount: "0.007463",
+     *   round: "exact",
+     *   all_products: initialized_all,
+     * });
+     * ```
+     *
+     * @example
+     * {Charge using a float with rounding}
+     * If you have a float, pass it and choose a rounding mode.
+     * ```ts
+     * await record_meter_usage(stripe, {
+     *   uid,
+     *   product: initialized.ai_usage,
+     *   amount: 0.007463,
+     *   round: "round",
+     *   all_products: initialized_all,
+     * });
+     * ```
+     * 
+     * @docs
      */
-    customer_mapping_event_payload_key?: string;
-    /**
-     * The payload key used as the numeric value for the meter.
-     * @default "value"
-     * @see https://docs.stripe.com/api/billing/meter/create
-     */
-    value_settings_event_payload_key?: string;
-    /**
-     * Optional pre-aggregation time window.
-     * @see https://docs.stripe.com/api/billing/meter/create
-     */
-    event_time_window?: "hour" | "day";
+    export interface MoneyMeter extends BaseProduct {
+        /** The product type. */
+        type: "meter";
+
+        /**
+         * Money meters fix the unit price internally; callers report arbitrary amounts.
+         */
+        kind: "money";
+
+        /** No integer price is allowed for money meters. */
+        price?: never;
+
+        /** The billing interval for the usage price (typically `"month"`). */
+        interval: RecurringInterval;
+
+        /** The recurring interval count. */
+        interval_count: number;
+
+        /**
+         * The Stripe meter event name.
+         * This must be stable and unique across your Stripe account.
+         * @see https://docs.stripe.com/api/billing/meter/create
+         */
+        meter_event_name: string;
+
+        /**
+         * The meter's default aggregation formula.
+         * @default "sum"
+         * @see https://docs.stripe.com/api/billing/meter/create
+         */
+        aggregation_formula?: MeterAggregationFormula;
+
+        /**
+         * The payload key used to map usage events to a Stripe customer id.
+         * Stripe currently requires customer_mapping.type="by_id".
+         * @default "stripe_customer_id"
+         * @see https://docs.stripe.com/api/billing/meter/create
+         */
+        customer_mapping_event_payload_key?: string;
+
+        /**
+         * The payload key used as the numeric value for the meter.
+         * @default "value"
+         * @see https://docs.stripe.com/api/billing/meter/create
+         */
+        value_settings_event_payload_key?: string;
+
+        /**
+         * Optional pre-aggregation time window.
+         * @see https://docs.stripe.com/api/billing/meter/create
+         */
+        event_time_window?: "hour" | "day";
+    }
+
+    /** Multiplier from major units to pico-cent units: 100 * 10^12 = 10^14. */
+    export const MONEY_METER_MAJOR_TO_PICO_CENTS_SHIFT = 14;
+
+    /** Fixed Stripe unit_amount_decimal for money meters, in cents. */
+    export const MONEY_METER_UNIT_AMOUNT_DECIMAL_CENTS = "0.000000000001"; // 10^-12 cents
 }
+
+/**
+ * A Stripe usage-based billing product backed by a Stripe Billing Meter and a metered recurring Price.
+ *
+ * This union offers two easy-to-understand variants:
+ * - `UnitsMeter`: unit-based pricing where usage is recorded as integer `value` events, and the unit price is either:
+ *   - integer smallest-currency pricing (`unit_amount`) via `price: number`, or
+ *   - decimal smallest-currency pricing (`unit_amount_decimal`) via `price: { decimals: string }`
+ * - `MoneyMeter`: fixed internal unit price with caller-specified per-event currency amounts recorded via `amount`
+ * 
+ * @warning
+ * A meter product is a public type and is accessible in the frontend,
+ * through the default Volt Rest API.
+ *
+ * @example
+ * {Choose a meter type}
+ * Pick the variant that matches how you want to report usage:
+ * ```ts
+ * const by_requests: MeterProduct = {
+ *   type: "meter",
+ *   kind: "units",
+ *   id: "requests",
+ *   name: "Requests",
+ *   description: "Charged per request.",
+ *   currency: "usd",
+ *   tax_code: "txcd_10103000",
+ *   tax_behavior: "unspecified",
+ *   interval: "month",
+ *   interval_count: 1,
+ *   meter_event_name: "requests_v1",
+ *   price: 1,
+ * };
+ *
+ * const by_tokens_small_price: MeterProduct = {
+ *   type: "meter",
+ *   kind: "units",
+ *   id: "tokens",
+ *   name: "Tokens",
+ *   description: "Charged per token with fractional cents.",
+ *   currency: "usd",
+ *   tax_code: "txcd_10103000",
+ *   tax_behavior: "unspecified",
+ *   interval: "month",
+ *   interval_count: 1,
+ *   meter_event_name: "tokens_v1",
+ *   price: { decimals: "0.000001" },
+ * };
+ *
+ * const by_actual_spend: MeterProduct = {
+ *   type: "meter",
+ *   kind: "money",
+ *   id: "ai_spend",
+ *   name: "AI Spend",
+ *   description: "Charged by actual spend per request.",
+ *   currency: "usd",
+ *   tax_code: "txcd_10103000",
+ *   tax_behavior: "unspecified",
+ *   interval: "month",
+ *   interval_count: 1,
+ *   meter_event_name: "ai_spend_v1",
+ * };
+ * ```
+ *
+ * @see {@link MeterProduct.UnitsMeter} for unit-based pricing (integer or decimal unit price).
+ * @see {@link MeterProduct.MoneyMeter} for arbitrary per-event currency amounts.
+ *
+ * @docs
+ */
+export type MeterProduct = MeterProduct.UnitsMeter | MeterProduct.MoneyMeter;
 
 /** A union type of all products. */
 export type Product = OneTimePaymentProduct | SubscriptionProduct | MeterProduct;
@@ -218,7 +543,7 @@ export interface InitializedSubscriptionProduct extends SubscriptionProduct {
 /**
  * An initialized meter product.
  */
-export interface InitializedMeterProduct extends MeterProduct {
+export type InitializedMeterProduct<T extends MeterProduct = MeterProduct> = T & {
     /** The product type. */
     type: "meter";
     /** The Stripe meter id. */
@@ -265,14 +590,170 @@ function validate_unit_amount(unit_amount: number, field_name: string): void {
     assert(
         Number.isInteger(unit_amount),
         "invalid_product",
-        `${field_name} must be an integer (smallest currency unit)`,
+        `Property '${field_name}' must be an integer (smallest currency unit)`,
         { field_name, unit_amount },
     );
     assert(
-        unit_amount >= 0,
+        unit_amount > 0,
         "invalid_product",
-        `${field_name} must be >= 0`,
+        `Property '${field_name}' must be > 0`,
         { field_name, unit_amount },
+    );
+}
+
+/**
+ * Normalize a Stripe-compatible `unit_amount_decimal` string (smallest currency unit, e.g. cents).
+ *
+ * Goals:
+ * - Accept only Stripe-style non-negative decimals with up to 12 fractional digits.
+ * - Canonicalize equivalent numeric strings so signatures/metadata comparisons are stable.
+ * - Remove leading/trailing whitespace.
+ * - Normalize leading zeros in the whole part:
+ *     "00012.3400" -> "12.3400"
+ *     "0000.5"     -> "0.5"
+ *     "0.5"        -> "0.5"
+ * - Normalize trailing zeros in the fractional part:
+ *     "12.3400" -> "12.34"
+ *     "12.000"  -> "12"
+ * - Disallow zero values (matches your current pricing policy):
+ *     "0", "0.0", "000.000" -> throws
+ *
+ * Notes:
+ * - This is designed for Stripe Price `unit_amount_decimal` (string) which supports up to 12 decimals.
+ * - This is intentionally strict (no "+", no "-", no scientific notation, no ".5").
+ *
+ * @throws {InternalStripeError} via `assert(...)` when invalid.
+ */
+function normalize_unit_amount_decimal(unit_amount_decimal: string, field_name: string): string {
+    assert(
+        typeof unit_amount_decimal === "string",
+        "invalid_product",
+        `Property '${field_name}' must be a string`,
+        { field_name, unit_amount_decimal },
+    );
+
+    let s = unit_amount_decimal.trim();
+    assert(s.length > 0, "invalid_product", `Property '${field_name}' must be non-empty`, { field_name });
+
+    // Strict Stripe-style non-negative decimal with up to 12 fractional digits.
+    // - no sign
+    // - no scientific notation
+    // - requires whole digits (so ".5" is rejected)
+    // - allows optional fractional part with 1..12 digits
+    assert(
+        /^\d+(\.\d{1,12})?$/.test(s),
+        "invalid_product",
+        `Property '${field_name}' must be a non-negative decimal with up to 12 decimals`,
+        { field_name, unit_amount_decimal: s },
+    );
+
+    // Split whole/fractional.
+    const dot = s.indexOf(".");
+    const whole_raw = dot >= 0 ? s.slice(0, dot) : s;
+    const frac_raw = dot >= 0 ? s.slice(dot + 1) : "";
+
+    // Normalize whole:
+    // - strip all leading zeros
+    // - if empty -> "0"
+    let whole = whole_raw.replace(/^0+/, "");
+    if (whole === "") whole = "0";
+
+    // Normalize fractional:
+    // - remove trailing zeros
+    // - if becomes empty -> no fractional part
+    let frac = frac_raw;
+    if (frac.length > 0) {
+        frac = frac.replace(/0+$/, "");
+    }
+
+    // Recompose canonical string.
+    s = frac.length > 0 ? `${whole}.${frac}` : whole;
+
+    // Reject zero values: "0" only (since "0.0" etc collapse to "0")
+    assert(
+        s !== "0",
+        "invalid_product",
+        `Property '${field_name}' must be > 0`,
+        { field_name, unit_amount_decimal: s },
+    );
+
+    // Final validation to be sure the normalization didn't produce an invalid string.
+    assert(/^\d+(\.\d{1,12})?$/.test(s), "invalid_product", "Normalization produced invalid decimal.", { s });
+
+    return s;
+}
+
+/**
+ * Resolve a unit price for meter products into Stripe Price create fields.
+ *
+ * Behavior:
+ * - Money meters: fixed `unit_amount_decimal` (in cents) at 10^-12 cents per unit.
+ * - Unit meters:
+ *   - If `price` is a number: validate as a positive integer and return `{ unit_amount }`.
+ *   - If `price` is `{ decimals: string }`: normalize to canonical form and return `{ unit_amount_decimal }`.
+ *
+ * Canonicalization:
+ * - Decimal prices are normalized by `normalize_unit_amount_decimal` to ensure:
+ *   - stable signatures (`app_price_signature`)
+ *   - stable matching of existing Stripe Prices
+ *
+ * @throws {InternalStripeError} via `assert(...)` when invalid.
+ */
+function resolve_unit_price_fields(
+    product: MeterProduct,
+): { unit_amount: number } | { unit_amount_decimal: string } {
+
+    if (product.kind === "money") {
+        // Fixed Stripe unit_amount_decimal for money meters, in cents (10^-12 cents).
+        return { unit_amount_decimal: MeterProduct.MONEY_METER_UNIT_AMOUNT_DECIMAL_CENTS };
+    }
+
+    if (product.kind === "units") {
+        const p: unknown = (product as MeterProduct.UnitsMeter).price;
+
+        if (typeof p === "number") {
+            // Positive integer in smallest currency unit (e.g., cents).
+            assert(
+                Number.isInteger(p),
+                "invalid_product",
+                "Property 'price' must be an integer (smallest currency unit)",
+                { field_name: "price", unit_amount: p },
+            );
+            assert(
+                p > 0,
+                "invalid_product",
+                "Property 'price' must be > 0",
+                { field_name: "price", unit_amount: p },
+            );
+            return { unit_amount: p };
+        }
+
+        // Validate object shape defensively.
+        assert(
+            p !== null && typeof p === "object",
+            "invalid_product",
+            "Property 'price' must be a number or { decimals: string }",
+            { price: p },
+        );
+
+        const decimals = (p as any).decimals;
+        assert(
+            typeof decimals === "string",
+            "invalid_product",
+            "Property 'price.decimals' must be a string",
+            { price: p },
+        );
+
+        return { unit_amount_decimal: normalize_unit_amount_decimal(decimals, "price.decimals") };
+    }
+
+    // Exhaustiveness guard.
+    // @ts-expect-error exhaustive
+    product.kind.toString();
+    throw new InternalStripeError(
+        "invalid_product",
+        `Unsupported meter product kind: ${(product as MeterProduct).kind}`,
+        { kind: (product as MeterProduct).kind },
     );
 }
 
@@ -314,12 +795,20 @@ function validate_images(images: string[] | undefined): void {
     }
 
     assert(Array.isArray(images), "invalid_product", "Images must be an array", { images });
+    assert(images.length <= 8, "invalid_product", "Images must contain at most 8 URLs", { count: images.length });
 
     for (const image of images) {
         assert(
             typeof image === "string" && image.trim().length > 0,
             "invalid_product",
             "Image URL must be a non-empty string",
+            { image },
+        );
+        // Require https URLs to avoid weird schemes ending up in Stripe/user-facing UIs.
+        assert(
+            /^https:\/\/\S+$/i.test(image.trim()),
+            "invalid_product",
+            "Image URL must be an https URL",
             { image },
         );
     }
@@ -347,7 +836,8 @@ function make_one_time_price_signature(opts: {
  */
 function make_recurring_price_signature(opts: {
     currency: string;
-    unit_amount: number;
+    unit_amount?: number;
+    unit_amount_decimal?: string;
     tax_behavior: TaxBehavior;
     interval: RecurringInterval;
     interval_count: number;
@@ -355,7 +845,9 @@ function make_recurring_price_signature(opts: {
     meter_id?: string;
 }): string {
     const meter_part = opts.usage_type === "metered" ? `|meter:${opts.meter_id ?? ""}` : "|meter:";
-    return `v1|recurring|${opts.currency}|${opts.unit_amount}|${opts.tax_behavior}|${opts.interval}|${opts.interval_count}|usage:${opts.usage_type}${meter_part}`;
+    const amount_part =
+        opts.unit_amount_decimal !== undefined ? opts.unit_amount_decimal : (opts.unit_amount ?? 0);
+    return `v1|recurring|${opts.currency}|${amount_part}|${opts.tax_behavior}|${opts.interval}|${opts.interval_count}|usage:${opts.usage_type}${meter_part}`;
 }
 
 /**
@@ -489,6 +981,11 @@ function index_stripe_products_by_app_id(
     for (const product of stripe_products) {
         const app_id = product.metadata?.[app_product_id_metadata_key];
         if (app_id) {
+            assert(!map.has(app_id), "api_error", "Duplicate Stripe product metadata app id", {
+                app_id,
+                existing_stripe_product_id: map.get(app_id)?.id,
+                duplicate_stripe_product_id: product.id,
+            });
             map.set(app_id, product);
         }
     }
@@ -534,6 +1031,11 @@ function index_stripe_meters_by_event_name(
     for (const meter of stripe_meters) {
         const event_name = meter.event_name;
         if (event_name) {
+            assert(!map.has(event_name), "api_error", "Duplicate Stripe meter event_name", {
+                event_name,
+                existing_stripe_meter_id: map.get(event_name)?.id,
+                duplicate_stripe_meter_id: meter.id,
+            });
             map.set(event_name, meter);
         }
     }
@@ -559,37 +1061,37 @@ function find_matching_active_price(
     return match ?? null;
 }
 
-/**
- * Deactivate all active Stripe Prices that match the internal price id but have different signatures.
- *
- * Docs: https://docs.stripe.com/api/prices/update
- */
-async function deactivate_stale_prices_for_app_price_id(
-    client: Stripe,
-    active_prices: Stripe.Price[],
-    app_price_id: string,
-    expected_signature: string,
-): Promise<void> {
-    const stale_prices = active_prices.filter((p) => {
-        const meta_price_id = p.metadata?.[app_price_id_metadata_key];
-        const meta_signature = p.metadata?.[app_price_signature_metadata_key];
-        return meta_price_id === app_price_id && meta_signature !== expected_signature;
-    });
-
-    await Promise.all(
-        stale_prices.map((p) =>
-            stripe_api_call(
-                () =>
-                    client.prices.update(
-                        p.id,
-                        { active: false },
-                        { idempotencyKey: `init_price_deactivate_${app_price_id}_${p.id}` },
-                    ),
-                { operation: "prices.update", app_price_id, stripe_price_id: p.id, action: "deactivate" },
-            ),
-        ),
-    );
-}
+// /**
+//  * Deactivate all active Stripe Prices that match the internal price id but have different signatures.
+//  *
+//  * Docs: https://docs.stripe.com/api/prices/update
+//  */
+// async function deactivate_stale_prices_for_app_price_id(
+//     client: Stripe,
+//     server: Server,
+//     active_prices: Stripe.Price[],
+//     app_price_id: string,
+//     expected_signature: string,
+// ): Promise<void> {
+//     const stale_prices = active_prices.filter((p) => {
+//         const meta_price_id = p.metadata?.[app_price_id_metadata_key];
+//         const meta_signature = p.metadata?.[app_price_signature_metadata_key];
+//         return meta_price_id === app_price_id && meta_signature !== expected_signature;
+//     });
+//     await Promise.all(
+//         stale_prices.map((p) =>
+//             stripe_api_call(
+//                 () =>
+//                     client.prices.update(
+//                         p.id,
+//                         { active: false },
+//                         { idempotencyKey: stable_idempotency_key(`init|prices.update|deactivate|${app_price_id}|${p.id}`) },
+//                     ),
+//                 { operation: "prices.update", app_price_id, stripe_price_id: p.id, action: "deactivate" },
+//             ),
+//         ),
+//     );
+// }
 
 /**
  * Create a Stripe Product for a given internal Product.
@@ -599,8 +1101,11 @@ async function deactivate_stale_prices_for_app_price_id(
  */
 async function create_stripe_product(
     client: Stripe,
+    server: Server,
     product: Product,
 ): Promise<Stripe.Product> {
+    server.log(0, `Creating Stripe product for product '${product.id}'`);
+
     return await stripe_api_call(
         () =>
             client.products.create(
@@ -613,7 +1118,7 @@ async function create_stripe_product(
                         [app_product_id_metadata_key]: product.id,
                     },
                 },
-                { idempotencyKey: `init_product_create_${product.id}` },
+                { idempotencyKey: generate_random_idempotency_key(`create_product_${product.id}`) },
             ),
         { operation: "products.create", app_product_id: product.id },
     );
@@ -626,6 +1131,7 @@ async function create_stripe_product(
  */
 async function update_stripe_product_if_needed(
     client: Stripe,
+    server: Server,
     stripe_product: Stripe.Product,
     product: Product,
 ): Promise<Stripe.Product> {
@@ -646,6 +1152,8 @@ async function update_stripe_product_if_needed(
         return stripe_product;
     }
 
+    server.log(0, `Updating Stripe product '${stripe_product.id}' to match app product '${product.id}'`);
+
     return await stripe_api_call(
         () =>
             client.products.update(
@@ -656,9 +1164,37 @@ async function update_stripe_product_if_needed(
                     tax_code: product.tax_code,
                     images: product.images,
                 },
-                { idempotencyKey: `init_product_update_${product.id}` },
+                { idempotencyKey: generate_random_idempotency_key(`update_product_${product.id}_${stripe_product.id}`) },
             ),
         { operation: "products.update", app_product_id: product.id, stripe_product_id: stripe_product.id },
+    );
+}
+
+/**
+ * Update default price on a stripe product if needed.
+ */
+async function update_stripe_product_default_price_if_needed(
+    client: Stripe,
+    server: Server,
+    stripe_product: Stripe.Product,
+    default_price: Stripe.Price,
+): Promise<void> {
+    if (stripe_product.default_price === default_price.id) {
+        return;
+    }
+
+    server.log(0, `Updating default price for Stripe product '${stripe_product.id}' to price '${default_price.id}'`);
+
+    await stripe_api_call(
+        () =>
+            client.products.update(
+                stripe_product.id,
+                {
+                    default_price: default_price.id,
+                },
+                { idempotencyKey: generate_random_idempotency_key(`update_product_default_price_${stripe_product.id}_${default_price.id}`) },
+            ),
+        { operation: "products.update", app_product_id: stripe_product.metadata?.[app_product_id_metadata_key], stripe_product_id: stripe_product.id, action: "update_default_price" },
     );
 }
 
@@ -669,7 +1205,9 @@ async function update_stripe_product_if_needed(
  */
 async function create_one_time_price(
     client: Stripe,
+    server: Server,
     opts: {
+        product_id: string;
         stripe_product_id: string;
         app_price_id: string;
         currency: string;
@@ -678,6 +1216,8 @@ async function create_one_time_price(
         nickname: string;
     },
 ): Promise<Stripe.Price> {
+    server.log(0, `Creating stripe one-time price for product: ${opts.product_id}`);
+
     return await stripe_api_call(
         () =>
             client.prices.create(
@@ -697,7 +1237,7 @@ async function create_one_time_price(
                         }),
                     },
                 },
-                { idempotencyKey: `init_price_create_one_time_${opts.app_price_id}` },
+                { idempotencyKey: generate_random_idempotency_key(`create_one_time_price_${opts.app_price_id}_${opts.stripe_product_id}`) },
             ),
         { operation: "prices.create", app_price_id: opts.app_price_id, stripe_product_id: opts.stripe_product_id },
     );
@@ -710,19 +1250,38 @@ async function create_one_time_price(
  */
 async function create_recurring_price(
     client: Stripe,
-    opts: {
-        stripe_product_id: string;
-        app_price_id: string;
-        currency: string;
-        unit_amount: number;
-        tax_behavior: TaxBehavior;
-        nickname: string;
-        interval: RecurringInterval;
-        interval_count: number;
-        recurring_usage:
+    server: Server,
+    opts:
+        | {
+            product_id: string
+            stripe_product_id: string;
+            app_price_id: string;
+            currency: string;
+            unit_amount: number;
+            unit_amount_decimal?: never;
+            tax_behavior: TaxBehavior;
+            nickname: string;
+            interval: RecurringInterval;
+            interval_count: number;
+            recurring_usage:
             | { usage_type: "licensed" }
             | { usage_type: "metered"; meter_id: string };
-    },
+        }
+        | {
+            product_id: string
+            stripe_product_id: string;
+            app_price_id: string;
+            currency: string;
+            unit_amount?: never;
+            unit_amount_decimal: string;
+            tax_behavior: TaxBehavior;
+            nickname: string;
+            interval: RecurringInterval;
+            interval_count: number;
+            recurring_usage:
+            | { usage_type: "licensed" }
+            | { usage_type: "metered"; meter_id: string };
+        },
 ): Promise<Stripe.Price> {
     // Build recurring fields with optional metered settings.
     const recurring: Stripe.PriceCreateParams.Recurring = {
@@ -738,7 +1297,9 @@ async function create_recurring_price(
 
     const signature = make_recurring_price_signature({
         currency: opts.currency,
-        unit_amount: opts.unit_amount,
+        ...(("unit_amount_decimal" in opts)
+            ? { unit_amount_decimal: opts.unit_amount_decimal }
+            : { unit_amount: opts.unit_amount }),
         tax_behavior: opts.tax_behavior,
         interval: opts.interval,
         interval_count: opts.interval_count,
@@ -746,13 +1307,16 @@ async function create_recurring_price(
         meter_id: opts.recurring_usage.usage_type === "metered" ? opts.recurring_usage.meter_id : undefined,
     });
 
+    server.log(0, `Creating stripe recurring price for product: ${opts.product_id}`);
     return await stripe_api_call(
         () =>
             client.prices.create(
                 {
                     product: opts.stripe_product_id,
                     currency: opts.currency,
-                    unit_amount: opts.unit_amount,
+                    ...(("unit_amount_decimal" in opts)
+                        ? { unit_amount_decimal: opts.unit_amount_decimal }
+                        : { unit_amount: opts.unit_amount }),
                     tax_behavior: opts.tax_behavior,
                     nickname: opts.nickname,
                     // Docs: https://docs.stripe.com/billing/prices-guide#create-prices
@@ -762,7 +1326,7 @@ async function create_recurring_price(
                         [app_price_signature_metadata_key]: signature,
                     },
                 },
-                { idempotencyKey: `init_price_create_recurring_${opts.app_price_id}` },
+                { idempotencyKey: generate_random_idempotency_key(`create_recurring_price_${opts.app_price_id}_${opts.stripe_product_id}`) },
             ),
         { operation: "prices.create", app_price_id: opts.app_price_id, stripe_product_id: opts.stripe_product_id },
     );
@@ -775,11 +1339,14 @@ async function create_recurring_price(
  */
 async function create_stripe_meter(
     client: Stripe,
+    server: Server,
     product: MeterProduct,
 ): Promise<Stripe.Billing.Meter> {
     const aggregation_formula = product.aggregation_formula ?? "sum";
     const customer_mapping_event_payload_key = product.customer_mapping_event_payload_key ?? "stripe_customer_id";
     const value_settings_event_payload_key = product.value_settings_event_payload_key ?? "value";
+    
+    server.log(0, `Creating stripe billing meter for product: ${product.id}`);
 
     return await stripe_api_call(
         () =>
@@ -803,7 +1370,7 @@ async function create_stripe_meter(
                     },
                     ...(product.event_time_window ? { event_time_window: product.event_time_window } : {}),
                 },
-                { idempotencyKey: `init_meter_create_${product.id}_${product.meter_event_name}` },
+                { idempotencyKey: generate_random_idempotency_key(`create_billing_meter_${product.id}_${product.meter_event_name}`) },
             ),
         {
             operation: "billing.meters.create",
@@ -834,9 +1401,11 @@ async function map_with_concurrency<T_in, T_out>(
 
     const results: T_out[] = new Array(items.length);
     let next_index = 0;
+    let first_error: unknown = null;
 
     const worker = async (): Promise<void> => {
         for (; ;) {
+            if (first_error) return;
             const current_index = next_index;
             next_index += 1;
             if (current_index >= items.length) {
@@ -851,12 +1420,19 @@ async function map_with_concurrency<T_in, T_out>(
                 { current_index, items_length: items.length },
             );
 
-            results[current_index] = await mapper(current_item, current_index);
+            try {
+                results[current_index] = await mapper(current_item, current_index);
+            } catch (e) {
+                // Stop other workers ASAP; rethrow after all workers settle.
+                if (!first_error) first_error = e;
+                return;
+            }
         }
     };
 
     const worker_count = Math.min(concurrency, items.length);
-    await Promise.all(Array.from({ length: worker_count }, () => worker()));
+    await Promise.allSettled(Array.from({ length: worker_count }, () => worker()));
+    if (first_error) throw first_error;
 
     return results;
 }
@@ -869,6 +1445,7 @@ async function map_with_concurrency<T_in, T_out>(
  */
 async function initialize_product(
     client: Stripe,
+    server: Server,
     product: Product,
     stripe_products_by_app_id: Map<string, Stripe.Product>,
     active_prices_by_stripe_product_id: Map<string, Stripe.Price[]>,
@@ -878,13 +1455,21 @@ async function initialize_product(
     assert(product.name.trim().length > 0, "invalid_product", "Product.name must be non-empty", { product_id: product.id });
     assert(product.currency.trim().length > 0, "invalid_product", "Product.currency must be non-empty", { product_id: product.id });
     assert(product.tax_code.trim().length > 0, "invalid_product", "Product.tax_code must be non-empty", { product_id: product.id });
+    assert(
+        product.tax_behavior === "inclusive" ||
+        product.tax_behavior === "exclusive" ||
+        product.tax_behavior === "unspecified",
+        "invalid_product",
+        "Product.tax_behavior is invalid",
+        { product_id: product.id, tax_behavior: product.tax_behavior },
+    );
 
     validate_images(product.images);
 
     // Normalize currency code to lowercase for consistent matching and Stripe API usage.
-    const normalized_currency = product.currency.trim().toLowerCase();
+    product.currency = product.currency.trim().toLowerCase();
     assert(
-        /^[a-z]{3}$/.test(normalized_currency),
+        /^[a-z]{3}$/.test(product.currency),
         "invalid_product",
         `Invalid currency code: "${product.currency}"`,
         { currency: product.currency },
@@ -905,7 +1490,7 @@ async function initialize_product(
                 { product_id: product.id, trial_days: product.trial_days },
             );
         }
-
+        
         if (product.billing_anchor !== undefined) {
             const anchor = product.billing_anchor;
             assert(
@@ -929,20 +1514,56 @@ async function initialize_product(
                 "Plan.interval_count must be >= 1",
                 { product_id: product.id, plan_id: plan.id, interval_count: plan.interval_count },
             );
+            assert(
+                plan.interval === "day" || plan.interval === "week" || plan.interval === "month" || plan.interval === "year",
+                "invalid_product",
+                "Plan.interval is invalid",
+                { product_id: product.id, plan_id: plan.id, interval: plan.interval },
+            );
         }
     }
     else if (product.type === "meter") {
-
-        validate_unit_amount(product.price, "MeterProduct.price");
+        assert(
+            product.interval === "day" || product.interval === "week" || product.interval === "month" || product.interval === "year",
+            "invalid_product",
+            "Property 'interval' is invalid",
+            { product_id: product.id, interval: product.interval },
+        );
+        if (product.kind === "units") {
+            assert(
+                product.price !== undefined,
+                "invalid_product",
+                "MeterProduct with kind='units' must define 'price'.",
+                { product_id: product.id },
+            );
+            // validates + normalizes shape
+            resolve_unit_price_fields(product);
+        } else if (product.kind === "money") {
+            // money meter: no price is allowed
+            assert(
+                product.price === undefined,
+                "invalid_product",
+                "MeterProduct with kind='money' must not define 'price'.",
+                { product_id: product.id },
+            );
+        } else {
+            // @ts-expect-error
+            product.kind.toString();
+            throw new InternalStripeError(
+                "invalid_product",
+                `Invalid 'kind': ${(product as MeterProduct).kind}`,
+                { product_id: (product as MeterProduct).id, kind: (product as MeterProduct).kind },
+            );
+        }
 
         assert(
             Number.isInteger(product.interval_count) && product.interval_count >= 1,
             "invalid_product",
-            "MeterProduct.interval_count must be >= 1",
+            "Property 'interval_count' must be >= 1",
             { product_id: product.id, interval_count: product.interval_count },
         );
 
-        assert(product.meter_event_name.trim().length > 0, "invalid_product", "MeterProduct.meter_event_name must be non-empty", {
+        assert(product.meter_event_name.trim().length > 0, "invalid_product", "Property 'meter_event_name' must be non-empty", {
             product_id: product.id,
             meter_event_name: product.meter_event_name,
         });
@@ -952,7 +1573,7 @@ async function initialize_product(
         assert(
             product.meter_event_name.length <= 100,
             "invalid_product",
-            "MeterProduct.meter_event_name must be <= 100 characters",
+            "Property 'meter_event_name' must be <= 100 characters",
             { product_id: product.id, meter_event_name_length: product.meter_event_name.length },
         );
 
@@ -961,7 +1582,7 @@ async function initialize_product(
             assert(
                 formula === "count" || formula === "sum" || formula === "last",
                 "invalid_product",
-                "MeterProduct.aggregation_formula is invalid",
+                "Property 'aggregation_formula' is invalid",
                 { product_id: product.id, aggregation_formula: formula },
             );
         }
@@ -970,7 +1591,7 @@ async function initialize_product(
             assert(
                 product.customer_mapping_event_payload_key.trim().length > 0,
                 "invalid_product",
-                "MeterProduct.customer_mapping_event_payload_key must be non-empty",
+                "Property 'customer_mapping_event_payload_key' must be non-empty",
                 { product_id: product.id, customer_mapping_event_payload_key: product.customer_mapping_event_payload_key },
             );
         }
@@ -979,7 +1600,7 @@ async function initialize_product(
             assert(
                 product.value_settings_event_payload_key.trim().length > 0,
                 "invalid_product",
-                "MeterProduct.value_settings_event_payload_key must be non-empty",
+                "Property 'value_settings_event_payload_key' must be non-empty",
                 { product_id: product.id, value_settings_event_payload_key: product.value_settings_event_payload_key },
             );
         }
@@ -989,7 +1610,7 @@ async function initialize_product(
             assert(
                 window === "hour" || window === "day",
                 "invalid_product",
-                "MeterProduct.event_time_window is invalid",
+                "Property 'event_time_window' is invalid",
                 { product_id: product.id, event_time_window: window },
             );
         }
@@ -1012,7 +1633,7 @@ async function initialize_product(
     if (product.type === "meter") {
         stripe_meter = stripe_meters_by_event_name.get(product.meter_event_name) ?? null;
         if (!stripe_meter) {
-            stripe_meter = await create_stripe_meter(client, product);
+            stripe_meter = await create_stripe_meter(client, server, product);
             stripe_meters_by_event_name.set(product.meter_event_name, stripe_meter);
         }
     }
@@ -1020,10 +1641,10 @@ async function initialize_product(
     // 1) Ensure Stripe Product exists (or create it), linked by metadata.
     let stripe_product = stripe_products_by_app_id.get(product.id) ?? null;
     if (!stripe_product) {
-        stripe_product = await create_stripe_product(client, product);
+        stripe_product = await create_stripe_product(client, server, product);
         stripe_products_by_app_id.set(product.id, stripe_product);
     } else {
-        stripe_product = await update_stripe_product_if_needed(client, stripe_product, product);
+        stripe_product = await update_stripe_product_if_needed(client, server, stripe_product, product);
         stripe_products_by_app_id.set(product.id, stripe_product);
     }
 
@@ -1033,19 +1654,19 @@ async function initialize_product(
     if (product.type === "one_time") {
         const app_price_id = make_price_app_id(product.id, undefined);
         const signature = make_one_time_price_signature({
-            currency: normalized_currency,
+            currency: product.currency,
             unit_amount: product.price,
             tax_behavior: product.tax_behavior,
         });
 
         let stripe_price = find_matching_active_price(active_prices, app_price_id, signature);
         if (!stripe_price) {
-            await deactivate_stale_prices_for_app_price_id(client, active_prices, app_price_id, signature);
 
-            stripe_price = await create_one_time_price(client, {
+            stripe_price = await create_one_time_price(client, server, {
+                product_id: product.id,
                 stripe_product_id: stripe_product.id,
                 app_price_id,
-                currency: normalized_currency,
+                currency: product.currency,
                 unit_amount: product.price,
                 tax_behavior: product.tax_behavior,
                 nickname: product.name,
@@ -1055,22 +1676,15 @@ async function initialize_product(
             active_prices_by_stripe_product_id.set(stripe_product.id, updated_prices);
         }
 
-        if (stripe_product.default_price !== stripe_price.id) {
-            stripe_product = await stripe_api_call(
-                () =>
-                    client.products.update(
-                        stripe_product!.id,
-                        { default_price: stripe_price.id },
-                        { idempotencyKey: `init_product_default_price_${product.id}_${stripe_price.id}` },
-                    ),
-                { operation: "products.update", app_product_id: product.id, stripe_product_id: stripe_product.id, action: "set_default_price" },
-            );
-            stripe_products_by_app_id.set(product.id, stripe_product);
-        }
+        await update_stripe_product_default_price_if_needed(
+            client,
+            server,
+            stripe_product,
+            stripe_price,
+        );
 
         return {
             ...product,
-            currency: normalized_currency,
             stripe_product_id: stripe_product.id,
             stripe_price_id: stripe_price.id,
         };
@@ -1080,7 +1694,7 @@ async function initialize_product(
         for (const plan of product.plans) {
             const app_price_id = make_price_app_id(product.id, plan.id);
             const signature = make_recurring_price_signature({
-                currency: normalized_currency,
+                currency: product.currency,
                 unit_amount: plan.price,
                 tax_behavior: product.tax_behavior,
                 interval: plan.interval,
@@ -1090,12 +1704,11 @@ async function initialize_product(
 
             let stripe_price = find_matching_active_price(active_prices, app_price_id, signature);
             if (!stripe_price) {
-                await deactivate_stale_prices_for_app_price_id(client, active_prices, app_price_id, signature);
-
-                stripe_price = await create_recurring_price(client, {
+                stripe_price = await create_recurring_price(client, server, {
+                    product_id: product.id,
                     stripe_product_id: stripe_product.id,
                     app_price_id,
-                    currency: normalized_currency,
+                    currency: product.currency,
                     unit_amount: plan.price,
                     tax_behavior: product.tax_behavior,
                     nickname: `${product.name} - ${plan.name}`,
@@ -1103,10 +1716,16 @@ async function initialize_product(
                     interval_count: plan.interval_count,
                     recurring_usage: { usage_type: "licensed" },
                 });
-
                 const updated_prices = [...active_prices, stripe_price];
                 active_prices_by_stripe_product_id.set(stripe_product.id, updated_prices);
             }
+
+            await update_stripe_product_default_price_if_needed(
+                client,
+                server,
+                stripe_product,
+                stripe_price,
+            );
 
             initialized_plans.push({
                 ...plan,
@@ -1118,7 +1737,6 @@ async function initialize_product(
 
         return {
             ...product,
-            currency: normalized_currency,
             stripe_product_id: stripe_product.id,
             plans: initialized_plans,
         };
@@ -1130,9 +1748,12 @@ async function initialize_product(
         });
 
         const app_price_id = `${product.id}__meter`;
+
+        const unit_price_fields = resolve_unit_price_fields(product);
+
         const signature = make_recurring_price_signature({
-            currency: normalized_currency,
-            unit_amount: product.price,
+            currency: product.currency,
+            ...unit_price_fields,
             tax_behavior: product.tax_behavior,
             interval: product.interval,
             interval_count: product.interval_count,
@@ -1142,40 +1763,31 @@ async function initialize_product(
 
         let stripe_price = find_matching_active_price(active_prices, app_price_id, signature);
         if (!stripe_price) {
-            await deactivate_stale_prices_for_app_price_id(client, active_prices, app_price_id, signature);
-
-            stripe_price = await create_recurring_price(client, {
+            const new_price = await create_recurring_price(client, server, {
+                product_id: product.id,
                 stripe_product_id: stripe_product.id,
                 app_price_id,
-                currency: normalized_currency,
-                unit_amount: product.price,
+                currency: product.currency,
+                ...unit_price_fields,
                 tax_behavior: product.tax_behavior,
                 nickname: product.name,
                 interval: product.interval,
                 interval_count: product.interval_count,
                 recurring_usage: { usage_type: "metered", meter_id: stripe_meter.id },
             });
-
-            const updated_prices = [...active_prices, stripe_price];
-            active_prices_by_stripe_product_id.set(stripe_product.id, updated_prices);
+            stripe_price = new_price;
+            active_prices_by_stripe_product_id.set(stripe_product.id, [...active_prices, new_price]);
         }
 
-        if (stripe_product.default_price !== stripe_price.id) {
-            stripe_product = await stripe_api_call(
-                () =>
-                    client.products.update(
-                        stripe_product!.id,
-                        { default_price: stripe_price.id },
-                        { idempotencyKey: `init_product_default_price_${product.id}_${stripe_price.id}` },
-                    ),
-                { operation: "products.update", app_product_id: product.id, stripe_product_id: stripe_product.id, action: "set_default_price" },
-            );
-            stripe_products_by_app_id.set(product.id, stripe_product);
-        }
+        await update_stripe_product_default_price_if_needed(
+            client,
+            server,
+            stripe_product,
+            stripe_price,
+        );
 
         return {
             ...product,
-            currency: normalized_currency,
             stripe_meter_id: stripe_meter.id,
             stripe_product_id: stripe_product.id,
             stripe_price_id: stripe_price.id,
@@ -1227,6 +1839,7 @@ export function resolve_plan_to_parent_subscription(opts: {
  */
 export async function initialize_products(
     client: Stripe,
+    server: Server,
     products: Product[],
 ): Promise<InitializedProduct[]> {
     assert(Array.isArray(products), "invalid_argument", "Products must be an array");
@@ -1272,6 +1885,7 @@ export async function initialize_products(
     const initialized_products = await map_with_concurrency(products, concurrency, async (product) => {
         return await initialize_product(
             client,
+            server,
             product,
             stripe_products_by_app_id,
             active_prices_by_stripe_product_id,

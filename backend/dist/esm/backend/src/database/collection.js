@@ -1596,6 +1596,10 @@ export class Collection {
      *
      * @note The `opts.throw` option defaults to `true`.
      * @note The `opts.upsert` option defaults to `true`.
+     * @note `set()` does not deep-merge nested objects.
+     *       With `flatten: false`, nested objects are written as whole objects—so their keys are replaced
+     *       by exactly what you provide (missing nested keys can be overwritten/removed).
+     *       With `flatten: true`, nested objects are flattened into dot notation, allowing you to update specific nested keys without affecting siblings.
      *
      * @returns
      * - When `opts.bulk === true`: an unexecuted bulk operation.
@@ -1629,6 +1633,10 @@ export class Collection {
      * @note Replacement documents are not allowed here. An update operator
      *       document (e.g. `$set`, `$inc`) or an aggregation pipeline is required.
      *       To replace a document use {@link replace}.
+     *
+     * @note This writes the value you pass in—it does not deep-merge nested objects.
+     *       If you save a nested object, any nested keys you leave out may be overwritten/removed.
+     *       Use `set()` in combination with `flatten: true` to perform deep merges on nested objects without worrying about this behavior.
      *
      * @returns
      * - When `opts.bulk === true`: an unexecuted bulk operation.

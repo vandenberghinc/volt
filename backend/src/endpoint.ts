@@ -16,6 +16,7 @@ import { Server } from "./server.js";
 import { Route } from './route.js';
 import Meta from './meta.js';
 import { Utils } from './utils.js';
+import { Request } from '../../frontend/src/modules/request.js';
 
 const { debug } = vlib;
 
@@ -122,40 +123,95 @@ export class Endpoint<
         } as Endpoint.Opts<M, E, S>);
     }
 
-    // /**
-    //  * Clone this endpoint, used to create a modified copy of the current endpoint.
-    //  * @param override Override specific endpoint options, note that this will be shallow merged.
-    //  * 
-    //  * @docs
-    //  */
-    // clone<
-    //     const M extends Endpoint.Method = "GET",
-    //     const E extends string | RegExp = string,
-    //     const S extends vlib.Schema.Entries.Opts = {}
-    // >(this: Endpoint<M, E, S>, override?: Partial<Endpoint.Opts<M, E, S>>): Endpoint<M, E, S> {
-    //     return new Endpoint({
-    //         ...vlib.Object.deep_copy({
-    //             method: this.route.method,
-    //             endpoint: this.route.endpoint,
-    //             authenticated: this.authenticated,
-    //             rate_limit: this.rate_limit_groups,
-    //             params: this.params_schema,
-    //             compress: this._compress,
-    //             cache: this._cache,
-    //             ip_whitelist: this.ip_whitelist,
-    //             sitemap: this.allow_sitemap,
-    //             robots: this.allow_robots,
-    //             allow_unknown_params: this.allow_unknown_params,
-    //             _is_static: this.is_static,
-    //             data: this.data,
-    //             file_path: this.file_path,
-    //             content_type: this.content_type,
-    //             callback: this.callback,
-    //         }),
-    //         view: this.view?.clone(),
-    //         ...override,
-    //     } as Endpoint.Opts<M, E, S>);
-    // }
+    /**
+     * Static function to create a very strict method.
+     * This is a utility type that can be used when defining frontend `Request.Info` types.
+     * With this function we can enforce that the method matches the method defined in the `Request.Info` type,
+     * which can be useful to prevent mistakes when defining endpoints.
+     * 
+     * @example
+     * {Create Strict Endpoint}
+     * Create a strict endpoint based on a frontend request info type.
+     * If there are any mismatches between the defined method,
+     * endpoint or result data with the `Request.Info` type,
+     * a TypeScript compile-time error will be thrown.
+     * 
+     * ```ts
+     * import { Request } from "@vandenberghinc/volt/frontend";
+     * import * as volt from "@vandenberghinc/volt";
+     * 
+     * type MyRequestInfo = Request.Info<
+     *   "POST", // method
+     *   "/api/my-endpoint", // endpoint
+     *   { id: string } // params
+     *   { name: string } // result
+     *   undefined // error
+     * >;
+     * 
+     * server.endpoint({
+     *     method: volt.Endpoint.method<MyRequestInfo>("POST"),
+     *     endpoint: volt.Endpoint.endpoint<MyRequestInfo>("/api/my-endpoint"),
+     *     params: { id: "string" },
+     *     callback: async (stream, params) => {
+     *         // Send a success response.
+     *         stream.send<MyRequestInfo["result"]>({
+     *             status: 200,
+     *             data: { name: "John Doe" },
+     *         });
+     *.    },
+     * })
+     * ```
+     */
+    static method<ReqInfo extends Request.Info<Request.Method, any, any, any, any>>(
+        method: ReqInfo["method"]
+    ): ReqInfo["method"] {
+        return method;
+    }
+
+    /**
+     * Static function to create a very strict endpoint.
+     * This is a utility type that can be used when defining frontend `Request.Info` types.
+     * With this function we can enforce that the endpoint matches the endpoint defined in the `Request.Info` type,
+     * which can be useful to prevent mistakes when defining endpoints.
+     * 
+     * @example
+     * {Create Strict Endpoint}
+     * Create a strict endpoint based on a frontend request info type.
+     * If there are any mismatches between the defined method,
+     * endpoint or result data with the `Request.Info` type,
+     * a TypeScript compile-time error will be thrown.
+     * 
+     * ```ts
+     * import { Request } from "@vandenberghinc/volt/frontend";
+     * import * as volt from "@vandenberghinc/volt";
+     * 
+     * type MyRequestInfo = Request.Info<
+     *   "POST", // method
+     *   "/api/my-endpoint", // endpoint
+     *   { id: string } // params
+     *   { name: string } // result
+     *   undefined // error
+     * >;
+     * 
+     * server.endpoint({
+     *     method: volt.Endpoint.method<MyRequestInfo>("POST"),
+     *     endpoint: volt.Endpoint.endpoint<MyRequestInfo>("/api/my-endpoint"),
+     *     params: { id: "string" },
+     *     callback: async (stream, params) => {
+     *         // Send a success response.
+     *         stream.send<MyRequestInfo["result"]>({
+     *             status: 200,
+     *             data: { name: "John Doe" },
+     *         });
+     *.    },
+     * })
+     * ```
+     */
+    static endpoint<ReqInfo extends Request.Info<any, any, any, any, any>>(
+        endpoint: ReqInfo["endpoint"]
+    ): ReqInfo["endpoint"] {
+        return endpoint;
+    }
 
     /**
      * Construct an endpoint.
@@ -354,14 +410,10 @@ export class Endpoint<
                     }
                 }
                 try {
-                    let promise;
                     if (this.params_validator != null) {
-                        promise = this.callback(stream, (stream.params ?? {}) as any);
+                        await this.callback(stream, (stream.params ?? {}) as any);
                     } else {
-                        promise = this.callback(stream, {} as any);
-                    }
-                    if (promise instanceof Promise) {
-                        await promise;
+                        await this.callback(stream, {} as any);
                     }
                 } catch (err: any) {
                     if (err instanceof ExternalError || err instanceof InternalError) {
@@ -709,8 +761,11 @@ export namespace Endpoint {
             callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any),
             /** Not allowed in this variant. */
             view?: never;
-            /** The content type. */
-            content_type: string;
+            /**
+             * The content type.
+             * Not required since a callback could have multiple different content types.
+             */
+            content_type?: string;
         }
 
         /**

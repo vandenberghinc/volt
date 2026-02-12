@@ -7,12 +7,13 @@ import Stripe from "stripe";
 import * as vlib from "@vandenberghinc/vlib"
 
 import {
-    type InitializedSubscriptionProduct,
     type InitializedOneTimeProduct,
     type InitializedProduct,
     type InitializedSubscriptionPlan,
     type InitializedMeterProduct,
     resolve_plan_to_parent_subscription,
+    SubscriptionPlanId,
+    ProductId,
 } from "./products.js";
 import { ensure_stripe_customer } from "./customers.js";
 import { ExternalStripeError, InternalStripeError } from "./error.js";
@@ -25,9 +26,11 @@ import {
     to_unix_seconds,
     is_non_empty_string,
     generate_random_idempotency_key,
+    stable_idempotency_key,
 } from "./utils.js";
-import { Server } from "src/server.js";
-import { Collection } from "src/database/collection.js";
+import { Server } from "../../server.js";
+import { Collection } from "../../database/collection.js";
+import { is_user_subscribed_to } from "./subscriptions.js";
 
 // ----------------------------------------------------------------------------------
 // Types.
@@ -37,7 +40,7 @@ import { Collection } from "src/database/collection.js";
  */
 export interface CreateCheckoutLineItem {
     /** Product reference: initialized product/plan object OR an id string. */
-    product: InitializedOneTimeProduct | InitializedSubscriptionPlan | string;
+    product: InitializedOneTimeProduct | InitializedSubscriptionPlan | ProductId | SubscriptionPlanId;
     /** Quantity to purchase/subscribe with. */
     quantity: number;
 }
@@ -46,8 +49,11 @@ export interface CreateCheckoutLineItem {
  * Options for creating a Stripe Checkout Session.
  */
 export interface CreateCheckoutSessionOpts {
-    /** The internal user id, used to resolve/ensure Stripe customer. */
-    uid: string;
+    /**
+     * The internal user id, used to resolve/ensure Stripe customer.
+     * The `uid` may be undefined for one-time payment checkouts, but must be defined for subscription checkouts since a Stripe Customer is required. In that case, the user must be authenticated and not "anonymous".
+     */
+    uid: string | undefined;
     /**
      * A caller-provided idempotency key for initialize/start.
      * Re-using the same session_id makes `start_checkout_session` idempotent across retries.
@@ -63,8 +69,8 @@ export interface CreateCheckoutSessionOpts {
     cancel_url: string;
     /** Optional: require tax id collection (useful for B2B in EU). */
     tax_id_collection_enabled?: boolean;
-    /** Optional: attach extra safe metadata to the session (never secrets). */
-    metadata?: Record<string, string>;
+    /** The allowed hosts for redirect URLs. */
+    allowed_hosts: undefined | string[];
 }
 
 /**
@@ -100,8 +106,6 @@ export interface CreateMeterSubscriptionOpts {
     meter_product: InitializedMeterProduct | string;
     /** All initialized products, used to resolve string ids to objects. */
     all_products: InitializedProduct[];
-    /** Optional: attach extra safe metadata to the subscription (never secrets). */
-    metadata?: Record<string, string>;
 }
 
 /**
@@ -130,8 +134,8 @@ export interface CreatedMeterSubscription {
  * The database record for a session.
  */
 interface CheckoutSessionRecord {
-    /** The internal user id. */
-    uid: string;
+    /** The internal user id, can be undefined for one-time payments. */
+    uid: string | undefined;
     /** The internal session id, can be used as idempotency key. */
     session_id: string;
     /** Currency used for the session. */
@@ -194,7 +198,7 @@ function resolve_checkout_item_product(opts: {
             throw new ExternalStripeError(
                 "checkout_subscription_plan_ambiguous",
                 "Subscription product id is ambiguous. Please specify a subscription plan id.",
-                { subscription_id: ref_id },
+                { ref_id: ref_id },
             );
         }
     }
@@ -223,8 +227,12 @@ function create_checkout_session_db(server: Server): Collection<CheckoutSessionR
         name: "Volt.Stripe.CheckoutSessions",
         indexes: [
             {
-                keys: { uid: 1, session_id: 1 },
+                keys: { session_id: 1 },
                 unique: true,
+            },
+            {
+                keys: { uid: 1 },
+                unique: false, // since it might be undefined/anonymous
             },
         ],
         ttl: {
@@ -236,14 +244,34 @@ function create_checkout_session_db(server: Server): Collection<CheckoutSessionR
     });
 }
 
+/**
+ * Assert a success_url or cancel_url is a valid https URL.
+ */
+function assert_https_url(raw: string, field: "success_url" | "cancel_url", allowed_hosts: undefined | string[]): void {
+    public_assert(is_non_empty_string(raw), "invalid_argument", `Property '${field}' must be provided.`);
+    let url: URL;
+    try {
+        url = new URL(raw);
+    } catch {
+        throw new ExternalStripeError("invalid_argument", `Property '${field}' must be a valid absolute URL.`, { field });
+    }
+    public_assert(url.protocol === "https:", "invalid_argument", `Property '${field}' must use https.`, { field });
+    public_assert(
+        allowed_hosts === undefined || allowed_hosts.includes(url.host),
+        "invalid_argument",
+        `Property '${field}' must use an allowed host.`,
+        { field, host: url.host },
+    );
+}
+
 // ----------------------------------------------------------------------------------
 // Public API
 
 /**
  * Create a new session id to ensure idempotency for checkout session creation.
  */
-export function create_session_id(uid: string): string {
-    return generate_random_idempotency_key(`checkout_${uid}`);
+export function create_checkout_session_id(uid: string | undefined): string {
+    return generate_random_idempotency_key(`checkout_${uid ?? "anonymous"}`, 255);
 }
 
 /**
@@ -263,16 +291,16 @@ export async function start_checkout_session(
     opts: CreateCheckoutSessionOpts,
 ): Promise<CreatedCheckoutSession> {
     // Basic validation (external/user-facing where appropriate).
-    public_assert(is_non_empty_string(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
     public_assert(
         is_non_empty_string(opts.session_id),
         "invalid_argument",
         "Property 'session_id' must be a non-empty string when provided.",
     );
     public_assert(Array.isArray(opts.line_items) && opts.line_items.length > 0, "invalid_argument", "Property 'line_items' must be a non-empty array.");
-    public_assert(is_non_empty_string(opts.success_url), "invalid_argument", "Property 'success_url' must be provided.");
-    public_assert(is_non_empty_string(opts.cancel_url), "invalid_argument", "Property 'cancel_url' must be provided.");
+    public_assert(opts.line_items.length <= 50, "invalid_argument", "Too many line items.", { count: opts.line_items.length });
     assert(Array.isArray(opts.all_products), "invalid_argument", "Property 'all_products' must be an array.");
+    assert_https_url(opts.success_url, "success_url", opts.allowed_hosts);
+    assert_https_url(opts.cancel_url, "cancel_url", opts.allowed_hosts);
 
     // Resolve all item product references into concrete purchasable objects.
     const resolved_items: {
@@ -312,8 +340,9 @@ export async function start_checkout_session(
             }
         }
 
-        // Subscriptions are not seat-based in our model; quantity for subscription plans must be 1.
+        // Validate subscription.
         if (resolved_product.type === "subscription_plan") {
+            // Subscriptions are not seat-based in our model; quantity for subscription plans must be 1.
             public_assert(
                 item.quantity === 1,
                 "checkout_invalid_quantity",
@@ -362,6 +391,23 @@ export async function start_checkout_session(
                 subscription_plan_count,
             },
         );
+
+        // Ensure uid is defined.
+        public_assert(opts.uid != null && opts.uid !== "anonymous", "invalid_uid", "You must be authenticated to purchase a subscription, sign in or sign up and try again.", { uid: opts.uid });
+
+        // Ensure the user is not already subscribed to the plan.
+        const is_already_subscribed = await is_user_subscribed_to(client, server, {
+            uid: opts.uid,
+            plan: item.product,
+            all_products: opts.all_products,
+            customer_id: undefined,
+        });
+        public_assert(
+            !is_already_subscribed,
+            "checkout_already_subscribed",
+            "You are already subscribed to this plan.",
+            { uid: opts.uid, plan_id: item.product.id, subscription_id: item.product.subscription_id },
+        );
     }
 
     // Determine mode (Stripe requires subscription mode if any recurring item is present).
@@ -390,13 +436,26 @@ export async function start_checkout_session(
     const currency = Array.from(currencies.values())[0];
     assert(currency !== undefined, "checkout_mixed_currency", "Missing currency after currency validation.");
 
-    // Ensure Stripe customer exists (required for subscription mode).
-    const stripe_customer_id = await ensure_stripe_customer(client, opts.uid);
+    // If mode is subscription, ensure the `uid` is defined.
+    // And retrieve the stripe customer id.
+    // For one-time payments, creating a Customer is optional; avoid extra API calls unless you need it.
+    let stripe_customer_id: string | undefined;
+    if (mode === "subscription" || opts.uid) {
+        public_assert(opts.uid != null && opts.uid !== "anonymous", "invalid_uid", "You must be authenticated to purchase a subscription, sign in or sign up and try again.", { uid: opts.uid });
+        public_assert(is_non_empty_string(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
+        stripe_customer_id = await ensure_stripe_customer(client, server, opts.uid);
+    }
 
     // Build Stripe line items.
     const stripe_line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = resolved_items.map((item) => {
         // We only use pre-created Price ids to avoid “inline price” pitfalls and keep tax behavior stable.
         // Stripe docs: line_items.price https://docs.stripe.com/api/checkout/sessions/create
+        public_assert(
+            is_non_empty_string(item.product.stripe_price_id),
+            "invalid_product",
+            "Product is missing a Stripe price id.",
+            { product_id: item.product.id, type: item.product.type },
+        );
         return {
             price: item.product.stripe_price_id,
             quantity: item.quantity,
@@ -480,20 +539,26 @@ export async function start_checkout_session(
         }
 
         // Include safe metadata on the Subscription object for downstream reconciliation (optional).
-        subscription_data.metadata = {
-            ...(opts.metadata ?? {}),
-            __volt_uid: opts.uid,
-        };
+        if (opts.uid) {
+            subscription_data.metadata = {
+                __volt_uid: opts.uid,
+            };
+        }
     }
 
     // Build Checkout Session request.
     const create_params: Stripe.Checkout.SessionCreateParams = {
         // Docs: https://docs.stripe.com/api/checkout/sessions/create
         mode,
-        customer: stripe_customer_id,
+        ...(stripe_customer_id ? { customer: stripe_customer_id } : {}),
         success_url: opts.success_url,
         cancel_url: opts.cancel_url,
         line_items: stripe_line_items,
+        customer_update: {
+            address: "auto",
+            name: "auto",
+            shipping: "auto",
+        },
 
         // Stripe Tax: collect address automatically for tax calculation.
         // Docs: https://docs.stripe.com/tax/checkout
@@ -504,8 +569,7 @@ export async function start_checkout_session(
 
         // Attach safe session metadata (not secrets).
         metadata: {
-            ...(opts.metadata ?? {}),
-            __volt_uid: opts.uid,
+            ...(opts.uid ? { __volt_uid: opts.uid } : {}),
             __volt_mode: mode,
         },
 
@@ -519,7 +583,7 @@ export async function start_checkout_session(
     // Check if a session record already exists.
     // If so then we need to assert the create_params and currency are the same to ensure idempotency.
     const loaded_session = await checkout_session_db.load(
-        { uid: opts.uid, session_id: opts.session_id },
+        { session_id: opts.session_id },
         { throw: false, retry: 3 }
     );
     let pinned_session: CheckoutSessionRecord;
@@ -532,7 +596,7 @@ export async function start_checkout_session(
             create_params,
         };
         await checkout_session_db.set(
-            { uid: opts.uid, session_id: opts.session_id },
+            { session_id: opts.session_id },
             record,
             { throw: true, retry: 3 }
         );
@@ -569,7 +633,10 @@ export async function start_checkout_session(
     const session = await stripe_api_call(
         () =>
             client.checkout.sessions.create(pinned_session.create_params, {
-                idempotencyKey: pinned_session.session_id,
+                idempotencyKey: stable_idempotency_key(
+                    `checkout.sessions.create:${pinned_session.session_id}`,
+                    255,
+                ),
             }),
         { operation: "checkout.sessions.create" },
     );

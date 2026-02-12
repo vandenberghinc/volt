@@ -15,8 +15,7 @@ import { promises as fs } from "fs"
 import * as vlib from "@vandenberghinc/vlib";
 import { Endpoint } from "./endpoint.js";
 import { RateLimitGroup } from "./rate_limit.js";
-import type { Server } from "./server.js";
-import Stream from './stream.js';
+import { Stream } from './stream.js';
 
 // ---------------------------------------------------------
 // ImageEndpoint.

@@ -74,6 +74,71 @@ class QuotaManager {
   format_quota_id(query) {
     return `${query.uid}:${query.id}`;
   }
+  /**
+   * Clamp a bigint to a minimum of 0n.
+   */
+  static clamp_min0(v) {
+    return v > 0n ? v : 0n;
+  }
+  /**
+   * Compute remaining capacity, clamped to [0, +inf).
+   */
+  static remaining(max, usage) {
+    return max > usage ? max - usage : 0n;
+  }
+  /**
+   * Compute percentage used in [0, 100] (2 decimals), based on bigint usage/max.
+   */
+  static percentage_used(usage, max) {
+    if (max > 0n) {
+      const scaled = usage * 10000n / max;
+      const capped = scaled < 0n ? 0n : scaled > 10000n ? 10000n : scaled;
+      return Number(capped) / 100;
+    }
+    return usage > 0n ? 100 : 0;
+  }
+  /**
+   * Multiply a bigint by a floating ratio, returning a bigint.
+   * - For positive values, rounds up (ceil) to avoid underestimation.
+   * - For negative values, rounds down (floor).
+   */
+  static mul_bigint_ratio(value, ratio) {
+    if (ratio === 1)
+      return value;
+    if (!Number.isFinite(ratio)) {
+      throw new Error(`Invalid ratio: ${ratio}`);
+    }
+    if (ratio <= 0)
+      throw new Error(`Invalid ratio: ${ratio}. Must be > 0.`);
+    if (Number.isInteger(ratio)) {
+      if (!Number.isSafeInteger(ratio)) {
+        throw new Error(`Invalid ratio: ${ratio}. Integer ratio must be a safe integer.`);
+      }
+      return value * BigInt(ratio);
+    }
+    const SCALE_NUM = 1e9;
+    const SCALE = 1000000000n;
+    const scaled_float = ratio * SCALE_NUM;
+    if (!Number.isFinite(scaled_float) || Math.abs(scaled_float) > Number.MAX_SAFE_INTEGER) {
+      throw new Error(`Invalid ratio: ${ratio}. Too large for fixed-point scaling at 1e9 precision.`);
+    }
+    const scaled_int = Math.round(scaled_float);
+    if (!Number.isSafeInteger(scaled_int)) {
+      throw new Error(`Invalid ratio scaling: ratio=${ratio}, scaled=${scaled_int}.`);
+    }
+    const scaled_ratio = BigInt(scaled_int);
+    const product = value * scaled_ratio;
+    let q = product / SCALE;
+    const r = product % SCALE;
+    if (r !== 0n) {
+      if (value > 0n) {
+        q += 1n;
+      } else if (value < 0n) {
+        q -= 1n;
+      }
+    }
+    return q;
+  }
   // ----------------------------------------------------------------
   // Database operation methods.
   // ----------------------------------------------------------------
@@ -162,13 +227,13 @@ class QuotaManager {
       };
     }
     const needs_reset = now_sec >= loaded_quota.start + loaded_quota.interval;
-    const effective_usage = needs_reset ? 0 : loaded_quota.usage;
+    const effective_usage = needs_reset ? 0n : loaded_quota.usage;
     const time_until_reset = needs_reset ? 0 : Math.max(0, loaded_quota.start + loaded_quota.interval - now_sec);
-    const remaining = Math.max(0, loaded_quota.max - effective_usage);
-    const percentage_used = loaded_quota.max > 0 ? Math.min(100, Math.max(0, effective_usage / loaded_quota.max * 100)) : effective_usage > 0 ? 100 : 0;
+    const remaining = QuotaManager.remaining(loaded_quota.max, effective_usage);
+    const percentage_used = QuotaManager.percentage_used(effective_usage, loaded_quota.max);
     return {
       found: true,
-      quota: needs_reset ? { ...loaded_quota, usage: 0, start: now_sec } : loaded_quota,
+      quota: needs_reset ? { ...loaded_quota, usage: 0n, start: now_sec } : loaded_quota,
       remaining,
       percentage_used,
       needs_reset,
@@ -192,11 +257,11 @@ class QuotaManager {
       retry: 5,
       callback: (q) => {
         const needs_reset = now_sec >= q.start + q.interval;
-        const effective_usage = needs_reset ? 0 : q.usage;
-        const percentage_used = q.max > 0 ? Math.min(100, Math.max(0, effective_usage / q.max * 100)) : effective_usage > 0 ? 100 : 0;
+        const effective_usage = needs_reset ? 0n : q.usage;
+        const percentage_used = QuotaManager.percentage_used(effective_usage, q.max);
         listed.push({
-          quota: needs_reset ? { ...q, usage: 0, start: now_sec } : q,
-          remaining: Math.max(0, q.max - effective_usage),
+          quota: needs_reset ? { ...q, usage: 0n, start: now_sec } : q,
+          remaining: QuotaManager.remaining(q.max, effective_usage),
           percentage_used,
           needs_reset
         });
@@ -252,7 +317,7 @@ class QuotaManager {
         interval: quota.interval
       },
       $setOnInsert: {
-        usage: 0,
+        usage: 0n,
         start: now_sec
       }
     }, save_opts);
@@ -295,7 +360,7 @@ class QuotaManager {
     };
     return await this.collection.save(this.create_db_query(query), {
       $set: {
-        usage: 0,
+        usage: 0n,
         start: Math.floor(Date.now() / 1e3)
       }
     }, save_opts);
@@ -318,27 +383,23 @@ class QuotaManager {
    * @docs
    */
   validate_limit_helper_params({ requested_usage, safety_ratio, query, upsert }) {
-    if (!Number.isFinite(requested_usage)) {
-      return {
-        success: false,
-        status: "invalid_usage",
-        error: `Invalid requested usage: ${requested_usage}. Must be a finite number.`
-      };
-    }
-    if (safety_ratio !== void 0 && (!Number.isFinite(safety_ratio) || safety_ratio < 1)) {
-      return {
-        success: false,
-        status: "invalid_usage",
-        error: `Invalid 'safety_ratio' value: ${safety_ratio}. Must be finite and >= 1.`
-      };
-    }
-    const product_safety_usage = requested_usage * (safety_ratio ?? 1);
-    if (!Number.isFinite(product_safety_usage)) {
-      return {
-        success: false,
-        status: "invalid_usage",
-        error: `Invalid product of 'requested_usage' and 'safety_ratio'.`
-      };
+    if (safety_ratio !== void 0) {
+      if (!Number.isFinite(safety_ratio) || safety_ratio < 1) {
+        return {
+          success: false,
+          status: "invalid_usage",
+          error: `Invalid 'safety_ratio' value: ${safety_ratio}. Must be finite and >= 1.`
+        };
+      }
+      const SCALE_NUM = 1e9;
+      const scaled = safety_ratio * SCALE_NUM;
+      if (!Number.isFinite(scaled) || Math.abs(scaled) > Number.MAX_SAFE_INTEGER) {
+        return {
+          success: false,
+          status: "invalid_usage",
+          error: `Invalid 'safety_ratio' value: ${safety_ratio}. Too large for safe fixed-point scaling.`
+        };
+      }
     }
     const val_err = QuotaManager.Query.validate(query);
     if (val_err) {
@@ -386,6 +447,7 @@ class QuotaManager {
     });
     if (val_input_res)
       return val_input_res;
+    const safety_usage = QuotaManager.mul_bigint_ratio(requested_usage, safety_ratio);
     const now_sec = Math.floor(Date.now() / 1e3);
     const db_query = this.create_db_query(query);
     if (check_limit) {
@@ -396,8 +458,8 @@ class QuotaManager {
             $and: [
               { $lt: [now_sec, { $add: ["$start", "$interval"] }] },
               { $lte: [{ $add: ["$usage", requested_usage] }, "$max"] },
-              { $lte: [{ $add: ["$usage", requested_usage * safety_ratio] }, "$max"] },
-              { $gte: [{ $add: ["$usage", requested_usage] }, 0] }
+              { $lte: [{ $add: ["$usage", safety_usage] }, "$max"] },
+              { $gte: [{ $add: ["$usage", requested_usage] }, 0n] }
             ]
           }
         }, { $inc: { usage: requested_usage } }, { return: true, upsert: false, retry: 25, throw: false });
@@ -406,7 +468,7 @@ class QuotaManager {
             success: true,
             status: "success",
             quota: result,
-            remaining: Math.max(0, result.max - result.usage),
+            remaining: QuotaManager.remaining(result.max, result.usage),
             was_reset: false
           };
         }
@@ -417,8 +479,8 @@ class QuotaManager {
             $and: [
               { $lt: [now_sec, { $add: ["$start", "$interval"] }] },
               { $lte: [{ $add: ["$usage", requested_usage] }, "$max"] },
-              { $lte: [{ $add: ["$usage", requested_usage * safety_ratio] }, "$max"] },
-              { $gte: [{ $add: ["$usage", requested_usage] }, 0] }
+              { $lte: [{ $add: ["$usage", safety_usage] }, "$max"] },
+              { $gte: [{ $add: ["$usage", requested_usage] }, 0n] }
             ]
           }
         }, { retry: 25, throw: false });
@@ -427,7 +489,7 @@ class QuotaManager {
             success: true,
             status: "success",
             quota: result,
-            remaining: Math.max(0, result.max - result.usage),
+            remaining: QuotaManager.remaining(result.max, result.usage),
             was_reset: false
           };
         }
@@ -439,7 +501,7 @@ class QuotaManager {
           $expr: {
             $and: [
               { $lt: [now_sec, { $add: ["$start", "$interval"] }] },
-              { $gte: [{ $add: ["$usage", requested_usage] }, 0] }
+              { $gte: [{ $add: ["$usage", requested_usage] }, 0n] }
             ]
           }
         }, { $inc: { usage: requested_usage } }, { return: true, upsert: false, throw: false, retry: 25 });
@@ -448,7 +510,7 @@ class QuotaManager {
             success: true,
             status: "success",
             quota: result,
-            remaining: Math.max(0, result.max - result.usage),
+            remaining: QuotaManager.remaining(result.max, result.usage),
             was_reset: false
           };
         }
@@ -488,12 +550,12 @@ class QuotaManager {
       }
       if (!perform_increment) {
         const would_exceed_actual = requested_usage > upsert.max;
-        const would_exceed_ratio = requested_usage * safety_ratio > upsert.max;
+        const would_exceed_ratio = safety_usage > upsert.max;
         if (check_limit && (would_exceed_actual || would_exceed_ratio)) {
           return {
             success: false,
             status: "would_exceed",
-            error: `Requested usage (${requested_usage}, safety=${requested_usage * safety_ratio}) exceeds fresh-window maximum (${upsert.max}).`,
+            error: `Requested usage (${requested_usage}, safety=${safety_usage}) exceeds fresh-window maximum (${upsert.max}).`,
             remaining: upsert.max
           };
         }
@@ -503,13 +565,13 @@ class QuotaManager {
           max: upsert.max,
           interval: upsert.interval,
           start: now_sec,
-          usage: Math.max(0, requested_usage)
+          usage: QuotaManager.clamp_min0(requested_usage)
         };
         return {
           success: true,
           status: "success",
           quota: virtual_doc,
-          remaining: Math.max(0, virtual_doc.max - virtual_doc.usage),
+          remaining: QuotaManager.remaining(virtual_doc.max, virtual_doc.usage),
           was_reset: false
         };
       }
@@ -519,7 +581,7 @@ class QuotaManager {
         max: upsert.max,
         interval: upsert.interval,
         start: now_sec,
-        usage: Math.max(0, requested_usage)
+        usage: QuotaManager.clamp_min0(requested_usage)
       };
       const created = await collection.set(db_query, doc_record, { return: true, upsert: true, throw: false, retry: 25 });
       if (created instanceof Error) {
@@ -551,28 +613,28 @@ class QuotaManager {
     if (interval_expired) {
       if (check_limit) {
         const would_exceed_actual = requested_usage > current.max;
-        const would_exceed_ratio = requested_usage * safety_ratio > current.max;
+        const would_exceed_ratio = safety_usage > current.max;
         if (would_exceed_actual || would_exceed_ratio) {
           return {
             success: false,
             status: "would_exceed",
-            error: `Requested usage (${requested_usage}, safety=${requested_usage * safety_ratio}) exceeds fresh-window maximum (${current.max}).`,
+            error: `Requested usage (${requested_usage}, safety=${safety_usage}) exceeds fresh-window maximum (${current.max}).`,
             quota: current,
             remaining: current.max
           };
         }
       }
       if (!perform_increment) {
-        const view_after_reset = { ...current, usage: 0, start: now_sec };
+        const view_after_reset = { ...current, usage: 0n, start: now_sec };
         return {
           success: true,
           status: "success",
           quota: view_after_reset,
-          remaining: Math.max(0, view_after_reset.max - view_after_reset.usage),
+          remaining: QuotaManager.remaining(view_after_reset.max, view_after_reset.usage),
           was_reset: false
         };
       }
-      const new_usage = Math.max(0, requested_usage);
+      const new_usage = QuotaManager.clamp_min0(requested_usage);
       const reset_result = await collection.save({
         ...db_query,
         // optimistic lock against concurrent reset
@@ -588,7 +650,7 @@ class QuotaManager {
           success: true,
           status: "success",
           quota: reset_result,
-          remaining: Math.max(0, reset_result.max - reset_result.usage),
+          remaining: QuotaManager.remaining(reset_result.max, reset_result.usage),
           was_reset: true
         };
       }
@@ -612,7 +674,7 @@ class QuotaManager {
         status: "system_error",
         error: `Race condition detected after maximum retries.`,
         quota: current,
-        remaining: Math.max(0, current.max - current.usage)
+        remaining: QuotaManager.remaining(current.max, current.usage)
       };
     }
     if (check_limit) {
@@ -623,40 +685,40 @@ class QuotaManager {
             status: "exceeded",
             error: `Quota usage '${current.usage}' has already exceeded maximum quota '${current.max}'`,
             quota: current,
-            remaining: Math.max(0, current.max - current.usage)
+            remaining: QuotaManager.remaining(current.max, current.usage)
           };
         }
         const would_exceed_actual2 = current.usage + requested_usage > current.max;
-        const would_exceed_ratio2 = current.usage + requested_usage * safety_ratio > current.max;
+        const would_exceed_ratio2 = current.usage + safety_usage > current.max;
         if (would_exceed_actual2 || would_exceed_ratio2) {
           return {
             success: false,
             status: "would_exceed",
-            error: `Requested usage (${requested_usage}, safety=${requested_usage * safety_ratio}) would exceed remaining quota.`,
+            error: `Requested usage (${requested_usage}, safety=${safety_usage}) would exceed remaining quota.`,
             quota: current,
-            remaining: Math.max(0, current.max - current.usage)
+            remaining: QuotaManager.remaining(current.max, current.usage)
           };
         }
         return {
           success: true,
           status: "success",
           quota: current,
-          remaining: Math.max(0, current.max - current.usage),
+          remaining: QuotaManager.remaining(current.max, current.usage),
           was_reset: false
         };
       }
-      if (current.usage + requested_usage < 0) {
+      if (current.usage + requested_usage < 0n) {
         const clamp_result = await collection.save({
           ...db_query,
           start: current.start
           // optimistic lock in the same window
-        }, { $set: { usage: 0 } }, { return: true, upsert: false, throw: false, retry: 25 });
+        }, { $set: { usage: 0n } }, { return: true, upsert: false, throw: false, retry: 25 });
         if (!(clamp_result instanceof Error)) {
           return {
             success: true,
             status: "success",
             quota: clamp_result,
-            remaining: Math.max(0, clamp_result.max - clamp_result.usage),
+            remaining: QuotaManager.remaining(clamp_result.max, clamp_result.usage),
             was_reset: false
           };
         }
@@ -680,7 +742,7 @@ class QuotaManager {
           status: "system_error",
           error: `Failed to clamp usage to zero for query '${this.format_quota_id(query)}'.`,
           quota: current,
-          remaining: Math.max(0, current.max - current.usage)
+          remaining: QuotaManager.remaining(current.max, current.usage)
         };
       }
       if (current.usage > current.max) {
@@ -689,31 +751,31 @@ class QuotaManager {
           status: "exceeded",
           error: `Quota usage '${current.usage}' has already exceeded maximum quota '${current.max}'`,
           quota: current,
-          remaining: Math.max(0, current.max - current.usage)
+          remaining: QuotaManager.remaining(current.max, current.usage)
         };
       }
       const would_exceed_actual = current.usage + requested_usage > current.max;
-      const would_exceed_ratio = current.usage + requested_usage * safety_ratio > current.max;
+      const would_exceed_ratio = current.usage + safety_usage > current.max;
       if (would_exceed_actual || would_exceed_ratio) {
         return {
           success: false,
           status: "would_exceed",
-          error: `Requested usage (${requested_usage}, safety=${requested_usage * safety_ratio}) would exceed remaining quota.`,
+          error: `Requested usage (${requested_usage}, safety=${safety_usage}) would exceed remaining quota.`,
           quota: current,
-          remaining: Math.max(0, current.max - current.usage)
+          remaining: QuotaManager.remaining(current.max, current.usage)
         };
       }
       const inc_result = await collection.save({
         ...db_query,
         start: current.start,
-        $expr: { $gte: [{ $add: ["$usage", requested_usage] }, 0] }
+        $expr: { $gte: [{ $add: ["$usage", requested_usage] }, 0n] }
       }, { $inc: { usage: requested_usage } }, { return: true, upsert: false, throw: false, retry: 25 });
       if (!(inc_result instanceof Error)) {
         return {
           success: true,
           status: "success",
           quota: inc_result,
-          remaining: Math.max(0, inc_result.max - inc_result.usage),
+          remaining: QuotaManager.remaining(inc_result.max, inc_result.usage),
           was_reset: false
         };
       }
@@ -737,42 +799,42 @@ class QuotaManager {
         status: "system_error",
         error: `Failed to update quota for query '${this.format_quota_id(query)}'.`,
         quota: current,
-        remaining: Math.max(0, current.max - current.usage)
+        remaining: QuotaManager.remaining(current.max, current.usage)
       };
     } else {
       if (!perform_increment) {
         const needs_reset = now_sec >= current.start + current.interval;
-        const effective_usage = needs_reset ? 0 : current.usage;
-        const view_quota = needs_reset ? { ...current, usage: 0, start: now_sec } : current;
+        const effective_usage = needs_reset ? 0n : current.usage;
+        const view_quota = needs_reset ? { ...current, usage: 0n, start: now_sec } : current;
         return {
           success: true,
           status: "success",
           quota: view_quota,
-          remaining: Math.max(0, view_quota.max - effective_usage),
+          remaining: QuotaManager.remaining(view_quota.max, effective_usage),
           was_reset: false
         };
       }
       const inc_result = await collection.save({
         ...db_query,
         start: current.start,
-        $expr: { $gte: [{ $add: ["$usage", requested_usage] }, 0] }
+        $expr: { $gte: [{ $add: ["$usage", requested_usage] }, 0n] }
       }, { $inc: { usage: requested_usage } }, { return: true, upsert: false, throw: false, retry: 25 });
       if (!(inc_result instanceof Error)) {
         return {
           success: true,
           status: "success",
           quota: inc_result,
-          remaining: Math.max(0, inc_result.max - inc_result.usage),
+          remaining: QuotaManager.remaining(inc_result.max, inc_result.usage),
           was_reset: false
         };
       }
-      const clamp_result = await collection.save({ ...db_query, start: current.start }, { $set: { usage: 0 } }, { return: true, upsert: false, throw: false, retry: 25 });
+      const clamp_result = await collection.save({ ...db_query, start: current.start }, { $set: { usage: 0n } }, { return: true, upsert: false, throw: false, retry: 25 });
       if (!(clamp_result instanceof Error)) {
         return {
           success: true,
           status: "success",
           quota: clamp_result,
-          remaining: Math.max(0, clamp_result.max - clamp_result.usage),
+          remaining: QuotaManager.remaining(clamp_result.max, clamp_result.usage),
           was_reset: false
         };
       }
@@ -796,7 +858,7 @@ class QuotaManager {
         status: "system_error",
         error: `Failed to update quota for query '${this.format_quota_id(query)}'.`,
         quota: current,
-        remaining: Math.max(0, current.max - current.usage)
+        remaining: QuotaManager.remaining(current.max, current.usage)
       };
     }
   }
@@ -817,7 +879,7 @@ class QuotaManager {
    * @docs
    */
   async limit({ query, requested_usage, upsert, safety_ratio, perform_increment = true }) {
-    if (requested_usage < 0) {
+    if (requested_usage < 0n) {
       return {
         success: false,
         status: "invalid_usage",
@@ -878,7 +940,7 @@ class QuotaManager {
       throw new Error("No limits provided for batch_limit");
     }
     for (const item of limits) {
-      if (item.requested_usage < 0) {
+      if (item.requested_usage < 0n) {
         return {
           success: false,
           status: "invalid_usage",
@@ -992,7 +1054,7 @@ class QuotaManager {
     (function(Opts2) {
       Opts2.Schema = {
         max: {
-          type: "number",
+          type: "bigint",
           required: true
         },
         interval: {
@@ -1001,10 +1063,10 @@ class QuotaManager {
         }
       };
       function validate(quota, collection) {
-        if (quota.max <= 0 || !Number.isFinite(quota.max)) {
-          return `Invalid quota 'max': ${quota.max}. Must be positive and finite.`;
+        if (typeof quota.max !== "bigint" || quota.max <= 0n) {
+          return `Invalid quota 'max': ${String(quota.max)}. Must be a positive bigint.`;
         }
-        if (quota.interval <= 0 || !Number.isFinite(quota.interval)) {
+        if (typeof quota.interval !== "number" || quota.interval <= 0 || !Number.isFinite(quota.interval)) {
           return `Invalid quota 'interval': ${quota.interval}. Must be positive and finite.`;
         } else if (collection.ttl != null && quota.interval * 1e3 >= collection.ttl) {
           return `Invalid quota 'interval': ${quota.interval}. Must be less than the collection TTL of ${Math.ceil(collection.ttl / 1e3)} seconds.`;
@@ -1015,11 +1077,11 @@ class QuotaManager {
     function to_nano(q, opts) {
       if (q == null)
         return void 0;
-      else if (typeof q === "number") {
-        return new import_safe_int.SafeInt(q, { from_scale: 1, to_scale: import_safe_int.SafeInt.Scale.Nano, round: opts?.round }).value();
+      else if (typeof q === "number" || typeof q === "bigint") {
+        return new import_safe_int.SafeInt(q, { from_scale: import_safe_int.SafeInt.Scale.Base, to_scale: import_safe_int.SafeInt.Scale.Nano, round: opts?.round }).value();
       }
       return {
-        max: new import_safe_int.SafeInt(q.max, { from_scale: 1, to_scale: import_safe_int.SafeInt.Scale.Nano, round: opts?.round }).value(),
+        max: new import_safe_int.SafeInt(q.max, { from_scale: import_safe_int.SafeInt.Scale.Base, to_scale: import_safe_int.SafeInt.Scale.Nano, round: opts?.round }).value(),
         interval: q.interval
       };
     }

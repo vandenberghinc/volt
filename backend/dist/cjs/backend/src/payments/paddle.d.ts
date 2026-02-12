@@ -171,7 +171,7 @@ export interface ActiveSubscription {
  * @deprecated Using stripe from now on.
  */
 export declare class Paddle {
-    type: string;
+    type: "paddle";
     private client_key;
     private sandbox;
     private inclusive_tax;

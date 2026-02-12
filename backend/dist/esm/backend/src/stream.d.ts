@@ -25,12 +25,29 @@ type ResponseBody = undefined | string | boolean | number | any[] | Record<strin
  * @docs
  */
 export declare class Stream {
-    private s?;
+    /** The request headers. */
     headers: IncomingHttpHeaders | IncomingMessage['headers'];
+    /** Whether this stream is an HTTP/2 stream. */
+    http2: boolean;
+    /** Whether this stream is an HTTP/1.1 stream (when false, it's an HTTP/2 stream). */
+    http1: boolean;
+    /** The status code of the sent response. */
+    status_code: number | undefined;
+    /** Whether the response has been finished. */
+    finished: boolean;
+    /** The received body potentially decompressed as string. */
+    body: string;
+    /** The raw body as a Buffer, potentially decompressed. */
+    raw_body: Buffer;
+    /** The body wired exactly as is, not decompressed etc. */
+    wire_body: Buffer;
+    /** The internal promise that resolves when the body is fully received. */
+    private promise;
+    /** The cached value of {@link normalize_ip} */
+    private _normalized_ip;
+    private s?;
     private req?;
     private res?;
-    http2: boolean;
-    http1: boolean;
     private _ip;
     private _port;
     private _method;
@@ -40,14 +57,8 @@ export declare class Stream {
     private _query_string;
     private _cookies;
     private _uid;
-    status_code: number | undefined;
-    finished: boolean;
     private res_cookies;
     private res_headers;
-    body: string;
-    private promise;
-    /** The cached value of {@link normalize_ip} */
-    private _normalized_ip;
     /**
      * Create a new Stream wrapper for HTTP/1.1 or HTTP/2.
      *
@@ -60,7 +71,6 @@ export declare class Stream {
     /**
      * Receive and buffer the request body, handling optional gzip/deflate decompression.
      * Sets {@link body} and resolves the internal promise used by {@link join}.
-     * @private
      */
     private _recv_body;
     /**
@@ -207,8 +217,6 @@ export declare class Stream {
      * This avoids missing replacements when a template key is split between chunks.
      */
     private create_template_replace_transform;
-    /** Remove content length header from headers. */
-    private remove_content_length_header;
     /** Create output headers for http2. */
     private create_http2_headers;
     /** Assign http headers to response. */
@@ -326,7 +334,7 @@ export declare class Stream {
      */
     set_headers(headers?: ResponseHeaders): this;
     /**
-     * Get an added header.
+     * Get an added response header.
      *
      * @param name The header name.
      * @example
@@ -431,4 +439,4 @@ export interface APIErrorResult<ErrorData extends RequestDataBase = unknown> {
  * @docs
  */
 export type APIResult<SuccessData extends RequestDataBase = unknown, ErrorData extends RequestDataBase = unknown> = APIErrorResult<ErrorData> | SuccessData;
-export default Stream;
+export {};

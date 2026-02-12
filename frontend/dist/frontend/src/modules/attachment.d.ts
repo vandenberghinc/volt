@@ -2,7 +2,7 @@
  * @author ...
  * @copyright ...
  */
-import { AnyElement } from "src/index.js";
+import { AnyElement } from "../ui/any_element.js";
 import { Compression } from "./compression.js";
 import type { Mail } from "../../../backend/src/plugins/mail/mail.js";
 /** A file attachment with an internal byte buffer and compression/encoding helpers. */

@@ -145,6 +145,7 @@ type NonStrictExprString<T extends MongoDocument, S> =
 type ExprValue<T extends MongoDocument> = 
     | number 
     | boolean 
+    | bigint
     | null 
     | Date
     | StrictExprString<T>

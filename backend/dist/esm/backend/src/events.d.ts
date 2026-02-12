@@ -4,6 +4,8 @@
  */
 import * as vlib from "@vandenberghinc/vlib";
 import { User } from "./users.js";
+import { MailElement } from "./plugins/mail/ui.js";
+import { StripeEvents } from "./payments/stripe/events.js";
 /**
  * All events and their callback types.
  * @nav Server
@@ -55,7 +57,20 @@ export type Events = {
     delete_user: (opts: {
         user: User;
     }) => void | Promise<void>;
-};
+    /**
+     * The callback for creating the mail content for the 2FA verification email.
+     * @returns The HTML content of the email, or a `MailElement` instance.
+     * @docs
+     */
+    "2fa_mail": (opts: {
+        code: string;
+        username: string;
+        email: string;
+        date: string;
+        ip: string;
+        device: string;
+    }) => string | MailElement | Promise<string | MailElement>;
+} & StripeEvents;
 /**
  * Event name.
  * @nav Server

@@ -8,7 +8,7 @@
  * @template S The canonical integer scale (see {@link SafeInt.Scale}) at which this instance stores its value.
  *
  * @remarks
- * - The stored value is always a **safe JavaScript integer** (may be negative) measured in units of `S`.
+ * - The stored value is always an **integer (`bigint`)** (may be negative) measured in units of `S`.
  * - Instances are **immutable**; all arithmetic returns new `SafeInt` instances.
  * - Conversions are **exact by default**. Provide a {@link SafeInt.Rounding} `round` to allow rounding.
  * - Arithmetic is **same-scale only**: pass raw integers or another `SafeInt<S>`.
@@ -18,9 +18,9 @@
  */
 export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
     /**
-     * The stored safe integer (may be negative) measured at {@link int_scale}.
+     * The stored integer (may be negative) measured at {@link int_scale}.
      */
-    protected readonly int_value: number;
+    protected readonly int_value: bigint;
     /**
      * The canonical integer scale for {@link int_value}.
      */
@@ -32,6 +32,9 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      *              - If `from_scale === Base`, `value` may be a float. When `round` is omitted,
      *                `value * to_scale` must be an integer. If `round` is provided, that rounding is applied.
      *              - If `from_scale !== Base`, `value` must be a safe integer.
+     *              - If `value` is a string:
+     *                - If `from_scale === Base`, it may be a decimal string (exact parsing).
+     *                - Otherwise it must be an integer string.
      * @param opts  The canonical scale or scale options.
      * @param opts.to_scale   The target scale for storage (the resulting instance type is `SafeInt<opts.to_scale>`).
      * @param opts.from_scale The source scale of {@link value}, defaults to {@link SafeInt.Scale.Base}.
@@ -43,13 +46,21 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * new SafeInt(123_000, "nano")
      * @example
      * new SafeInt(1.5, { from_scale: SafeInt.Scale.Base, to_scale: SafeInt.Scale.Milli, round: "round" }) // 1500
+     * @example
+     * new SafeInt(2n, { from_scale: SafeInt.Scale.Base, to_scale: SafeInt.Scale.Nano }) // 2_000_000_000n
+     * @example
+     * // Exact, decimal-safe parsing (no float surprises)
+     * new SafeInt("1.005", { from_scale: "base", to_scale: "milli", round: "round" }) // 1005
+     * @example
+     * // Integer string at already-at-scale (underscores allowed)
+     * new SafeInt("123_000", "nano")
      *
      * @throws
      * Error If inputs are invalid, conversion overflows, or exactness is required but not met.
      *
      * @docs
      */
-    constructor(value: number, opts: S | SafeInt.ScaleToString<S> | {
+    constructor(value: number | bigint | string, opts: S | SafeInt.ScaleToString<S> | {
         to_scale: S | SafeInt.ScaleToString<S>;
         from_scale?: SafeInt.Scale | SafeInt.StringScale;
         round?: SafeInt.Rounding;
@@ -57,19 +68,28 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
     /**
      * Retrieve the underlying integer (measured in {@link scale} units).
      *
-     * @returns The stored safe integer.
+     * @returns The stored integer.
      *
      * @docs
      */
-    value(): number;
+    value(): bigint;
+    /**
+     * Conver the stored integer to a `number`.
+     *
+     * @returns The amount in stored integer units as `number` instead of `bigint`.
+     * @throws Error if the stored integer cannot be represented safely as a `number`.
+     *
+     * @docs
+     */
+    to_number(): number;
     /**
      * Alias of {@link value}. Provided for JavaScript numeric coercion.
      *
-     * @returns The stored safe integer.
+     * @returns The stored integer.
      *
      * @docs
      */
-    valueOf(): number;
+    valueOf(): bigint;
     /**
      * Retrieve this instance's canonical scale.
      *
@@ -145,33 +165,33 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @param other The addend, as a raw safe integer or a `SafeInt<S>`.
      * @returns     A new `SafeInt<S>` with the sum.
      *
-     * @throws Error If the operand is invalid or the sum overflows.
+     * @throws Error If the operand is invalid.
      *
      * @docs
      */
-    add(other: number | SafeInt<S>): SafeInt<S>;
+    add(other: number | bigint | SafeInt<S>): SafeInt<S>;
     /**
      * Subtract an amount at the same scale.
      *
      * @param other The subtrahend, as a raw safe integer or a `SafeInt<S>`.
      * @returns     A new `SafeInt<S>` with the difference.
      *
-     * @throws Error If the operand is invalid or subtraction overflows.
+     * @throws Error If the operand is invalid.
      *
      * @docs
      */
-    sub(other: number | SafeInt<S>): SafeInt<S>;
+    sub(other: number | bigint | SafeInt<S>): SafeInt<S>;
     /**
      * Multiply by an integer factor at the same scale.
      *
      * @param factor The factor as a raw safe integer or a `SafeInt<S>`.
      * @returns      A new `SafeInt<S>` with the product.
      *
-     * @throws Error If the factor is invalid or the product overflows.
+     * @throws Error If the factor is invalid.
      *
      * @docs
      */
-    mul(factor: number | SafeInt<S>): SafeInt<S>;
+    mul(factor: number | bigint | SafeInt<S>): SafeInt<S>;
     /**
      * Divide by a positive integer divisor at the same scale.
      *
@@ -179,11 +199,11 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      * @param round    Rounding mode. Default `"exact"` requires no remainder.
      * @returns       A new `SafeInt<S>` with the integer quotient (per {@link round}).
      *
-     * @throws Error If the divisor is invalid, division by zero, non-exact remainder in `"exact"` round, or overflow.
+     * @throws Error If the divisor is invalid, division by zero, or non-exact remainder in `"exact"` round.
      *
      * @docs
      */
-    div(divisor: number | SafeInt<S>, round?: SafeInt.Rounding): SafeInt<S>;
+    div(divisor: number | bigint | SafeInt<S>, round?: SafeInt.Rounding): SafeInt<S>;
     /**
      * Compare with another `SafeInt<S>`.
      *
@@ -203,25 +223,25 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      */
     eq(other: SafeInt<S>): boolean;
     /**
-     * Assert `value` is a `>=0` safe integer.
+     * Assert `value` is a `>=0` integer.
      *
      * @docs
      */
     assert_non_negative(): void;
     /**
-     * Assert `value` is a `>0` safe integer.
+     * Assert `value` is a `>0` integer.
      *
      * @docs
      */
     assert_positive(): void;
     /**
-     * Assert `value` is a `<=0` safe integer.
+     * Assert `value` is a `<=0` integer.
      *
      * @docs
      */
     assert_non_positive(): void;
     /**
-     * Assert `value` is a `<0` safe integer.
+     * Assert `value` is a `<0` integer.
      *
      * @docs
      */
@@ -260,49 +280,76 @@ export declare class SafeInt<S extends SafeInt.Scale = SafeInt.Scale.Base> {
      */
     protected static apply_round(v: number, round: SafeInt.Rounding): number;
     /**
+     * Parse an integer string into bigint.
+     * - Allows optional leading +/-.
+     * - Allows underscores as separators.
+     * - Rejects decimals.
+     *
+     * @internal
+     */
+    protected static parse_int_str(text: string, label: string): bigint;
+    /**
+     * Parse a base-scale decimal string and convert to an integer at `to_scale` using bigint math.
+     *
+     * Examples:
+     *  "1.5" with to_scale=1000 => 1500
+     *  "-0.001" with to_scale=1000 => -1
+     *
+     * - Underscores are allowed.
+     * - Exact by default; non-exact requires a rounding mode.
+     *
+     * @internal
+     */
+    protected static parse_base_decimal_to_scaled(text: string, to_scale: number, round: SafeInt.Rounding): bigint;
+    /**
+     * Compute 10^n as bigint.
+     * @internal
+     */
+    protected static pow10(n: number): bigint;
+    /**
      * Convert integer-scale value → base **integer** using a rounding policy.
      *
-     * @param value      Safe integer at `from_scale` (may be negative).
+     * @param value      Integer at `from_scale` (may be negative).
      * @param from_scale Source scale.
      * @param round       Rounding (default exact).
      * @returns          Base-scale integer.
      * @internal
      */
-    protected static div_to_base(value: number, from_scale: number, round: SafeInt.Rounding): number;
+    protected static div_to_base(value: bigint, from_scale: number, round: SafeInt.Rounding): bigint;
     /**
      * Integer division helper with selectable rounding semantics.
      *
-     * @param numerator   Safe integer (may be negative).
-     * @param denominator Positive safe integer.
+     * @param numerator   Integer (may be negative).
+     * @param denominator Positive integer.
      * @param round        Rounding mode (default `"exact"`).
      * @returns           Integer quotient as per {@link round}.
      *
-     * @throws Error On invalid inputs, division by zero, non-exact remainder in `"exact"`, or overflow.
+     * @throws Error On invalid inputs, division by zero, or non-exact remainder in `"exact"`.
      * @internal
      */
-    protected static div_int_checked(numerator: number, denominator: number, round?: SafeInt.Rounding): number;
+    protected static div_int_checked(numerator: bigint, denominator: bigint, round?: SafeInt.Rounding): bigint;
     /**
      * Integer-only scale converter with rounding policy.
      *
-     * @param value       Safe integer at {@link from_scale} (may be negative).
+     * @param value       Integer at {@link from_scale} (may be negative).
      * @param from_scale  Integer source scale.
      * @param to_scale    Integer target scale.
      * @param round        Rounding mode (default exact).
-     * @returns           Safe integer at `to_scale`.
+     * @returns           Integer at `to_scale`.
      *
-     * @throws Error On invalid inputs or overflow.
+     * @throws Error On invalid inputs.
      * @internal
      */
-    protected static convert_int_scale(value: number, from_scale: number, to_scale: number, round: SafeInt.Rounding): number;
+    protected static convert_int_scale(value: bigint, from_scale: number, to_scale: number, round: SafeInt.Rounding): bigint;
 }
 export declare namespace SafeInt {
     /**
      * Rounding mode for integer division and integer-scale conversions.
      *
      * - `"exact"` — require exactness; throw if any remainder exists (default).
-     * - `"floor"` — truncate toward zero.
-     * - `"ceil"`  — round up if any remainder exists.
-     * - `"round"` — round half up (≥ 0.5).
+     * - `"floor"` — round toward -∞ (mathematical floor).
+     * - `"ceil"`  — round toward +∞ (mathematical ceil).
+     * - `"round"` — round half away from zero (|x|≥0.5 rounds outward).
      *
      * @docs
      */

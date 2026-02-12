@@ -454,11 +454,6 @@ ${bundle.debug({ limit: 25 })}`);
     }
     html += `<script nonce="${nonce_identifier}">${line_break}window.volt_statics_aspect_ratios = ${JSON.stringify(Object.fromEntries(this.server.statics_aspect_ratios))}${line_break}</script>${line_break}`;
     if (this.server.payments) {
-      if (this.server.payments.type === "paddle") {
-        if (add_payments_module) {
-          include_js_script += `__volt_incl_js("https://cdn.paddle.com/paddle/v2/paddle.js");${line_break}`;
-        }
-      }
     }
     html += `<script nonce="${nonce_identifier}">${line_break}${include_js_script.trimEnd()}${line_break}</script>${line_break}`;
     this.includes.forEach((url) => {

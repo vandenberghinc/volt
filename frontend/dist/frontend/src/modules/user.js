@@ -2,6 +2,7 @@
  * @author Daan van den Bergh
  * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
+// Imports.
 import { Cookies } from "./cookies";
 import { request } from "./request.js";
 // User module.

@@ -50,12 +50,40 @@ type ResponseBody = undefined | string | boolean | number | any[] | Record<strin
  * @docs
  */
 export class Stream {
-    private s?: ServerHttp2Stream;
+
+    /** The request headers. */
     public headers: IncomingHttpHeaders | IncomingMessage['headers'];
+
+    /** Whether this stream is an HTTP/2 stream. */
+    public http2: boolean;
+
+    /** Whether this stream is an HTTP/1.1 stream (when false, it's an HTTP/2 stream). */
+    public http1: boolean;
+
+    /** The status code of the sent response. */
+    public status_code: number | undefined;
+
+    /** Whether the response has been finished. */
+    public finished: boolean;
+
+    /** The received body potentially decompressed as string. */
+    public body: string;
+
+    /** The raw body as a Buffer, potentially decompressed. */
+    public raw_body: Buffer;
+
+    /** The body wired exactly as is, not decompressed etc. */
+    public wire_body: Buffer;
+
+    /** The internal promise that resolves when the body is fully received. */
+    private promise: Promise<void> | undefined;
+
+    /** The cached value of {@link normalize_ip} */
+    private _normalized_ip: string | undefined;
+
+    private s?: ServerHttp2Stream;
     private req?: IncomingMessage | Http2ServerRequest;
     private res?: ServerResponse | Http2ServerResponse;
-    public http2: boolean;
-    public http1: boolean;
     private _ip: string;
     private _port: number;
     private _method: string;
@@ -65,15 +93,8 @@ export class Stream {
     private _query_string: string | undefined;
     private _cookies: Record<string, any> | undefined;
     private _uid: string | undefined;
-    public status_code: number | undefined;
-    public finished: boolean;
     private res_cookies: string[];
     private res_headers: Record<string, any> | [string, any][];
-    public body: string;
-    private promise: Promise<void> | undefined;
-
-    /** The cached value of {@link normalize_ip} */
-    private _normalized_ip: string | undefined;
 
     /**
      * Create a new Stream wrapper for HTTP/1.1 or HTTP/2.
@@ -122,6 +143,8 @@ export class Stream {
 
         // Read body.
         this.body = "";
+        this.raw_body = Buffer.alloc(0);
+        this.wire_body = Buffer.alloc(0);
         this.promise = undefined;
         this._recv_body();
     }
@@ -129,13 +152,13 @@ export class Stream {
     /**
      * Receive and buffer the request body, handling optional gzip/deflate decompression.
      * Sets {@link body} and resolves the internal promise used by {@link join}.
-     * @private
      */
     private _recv_body() {
         this.promise = new Promise<void>((resolve, reject) => {
 
-            // Buffers.
+            // Buffers: decoded + wire.
             const buffs: Buffer[] = [];
+            const wire_buffs: Buffer[] = [];
 
             // Get decompress stream.
             let decompress_stream: zlib.Gunzip | zlib.Inflate | undefined;
@@ -145,60 +168,95 @@ export class Stream {
             } else if (content_encoding === 'deflate') {
                 decompress_stream = zlib.createInflate();
             }
+
             const cleanup = () => {
                 if (decompress_stream) {
                     decompress_stream.close();
                 }
             };
 
-            // HTTP2.
-            if (this.http2) {
-                let stream: any = this.s;
+            const on_error = (e: unknown) => {
+                cleanup();
+                reject(e);
+            };
 
-                // If decompression is needed, pipe the stream through the decompression stream
+            // -------------------------
+            // HTTP2
+            // -------------------------
+            if (this.http2) {
+                const source = this.s as Http2Stream;
+
+                // 1) Buffer wire bytes from the source stream (exact on-the-wire chunks).
+                source.on("data", (chunk: Buffer) => {
+                    wire_buffs.push(chunk);
+                });
+
+                // 2) Create decoded stream (maybe decompressed).
+                let decoded: NodeJS.ReadableStream = source;
                 if (decompress_stream) {
-                    stream = (this.s as Http2Stream).pipe(decompress_stream);
-                    // decompress_stream.on('error', (e) => { cleanup(); reject(e); });
+                    decoded = source.pipe(decompress_stream);
                 }
 
-                // On error.
-                stream.on('error', (e) => { cleanup(); reject(e); });
+                source.on("error", on_error);
+                decoded.on("error", on_error);
 
-                // Receive data.
-                stream.on('data', (chunk: Buffer) => {
+                // 3) Buffer decoded bytes.
+                decoded.on("data", (chunk: Buffer) => {
                     buffs.push(chunk);
                 });
-                stream.on('end', () => {
-                    this.body = Buffer.concat(buffs).toString();
-                    cleanup();
-                    resolve();
+
+                // IMPORTANT: resolve on *decoded* end, because that’s when decoded body is complete.
+                decoded.on("end", () => {
+                    try {
+                        this.wire_body = Buffer.concat(wire_buffs);
+                        this.raw_body = Buffer.concat(buffs);
+                        this.body = this.raw_body.toString("utf8");
+                        cleanup();
+                        resolve();
+                    } catch (e) {
+                        on_error(e);
+                    }
                 });
+
+                return;
             }
 
-            // HTTP1.
-            else {
-                let stream: any = this.req!;
+            // -------------------------
+            // HTTP1
+            // -------------------------
+            const source = this.req as IncomingMessage;
 
-                // Decompress data.
-                if (decompress_stream) {
-                    this.req!.pipe(decompress_stream)
-                    stream = decompress_stream;
-                }
+            // 1) Buffer wire bytes from the source request.
+            source.on("data", (chunk: Buffer) => {
+                wire_buffs.push(chunk);
+            });
 
-                // On error.
-                stream.on('error', (e) => { cleanup(); reject(e); });
+            // 2) Create decoded stream (maybe decompressed).
+            let decoded: NodeJS.ReadableStream = source;
+            if (decompress_stream) {
+                decoded = source.pipe(decompress_stream);
+            }
 
-                // Receive data.
-                stream.on("data", (data: Buffer) => {
-                    buffs.push(data);
-                })
-                stream.on("end", () => {
-                    this.body = Buffer.concat(buffs).toString();
+            source.on("error", on_error);
+            decoded.on("error", on_error);
+
+            // 3) Buffer decoded bytes.
+            decoded.on("data", (chunk: Buffer) => {
+                buffs.push(chunk);
+            });
+
+            decoded.on("end", () => {
+                try {
+                    this.wire_body = Buffer.concat(wire_buffs);
+                    this.raw_body = Buffer.concat(buffs);
+                    this.body = this.raw_body.toString("utf8");
                     cleanup();
                     resolve();
-                })
-            }
-        })
+                } catch (e) {
+                    on_error(e);
+                }
+            });
+        });
     }
 
     /**
@@ -868,10 +926,6 @@ export class Stream {
         });
     }
 
-    /** Remove content length header from headers. */
-    private remove_content_length_header(headers: Record<string, any>): void {
-    }
-
     /** Create output headers for http2. */
     private create_http2_headers(
         status: number,
@@ -896,14 +950,14 @@ export class Stream {
         if (!Array.isArray(this.res_headers)) {
             for (const [k, v] of Object.entries(this.res_headers)) {
                 const nv = normalize_header_value(v as ResponseHeaderValue);
-                if (nv !== undefined) out_headers[k] = nv;
+                if (nv !== undefined) out_headers[k.toLowerCase()] = nv;
             }
         }
 
         // Merge call-specific headers last so they win.
         for (const [k, v] of Object.entries(new_headers)) {
             const nv = normalize_header_value(v);
-            if (nv !== undefined) out_headers[k] = nv;
+            if (nv !== undefined) out_headers[k.toLowerCase()] = nv;
         }
 
         // Attach any cookies staged via set_cookie/set_cookies.
@@ -928,12 +982,12 @@ export class Stream {
 
         // Set headers.
         for (let i = 0; i < this.res_headers.length; i++) {
-            this.res.setHeader(this.res_headers[i][0], this.res_headers[i][1]);
+            this.res.setHeader(this.res_headers[i][0].toLowerCase(), this.res_headers[i][1]);
         }
         Object.keys(headers).forEach((key) => {
             const v = headers[key];
             if (v != null) {
-                this.res?.setHeader(key, typeof v === "boolean" ? v.toString() : v);
+                this.res?.setHeader(key.toLowerCase(), typeof v === "boolean" ? v.toString() : v);
             }
         });
     }
@@ -1040,7 +1094,7 @@ export class Stream {
 
                 // Add content type.
                 const content_type = Utils.mime_type(from_path.extension());
-                if (content_type && out_headers["Content-Type"] == null && out_headers["content-type"] == null) {
+                if (content_type && out_headers["content-type"] == null) {
                     out_headers["content-type"] = content_type;
                 }
 
@@ -1065,13 +1119,11 @@ export class Stream {
 
                     // Do not set content-length when streaming gzip.
                     delete out_headers["content-length"];
-                    delete out_headers["Content-Length"];
                 }
 
                 // Do not set content-length when template replacement is enabled.
                 if (should_apply_templates) {
                     delete out_headers["content-length"];
-                    delete out_headers["Content-Length"];
                 }
 
                 // If we are NOT gzipping and NOT replacing, use respondWithFile for best performance.
@@ -1150,7 +1202,6 @@ export class Stream {
 
                     // No content-length if we compress asynchronously.
                     delete out_headers["content-length"];
-                    delete out_headers["Content-Length"];
                 }
 
                 // Respond.
@@ -1349,151 +1400,6 @@ export class Stream {
         }
     }
 
-
-    // send<Data extends ResponseBody = ResponseBody>({
-    //     status = 200,
-    //     headers = {},
-    //     data,
-    //     compress = false,
-    // }: {
-    //     status?: number,
-    //     headers?: ResponseHeaders,
-    //     data?: Data,
-    //     compress?: boolean
-    // } = {}): this {
-
-    //     // Assign sent status code.
-    //     this.status_code = status;
-
-    //     // The body to send as non `ResponseBody` type.
-    //     let body = data as ResponseBody;
-
-    //     // Convert body primitivies to string.
-    //     if (typeof body === 'boolean' || typeof body === 'number') {
-    //         body = body.toString();
-    //     }
-
-    //     // HTTP2.
-    //     if (this.http2) {
-    //         const stream = this.s as ServerHttp2Stream;
-
-    //         // Headers.
-    //         this.res_headers[":status"] = status;
-    //         this.set_headers(headers);
-    //         if (this.res_cookies.length > 0) {
-    //             this.res_headers["set-cookie"] = this.res_cookies;
-    //         }
-    //         if (compress && body) {
-    //             this.res_headers["Content-Encoding"] = "gzip";
-    //             this.res_headers["Vary"] = "Accept-Encoding";
-    //         }
-
-    //         // Is json.
-    //         if (body && typeof body === 'object' && Buffer.isBuffer(body) === false && (body instanceof Uint8Array) === false) {
-    //             this.res_headers["Content-Type"] = "application/json";
-    //             body = JSON.stringify(body);
-    //         }
-
-    //         // Compress.
-    //         if (
-    //             body
-    //             && typeof body === "object"
-    //             && !(body instanceof Buffer)
-    //             && !(body instanceof Uint8Array)
-    //         ) {
-    //             // Convert to string.
-    //             body = JSON.stringify(body);
-    //         }
-    //         if (
-    //             compress
-    //             && body
-    //         ) {
-    //             if (
-    //                 typeof body === 'string'
-    //                 || Buffer.isBuffer(body)
-    //                 || body instanceof Uint8Array
-    //             ) {
-    //                 body = zlib.gzipSync(body, { level: zlib.constants.Z_BEST_COMPRESSION });
-    //             } else {
-    //                 body = zlib.gzipSync(JSON.stringify(body), { level: zlib.constants.Z_BEST_COMPRESSION });
-    //             }
-    //         }
-
-    //         // Respond.
-    //         stream.respond(this.res_headers as any)
-
-    //         // End.
-    //         debug(3, "Sending response: ", status, " - has body: ", !!body);
-    //         if (body) {
-    //             if (Buffer.isBuffer(body) || body instanceof Uint8Array) {
-    //                 stream.end(body);
-    //             } else {
-    //                 stream.end(Buffer.from(body as any));
-    //             }
-    //             // stream.end(body); // do not use toString() here or it will cause issues with writing binary data.
-    //         } else {
-    //             stream.end();
-    //         }
-    //     }
-
-    //     // HTTP1.
-    //     else {
-    //         const req = this.req as IncomingMessage;
-    //         const res = this.res as ServerResponse;
-
-    //         // Set status code.
-    //         res.statusCode = status;
-
-    //         // Set headers.
-    //         for (let i = 0; i < this.res_headers.length; i++) {
-    //             res.setHeader(this.res_headers[i][0], this.res_headers[i][1]);
-    //         }
-    //         Object.keys(headers).forEach((key) => {
-    //             const v = headers[key];
-    //             if (v != null) {
-    //                 if (typeof v === "boolean") {
-    //                     res.setHeader(key, v.toString());
-    //                 } else {
-    //                     res.setHeader(key, v);
-    //                 }
-    //             }
-    //         });
-
-    //         // Set cookies.
-    //         if (this.cookies.length > 0) {
-    //             res.setHeader('Set-Cookie', this.res_cookies);
-    //         }
-
-    //         // Convert data.
-    //         if (body && typeof body === 'object' && Buffer.isBuffer(body) === false && (body instanceof Uint8Array) === false) {
-    //             res.setHeader("Content-Type", "application/json");
-    //             body = JSON.stringify(body);
-    //         }
-
-    //         // @todo compress.
-    //         if (compress && body) {
-    //             res.setHeader("Content-Encoding", "gzip");
-    //             res.setHeader("Vary", "Accept-Encoding");
-    //             body = zlib.gzipSync(body, { level: zlib.constants.Z_BEST_COMPRESSION });
-    //         }
-
-    //         // Set data.
-    //         if (body) {
-    //             res.end(body); // do not use toString() here or it will cause issues with writing binary data.
-    //         }
-
-    //         // End.
-    //         else {
-    //             res.end();
-    //         }
-    //     }
-
-    //     // Set as finished.
-    //     this.finished = true;
-
-    //     return this;
-    // }
-
     // Send a successs response.
     /**
      * Send a response
@@ -1638,7 +1544,7 @@ export class Stream {
             for (const k of Object.keys(headers ?? {})) {
                 if (k.toLowerCase() === "content-encoding") return true;
             }
-            const existing = this.get_header("Content-Encoding") ?? this.get_header("content-encoding");
+            const existing = this.get_header("content-encoding");
             return existing != null;
         })();
 
@@ -1694,7 +1600,6 @@ export class Stream {
 
             // Strip content-length because streaming/transforms make it unreliable.
             delete out_headers["content-length"];
-            delete out_headers["Content-Length"];
 
             // Write headers once, before streaming data.
             h2.respond(out_headers);
@@ -1764,6 +1669,7 @@ export class Stream {
      * @docs
      */
     set_header(name: string, value: ResponseHeaderValue): this {
+        name = name.toLowerCase();
         if (this.http2) {
             this.res_headers[name] = value;
         } else {
@@ -1787,18 +1693,18 @@ export class Stream {
         if (headers == null) { return this; }
         if (this.http2) {
             Object.keys(headers).forEach((key) => {
-                this.res_headers[key] = headers[key];
+                this.res_headers[key.toLowerCase()] = headers[key];
             });
         } else {
             Object.keys(headers).forEach((key) => {
-                this.res_headers.append([key, headers[key]]);
+                this.res_headers.append([key.toLowerCase(), headers[key]]);
             });
         }
         return this;
     }
 
     /**
-     * Get an added header.
+     * Get an added response header.
      *
      * @param name The header name.
      * @example
@@ -1808,10 +1714,11 @@ export class Stream {
      * @docs
      */
     get_header(name: string): ResponseHeaderValue | undefined {
+        name = name.toLowerCase();
         if (this.http2) {
             return this.res_headers[name];
         } else {
-            return this.res_headers.find((header) => header[0] === name)?.[1];
+            return this.res_headers.find((h) => h[0] === name)?.[1];
         }
     }
 
@@ -1826,6 +1733,8 @@ export class Stream {
      * @docs
      */
     remove_header(...names: string[]): this {
+        // Normalize header names.
+        names = names.map((n) => n.toLowerCase());
         if (this.http1) {
             const headers: [string, string][] = [];
             for (let i = 0; i < this.res_headers.length; i++) {
@@ -1960,9 +1869,3 @@ export interface APIErrorResult<ErrorData extends RequestDataBase = unknown> {
 export type APIResult<SuccessData extends RequestDataBase = unknown, ErrorData extends RequestDataBase = unknown> =
     | APIErrorResult<ErrorData>
     | SuccessData;
-
-// ---------------------------------------------------------
-// Exports.
-
-export default Stream;
-

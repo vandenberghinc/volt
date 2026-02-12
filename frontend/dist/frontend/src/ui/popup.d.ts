@@ -3,7 +3,7 @@
  * @copyright © 2022 - 2025 Daan van den Bergh. All rights reserved
  */
 import { Mutex } from "@vandenberghinc/vlib/frontend";
-import { VElementBaseSignature } from "../elements/module.js";
+import { VElementBaseSignature, AppendType } from "../elements/module.js";
 import { HStackElement, VStackElement } from "./stack.js";
 import { TextElement } from "./text.js";
 import { TitleElement } from "./title.js";
@@ -34,7 +34,8 @@ export declare class YesNoPopupElement extends YesNoPopupElement_base {
     constructor({ title, text, no, yes, image, image_color, content, auto_hide, auto_remove, animation_duration, // in ms.
     blur, on_no, on_yes, on_popup, }: {
         title: string;
-        text: string;
+        /** The text content (string) or children elements to be added to the text node. */
+        text: string | AppendType[];
         no?: string;
         yes?: string;
         image?: boolean | string;
@@ -57,7 +58,7 @@ export declare class YesNoPopupElement extends YesNoPopupElement_base {
     image_color(value: string): this;
     popup({ title, text, image, image_color, content, on_no, on_yes, }?: {
         title?: string;
-        text?: string;
+        text?: string | AppendType[];
         no?: string;
         yes?: string;
         image?: boolean | string;
@@ -69,7 +70,8 @@ export declare class YesNoPopupElement extends YesNoPopupElement_base {
 }
 export declare const YesNoPopup: <Extensions extends object = {}>(args_0: {
     title: string;
-    text: string;
+    /** The text content (string) or children elements to be added to the text node. */
+    text: string | AppendType[];
     no?: string;
     yes?: string;
     image?: boolean | string;

@@ -3,7 +3,7 @@
  * @copyright © 2026 - 2026 Daan van den Bergh. All rights reserved
  */
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { ExternalStripeError, InternalStripeError, StripeErrorCode } from "./error.js";
 
 /**
@@ -16,6 +16,9 @@ export async function stripe_api_call<T>(
     try {
         return await fn();
     } catch (error: unknown) {
+        if (error instanceof ExternalStripeError || error instanceof InternalStripeError) {
+            throw error;
+        }
         throw new InternalStripeError(
             "api_error",
             "Stripe API request failed.",
@@ -91,10 +94,44 @@ export function is_non_empty_string(value: unknown): value is string {
  * @param prefix A string prefix for observability and to avoid collisions with other idempotency domains in logs.
  *               This is still suffixed with a `_${randomUUID()}`.
  */
-export function generate_random_idempotency_key(prefix: string): string {
-    // We prefix for observability and to avoid collisions with other idempotency domains in logs.
-    // randomUUID() is RFC 4122 v4.
-    return `${prefix}_${randomUUID()}`;
+export function generate_random_idempotency_key(prefix: string, max_length = 255): string {
+    if (!Number.isInteger(max_length) || max_length < 1 || max_length > 255) {
+        throw new Error(`generate_random_idempotency_key: max_length must be an integer between 1 and 255 (got ${max_length})`);
+    }
+    const p = prefix.trim();
+    if (p.length === 0) {
+        throw new Error("generate_random_idempotency_key: prefix must be non-empty");
+    }
+    const key = `${p}_${randomUUID()}`;
+    if (key.length > max_length) {
+        const digest = createHash("sha256").update(key).digest("hex");
+        return digest.slice(0, Math.min(max_length, digest.length));
+    }
+    return key;
+}
+
+/**
+ * Generate a stable idempotency key by hashing a seed string if it exceeds the max length.
+ * This is useful when you want idempotency based on a natural key that may be too long for Stripe's limits.
+ * The seed should be unique for each distinct operation you want to dedupe.
+ */
+export function stable_idempotency_key(seed: string, max_length = 255): string {
+    assert(
+        Number.isInteger(max_length) && max_length >= 1 && max_length <= 255,
+        "invalid_argument",
+        "Idempotency max_length must be an integer between 1 and 255.",
+        { max_length },
+    );
+    const s = seed.trim();
+    assert(s.length > 0, "invalid_argument", "Idempotency seed must be non-empty.", {});
+    if (s.length <= max_length) return s;
+    
+    // Deterministic truncation via hash.
+    const digest = createHash("sha256").update(s).digest("hex"); // 64 chars
+    
+    // Respect max_length even if caller sets it < 64.
+    // (Stripe max is 255, but we keep this function correct for any valid max_length.)
+    return digest.slice(0, Math.min(max_length, digest.length));
 }
 
 /**

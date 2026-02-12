@@ -162,6 +162,7 @@ class Users {
       name: "Volt.Server.Users.Private",
       indexes: ["uid", "query"]
     });
+    this.set_default_2fa_event();
   }
   // ---------------------------------------------------------
   // Utils.
@@ -481,6 +482,74 @@ class Users {
     stream.set_cookie(`UserFirstName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
     stream.set_cookie(`UserLastName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
     stream.set_cookie(`UserEmail=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
+  }
+  // ---------------------------------------------------------
+  // 2FA mail.
+  // Mail template.
+  /** Build the base email layout used by the various transactional email builders. */
+  _2fa_mail_template({ max_width = 400, children = [] }) {
+    this.server.assert_mail();
+    const style = this.server.mail.style;
+    const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
+    let header;
+    if (this.server.company.stroke_icon != null) {
+      header = [
+        Image(`${this.server.full_domain}${this.server.company.stroke_icon ?? ""}`).height(16)
+      ];
+    } else if (this.server.company.icon != null) {
+      header = [
+        Image(`${this.server.full_domain}${this.server.company.icon ?? ""}`).frame(20, 40)
+      ];
+    }
+    if (header) {
+      header = Table(TableRow(...header).wrap(true).center().center_vertical()).margin_bottom(15);
+    }
+    return MailUI.Mail(Table(TableData(Table(
+      // Header.
+      header,
+      // Widget.
+      Table(...children).background_color(style.widget_bg ?? "").border(`1px solid ${style.widget_border ?? ""}`).border_radius("10px").padding(40, 25, 25, 25).margin(0),
+      // Copyright.
+      Table(TableRow(Text(`Copyright \xA9 ${(/* @__PURE__ */ new Date()).getFullYear()} ${this.server.company.name}, ${this.server.company.legal_name} All Rights Included.
+${this.server.company.street} ${this.server.company.house_number}, ${this.server.company.postal_code}, ${this.server.company.city}, ${this.server.company.province}, ${this.server.company.country}.
+` + (this.server.company.tax_id == null ? "" : `VAT ID ${this.server.company.tax_id}`)).white_space("pre").display("inline-block").font_size(11).color(style.footer_fg).margin(0)).center().center_vertical()).margin(0, 0, 10, 0)
+    ).max_width(max_width)).center()).padding(25, 20, 25, 20)).font_family(style.font).background(style.bg);
+  }
+  /**
+   * Build the 2FA verification email content.
+   */
+  set_default_2fa_event() {
+    this.server.on("2fa_mail", ({ code, username, email, date, ip, device }) => {
+      this.server.assert_mail();
+      const style = this.server.mail.style;
+      const { Title, Text, Image, Table, TableRow, TableData, VStack } = MailUI;
+      return this._2fa_mail_template({
+        max_width: 400,
+        children: [
+          // Title.
+          TableRow(Title("Verification Required").color(style.title_fg).width("fit-content").font_size(26)).center(),
+          // Text.
+          TableRow(Text("Please confirm your request with this 2FA code.").center().margin(10, 0, 20, 0).color(style.text_fg).font_size(18)),
+          // Auth info.
+          [
+            ["Username", username],
+            ["Email", email],
+            ["Date", date],
+            ["Ip Address", ip],
+            ["Device", device]
+          ].map((item) => {
+            return [
+              TableRow(VStack().margin_right(7.5).background_color(style.text_fg).border_radius("50%").frame(5, 5), Text(`<span style='font-weight: 600'>${item[0]}:</span> ${item[1]}`).color(style.text_fg).font_size(16).text_wrap("wrap").overflow_wrap("break-word").word_wrap("break-word")).wrap(true).center_vertical(),
+              TableRow().fixed_frame(5, 5)
+            ];
+          }),
+          // 2FA code.
+          TableRow(Text(code).background(style.button_bg).border_radius("10px").padding(10, 15).center().color(style.button_fg).width("100%").margin(20, 0, 0, 0)),
+          // Text.
+          TableRow(Text("This 2FA code will be valid for 5 minutes.").color(style.text_fg).font_style("italic").font_size(12).margin_top(20).center())
+        ]
+      });
+    });
   }
   // ---------------------------------------------------------
   // Initialization (private).
@@ -1502,7 +1571,7 @@ class Users {
     await this.protected.delete_many({ uid });
     await this.private.delete_many({ uid });
     if (this.server.payments !== void 0) {
-      await this.server.payments._delete_user(uid);
+      await this.server.payments.delete_user(uid);
     }
     for (const cb of this.server.events.get("delete_user")) {
       try {
@@ -2030,10 +2099,11 @@ class Users {
       code = await this._create_2fa_token(_email, expiration);
     }
     const user_agent = _user_agent ?? (stream.headers["user-agent"] ?? "Unknown");
-    if (this.server.on_2fa_mail === void 0) {
+    const on_2fa_mail = this.server.events.get("2fa_mail");
+    if (!on_2fa_mail?.length) {
       throw Error('Define server callback "Server.on_2fa_mail" to generate the HTML mail body.');
     }
-    let mail = this.server.on_2fa_mail({
+    const mail = await on_2fa_mail[0]({
       code,
       username: _username,
       email: _email,
@@ -2041,10 +2111,14 @@ class Users {
       ip: stream.ip,
       device: user_agent
     });
-    let body = mail, subject;
+    let body, subject;
     if (mail instanceof MailUI.MailElement) {
       body = mail.html();
       subject = mail.subject();
+    } else if (typeof mail === "string") {
+      body = mail;
+    } else {
+      throw new Error(`Invalid return value from server callback "Server.on('2fa_mail')", expected string or MailUI.MailElement.`);
     }
     this.server.assert_mail();
     await this.server.mail.send({

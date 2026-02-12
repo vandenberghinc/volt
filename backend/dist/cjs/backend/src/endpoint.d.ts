@@ -8,6 +8,7 @@ import { RateLimitGroup, RateLimitData } from "./rate_limit.js";
 import { Stream, AuthStream } from "./stream.js";
 import { Server } from "./server.js";
 import { Route } from './route.js';
+import { Request } from '../../frontend/src/modules/request.js';
 /**
  * The endpoint class.
  * @nav Endpoints
@@ -58,6 +59,86 @@ export declare class Endpoint<const M extends Endpoint.Method = "GET", const E e
      * @docs
      */
     static clone<const M extends Endpoint.Method = "GET", const E extends string | RegExp = string, const S extends vlib.Schema.Entries.Opts = {}>(endpoint: Endpoint<M, E, S>, override?: Partial<Endpoint.Opts<M, E, S>>): Endpoint<M, E, S>;
+    /**
+     * Static function to create a very strict method.
+     * This is a utility type that can be used when defining frontend `Request.Info` types.
+     * With this function we can enforce that the method matches the method defined in the `Request.Info` type,
+     * which can be useful to prevent mistakes when defining endpoints.
+     *
+     * @example
+     * {Create Strict Endpoint}
+     * Create a strict endpoint based on a frontend request info type.
+     * If there are any mismatches between the defined method,
+     * endpoint or result data with the `Request.Info` type,
+     * a TypeScript compile-time error will be thrown.
+     *
+     * ```ts
+     * import { Request } from "@vandenberghinc/volt/frontend";
+     * import * as volt from "@vandenberghinc/volt";
+     *
+     * type MyRequestInfo = Request.Info<
+     *   "POST", // method
+     *   "/api/my-endpoint", // endpoint
+     *   { id: string } // params
+     *   { name: string } // result
+     *   undefined // error
+     * >;
+     *
+     * server.endpoint({
+     *     method: volt.Endpoint.method<MyRequestInfo>("POST"),
+     *     endpoint: volt.Endpoint.endpoint<MyRequestInfo>("/api/my-endpoint"),
+     *     params: { id: "string" },
+     *     callback: async (stream, params) => {
+     *         // Send a success response.
+     *         stream.send<MyRequestInfo["result"]>({
+     *             status: 200,
+     *             data: { name: "John Doe" },
+     *         });
+     *.    },
+     * })
+     * ```
+     */
+    static method<ReqInfo extends Request.Info<Request.Method, any, any, any, any>>(method: ReqInfo["method"]): ReqInfo["method"];
+    /**
+     * Static function to create a very strict endpoint.
+     * This is a utility type that can be used when defining frontend `Request.Info` types.
+     * With this function we can enforce that the endpoint matches the endpoint defined in the `Request.Info` type,
+     * which can be useful to prevent mistakes when defining endpoints.
+     *
+     * @example
+     * {Create Strict Endpoint}
+     * Create a strict endpoint based on a frontend request info type.
+     * If there are any mismatches between the defined method,
+     * endpoint or result data with the `Request.Info` type,
+     * a TypeScript compile-time error will be thrown.
+     *
+     * ```ts
+     * import { Request } from "@vandenberghinc/volt/frontend";
+     * import * as volt from "@vandenberghinc/volt";
+     *
+     * type MyRequestInfo = Request.Info<
+     *   "POST", // method
+     *   "/api/my-endpoint", // endpoint
+     *   { id: string } // params
+     *   { name: string } // result
+     *   undefined // error
+     * >;
+     *
+     * server.endpoint({
+     *     method: volt.Endpoint.method<MyRequestInfo>("POST"),
+     *     endpoint: volt.Endpoint.endpoint<MyRequestInfo>("/api/my-endpoint"),
+     *     params: { id: "string" },
+     *     callback: async (stream, params) => {
+     *         // Send a success response.
+     *         stream.send<MyRequestInfo["result"]>({
+     *             status: 200,
+     *             data: { name: "John Doe" },
+     *         });
+     *.    },
+     * })
+     * ```
+     */
+    static endpoint<ReqInfo extends Request.Info<any, any, any, any, any>>(endpoint: ReqInfo["endpoint"]): ReqInfo["endpoint"];
     /**
      * Construct an endpoint.
      * @docs
@@ -237,8 +318,11 @@ export declare namespace Endpoint {
             callback: ((stream: AuthStream, params: vlib.Schema.Entries.Infer<S>) => any);
             /** Not allowed in this variant. */
             view?: never;
-            /** The content type. */
-            content_type: string;
+            /**
+             * The content type.
+             * Not required since a callback could have multiple different content types.
+             */
+            content_type?: string;
         }
         /**
          * Options for constructing an endpoint by authenticated view.
