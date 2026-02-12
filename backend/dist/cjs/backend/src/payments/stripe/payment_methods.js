@@ -45,9 +45,9 @@ function assert_setup_intent_belongs_to_customer(opts) {
   const setup_customer_id = typeof setup_intent_customer === "string" ? setup_intent_customer : setup_intent_customer.id;
   (0, import_utils.public_assert)(setup_customer_id === expected_customer_id, "invalid_argument", "Setup intent does not belong to this customer.", { uid, setup_intent_id: setup_intent.id, expected_customer_id, setup_customer_id });
 }
-async function create_payment_method_setup_intent(client, opts) {
+async function create_payment_method_setup_intent(client, server, opts) {
   (0, import_utils.public_assert)((0, import_utils.is_non_empty_string)(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
-  const stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, opts.uid);
+  const stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, server, opts.uid);
   let setup_intent;
   try {
     setup_intent = await (0, import_utils.stripe_api_call)(() => client.setupIntents.create({
@@ -68,10 +68,10 @@ async function create_payment_method_setup_intent(client, opts) {
     stripe_customer_id
   };
 }
-async function finalize_payment_method_setup(client, opts) {
+async function finalize_payment_method_setup(client, server, opts) {
   (0, import_utils.public_assert)((0, import_utils.is_non_empty_string)(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
   (0, import_utils.public_assert)((0, import_utils.is_non_empty_string)(opts.setup_intent_id), "invalid_argument", "Property 'setup_intent_id' must be a non-empty string.");
-  const stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, opts.uid);
+  const stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, server, opts.uid);
   const setup_intent = await (0, import_utils.stripe_api_call)(() => client.setupIntents.retrieve(opts.setup_intent_id, {
     expand: ["payment_method"]
   }), { operation: "setupIntents.retrieve", uid: opts.uid, setup_intent_id: opts.setup_intent_id });

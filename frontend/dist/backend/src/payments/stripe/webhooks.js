@@ -17,7 +17,7 @@ import { Collection } from "../../database/collection.js";
 import { InternalStripeError } from "./error.js";
 import { assert, is_non_empty_string, stable_idempotency_key, stripe_api_call, } from "./utils.js";
 import { resolve_plan_to_parent_subscription, } from "./products.js";
-import { delete_subscription_caches, enforce_single_subscription_plan, } from "./subscriptions.js";
+import { delete_subscription_caches, enforce_single_subscription_plan, update_subscription_record, } from "./subscriptions.js";
 import { finalize_payment_method_setup } from "./payment_methods.js";
 // -------------------------------------------------------------------------------------------------
 // Internal constants.
@@ -519,7 +519,7 @@ export async function handle_stripe_webhook(client, opts) {
                     delete_subscription_caches(uid);
                     if (event.type === "customer.subscription.created"
                         || event.type === "customer.subscription.updated") {
-                        await enforce_single_subscription_plan(client, {
+                        await enforce_single_subscription_plan(client, opts.server, {
                             uid,
                             stripe_customer_id: stripe_customer_id,
                             new_subscription: typed_subscription,
@@ -527,6 +527,12 @@ export async function handle_stripe_webhook(client, opts) {
                             idempotency_key: stable_idempotency_key(`enforce_single_subscription_plan:${event.id}`),
                         });
                     }
+                    // Update the subscription record.
+                    await update_subscription_record(client, opts.server, {
+                        uid,
+                        all_products: opts.all_products,
+                    });
+                    // Trigger event.
                     const items = resolve_subscription_items({
                         subscription: typed_subscription,
                         all_products: opts.all_products,
@@ -697,7 +703,7 @@ export async function handle_stripe_webhook(client, opts) {
                     if (!is_non_empty_string(uid)) {
                         throw new InternalStripeError("invalid_argument", "SetupIntent missing uid metadata (intent + customer).", { stripe_setup_intent_id, stripe_customer_id });
                     }
-                    const finalized = await finalize_payment_method_setup(client, {
+                    const finalized = await finalize_payment_method_setup(client, opts.server, {
                         uid,
                         setup_intent_id: stripe_setup_intent_id,
                         idempotency_key: stable_idempotency_key(`finalize_payment_method_setup:${event.id}`),

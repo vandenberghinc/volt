@@ -4,6 +4,7 @@
  */
 import Stripe from "stripe";
 import { InitializedMeterProduct, InitializedProduct, MeterProduct } from "./products.js";
+import { Server } from "../../server.js";
 type AmountRounding = "exact" | "floor" | "ceil" | "round";
 /**
  * The options for recording meter usage.
@@ -73,7 +74,7 @@ export interface RecordMeterUsageResult {
  * @throws {InternalStripeError} On internal errors.
  * @throws {ExternalStripeError} On external errors such as the customer not being entitled to record usage for the meter product.
  */
-export declare function record_meter_usage<Kind extends MeterProduct.Kind>(client: Stripe, all_products: InitializedProduct[], opts: RecordMeterUsageOpts<Kind>): Promise<RecordMeterUsageResult>;
+export declare function record_meter_usage<Kind extends MeterProduct.Kind>(client: Stripe, server: Server, all_products: InitializedProduct[], opts: RecordMeterUsageOpts<Kind>): Promise<RecordMeterUsageResult>;
 /** The options for {@link cancel_meter_usage_event} */
 export interface CancelMeterUsageEventOpts {
     /** The user id. */
@@ -100,5 +101,5 @@ export interface CancelMeterUsageEventResult {
  * Stripe docs:
  * - Create meter event adjustment: https://docs.stripe.com/api/billing/meter-event-adjustment/create
  */
-export declare function cancel_meter_usage_event(client: Stripe, all_products: InitializedProduct[], opts: CancelMeterUsageEventOpts): Promise<CancelMeterUsageEventResult>;
+export declare function cancel_meter_usage_event(client: Stripe, server: Server, all_products: InitializedProduct[], opts: CancelMeterUsageEventOpts): Promise<CancelMeterUsageEventResult>;
 export {};

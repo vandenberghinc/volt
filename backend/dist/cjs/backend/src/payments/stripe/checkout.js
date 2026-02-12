@@ -37,6 +37,7 @@ var import_customers = require("./customers.js");
 var import_error = require("./error.js");
 var import_utils = require("./utils.js");
 var import_collection = require("../../database/collection.js");
+var import_subscriptions = require("./subscriptions.js");
 function resolve_checkout_item_product(opts) {
   const { product_ref, all_products } = opts;
   if (typeof product_ref !== "string") {
@@ -149,6 +150,14 @@ async function start_checkout_session(client, server, opts) {
       selected_subscription_id,
       subscription_plan_count
     });
+    (0, import_utils.public_assert)(opts.uid != null && opts.uid !== "anonymous", "invalid_uid", "You must be authenticated to purchase a subscription, sign in or sign up and try again.", { uid: opts.uid });
+    const is_already_subscribed = await (0, import_subscriptions.is_user_subscribed_to)(client, server, {
+      uid: opts.uid,
+      plan: item.product,
+      all_products: opts.all_products,
+      customer_id: void 0
+    });
+    (0, import_utils.public_assert)(!is_already_subscribed, "checkout_already_subscribed", "You are already subscribed to this plan.", { uid: opts.uid, plan_id: item.product.id, subscription_id: item.product.subscription_id });
   }
   const has_subscription_item = resolved_items.some((item) => item.product.type === "subscription_plan");
   const mode = has_subscription_item ? "subscription" : "payment";
@@ -171,7 +180,7 @@ async function start_checkout_session(client, server, opts) {
   if (mode === "subscription" || opts.uid) {
     (0, import_utils.public_assert)(opts.uid != null && opts.uid !== "anonymous", "invalid_uid", "You must be authenticated to purchase a subscription, sign in or sign up and try again.", { uid: opts.uid });
     (0, import_utils.public_assert)((0, import_utils.is_non_empty_string)(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
-    stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, opts.uid);
+    stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, server, opts.uid);
   }
   const stripe_line_items = resolved_items.map((item) => {
     (0, import_utils.public_assert)((0, import_utils.is_non_empty_string)(item.product.stripe_price_id), "invalid_product", "Product is missing a Stripe price id.", { product_id: item.product.id, type: item.product.type });

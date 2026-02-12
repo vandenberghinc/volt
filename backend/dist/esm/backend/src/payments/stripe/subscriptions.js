@@ -10,26 +10,13 @@ import { Collection } from "../../database/collection.js";
 // ----------------------------------------------------------------------------
 // Caching.
 /**
- * Cache for the active subscriptions plan ids per user id.
+ * Cache for loading the subscription record of a user.
+ *
  * This is a short lived cache for hot paths,
  * since changes accross multiple forks & multi-load server
  * are not persisted to this cache.
  */
-const active_sub_plans_cache = new vlib.Cache({
-    max_size: 250_000,
-    ttl: {
-        sliding: true,
-        // Short lived cache, see docstring why
-        duration: 1000 * 60 * 5,
-    },
-});
-/**
- * Cache for the active meter product ids per user id.
- * This is a short lived cache for hot paths,
- * since changes accross multiple forks & multi-load server
- * are not persisted to this cache.
- */
-const active_meters_cache = new vlib.Cache({
+const subscription_record_cache = new vlib.Cache({
     max_size: 250_000,
     ttl: {
         sliding: true,
@@ -272,6 +259,34 @@ export async function update_subscription_record(client, server, opts) {
         retry: 3,
     });
 }
+/**
+ * Load a subscription record with caching.
+ */
+async function load_subscription_record(server, opts) {
+    const use_cache = opts.cache ?? true;
+    // Check cache first.
+    if (use_cache) {
+        const cached = subscription_record_cache.get(opts.uid);
+        if (cached != null) {
+            return cached;
+        }
+    }
+    // Load.
+    const db = create_subscriptions_db(server);
+    const record = await db.load({ uid: opts.uid }, { throw: false });
+    if (record instanceof Error) {
+        if (record instanceof Collection.NotFoundError) {
+            // Cache empty record to avoid repeated db hits for users without subscriptions.
+            const empty_record = { uid: opts.uid, subscriptions: {}, meters: {} };
+            subscription_record_cache.set(opts.uid, empty_record);
+            return empty_record;
+        }
+        throw record;
+    }
+    // Cache always and return.
+    subscription_record_cache.set(opts.uid, record);
+    return record;
+}
 // ----------------------------------------------------------------------------
 // Public API.
 /**
@@ -279,8 +294,7 @@ export async function update_subscription_record(client, server, opts) {
  * Should be called after any mutation to the user's subscriptions to avoid stale cache entries.
  */
 export function delete_subscription_caches(uid) {
-    active_sub_plans_cache.delete(uid);
-    active_meters_cache.delete(uid);
+    subscription_record_cache.delete(uid);
 }
 /**
  * List all subscribed product plans for a given user.
@@ -288,28 +302,8 @@ export function delete_subscription_caches(uid) {
 export async function list_subscribed_plans(client, server, opts) {
     /** Validate input early to avoid cache poisoning with ambiguous keys. */
     assert(opts.uid.trim().length > 0, "invalid_argument", "Uid must be a non-empty string.", { uid: opts.uid });
-    // All subscription statuses unfiltered.
-    let subscriptions;
-    // Check cache first.
-    const cached = active_sub_plans_cache.get(opts.uid);
-    if (cached != null) {
-        subscriptions = cached;
-    }
     // Load record.
-    else {
-        const db = create_subscriptions_db(server);
-        let record = await db.load({ uid: opts.uid }, { throw: false, projection: { subscriptions: 1 } });
-        if (record instanceof Error) {
-            if (record instanceof Collection.NotFoundError) {
-                subscriptions = {};
-            }
-            throw record;
-        }
-        else {
-            subscriptions = record.subscriptions;
-        }
-        active_sub_plans_cache.set(opts.uid, subscriptions);
-    }
+    const record = await load_subscription_record(server, { uid: opts.uid });
     // Subscription statuses that represent a live (entitlement-granting) subscription.
     const active_statuses = new Set(opts.status ?? [
         "active",
@@ -318,7 +312,7 @@ export async function list_subscribed_plans(client, server, opts) {
     ]);
     // Walk all subscriptions.
     const active = {};
-    for (const [id, status] of Object.entries(subscriptions)) {
+    for (const [id, status] of Object.entries(record.subscriptions)) {
         if (!active_statuses.has(status)) {
             continue;
         }
@@ -337,28 +331,8 @@ export async function list_subscribed_plans(client, server, opts) {
  * - Expand: https://docs.stripe.com/expand
  */
 export async function list_subscribed_meters(client, server, opts) {
-    // All meters statuses unfiltered.
-    let meters;
-    // Check cache first.
-    const cached = active_meters_cache.get(opts.uid);
-    if (cached != null) {
-        meters = cached;
-    }
     // Load record.
-    else {
-        const db = create_subscriptions_db(server);
-        let record = await db.load({ uid: opts.uid }, { throw: false, projection: { subscriptions: 1 } });
-        if (record instanceof Error) {
-            if (record instanceof Collection.NotFoundError) {
-                meters = {};
-            }
-            throw record;
-        }
-        else {
-            meters = record.meters;
-        }
-        active_meters_cache.set(opts.uid, meters);
-    }
+    const record = await load_subscription_record(server, { uid: opts.uid });
     // Subscription statuses that represent a live (entitlement-granting) subscription.
     const active_statuses = new Set(opts.status ?? [
         "active",
@@ -366,7 +340,7 @@ export async function list_subscribed_meters(client, server, opts) {
     ]);
     // Walk all subscriptions.
     const active = {};
-    for (const [id, status] of Object.entries(meters)) {
+    for (const [id, status] of Object.entries(record.meters)) {
         if (!active_statuses.has(status)) {
             continue;
         }

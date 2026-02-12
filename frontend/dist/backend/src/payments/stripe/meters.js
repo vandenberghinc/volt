@@ -115,16 +115,16 @@ function validate_meter_event_timestamp(now, timestamp) {
  * - List subscriptions: https://docs.stripe.com/api/subscriptions/list
  * - Expand: https://docs.stripe.com/expand
  */
-async function assert_customer_entitled_for_meter_price(client, opts) {
+async function assert_customer_entitled_for_meter_price(client, server, opts) {
     // List the subscribed meters.
-    const active_meters = await list_subscribed_meters(client, {
+    const active_meters = await list_subscribed_meters(client, server, {
         uid: opts.uid,
         stripe_customer_id: opts.stripe_customer_id,
         all_products: opts.all_products,
     });
     // If not entitled, this should usually be user-visible (they are not subscribed),
     // but be careful: this function can also be called internally.
-    if (!active_meters.includes(opts.meter_product.id)) {
+    if (!active_meters[opts.meter_product.id]) {
         throw new ExternalStripeError("subscription_not_active", "You must be subscribed to use this metered feature.", { uid: opts.uid, stripe_customer_id: opts.stripe_customer_id, meter_product: opts.meter_product.id });
     }
 }
@@ -175,7 +175,7 @@ function resolve_meter_payload_keys(product) {
  * @throws {InternalStripeError} On internal errors.
  * @throws {ExternalStripeError} On external errors such as the customer not being entitled to record usage for the meter product.
  */
-export async function record_meter_usage(client, all_products, opts) {
+export async function record_meter_usage(client, server, all_products, opts) {
     // -------------------------------------------------------------------------
     // Validate inputs.
     public_assert(is_non_empty_string(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
@@ -230,9 +230,9 @@ export async function record_meter_usage(client, all_products, opts) {
         validate_meter_event_timestamp(now, opts.timestamp);
     }
     // Resolve Stripe customer.
-    const stripe_customer_id = await ensure_stripe_customer(client, opts.uid);
+    const stripe_customer_id = await ensure_stripe_customer(client, server, opts.uid);
     // Enforce entitlement: only record usage for subscribed users.
-    await assert_customer_entitled_for_meter_price(client, {
+    await assert_customer_entitled_for_meter_price(client, server, {
         uid: opts.uid,
         meter_product: opts.product,
         stripe_customer_id,
@@ -284,7 +284,7 @@ export async function record_meter_usage(client, all_products, opts) {
  * Stripe docs:
  * - Create meter event adjustment: https://docs.stripe.com/api/billing/meter-event-adjustment/create
  */
-export async function cancel_meter_usage_event(client, all_products, opts) {
+export async function cancel_meter_usage_event(client, server, all_products, opts) {
     public_assert(opts.product.type === "meter", "invalid_argument", "Property 'product' must be a meter product.", {
         product_type: opts.product.type,
     });
@@ -292,8 +292,8 @@ export async function cancel_meter_usage_event(client, all_products, opts) {
     public_assert(is_non_empty_string(opts.meter_event_identifier), "invalid_argument", "Property 'identifier' must be a non-empty string.");
     validate_meter_event_identifier(opts.meter_event_identifier);
     // Resolve Stripe customer and enforce entitlement before canceling usage.
-    const stripe_customer_id = await ensure_stripe_customer(client, opts.uid);
-    await assert_customer_entitled_for_meter_price(client, {
+    const stripe_customer_id = await ensure_stripe_customer(client, server, opts.uid);
+    await assert_customer_entitled_for_meter_price(client, server, {
         uid: opts.uid,
         meter_product: opts.product,
         stripe_customer_id,

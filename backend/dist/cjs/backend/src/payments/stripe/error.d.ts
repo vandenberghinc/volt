@@ -27,6 +27,8 @@ export type StripeErrorCode = (
  | "checkout_subscription_plan_ambiguous"
 /** An error code indicating an invalid quantity during checkout session creation. */
  | "checkout_invalid_quantity"
+/** An error code indicating the user is already subscribed to the plan. */
+ | "checkout_already_subscribed"
 /** An error code indicating a subscription is not active and can not be billed. */
  | "subscription_not_active"
 /** An error code indicating a failure during subscription creation. */

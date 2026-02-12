@@ -3,6 +3,7 @@
  * @copyright © 2026 - 2026 Daan van den Bergh. All rights reserved
  */
 import Stripe from "stripe";
+import { Server } from "../../server.js";
 /**
  * Create a Stripe SetupIntent so the client can add a payment method and prepare it for off-session billing.
  *
@@ -15,7 +16,7 @@ import Stripe from "stripe";
  * - SetupIntents overview: https://docs.stripe.com/payments/setup-intents
  * - Create SetupIntent: https://docs.stripe.com/api/setup_intents/create
  */
-export declare function create_payment_method_setup_intent(client: Stripe, opts: {
+export declare function create_payment_method_setup_intent(client: Stripe, server: Server, opts: {
     /** The internal user id, used to resolve/ensure Stripe customer. */
     uid: string;
     /** An optional idempotency key. */
@@ -37,7 +38,7 @@ export declare function create_payment_method_setup_intent(client: Stripe, opts:
  * - Retrieve SetupIntent: https://docs.stripe.com/api/setup_intents/retrieve
  * - Update customer invoice_settings.default_payment_method: https://docs.stripe.com/api/customers/update
  */
-export declare function finalize_payment_method_setup(client: Stripe, opts: {
+export declare function finalize_payment_method_setup(client: Stripe, server: Server, opts: {
     /** The internal user id, used to resolve/ensure Stripe customer. */
     uid: string;
     /**

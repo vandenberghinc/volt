@@ -8,7 +8,7 @@ import Stripe from "stripe";
 import { InternalStripeError } from "./error.js";
 import { stable_idempotency_key, stripe_api_call } from "./utils.js";
 import { Server } from "../../server.js";
-import { Collection } from "src/database/collection.js";
+import { Collection } from "../../database/collection.js";
 
 /**
  * A cache for resolving Stripe customer ids from our internal user IDs (`uid`).

@@ -8,6 +8,7 @@ import { ensure_stripe_customer } from "./customers.js";
 import { ExternalStripeError, InternalStripeError } from "./error.js";
 import { assert, public_assert, stripe_api_call, add_days_utc, first_day_of_next_month_utc, to_unix_seconds, is_non_empty_string, generate_random_idempotency_key, stable_idempotency_key, } from "./utils.js";
 import { Collection } from "../../database/collection.js";
+import { is_user_subscribed_to } from "./subscriptions.js";
 // ----------------------------------------------------------------------------------
 // Internal helpers.
 /**
@@ -137,8 +138,9 @@ export async function start_checkout_session(client, server, opts) {
                 public_assert(item.quantity <= resolved_product.quantity_rules.max, "checkout_invalid_quantity", "Quantity is above the maximum allowed.", { product_id: resolved_product.id, quantity: item.quantity, max: resolved_product.quantity_rules.max });
             }
         }
-        // Subscriptions are not seat-based in our model; quantity for subscription plans must be 1.
+        // Validate subscription.
         if (resolved_product.type === "subscription_plan") {
+            // Subscriptions are not seat-based in our model; quantity for subscription plans must be 1.
             public_assert(item.quantity === 1, "checkout_invalid_quantity", "Quantity must be 1 for subscription plans.", { plan_id: resolved_product.id, quantity: item.quantity });
         }
         return {
@@ -171,6 +173,16 @@ export async function start_checkout_session(client, server, opts) {
             selected_subscription_id,
             subscription_plan_count,
         });
+        // Ensure uid is defined.
+        public_assert(opts.uid != null && opts.uid !== "anonymous", "invalid_uid", "You must be authenticated to purchase a subscription, sign in or sign up and try again.", { uid: opts.uid });
+        // Ensure the user is not already subscribed to the plan.
+        const is_already_subscribed = await is_user_subscribed_to(client, server, {
+            uid: opts.uid,
+            plan: item.product,
+            all_products: opts.all_products,
+            customer_id: undefined,
+        });
+        public_assert(!is_already_subscribed, "checkout_already_subscribed", "You are already subscribed to this plan.", { uid: opts.uid, plan_id: item.product.id, subscription_id: item.product.subscription_id });
     }
     // Determine mode (Stripe requires subscription mode if any recurring item is present).
     const has_subscription_item = resolved_items.some((item) => item.product.type === "subscription_plan");
@@ -199,7 +211,7 @@ export async function start_checkout_session(client, server, opts) {
     if (mode === "subscription" || opts.uid) {
         public_assert(opts.uid != null && opts.uid !== "anonymous", "invalid_uid", "You must be authenticated to purchase a subscription, sign in or sign up and try again.", { uid: opts.uid });
         public_assert(is_non_empty_string(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
-        stripe_customer_id = await ensure_stripe_customer(client, opts.uid);
+        stripe_customer_id = await ensure_stripe_customer(client, server, opts.uid);
     }
     // Build Stripe line items.
     const stripe_line_items = resolved_items.map((item) => {

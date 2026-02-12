@@ -407,7 +407,7 @@ async function handle_stripe_webhook(client, opts) {
           });
           (0, import_subscriptions.delete_subscription_caches)(uid);
           if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated") {
-            await (0, import_subscriptions.enforce_single_subscription_plan)(client, {
+            await (0, import_subscriptions.enforce_single_subscription_plan)(client, opts.server, {
               uid,
               stripe_customer_id,
               new_subscription: typed_subscription,
@@ -415,6 +415,10 @@ async function handle_stripe_webhook(client, opts) {
               idempotency_key: (0, import_utils.stable_idempotency_key)(`enforce_single_subscription_plan:${event.id}`)
             });
           }
+          await (0, import_subscriptions.update_subscription_record)(client, opts.server, {
+            uid,
+            all_products: opts.all_products
+          });
           const items = resolve_subscription_items({
             subscription: typed_subscription,
             all_products: opts.all_products
@@ -575,7 +579,7 @@ async function handle_stripe_webhook(client, opts) {
           if (!(0, import_utils.is_non_empty_string)(uid)) {
             throw new import_error.InternalStripeError("invalid_argument", "SetupIntent missing uid metadata (intent + customer).", { stripe_setup_intent_id, stripe_customer_id });
           }
-          const finalized = await (0, import_payment_methods.finalize_payment_method_setup)(client, {
+          const finalized = await (0, import_payment_methods.finalize_payment_method_setup)(client, opts.server, {
             uid,
             setup_intent_id: stripe_setup_intent_id,
             idempotency_key: (0, import_utils.stable_idempotency_key)(`finalize_payment_method_setup:${event.id}`)

@@ -53,10 +53,10 @@ function assert_setup_intent_belongs_to_customer(opts) {
  * - SetupIntents overview: https://docs.stripe.com/payments/setup-intents
  * - Create SetupIntent: https://docs.stripe.com/api/setup_intents/create
  */
-export async function create_payment_method_setup_intent(client, opts) {
+export async function create_payment_method_setup_intent(client, server, opts) {
     public_assert(is_non_empty_string(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
     // Ensure a Stripe customer exists for this user.
-    const stripe_customer_id = await ensure_stripe_customer(client, opts.uid);
+    const stripe_customer_id = await ensure_stripe_customer(client, server, opts.uid);
     // Create a SetupIntent for off-session usage so the resulting payment method can be used for subscriptions/invoices.
     // Stripe docs: https://docs.stripe.com/api/setup_intents/create
     let setup_intent;
@@ -90,11 +90,11 @@ export async function create_payment_method_setup_intent(client, opts) {
  * - Retrieve SetupIntent: https://docs.stripe.com/api/setup_intents/retrieve
  * - Update customer invoice_settings.default_payment_method: https://docs.stripe.com/api/customers/update
  */
-export async function finalize_payment_method_setup(client, opts) {
+export async function finalize_payment_method_setup(client, server, opts) {
     public_assert(is_non_empty_string(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
     public_assert(is_non_empty_string(opts.setup_intent_id), "invalid_argument", "Property 'setup_intent_id' must be a non-empty string.");
     // Always derive the customer from uid on the server.
-    const stripe_customer_id = await ensure_stripe_customer(client, opts.uid);
+    const stripe_customer_id = await ensure_stripe_customer(client, server, opts.uid);
     // Retrieve the SetupIntent (expand payment_method to avoid extra round-trips if needed).
     // Stripe docs: https://docs.stripe.com/api/setup_intents/retrieve
     const setup_intent = await stripe_api_call(() => client.setupIntents.retrieve(opts.setup_intent_id, {

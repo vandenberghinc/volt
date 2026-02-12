@@ -3,7 +3,7 @@
  * @copyright © 2026 - 2026 Daan van den Bergh. All rights reserved
  */
 import { InternalStripeError } from "./error.js";
-import { assert, generate_random_idempotency_key, stable_idempotency_key, stripe_api_call } from "./utils.js";
+import { assert, generate_random_idempotency_key, stripe_api_call } from "./utils.js";
 /**
  * Nested types for the meter product definition.
  *
@@ -361,19 +361,37 @@ function find_matching_active_price(active_prices, app_price_id, expected_signat
     });
     return match ?? null;
 }
-/**
- * Deactivate all active Stripe Prices that match the internal price id but have different signatures.
- *
- * Docs: https://docs.stripe.com/api/prices/update
- */
-async function deactivate_stale_prices_for_app_price_id(client, server, active_prices, app_price_id, expected_signature) {
-    const stale_prices = active_prices.filter((p) => {
-        const meta_price_id = p.metadata?.[app_price_id_metadata_key];
-        const meta_signature = p.metadata?.[app_price_signature_metadata_key];
-        return meta_price_id === app_price_id && meta_signature !== expected_signature;
-    });
-    await Promise.all(stale_prices.map((p) => stripe_api_call(() => client.prices.update(p.id, { active: false }, { idempotencyKey: stable_idempotency_key(`init|prices.update|deactivate|${app_price_id}|${p.id}`) }), { operation: "prices.update", app_price_id, stripe_price_id: p.id, action: "deactivate" })));
-}
+// /**
+//  * Deactivate all active Stripe Prices that match the internal price id but have different signatures.
+//  *
+//  * Docs: https://docs.stripe.com/api/prices/update
+//  */
+// async function deactivate_stale_prices_for_app_price_id(
+//     client: Stripe,
+//     server: Server,
+//     active_prices: Stripe.Price[],
+//     app_price_id: string,
+//     expected_signature: string,
+// ): Promise<void> {
+//     const stale_prices = active_prices.filter((p) => {
+//         const meta_price_id = p.metadata?.[app_price_id_metadata_key];
+//         const meta_signature = p.metadata?.[app_price_signature_metadata_key];
+//         return meta_price_id === app_price_id && meta_signature !== expected_signature;
+//     });
+//     await Promise.all(
+//         stale_prices.map((p) =>
+//             stripe_api_call(
+//                 () =>
+//                     client.prices.update(
+//                         p.id,
+//                         { active: false },
+//                         { idempotencyKey: stable_idempotency_key(`init|prices.update|deactivate|${app_price_id}|${p.id}`) },
+//                     ),
+//                 { operation: "prices.update", app_price_id, stripe_price_id: p.id, action: "deactivate" },
+//             ),
+//         ),
+//     );
+// }
 /**
  * Create a Stripe Product for a given internal Product.
  *
@@ -416,6 +434,18 @@ async function update_stripe_product_if_needed(client, server, stripe_product, p
         tax_code: product.tax_code,
         images: product.images,
     }, { idempotencyKey: generate_random_idempotency_key(`update_product_${product.id}_${stripe_product.id}`) }), { operation: "products.update", app_product_id: product.id, stripe_product_id: stripe_product.id });
+}
+/**
+ * Update default price on a stripe product if needed.
+ */
+async function update_stripe_product_default_price_if_needed(client, server, stripe_product, default_price) {
+    if (stripe_product.default_price === default_price.id) {
+        return;
+    }
+    server.log(0, `Updating default price for Stripe product '${stripe_product.id}' to price '${default_price.id}'`);
+    await stripe_api_call(() => client.products.update(stripe_product.id, {
+        default_price: default_price.id,
+    }, { idempotencyKey: generate_random_idempotency_key(`update_product_default_price_${stripe_product.id}_${default_price.id}`) }), { operation: "products.update", app_product_id: stripe_product.metadata?.[app_product_id_metadata_key], stripe_product_id: stripe_product.id, action: "update_default_price" });
 }
 /**
  * Create a Stripe one-time Price for a product.
@@ -678,7 +708,6 @@ async function initialize_product(client, server, product, stripe_products_by_ap
         });
         let stripe_price = find_matching_active_price(active_prices, app_price_id, signature);
         if (!stripe_price) {
-            await deactivate_stale_prices_for_app_price_id(client, server, active_prices, app_price_id, signature);
             stripe_price = await create_one_time_price(client, server, {
                 product_id: product.id,
                 stripe_product_id: stripe_product.id,
@@ -691,10 +720,7 @@ async function initialize_product(client, server, product, stripe_products_by_ap
             const updated_prices = [...active_prices, stripe_price];
             active_prices_by_stripe_product_id.set(stripe_product.id, updated_prices);
         }
-        if (stripe_product.default_price !== stripe_price.id) {
-            stripe_product = await stripe_api_call(() => client.products.update(stripe_product.id, { default_price: stripe_price.id }, { idempotencyKey: stable_idempotency_key(`init|products.update|default_price|${product.id}|${stripe_product.id}|${stripe_price.id}`) }), { operation: "products.update", app_product_id: product.id, stripe_product_id: stripe_product.id, action: "set_default_price" });
-            stripe_products_by_app_id.set(product.id, stripe_product);
-        }
+        await update_stripe_product_default_price_if_needed(client, server, stripe_product, stripe_price);
         return {
             ...product,
             stripe_product_id: stripe_product.id,
@@ -715,7 +741,6 @@ async function initialize_product(client, server, product, stripe_products_by_ap
             });
             let stripe_price = find_matching_active_price(active_prices, app_price_id, signature);
             if (!stripe_price) {
-                await deactivate_stale_prices_for_app_price_id(client, server, active_prices, app_price_id, signature);
                 stripe_price = await create_recurring_price(client, server, {
                     product_id: product.id,
                     stripe_product_id: stripe_product.id,
@@ -731,6 +756,7 @@ async function initialize_product(client, server, product, stripe_products_by_ap
                 const updated_prices = [...active_prices, stripe_price];
                 active_prices_by_stripe_product_id.set(stripe_product.id, updated_prices);
             }
+            await update_stripe_product_default_price_if_needed(client, server, stripe_product, stripe_price);
             initialized_plans.push({
                 ...plan,
                 type: "subscription_plan",
@@ -762,7 +788,6 @@ async function initialize_product(client, server, product, stripe_products_by_ap
         });
         let stripe_price = find_matching_active_price(active_prices, app_price_id, signature);
         if (!stripe_price) {
-            // 1) Create the new price first
             const new_price = await create_recurring_price(client, server, {
                 product_id: product.id,
                 stripe_product_id: stripe_product.id,
@@ -775,28 +800,10 @@ async function initialize_product(client, server, product, stripe_products_by_ap
                 interval_count: product.interval_count,
                 recurring_usage: { usage_type: "metered", meter_id: stripe_meter.id },
             });
-            // 2) Move default_price to the new price BEFORE archiving anything
-            if (stripe_product.default_price !== new_price.id) {
-                stripe_product = await stripe_api_call(() => client.products.update(stripe_product.id, { default_price: new_price.id }, {
-                    idempotencyKey: stable_idempotency_key(`init|products.update|default_price|${product.id}|${stripe_product.id}|${new_price.id}`),
-                }), {
-                    operation: "products.update",
-                    app_product_id: product.id,
-                    stripe_product_id: stripe_product.id,
-                    action: "set_default_price",
-                });
-                stripe_products_by_app_id.set(product.id, stripe_product);
-            }
-            // 3) Now it is safe to archive stale prices (including the former default)
-            await deactivate_stale_prices_for_app_price_id(client, server, active_prices, app_price_id, signature);
-            // 4) Update local cache
             stripe_price = new_price;
             active_prices_by_stripe_product_id.set(stripe_product.id, [...active_prices, new_price]);
         }
-        if (stripe_product.default_price !== stripe_price.id) {
-            stripe_product = await stripe_api_call(() => client.products.update(stripe_product.id, { default_price: stripe_price.id }, { idempotencyKey: stable_idempotency_key(`init|products.update|default_price|${product.id}|${stripe_product.id}|${stripe_price.id}`) }), { operation: "products.update", app_product_id: product.id, stripe_product_id: stripe_product.id, action: "set_default_price" });
-            stripe_products_by_app_id.set(product.id, stripe_product);
-        }
+        await update_stripe_product_default_price_if_needed(client, server, stripe_product, stripe_price);
         return {
             ...product,
             stripe_meter_id: stripe_meter.id,

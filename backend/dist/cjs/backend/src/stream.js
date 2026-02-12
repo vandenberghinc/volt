@@ -863,7 +863,6 @@ class Stream {
           out_headers["vary"] = "Accept-Encoding";
           delete out_headers["content-length"];
         }
-        console.log("Out headers: ", out_headers);
         stream.respond(out_headers);
         if (debug.on(3))
           debug("Sending response: ", status, " - has body: ", !!body);

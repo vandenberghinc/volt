@@ -33,30 +33,26 @@ __export(stdin_exports, {
   enforce_single_subscription_plan: () => enforce_single_subscription_plan,
   is_user_subscribed_to: () => is_user_subscribed_to,
   list_subscribed_meters: () => list_subscribed_meters,
-  list_subscribed_plans: () => list_subscribed_plans
+  list_subscribed_plans: () => list_subscribed_plans,
+  update_subscription_record: () => update_subscription_record
 });
 module.exports = __toCommonJS(stdin_exports);
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var import_error = require("./error.js");
 var import_customers = require("./customers.js");
 var import_utils = require("./utils.js");
-const active_sub_plans_cache = new vlib.Cache({
+var import_collection = require("../../database/collection.js");
+const subscription_record_cache = new vlib.Cache({
   max_size: 25e4,
   ttl: {
     sliding: true,
-    duration: 1e3 * 3600 * 24
+    // Short lived cache, see docstring why
+    duration: 1e3 * 60 * 5
   }
 });
-const active_meters_cache = new vlib.Cache({
-  max_size: 25e4,
-  ttl: {
-    sliding: true,
-    duration: 1e3 * 3600 * 24
-  }
-});
-async function list_all_customer_subscriptions(client, uid, customer_id) {
+async function list_all_customer_subscriptions(client, server, uid, customer_id) {
   (0, import_utils.assert)(uid.trim().length > 0, "invalid_argument", "Uid must be a non-empty string.", { uid });
-  const ensured_customer_id = customer_id ?? await (0, import_customers.ensure_stripe_customer)(client, uid);
+  const ensured_customer_id = customer_id ?? await (0, import_customers.ensure_stripe_customer)(client, server, uid);
   const subscriptions = [];
   let starting_after;
   for (; ; ) {
@@ -145,129 +141,162 @@ function build_subscription_create_params_from_product(opts) {
   }
   throw new import_error.InternalStripeError("invalid_product", "Unsupported billing_anchor value.", { billing_anchor, subscription_id: parent.id });
 }
-function delete_subscription_caches(uid) {
-  active_sub_plans_cache.delete(uid);
-  active_meters_cache.delete(uid);
+function create_subscriptions_db(server) {
+  return server.db.collection({
+    name: "Volt.Stripe.Subscriptions",
+    indexes: [
+      {
+        keys: { uid: 1 },
+        unique: true
+      }
+    ],
+    // Ensure its not unique so we retrieve the cached collection if already created.
+    unique: false
+  });
 }
-async function list_subscribed_plans(client, opts) {
-  (0, import_utils.assert)(opts.uid.trim().length > 0, "invalid_argument", "Uid must be a non-empty string.", { uid: opts.uid });
-  const cached = active_sub_plans_cache.get(opts.uid);
-  if (cached != null) {
-    return cached;
+async function update_subscription_record(client, server, opts) {
+  const subscriptions = await list_all_customer_subscriptions(client, server, opts.uid, void 0);
+  const sub_price_id_to_plan_id = /* @__PURE__ */ new Map();
+  const meter_price_id_to_product_id = /* @__PURE__ */ new Map();
+  for (const product of opts.all_products) {
+    if (product.type === "subscription") {
+      for (const plan of product.plans) {
+        sub_price_id_to_plan_id.set(plan.stripe_price_id, plan.id);
+      }
+    } else if (product.type === "meter") {
+      meter_price_id_to_product_id.set(product.stripe_price_id, product.id);
+    } else if (product.type !== "one_time") {
+      product.toString();
+    }
   }
-  const active_sub_status = /* @__PURE__ */ new Set([
+  const record = {
+    uid: opts.uid,
+    subscriptions: {},
+    meters: {}
+  };
+  for (const subscription of subscriptions) {
+    switch (subscription.status) {
+      // Store all semi-active statuses, they can later be filtered.
+      case "active":
+      case "trialing":
+      case "past_due": {
+        for (const item of subscription.items.data) {
+          const price = item.price;
+          if (!price) {
+            continue;
+          }
+          if (sub_price_id_to_plan_id.has(price.id)) {
+            const plan_id = sub_price_id_to_plan_id.get(price.id);
+            if (!plan_id) {
+              continue;
+            }
+            record.subscriptions[plan_id] = subscription.status;
+          }
+          if (meter_price_id_to_product_id.has(price.id)) {
+            const product_id = meter_price_id_to_product_id.get(price.id);
+            if (!product_id) {
+              continue;
+            }
+            record.meters[product_id] = subscription.status;
+          }
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  const db = create_subscriptions_db(server);
+  await db.set({ uid: opts.uid }, record, {
+    // ensure we do not flatten the subscriptions object so we can remove old plans that are no longer active.
+    flatten: false,
+    upsert: true,
+    retry: 3
+  });
+}
+async function load_subscription_record(server, opts) {
+  const use_cache = opts.cache ?? true;
+  if (use_cache) {
+    const cached = subscription_record_cache.get(opts.uid);
+    if (cached != null) {
+      return cached;
+    }
+  }
+  const db = create_subscriptions_db(server);
+  const record = await db.load({ uid: opts.uid }, { throw: false });
+  if (record instanceof Error) {
+    if (record instanceof import_collection.Collection.NotFoundError) {
+      const empty_record = { uid: opts.uid, subscriptions: {}, meters: {} };
+      subscription_record_cache.set(opts.uid, empty_record);
+      return empty_record;
+    }
+    throw record;
+  }
+  subscription_record_cache.set(opts.uid, record);
+  return record;
+}
+function delete_subscription_caches(uid) {
+  subscription_record_cache.delete(uid);
+}
+async function list_subscribed_plans(client, server, opts) {
+  (0, import_utils.assert)(opts.uid.trim().length > 0, "invalid_argument", "Uid must be a non-empty string.", { uid: opts.uid });
+  const record = await load_subscription_record(server, { uid: opts.uid });
+  const active_statuses = new Set(opts.status ?? [
     "active",
     "trialing",
     "past_due"
-    // since Stripe can keep subscriptions in past_due while retrying payment.
   ]);
-  const subscriptions = await list_all_customer_subscriptions(client, opts.uid, opts.customer_id);
-  const price_id_to_plan = /* @__PURE__ */ new Map();
-  for (const product of opts.all_products) {
-    if (product.type !== "subscription") {
+  const active = {};
+  for (const [id, status] of Object.entries(record.subscriptions)) {
+    if (!active_statuses.has(status)) {
       continue;
     }
-    for (const plan of product.plans) {
-      price_id_to_plan.set(plan.stripe_price_id, plan);
-    }
+    active[id] = status;
   }
-  const matched_plan_ids = /* @__PURE__ */ new Set();
-  for (const subscription of subscriptions) {
-    if (!active_sub_status.has(subscription.status)) {
-      continue;
-    }
-    for (const item of subscription.items.data) {
-      const price = item.price;
-      if (!price) {
-        continue;
-      }
-      const plan_id = price_id_to_plan.get(price.id)?.id;
-      if (plan_id) {
-        matched_plan_ids.add(plan_id);
-      }
-    }
-  }
-  const result = [...matched_plan_ids];
-  active_sub_plans_cache.set(opts.uid, result);
-  return result;
+  return active;
 }
-async function list_subscribed_meters(client, opts) {
-  const cached = active_meters_cache.get(opts.uid);
-  if (cached != null) {
-    return cached;
-  }
-  const active_sub_status = /* @__PURE__ */ new Set([
+async function list_subscribed_meters(client, server, opts) {
+  const record = await load_subscription_record(server, { uid: opts.uid });
+  const active_statuses = new Set(opts.status ?? [
     "active"
     // We dont allow `trialing` and `past_due` to reduce risk of accidental/abusive access.
   ]);
-  const meter_price_id_to_product_id = /* @__PURE__ */ new Map();
-  for (const product of opts.all_products) {
-    if (product.type === "meter") {
-      meter_price_id_to_product_id.set(product.stripe_price_id, product.id);
-    }
-  }
-  const subscriptions = await list_all_customer_subscriptions(client, opts.uid, opts.stripe_customer_id);
-  const entitled_meters = /* @__PURE__ */ new Set();
-  for (const subscription of subscriptions) {
-    if (!active_sub_status.has(subscription.status)) {
+  const active = {};
+  for (const [id, status] of Object.entries(record.meters)) {
+    if (!active_statuses.has(status)) {
       continue;
     }
-    for (const item of subscription.items.data) {
-      const price = item.price;
-      if (!price) {
-        continue;
-      }
-      const resolved_meter = meter_price_id_to_product_id.get(price.id);
-      if (!resolved_meter) {
-        continue;
-      }
-      entitled_meters.add(resolved_meter);
-    }
+    active[id] = status;
   }
-  const result = [...entitled_meters];
-  active_meters_cache.set(opts.uid, result);
-  return result;
+  return active;
 }
-async function is_user_subscribed_to(client, opts) {
+async function is_user_subscribed_to(client, server, opts) {
   (0, import_utils.assert)(opts.plan.id.trim().length > 0, "invalid_argument", "Plan.id must be a non-empty string.", { plan_id: opts.plan.id });
-  if (opts.plan.type === "subscription") {
-    (0, import_utils.assert)(Array.isArray(opts.plan.plans) && opts.plan.plans.length > 0, "invalid_argument", "Subscription product must have plans.", { plan_id: opts.plan.id });
-  }
   if (opts.plan.type === "meter") {
-    const subscribed_plans = await list_subscribed_meters(client, {
+    const subscribed_plans = await list_subscribed_meters(client, server, {
       uid: opts.uid,
-      stripe_customer_id: opts.customer_id ?? await (0, import_customers.ensure_stripe_customer)(client, opts.uid),
-      all_products: opts.all_products
+      stripe_customer_id: opts.customer_id ?? await (0, import_customers.ensure_stripe_customer)(client, server, opts.uid),
+      all_products: opts.all_products,
+      status: opts.status
     });
-    return subscribed_plans.includes(opts.plan.id);
+    return Object.keys(subscribed_plans).includes(opts.plan.id);
   } else {
-    const subscribed_plans = new Set(await list_subscribed_plans(client, {
+    const subscribed_plans = await list_subscribed_plans(client, server, {
       uid: opts.uid,
       customer_id: opts.customer_id,
-      all_products: opts.all_products
-    }));
-    if (opts.plan.type === "subscription") {
-      for (const plan of opts.plan.plans) {
-        if (subscribed_plans.has(plan.id)) {
-          return true;
-        }
-      }
-    } else if (opts.plan.type === "subscription_plan") {
-      if (subscribed_plans.has(opts.plan.id)) {
-        return true;
-      }
-    } else {
-      opts.plan.toString();
-    }
+      all_products: opts.all_products,
+      status: opts.status
+    });
+    return Object.keys(subscribed_plans).includes(opts.plan.id);
   }
   return false;
 }
-async function create_user_subscription(client, opts) {
+async function create_user_subscription(client, server, opts) {
   (0, import_utils.public_assert)((0, import_utils.is_non_empty_string)(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
   (0, import_utils.assert)(Array.isArray(opts.all_products), "invalid_argument", "Property 'all_products' must be an array.");
   (0, import_utils.assert)(opts.target.id.trim().length > 0, "invalid_argument", "Target.id must be non-empty.", { target_id: opts.target.id });
   delete_subscription_caches(opts.uid);
-  const stripe_customer_id = opts.customer_id ?? await (0, import_customers.ensure_stripe_customer)(client, opts.uid);
+  const stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, server, opts.uid);
   const default_payment_method_id = await resolve_default_payment_method_id(client, {
     uid: opts.uid,
     stripe_customer_id
@@ -368,14 +397,14 @@ async function create_user_subscription(client, opts) {
     status: subscription.status
   };
 }
-async function cancel_user_subscription(client, opts) {
+async function cancel_user_subscription(client, server, opts) {
   const uid = opts.uid;
   (0, import_utils.assert)(uid.trim().length > 0, "invalid_argument", "Uid must be a non-empty string.", { uid });
   (0, import_utils.assert)(opts.plan.id.trim().length > 0, "invalid_argument", "Plan.id must be non-empty.", { plan_id: opts.plan.id });
   (0, import_utils.assert)(opts.plan.stripe_price_id.trim().length > 0, "invalid_argument", "Plan.stripe_price_id must be non-empty.", { plan_id: opts.plan.id });
   const cancel_at_period_end = opts.cancel_at_period_end ?? true;
   delete_subscription_caches(uid);
-  const subscriptions = await list_all_customer_subscriptions(client, uid, opts.customer_id);
+  const subscriptions = await list_all_customer_subscriptions(client, server, uid, opts.customer_id);
   const active_sub_status = /* @__PURE__ */ new Set([
     "active",
     "trialing",
@@ -431,7 +460,7 @@ async function cancel_user_subscription(client, opts) {
   delete_subscription_caches(uid);
   return affected_subscriptions;
 }
-async function enforce_single_subscription_plan(client, opts) {
+async function enforce_single_subscription_plan(client, server, opts) {
   (0, import_utils.assert)(opts.uid.length > 0, "invalid_argument", "uid must be provided");
   (0, import_utils.assert)(opts.stripe_customer_id.length > 0, "invalid_argument", "stripe_customer_id must be provided");
   const { new_subscription, all_products } = opts;
@@ -475,7 +504,7 @@ async function enforce_single_subscription_plan(client, opts) {
   }
   const [subscription_product] = [...resolved_products];
   const product_price_ids = new Set(subscription_product.plans.map((p) => p.stripe_price_id));
-  const all_subscriptions = await list_all_customer_subscriptions(client, opts.uid, opts.stripe_customer_id);
+  const all_subscriptions = await list_all_customer_subscriptions(client, server, opts.uid, opts.stripe_customer_id);
   const canceled = [];
   for (const sub of all_subscriptions) {
     if (sub.id === new_subscription.id)
@@ -523,5 +552,6 @@ async function enforce_single_subscription_plan(client, opts) {
   enforce_single_subscription_plan,
   is_user_subscribed_to,
   list_subscribed_meters,
-  list_subscribed_plans
+  list_subscribed_plans,
+  update_subscription_record
 });

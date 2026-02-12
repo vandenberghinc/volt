@@ -3,7 +3,8 @@
  * @copyright © 2026 - 2026 Daan van den Bergh. All rights reserved
  */
 import Stripe from "stripe";
-import type { InitializedMeterProduct, InitializedProduct, InitializedSubscriptionPlan, InitializedSubscriptionProduct, ProductId, SubscriptionPlanId } from "./products.js";
+import type { InitializedMeterProduct, InitializedProduct, InitializedSubscriptionPlan, ProductId, SubscriptionPlanId } from "./products.js";
+import { Server } from "../../server.js";
 /**
  * A discriminated union describing what the UI must do after subscription creation.
  */
@@ -31,6 +32,23 @@ export type CreateSubscriptionResult = {
     status: Stripe.Subscription.Status;
 };
 /**
+ * A semi-active subscription status.
+ * Note that we support past_due here as stripe can still retry the payment
+ * before marking the subscription as unpaid (canceled).
+ */
+export type SemiActiveSubscriptionStatus = "active" | "trialing" | "past_due";
+/**
+ * Update the subscriptions record for a user after a subscription mutation.
+ * @note This includes the meter subscriptions.
+ * @internal
+ */
+export declare function update_subscription_record(client: Stripe, server: Server, opts: {
+    /** The user id. */
+    uid: string;
+    /** All products. */
+    all_products: InitializedProduct[];
+}): Promise<void>;
+/**
  * Delete a user from the subscription caches.
  * Should be called after any mutation to the user's subscriptions to avoid stale cache entries.
  */
@@ -38,11 +56,12 @@ export declare function delete_subscription_caches(uid: string): void;
 /**
  * List all subscribed product plans for a given user.
  */
-export declare function list_subscribed_plans(client: Stripe, opts: {
+export declare function list_subscribed_plans<Status extends SemiActiveSubscriptionStatus = "active" | "trialing" | "past_due">(client: Stripe, server: Server, opts: {
     uid: string;
     customer_id: undefined | string;
     all_products: InitializedProduct[];
-}): Promise<SubscriptionPlanId[]>;
+    status?: Status[];
+}): Promise<Record<SubscriptionPlanId, Status>>;
 /**
  * List all meter product id's that a customer is currently subscribed (entitled) to.
  *
@@ -53,21 +72,23 @@ export declare function list_subscribed_plans(client: Stripe, opts: {
  * - List subscriptions: https://docs.stripe.com/api/subscriptions/list
  * - Expand: https://docs.stripe.com/expand
  */
-export declare function list_subscribed_meters(client: Stripe, opts: {
+export declare function list_subscribed_meters<Status extends SemiActiveSubscriptionStatus = "active">(client: Stripe, server: Server, opts: {
     uid: string;
     stripe_customer_id: undefined | string;
     all_products: InitializedProduct[];
-}): Promise<ProductId[]>;
+    status?: SemiActiveSubscriptionStatus[];
+}): Promise<Record<ProductId, Status>>;
 /**
  * Check whether a user (by uid) is subscribed to a specific subscription (plan) or meter product.
  *
  * @returns `true` if the user has an active subscription to the subscription (plan) or meter product, `false` otherwise.
  */
-export declare function is_user_subscribed_to(client: Stripe, opts: {
+export declare function is_user_subscribed_to(client: Stripe, server: Server, opts: {
     uid: string;
-    plan: InitializedSubscriptionProduct | InitializedSubscriptionPlan | InitializedMeterProduct;
+    plan: InitializedSubscriptionPlan | InitializedMeterProduct;
     customer_id: undefined | string;
     all_products: InitializedProduct[];
+    status?: SemiActiveSubscriptionStatus[];
 }): Promise<boolean>;
 /**
  * Create a subscription for either:
@@ -86,15 +107,13 @@ export declare function is_user_subscribed_to(client: Stripe, opts: {
  * @warning This function intentionally creates subscriptions with `payment_behavior="default_incomplete"`
  *          so we can reliably detect and surface required customer actions (SCA).
  */
-export declare function create_user_subscription(client: Stripe, opts: {
+export declare function create_user_subscription(client: Stripe, server: Server, opts: {
     /** The user id (uid) to create the subscription for. */
     uid: string;
     /** The subscription target (plan or meter product). */
     target: InitializedSubscriptionPlan | InitializedMeterProduct;
     /** All initialized products (required to resolve trial/billing_anchor for plans). */
     all_products: InitializedProduct[];
-    /** Optional Stripe customer id (avoids re-resolving). */
-    customer_id: undefined | string;
     /** Idempotency key to ensure stable retries. */
     idempotency_key: string;
 }): Promise<CreateSubscriptionResult>;
@@ -114,7 +133,7 @@ export declare function create_user_subscription(client: Stripe, opts: {
  *
  * @returns The affected subscriptions which were canceled/updated.
  */
-export declare function cancel_user_subscription(client: Stripe, opts: {
+export declare function cancel_user_subscription(client: Stripe, server: Server, opts: {
     /** The user id (uid) to cancel the subscription for. */
     uid: string;
     /** The specific plan to cancel (cancels subscriptions containing this plan price id). */
@@ -139,7 +158,7 @@ export declare function cancel_user_subscription(client: Stripe, opts: {
  * - Does nothing if the subscription does not map to any known SubscriptionProduct.
  * - Cancels only subscriptions that clearly overlap with the same SubscriptionProduct.
  */
-export declare function enforce_single_subscription_plan(client: Stripe, opts: {
+export declare function enforce_single_subscription_plan(client: Stripe, server: Server, opts: {
     /** Internal user id */
     uid: string;
     /** Stripe customer id */

@@ -4,6 +4,7 @@
  */
 import StripeClient from "stripe";
 import { InitializedMeterProduct, InitializedOneTimeProduct, InitializedProduct, InitializedSubscriptionPlan, InitializedSubscriptionProduct, MeterProduct, Product, ProductId, SubscriptionPlan, SubscriptionPlanId } from "./products.js";
+import { SemiActiveSubscriptionStatus } from "./subscriptions.js";
 import { Server } from "../../server.js";
 import { CancelMeterUsageEventOpts, CancelMeterUsageEventResult, RecordMeterUsageOpts, RecordMeterUsageResult } from "./meters.js";
 import { Request } from "../../../../frontend/src/modules/request.js";
@@ -51,11 +52,6 @@ export declare class Stripe {
      * A callback to delete a user from the payments provider when the user is deleted from our system.
      */
     delete_user(uid: string): Promise<void>;
-    /**
-     * Get the stripe customer id for a given user id (uid).
-     * @returns The stripe customer id, or `undefined` if no customer exists for the uid.
-     */
-    get_stripe_customer_id(uid: string): Promise<string | undefined>;
     /**
      * Get the stripe customer id for a given user id (uid), if a customer does
      * not exist, it is automatically created and the new customer id is returned.
@@ -105,7 +101,9 @@ export declare class Stripe {
         /** The user id */
         uid: string;
         /** The subcription (plan) or its id to check. */
-        plan: InitializedSubscriptionPlan | SubscriptionPlanId | InitializedSubscriptionProduct | ProductId;
+        plan: InitializedSubscriptionPlan | SubscriptionPlanId | InitializedMeterProduct | ProductId;
+        /** Only allow specific subscription statuses. */
+        status?: SemiActiveSubscriptionStatus[];
     }): Promise<boolean>;
     /**
      * Fetch all active subscription plan id's for a user.
@@ -114,10 +112,12 @@ export declare class Stripe {
      * since Stripe can still attempt to pay those subscriptions and move them to `active` status.
      * @returns An array of active subscription plan id's the user is subscribed to.
      */
-    get_active_subscriptions(opts: {
+    get_active_subscriptions<Status extends SemiActiveSubscriptionStatus = "active" | "trialing" | "past_due">(opts: {
         /** The user id */
         uid: string;
-    }): Promise<SubscriptionPlanId[]>;
+        /** The optional subscription status to filter. */
+        status?: Status[];
+    }): Promise<Record<SubscriptionPlanId, Status>>;
     /**
      * Fetch all active meter subscription id's for a user.
      * @note
@@ -127,10 +127,12 @@ export declare class Stripe {
      *
      * @returns An array of active subscription plan id's the user is subscribed to.
      */
-    get_active_meters(opts: {
+    get_active_meters<Status extends SemiActiveSubscriptionStatus = "active">(opts: {
         /** The user id */
         uid: string;
-    }): Promise<ProductId[]>;
+        /** The optional subscription status to filter. */
+        status?: Status[];
+    }): Promise<Record<ProductId, Status>>;
     /**
      * Cancel a user's subscription to a plan.
      * @warning This will cancel all of the user's subscriptions containing the plan's price id, use with caution.

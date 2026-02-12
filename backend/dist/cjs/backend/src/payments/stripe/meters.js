@@ -87,13 +87,13 @@ function validate_meter_event_timestamp(now, timestamp) {
   (0, import_utils.assert)(ts_ms >= now_ms - max_past_ms, "invalid_argument", "Meter event timestamp is too far in the past.", { now_ms, ts_ms });
   (0, import_utils.assert)(ts_ms <= now_ms + max_future_ms, "invalid_argument", "Meter event timestamp is too far in the future.", { now_ms, ts_ms });
 }
-async function assert_customer_entitled_for_meter_price(client, opts) {
-  const active_meters = await (0, import_subscriptions.list_subscribed_meters)(client, {
+async function assert_customer_entitled_for_meter_price(client, server, opts) {
+  const active_meters = await (0, import_subscriptions.list_subscribed_meters)(client, server, {
     uid: opts.uid,
     stripe_customer_id: opts.stripe_customer_id,
     all_products: opts.all_products
   });
-  if (!active_meters.includes(opts.meter_product.id)) {
+  if (!active_meters[opts.meter_product.id]) {
     throw new import_error.ExternalStripeError("subscription_not_active", "You must be subscribed to use this metered feature.", { uid: opts.uid, stripe_customer_id: opts.stripe_customer_id, meter_product: opts.meter_product.id });
   }
 }
@@ -118,7 +118,7 @@ function resolve_meter_payload_keys(product) {
   });
   return { customer_key, value_key };
 }
-async function record_meter_usage(client, all_products, opts) {
+async function record_meter_usage(client, server, all_products, opts) {
   (0, import_utils.public_assert)((0, import_utils.is_non_empty_string)(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
   (0, import_utils.assert)(opts.product.type === "meter", "invalid_argument", "Property 'product' must be a meter product.", {
     product_type: opts.product.type
@@ -159,8 +159,8 @@ async function record_meter_usage(client, all_products, opts) {
   if (opts.timestamp) {
     validate_meter_event_timestamp(now, opts.timestamp);
   }
-  const stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, opts.uid);
-  await assert_customer_entitled_for_meter_price(client, {
+  const stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, server, opts.uid);
+  await assert_customer_entitled_for_meter_price(client, server, {
     uid: opts.uid,
     meter_product: opts.product,
     stripe_customer_id,
@@ -195,15 +195,15 @@ async function record_meter_usage(client, all_products, opts) {
     timestamp: meter_event.timestamp
   };
 }
-async function cancel_meter_usage_event(client, all_products, opts) {
+async function cancel_meter_usage_event(client, server, all_products, opts) {
   (0, import_utils.public_assert)(opts.product.type === "meter", "invalid_argument", "Property 'product' must be a meter product.", {
     product_type: opts.product.type
   });
   (0, import_utils.public_assert)((0, import_utils.is_non_empty_string)(opts.uid), "invalid_argument", "Property 'uid' must be a non-empty string.");
   (0, import_utils.public_assert)((0, import_utils.is_non_empty_string)(opts.meter_event_identifier), "invalid_argument", "Property 'identifier' must be a non-empty string.");
   validate_meter_event_identifier(opts.meter_event_identifier);
-  const stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, opts.uid);
-  await assert_customer_entitled_for_meter_price(client, {
+  const stripe_customer_id = await (0, import_customers.ensure_stripe_customer)(client, server, opts.uid);
+  await assert_customer_entitled_for_meter_price(client, server, {
     uid: opts.uid,
     meter_product: opts.product,
     stripe_customer_id,

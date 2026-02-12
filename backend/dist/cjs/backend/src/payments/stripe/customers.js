@@ -28,14 +28,13 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var stdin_exports = {};
 __export(stdin_exports, {
   delete_stripe_customer: () => delete_stripe_customer,
-  ensure_stripe_customer: () => ensure_stripe_customer,
-  find_stripe_customer_id: () => find_stripe_customer_id,
-  retrieve_active_customer: () => retrieve_active_customer
+  ensure_stripe_customer: () => ensure_stripe_customer
 });
 module.exports = __toCommonJS(stdin_exports);
 var vlib = __toESM(require("@vandenberghinc/vlib"));
 var import_error = require("./error.js");
 var import_utils = require("./utils.js");
+var import_collection = require("../../database/collection.js");
 const stripe_customer_cache = new vlib.Cache({
   max_size: 1e5,
   ttl: {
@@ -56,6 +55,23 @@ function assert_uid(uid) {
     throw new import_error.InternalStripeError("invalid_uid", "uid contains control characters.", {});
   }
 }
+function create_customer_db(server) {
+  return server.db.collection({
+    name: "Volt.Stripe.Customers",
+    indexes: [
+      {
+        keys: { customer_id: 1 },
+        unique: true
+      },
+      {
+        keys: { uid: 1 },
+        unique: true
+      }
+    ],
+    // Ensure its not unique so we retrieve the cached collection if already created.
+    unique: false
+  });
+}
 async function find_stripe_customer_id(client, uid) {
   assert_uid(uid);
   const escaped_uid = escape_stripe_search_value(uid);
@@ -70,53 +86,79 @@ async function find_stripe_customer_id(client, uid) {
   }
   return customer.id;
 }
-async function ensure_stripe_customer(client, uid) {
+async function ensure_stripe_customer(client, server, uid) {
   assert_uid(uid);
   const cached_customer_id = stripe_customer_cache.get(uid);
   if (cached_customer_id) {
     return cached_customer_id;
   }
-  const existing_customer_id = await find_stripe_customer_id(client, uid);
-  if (existing_customer_id) {
-    stripe_customer_cache.set(uid, existing_customer_id);
-    return existing_customer_id;
-  }
-  const created_customer = await (0, import_utils.stripe_api_call)(() => client.customers.create({
-    metadata: {
-      [stripe_customer_uid_metadata_key]: uid
+  const db = create_customer_db(server);
+  let customer_id;
+  const record = await db.load({ uid }, {
+    throw: false,
+    projection: { customer_id: 1 },
+    retry: 3
+  });
+  if (!(record instanceof Error)) {
+    customer_id = record.customer_id;
+  } else if (record instanceof import_collection.Collection.NotFoundError) {
+    const existing_customer_id = await find_stripe_customer_id(client, uid);
+    if (existing_customer_id) {
+      customer_id = existing_customer_id;
+    } else {
+      const created_customer = await (0, import_utils.stripe_api_call)(() => client.customers.create({
+        metadata: {
+          [stripe_customer_uid_metadata_key]: uid
+        }
+      }, {
+        // Prevent duplicates across concurrent calls / processes.
+        idempotencyKey: (0, import_utils.stable_idempotency_key)(`customer_create_uid:${uid}`)
+      }), { uid, metadata_key: stripe_customer_uid_metadata_key });
+      customer_id = created_customer.id;
     }
-  }, {
-    // Prevent duplicates across concurrent calls / processes.
-    idempotencyKey: (0, import_utils.stable_idempotency_key)(`customer_create_uid:${uid}`)
-  }), { uid, metadata_key: stripe_customer_uid_metadata_key });
-  const created_customer_id = created_customer.id;
-  stripe_customer_cache.set(uid, created_customer_id);
-  return created_customer_id;
+    await db.set({ uid }, { customer_id }, {
+      upsert: true,
+      retry: 3
+    });
+    const final_record = await db.load({ uid }, {
+      throw: false,
+      projection: { customer_id: 1 },
+      retry: 3
+    });
+    if (final_record instanceof Error) {
+      throw new import_error.InternalStripeError("customer_not_found", "Failed to load Stripe customer from database after creation.", { uid, cause: final_record });
+    }
+    customer_id = final_record.customer_id;
+  } else {
+    throw new import_error.InternalStripeError("customer_not_found", "Failed to load Stripe customer from database.", { uid, cause: record });
+  }
+  stripe_customer_cache.set(uid, customer_id);
+  return customer_id;
 }
-async function delete_stripe_customer(client, uid) {
+async function delete_stripe_customer(client, server, uid) {
   assert_uid(uid);
-  const cached_customer_id = stripe_customer_cache.get(uid);
-  const customer_id = cached_customer_id ?? await find_stripe_customer_id(client, uid);
   stripe_customer_cache.delete(uid);
-  if (!customer_id) {
+  const db = create_customer_db(server);
+  const record = await db.load({ uid }, {
+    throw: false,
+    projection: { customer_id: 1 }
+  });
+  if (record instanceof import_collection.Collection.NotFoundError) {
+    return;
+  } else if (record instanceof Error) {
+    throw new import_error.InternalStripeError("customer_not_found", "Failed to load Stripe customer from database.", { uid, cause: record });
+  }
+  if (!record.customer_id) {
     return;
   }
-  const deleted_customer = await (0, import_utils.stripe_api_call)(() => client.customers.del(customer_id), { uid, customer_id });
+  const deleted_customer = await (0, import_utils.stripe_api_call)(() => client.customers.del(record.customer_id), { uid, customer_id: record.customer_id });
   if (deleted_customer.deleted !== true) {
-    throw new import_error.InternalStripeError("customer_delete_error", "Stripe customer delete did not return a deleted confirmation.", { uid, customer_id });
+    throw new import_error.InternalStripeError("customer_delete_error", "Stripe customer delete did not return a deleted confirmation.", { uid, customer_id: record.customer_id });
   }
-}
-async function retrieve_active_customer(client, stripe_customer_id, context) {
-  const customer = await (0, import_utils.stripe_api_call)(() => client.customers.retrieve(stripe_customer_id), { ...context, operation: "customers.retrieve", stripe_customer_id });
-  if ("deleted" in customer && customer.deleted === true) {
-    throw new import_error.InternalStripeError("customer_not_found", "Stripe customer was deleted.", { ...context, stripe_customer_id });
-  }
-  return customer;
+  await db.delete({ uid });
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   delete_stripe_customer,
-  ensure_stripe_customer,
-  find_stripe_customer_id,
-  retrieve_active_customer
+  ensure_stripe_customer
 });

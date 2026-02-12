@@ -3,7 +3,7 @@
  * @copyright © 2026 - 2026 Daan van den Bergh. All rights reserved
  */
 import StripeClient from "stripe";
-import { delete_stripe_customer, ensure_stripe_customer, find_stripe_customer_id } from "./customers.js";
+import { delete_stripe_customer, ensure_stripe_customer } from "./customers.js";
 import { initialize_products } from "./products.js";
 import { assert } from "./utils.js";
 import { cancel_user_subscription, delete_subscription_caches, is_user_subscribed_to, list_subscribed_meters, list_subscribed_plans } from "./subscriptions.js";
@@ -110,11 +110,13 @@ export class Stripe {
                 const subs = await this.get_active_subscriptions({
                     uid: stream.uid,
                 });
-                const active_subs = subs.map((plan_id) => {
+                const active_subs = [];
+                for (const plan_id of Object.keys(subs)) {
                     const plan = this.get_subscription_plan(plan_id);
                     const product = this.get_subscription_product_by_plan(plan);
-                    return { product, plan, };
-                });
+                    active_subs.push({ product, plan, });
+                }
+                ;
                 return stream.send({
                     status: 200,
                     data: {
@@ -133,10 +135,14 @@ export class Stripe {
                 const active = await this.get_active_meters({
                     uid: stream.uid,
                 });
+                const meters = [];
+                for (const product_id of Object.keys(active)) {
+                    meters.push(this.get_meter_product(product_id));
+                }
                 return stream.send({
                     status: 200,
                     data: {
-                        meters: active.map(id => this.get_meter_product(id)),
+                        meters,
                     }
                 });
             },
@@ -257,16 +263,8 @@ export class Stripe {
      * A callback to delete a user from the payments provider when the user is deleted from our system.
      */
     async delete_user(uid) {
-        await delete_stripe_customer(this.client, uid);
+        await delete_stripe_customer(this.client, this.server, uid);
         delete_subscription_caches(uid);
-    }
-    /**
-     * Get the stripe customer id for a given user id (uid).
-     * @returns The stripe customer id, or `undefined` if no customer exists for the uid.
-     */
-    async get_stripe_customer_id(uid) {
-        const customer_id = await find_stripe_customer_id(this.client, uid);
-        return customer_id ?? undefined;
     }
     /**
      * Get the stripe customer id for a given user id (uid), if a customer does
@@ -274,7 +272,7 @@ export class Stripe {
      * @returns The stripe customer id.
      */
     async ensure_stripe_customer(uid) {
-        return await ensure_stripe_customer(this.client, uid);
+        return await ensure_stripe_customer(this.client, this.server, uid);
     }
     // -------------------------------------------------------------------------
     // Products API.
@@ -375,13 +373,32 @@ export class Stripe {
      * @returns `true` if the user has an active subscription to the plan or subscription product, `false` otherwise.
      */
     async is_subscribed(opts) {
-        return await is_user_subscribed_to(this.client, {
+        let plan;
+        if (typeof opts.plan === "string") {
+            for (const product of this.products) {
+                if (product.type === "subscription") {
+                    const found_plan = product.plans.find((p) => p.id === opts.plan);
+                    if (found_plan) {
+                        plan = found_plan;
+                        break;
+                    }
+                }
+                else if (product.type === "meter" && product.id === opts.plan) {
+                    plan = product;
+                    break;
+                }
+            }
+        }
+        else {
+            plan = opts.plan;
+        }
+        assert(plan, "invalid_argument", `Subscription plan or meter with id '${typeof opts.plan === "string" ? opts.plan : opts.plan.id}' not found.`, { plan_id: typeof opts.plan === "string" ? opts.plan : opts.plan.id });
+        return await is_user_subscribed_to(this.client, this.server, {
             uid: opts.uid,
-            plan: typeof opts.plan === "string"
-                ? this.get_subscription_or_plan(opts.plan)
-                : opts.plan,
+            plan,
             customer_id: undefined,
             all_products: this.products,
+            status: opts.status,
         });
     }
     /**
@@ -392,10 +409,11 @@ export class Stripe {
      * @returns An array of active subscription plan id's the user is subscribed to.
      */
     async get_active_subscriptions(opts) {
-        return await list_subscribed_plans(this.client, {
+        return await list_subscribed_plans(this.client, this.server, {
             uid: opts.uid,
             customer_id: undefined,
             all_products: this.products,
+            status: opts.status,
         });
     }
     /**
@@ -408,10 +426,11 @@ export class Stripe {
      * @returns An array of active subscription plan id's the user is subscribed to.
      */
     async get_active_meters(opts) {
-        return await list_subscribed_meters(this.client, {
+        return await list_subscribed_meters(this.client, this.server, {
             uid: opts.uid,
             stripe_customer_id: undefined,
             all_products: this.products,
+            status: opts.status,
         });
     }
     /**
@@ -421,7 +440,7 @@ export class Stripe {
      *          However, during checkout its not allowed to checkout multiple subscription plans, therefore this should not be an issue.
      */
     async cancel_subscription(opts) {
-        await cancel_user_subscription(this.client, {
+        await cancel_user_subscription(this.client, this.server, {
             uid: opts.uid,
             plan: opts.plan,
             customer_id: undefined,
@@ -434,12 +453,12 @@ export class Stripe {
      * Record usage for a meter product.
      */
     async record_meter_usage(opts) {
-        return await record_meter_usage(this.client, this.products, opts);
+        return await record_meter_usage(this.client, this.server, this.products, opts);
     }
     /**
      * Cancel a previously recorded meter usage event by its identifier (best-effort within 24 hours).
      */
     async cancel_meter_usage_event(opts) {
-        return await cancel_meter_usage_event(this.client, this.products, opts);
+        return await cancel_meter_usage_event(this.client, this.server, this.products, opts);
     }
 }
