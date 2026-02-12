@@ -1,7 +1,7 @@
 {
     "author": "Daan van den Bergh",
     "name": "@vandenberghinc/volt",
-    "version": "1.1.160",
+    "version": "1.2.0",
     "description": "",
     "type": "module",
     "types": "./backend/dist/esm/index.d.ts",
