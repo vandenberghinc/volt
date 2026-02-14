@@ -71,7 +71,7 @@ export declare class TableElement extends VElementTagMap.div {
     table_body: TableBodyElement;
     constructor({ rows, columns, show_columns, }: {
         rows?: AppendType[][];
-        columns: AppendType[] | boolean;
+        columns?: AppendType[];
         show_columns?: boolean;
     });
     iterate(callback: any): this;
@@ -89,7 +89,7 @@ export declare class TableElement extends VElementTagMap.div {
 }
 export declare const Table: <Extensions extends object = {}>(args_0: {
     rows?: AppendType[][];
-    columns: AppendType[] | boolean;
+    columns?: AppendType[];
     show_columns?: boolean;
 }) => TableElement & Extensions;
 export declare const NullTable: <Extensions extends object = {}>() => TableElement & Extensions;

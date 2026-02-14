@@ -1,7 +1,7 @@
 {
     "author": "Daan van den Bergh",
     "name": "@vandenberghinc/volt",
-    "version": "1.2.0",
+    "version": "1.2.13",
     "description": "",
     "type": "module",
     "types": "./backend/dist/esm/index.d.ts",
@@ -16,14 +16,22 @@
             "import": "./frontend/dist/frontend/src/index.js"
         }
     },
+    "files": [
+        "frontend/assets/**",
+        "frontend/css/**",
+        "frontend/dist/**",
+        "backend/dist/**",
+        "package.json",
+        "README.md",
+        "LICENSE"
+    ],
     "scripts": {
         "link": "vrepo --npm --link --dependencies ../vlib/ts/,../vhighlight/",
         "unlink": "vrepo --npm --unlink",
-        "publish": "vrepo --npm --unlink && vrepo --npm --push",
         "build": "npm run build:backend --silent && npm run build:backend:cjs --silent && npm run build:frontend --silent",
         "build:backend": "tsc -p backend/tsconfig.json",
         "build:backend:cjs": "vts --transform-esm --debug 1 --src backend/dist/esm/ --dest backend/dist/cjs/ --override --platform node --target es2023",
-        "build:frontend": "tsc -p frontend/tsconfig.json && rsync -az --delete frontend/src/css/ frontend/dist/frontend/src/css/",
+        "build:frontend": "tsc -p frontend/tsconfig.json",
         "start": "node start.js",
         "check-circular-dependencies": "npx madge --circular frontend/src/"
     },
@@ -36,7 +44,7 @@
     },
     "dependencies": {
         "@vandenberghinc/vhighlight": "^1.3.17",
-        "@vandenberghinc/vlib": "^1.6.42",
+        "@vandenberghinc/vlib": "^1.6.47",
         "blob-stream": "^0.1.3",
         "clean-css": "^5.3.3",
         "esbuild": "^0.25.12",

@@ -178,15 +178,12 @@ export class TableElement extends VElementTagMap.div {
 	
 	// Constructor.
 	constructor({
-		rows = [
-			["a", "b"],
-			["c", "d"],
-		],
-		columns = ["Column 1", "Column 2"],
+		rows = [],
+		columns = [],
 		show_columns = true,
 	}: {
         rows?: AppendType[][],
-        columns: AppendType[] | boolean,
+        columns?: AppendType[],
 		show_columns?: boolean,
 	}) {
 		
@@ -197,10 +194,10 @@ export class TableElement extends VElementTagMap.div {
 
 		// Attributes.
 		this.table_rows = [];
-		this.show_columns = show_columns === true && columns !== false;
+		this.show_columns = show_columns === true && columns.length > 0;
 	
 		// Append content.
-		this.create({rows, columns: columns === false ? [] : columns as string[]});
+		this.create({rows, columns});
 		this.overflow("hidden") // without overflow hidden when border radius is set on the element the background of rows can overflow.
 	}
 

@@ -30,7 +30,7 @@ export namespace User {
      */
     export function uid(): string | undefined {
         const uid = Cookies.get("UserID");
-        return typeof uid !== "string" || uid == "-1" ? undefined : uid;
+        return typeof uid !== "string" || uid == "-1" || uid === "" ? undefined : uid;
     }
 
     /**
@@ -100,7 +100,8 @@ export namespace User {
      * @docs
      */
     export function is_activated(): boolean {
-        return Cookies.get("UserActivated") as string === "true";
+        const activated = Cookies.get("UserActivated");
+        return activated === "true" || activated === "1";
     }
 
     /**

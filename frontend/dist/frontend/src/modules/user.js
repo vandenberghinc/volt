@@ -17,7 +17,7 @@ export var User;
      */
     function uid() {
         const uid = Cookies.get("UserID");
-        return typeof uid !== "string" || uid == "-1" ? undefined : uid;
+        return typeof uid !== "string" || uid == "-1" || uid === "" ? undefined : uid;
     }
     User.uid = uid;
     /**
@@ -87,7 +87,8 @@ export var User;
      * @docs
      */
     function is_activated() {
-        return Cookies.get("UserActivated") === "true";
+        const activated = Cookies.get("UserActivated");
+        return activated === "true" || activated === "1";
     }
     User.is_activated = is_activated;
     /**

@@ -873,6 +873,7 @@ async function list_all_stripe_products(client: Stripe): Promise<Stripe.Product[
                 client.products.list({
                     limit: stripe_list_page_size,
                     starting_after,
+                    expand: ["data.default_price"],
                 }),
             { operation: "products.list_all", starting_after },
         );
@@ -1104,7 +1105,7 @@ async function create_stripe_product(
     server: Server,
     product: Product,
 ): Promise<Stripe.Product> {
-    server.log(0, `Creating Stripe product for product '${product.id}'`);
+    server.log(1, `Creating Stripe product for product '${product.id}'`);
 
     return await stripe_api_call(
         () =>
@@ -1117,6 +1118,7 @@ async function create_stripe_product(
                     metadata: {
                         [app_product_id_metadata_key]: product.id,
                     },
+                    expand: ["default_price"],
                 },
                 { idempotencyKey: generate_random_idempotency_key(`create_product_${product.id}`) },
             ),
@@ -1152,7 +1154,7 @@ async function update_stripe_product_if_needed(
         return stripe_product;
     }
 
-    server.log(0, `Updating Stripe product '${stripe_product.id}' to match app product '${product.id}'`);
+    server.log(1, `Updating Stripe product '${stripe_product.id}' to match app product '${product.id}'`);
 
     return await stripe_api_call(
         () =>
@@ -1163,6 +1165,7 @@ async function update_stripe_product_if_needed(
                     description: product.description,
                     tax_code: product.tax_code,
                     images: product.images,
+                    expand: ["default_price"],
                 },
                 { idempotencyKey: generate_random_idempotency_key(`update_product_${product.id}_${stripe_product.id}`) },
             ),
@@ -1178,13 +1181,39 @@ async function update_stripe_product_default_price_if_needed(
     server: Server,
     stripe_product: Stripe.Product,
     default_price: Stripe.Price,
+    other_plans_from_parent_subscription?: InitializedSubscriptionPlan[],
 ): Promise<void> {
-    if (stripe_product.default_price === default_price.id) {
+
+    // Extract default price.
+    let default_price_id: string | null = null;
+    if (typeof stripe_product.default_price === "string") {
+        default_price_id = stripe_product.default_price;
+    } else if (stripe_product.default_price && typeof stripe_product.default_price === "object") {
+        default_price_id = stripe_product.default_price.id;
+    }
+
+    // If its still undefined, fetch the product to get the default_price expanded (this should be rare since we expand it on list/create/update).
+    if (!default_price_id) {
+        const fetched = await stripe_api_call(
+            () =>
+                client.products.retrieve(stripe_product.id, {
+                    expand: ["default_price"],
+                }),
+            { operation: "products.retrieve_for_default_price", stripe_product_id: stripe_product.id },
+        );
+        default_price_id = typeof fetched.default_price === "string" ? fetched.default_price : fetched.default_price?.id ?? null;
+    }
+
+    // If the default price is already correct, do nothing.
+    if (
+        default_price_id === default_price.id
+        // For subscription products, the default_price may be shared across multiple plans, so we also check if any other plan from the same subscription is using the price. If so, we should not update the default_price since it would affect those plans as well.
+        || other_plans_from_parent_subscription?.some((plan) => plan.stripe_price_id === default_price_id)
+    ) {
         return;
     }
 
-    server.log(0, `Updating default price for Stripe product '${stripe_product.id}' to price '${default_price.id}'`);
-
+    server.log(1, `Updating default price for Stripe product '${stripe_product.id}' to price '${default_price.id}'`);
     await stripe_api_call(
         () =>
             client.products.update(
@@ -1216,7 +1245,7 @@ async function create_one_time_price(
         nickname: string;
     },
 ): Promise<Stripe.Price> {
-    server.log(0, `Creating stripe one-time price for product: ${opts.product_id}`);
+    server.log(1, `Creating stripe one-time price for product: ${opts.product_id}`);
 
     return await stripe_api_call(
         () =>
@@ -1307,7 +1336,7 @@ async function create_recurring_price(
         meter_id: opts.recurring_usage.usage_type === "metered" ? opts.recurring_usage.meter_id : undefined,
     });
 
-    server.log(0, `Creating stripe recurring price for product: ${opts.product_id}`);
+    server.log(1, `Creating stripe recurring price for product: ${opts.product_id}`);
     return await stripe_api_call(
         () =>
             client.prices.create(
@@ -1346,7 +1375,7 @@ async function create_stripe_meter(
     const customer_mapping_event_payload_key = product.customer_mapping_event_payload_key ?? "stripe_customer_id";
     const value_settings_event_payload_key = product.value_settings_event_payload_key ?? "value";
     
-    server.log(0, `Creating stripe billing meter for product: ${product.id}`);
+    server.log(1, `Creating stripe billing meter for product: ${product.id}`);
 
     return await stripe_api_call(
         () =>
@@ -1725,6 +1754,7 @@ async function initialize_product(
                 server,
                 stripe_product,
                 stripe_price,
+                initialized_plans,
             );
 
             initialized_plans.push({

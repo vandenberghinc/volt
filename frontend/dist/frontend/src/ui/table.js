@@ -285,19 +285,16 @@ let TableElement = (() => {
         table_head = NullTableHead();
         table_body = NullTableBody();
         // Constructor.
-        constructor({ rows = [
-            ["a", "b"],
-            ["c", "d"],
-        ], columns = ["Column 1", "Column 2"], show_columns = true, }) {
+        constructor({ rows = [], columns = [], show_columns = true, }) {
             // Initialize base class.
             super({
                 derived: TableElement,
             });
             // Attributes.
             this.table_rows = [];
-            this.show_columns = show_columns === true && columns !== false;
+            this.show_columns = show_columns === true && columns.length > 0;
             // Append content.
-            this.create({ rows, columns: columns === false ? [] : columns });
+            this.create({ rows, columns });
             this.overflow("hidden"); // without overflow hidden when border radius is set on the element the background of rows can overflow.
         }
         // Iterate the table data items.

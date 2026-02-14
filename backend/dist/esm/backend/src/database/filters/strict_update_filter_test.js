@@ -403,3 +403,13 @@ const ok_query = {
     },
 };
 export {};
+// ============================================================================
+// $set + $concatArray
+// const u: StrictUpdateFilter<TestSchema> = {
+//     $set: {
+//         items: { $concatArrays: [
+//             { $ifNull: ["$items", []] },
+//             [{ id: "x", quantity: 1 }]]
+//         }
+//     }
+// };

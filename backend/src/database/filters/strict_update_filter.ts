@@ -68,12 +68,16 @@ type Exact<T, Shape = T> = T extends Shape ?
 // Strict Update Filter.
 // ==================================================================
 
+// ------------------------------------------------------------------
+
 /**
  * Strict set/update fields
  */
 type SetFields<TSchema> = Exact<{
     [K in Paths<TSchema>]?: PathValue<TSchema, K>;
 }>;
+
+// -----------------------------------------------------------------
 
 /**
  * Strict numeric fields for math operations
@@ -142,6 +146,8 @@ type ArrayPullAllFields<TSchema> = Exact<{
 type BitFields<TSchema> = Exact<{
     [K in Paths<TSchema> as PathValue<TSchema, K> extends number | undefined ? K : never]?: BitwiseOperators;
 }>;
+
+// -------------------------------
 
 /**
  * Strict version of MongoDB UpdateFilter that only allows updating existing fields

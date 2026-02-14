@@ -492,6 +492,314 @@ export class Collection {
     _is_operator_update_or_pipeline(operation) {
         return Array.isArray(operation) || (operation && typeof operation === "object" && Object.keys(operation).some(k => k[0] === "$"));
     }
+    _index_key_signature(keys) {
+        // Preserve order (Mongo treats order as significant for compound indexes)
+        return Object.entries(keys).map(([k, v]) => `${k}:${v}`).join("|");
+    }
+    _keys_equal(a, b) {
+        const aEnt = Object.entries(a);
+        const bEnt = Object.entries(b);
+        if (aEnt.length !== bEnt.length)
+            return false;
+        for (let i = 0; i < aEnt.length; i++) {
+            const [ak, av] = aEnt[i];
+            const [bk, bv] = bEnt[i];
+            if (ak !== bk || av !== bv)
+                return false;
+        }
+        return true;
+    }
+    _normalize_index_opts(opts) {
+        // ---- Normalize inputs ----
+        let key;
+        let keys;
+        let options;
+        let unique;
+        let sparse;
+        let forced = false;
+        if (typeof opts === "string") {
+            key = opts;
+            unique = undefined;
+            sparse = undefined;
+        }
+        else {
+            ({ key, keys, forced = false } = opts);
+            const user_options = opts.options;
+            options = user_options ? { ...user_options } : undefined;
+            // Conflict guard between `unique` and `options.unique`
+            if (opts.unique != null && options?.unique != null && opts.unique !== options.unique) {
+                throw new InvalidUsageError({
+                    message: `Encountered different values for attribute 'unique': ${opts.unique} and 'options.unique': ${options.unique}.`,
+                    reason: "invalid_unique_option",
+                });
+            }
+            unique = opts.unique ?? options?.unique;
+            // Conflict guard between `sparse` and `options.sparse`
+            if (opts.sparse != null && options?.sparse != null && opts.sparse !== options.sparse) {
+                throw new InvalidUsageError({
+                    message: `Encountered different values for attribute 'sparse': ${opts.sparse} and 'options.sparse': ${options.sparse}.`,
+                    reason: "invalid_sparse_option",
+                });
+            }
+            sparse = opts.sparse ?? options?.sparse;
+        }
+        // Ensure `unique`/`sparse` are reflected in `options`
+        if (unique != null) {
+            options = options || {};
+            options.unique = unique;
+        }
+        if (sparse != null) {
+            options = options || {};
+            options.sparse = sparse;
+        }
+        // ---- Build keys object (same rules everywhere) ----
+        let keys_obj;
+        if (key) {
+            keys_obj = { [key]: 1 };
+        }
+        else if (Array.isArray(keys) && keys.length > 0) {
+            keys_obj = {};
+            for (const k of keys)
+                keys_obj[k] = 1;
+        }
+        else if (keys != null && typeof keys === "object") {
+            keys_obj = keys;
+        }
+        else {
+            throw new InvalidUsageError({
+                message: "Define one of the following parameters: [key, keys].",
+                reason: "invalid_index_definition",
+            });
+        }
+        return { keys_obj, options, forced };
+    }
+    /**
+     * Drop all indexes that are NOT part of this._init_indexes, excluding _id_ (and TTL index if enabled).
+     *
+     * @note We match by key pattern rather than name because names can differ.
+     */
+    async _drop_non_init_indexes() {
+        this.assert_not_transaction_based();
+        this.assert_init();
+        const existing = await this._col.listIndexes().toArray();
+        // Desired signatures (same parsing as create_index)
+        const desired = new Set();
+        for (const item of (this._init_indexes ?? [])) {
+            const { keys_obj } = this._normalize_index_opts(item);
+            desired.add(this._index_key_signature(keys_obj));
+        }
+        // Always keep _id_
+        const protected_names = new Set(["_id_"]);
+        // Keep TTL index if TTL is enabled (managed by _setup_ttl)
+        const keep_ttl = this.ttl_enabled;
+        const ttl_sig = this._index_key_signature({ __ttl_timestamp: 1 });
+        for (const ix of existing) {
+            const name = ix?.name;
+            if (!name)
+                continue;
+            if (protected_names.has(name))
+                continue;
+            const keyObj = ix.key;
+            if (!keyObj)
+                continue;
+            const sig = this._index_key_signature(keyObj);
+            if (desired.has(sig))
+                continue;
+            if (keep_ttl && sig === ttl_sig)
+                continue;
+            try {
+                this.db.server.log(3, `Dropping stale index "${name}" on collection: ${this.name}`);
+                await this._col.dropIndex(name);
+            }
+            catch (err) {
+                if (err?.codeName !== "IndexNotFound")
+                    throw err;
+            }
+        }
+    }
+    /**
+     * Creates indexes on collections.
+     *
+     * @note When transaction mode is enabled, the session option will not be used.
+     *
+     * @param opts The index create options.
+     */
+    async _create_index(opts) {
+        this.assert_not_transaction_based();
+        if (!this.initialized) {
+            await this.init();
+        }
+        this.assert_init();
+        const { keys_obj, options, forced } = this._normalize_index_opts(opts);
+        const drop_index = async () => {
+            const existing = await this._col.listIndexes().toArray();
+            const match = existing.find(ix => {
+                const ix_key = ix?.key;
+                if (!ix_key)
+                    return false;
+                return this._keys_equal(ix_key, keys_obj);
+            });
+            if (match?.name) {
+                try {
+                    await this._col.dropIndex(match.name);
+                }
+                catch (err) {
+                    if (err?.codeName !== "IndexNotFound")
+                        throw err;
+                }
+                return;
+            }
+            // fallback: name provided in options
+            if (options?.name) {
+                try {
+                    await this._col.dropIndex(options.name);
+                }
+                catch (err) {
+                    if (err?.codeName !== "IndexNotFound")
+                        throw err;
+                }
+                return;
+            }
+            // last resort synthesized (may not match Mongo’s generated name for compound cases)
+            const synthesized = Object.entries(keys_obj).map(([k, v]) => `${k}_${v}`).join("_");
+            try {
+                await this._col.dropIndex(synthesized);
+            }
+            catch (err) {
+                if (err?.codeName !== "IndexNotFound")
+                    throw err;
+            }
+        };
+        try {
+            try {
+                return await this._col.createIndex(keys_obj, options);
+            }
+            catch (err) {
+                if (forced && err && typeof err === "object" && err.codeName === "IndexKeySpecsConflict") {
+                    await drop_index();
+                    return await this._col.createIndex(keys_obj, options);
+                }
+                throw err;
+            }
+        }
+        catch (err) {
+            throw new Error(`Failed to create index on collection "${this.name}": ${err}`, { cause: err });
+        }
+    }
+    // async create_index(opts: string | Collection.IndexOpts): Promise<string> {
+    //     // Not supported on transaction-based collections.
+    //     this.assert_not_transaction_based();
+    //     // Ensure initialized
+    //     if (!this.initialized) { await this.init(); } this.assert_init();
+    //     // ---- Normalize inputs ----
+    //     let key: string | undefined;
+    //     let keys: string[] | Record<string, number> | undefined;
+    //     let options: mongodb.CreateIndexesOptions | undefined;
+    //     let unique: boolean | undefined;
+    //     let sparse: boolean | undefined;
+    //     let forced = false;
+    //     if (typeof opts === "string") {
+    //         key = opts;
+    //         unique = undefined;
+    //         sparse = undefined;
+    //     } else {
+    //         ({ key, keys, forced = false } = opts);
+    //         const options = opts.options as unknown as undefined | mongodb.CreateIndexesOptions;
+    //         // Conflict guard between `unique` and `options.unique`
+    //         if (opts.unique != null && options?.unique != null && opts.unique !== options.unique) {
+    //             throw new InvalidUsageError({
+    //                 message: `Encountered different values for attribute 'unique': ${opts.unique} and 'options.unique': ${options.unique}.`,
+    //                 reason: "invalid_unique_option",
+    //             });
+    //         }
+    //         unique = opts.unique ?? options?.unique;
+    //         // Conflict guard between `sparse` and `options.sparse`
+    //         if (opts.sparse != null && options?.sparse != null && opts.sparse !== options.sparse) {
+    //             throw new InvalidUsageError({
+    //                 message: `Encountered different values for attribute 'sparse': ${opts.sparse} and 'options.sparse': ${options.sparse}.`,
+    //                 reason: "invalid_sparse_option",
+    //             });
+    //         }
+    //         sparse = opts.sparse ?? options?.sparse;
+    //     }
+    //     // Ensure `unique` in options when provided
+    //     if (unique) {
+    //         options = options || {};
+    //         options.unique = unique;
+    //     }
+    //     // Ensure `sparse` in options when provided
+    //     if (sparse) {
+    //         options = options || {};
+    //         options.sparse = sparse;
+    //     }
+    //     // Build keys object
+    //     let keys_obj: Record<string, number>;
+    //     if (key) {
+    //         keys_obj = { [key]: 1 };
+    //     } else if (Array.isArray(keys) && keys.length > 0) {
+    //         keys_obj = {};
+    //         for (const k of keys) keys_obj[k] = 1;
+    //     } else if (keys != null && typeof keys === "object") {
+    //         keys_obj = keys as Record<string, number>;
+    //     } else {
+    //         throw new InvalidUsageError({
+    //             message: "Define one of the following parameters: [key, keys].",
+    //             reason: "invalid_index_definition",
+    //         });
+    //     }
+    //     const drop_index = async () => {
+    //         try {
+    //             const existing = await this._col.listIndexes().toArray();
+    //             const match = existing.find(ix => {
+    //                 const ix_key = ix?.key as Record<string, number> | undefined;
+    //                 if (!ix_key) return false;
+    //                 const a = Object.entries(ix_key);
+    //                 const b = Object.entries(keys_obj);
+    //                 if (a.length !== b.length) return false;
+    //                 // exact key-value equality (order-insensitive)
+    //                 const as = new Map(a);
+    //                 for (const [kk, vv] of b) {
+    //                     if (as.get(kk) !== vv) return false;
+    //                 }
+    //                 return true;
+    //             });
+    //             // Prefer matched key's real name
+    //             if (match?.name) {
+    //                 try { await this._col.dropIndex(match.name); }
+    //                 catch (err: any) { if (err?.codeName !== "IndexNotFound") throw err; }
+    //             } else if (options?.name) {
+    //                 try { await this._col.dropIndex(options.name); }
+    //                 catch (err: any) { if (err?.codeName !== "IndexNotFound") throw err; }
+    //             } else {
+    //                 // last-resort synthesized name (simple cases)
+    //                 const synthesized = Object.entries(keys_obj).map(([k, v]) => `${k}_${v}`).join("_");
+    //                 try { await this._col.dropIndex(synthesized); }
+    //                 catch (err: any) { if (err?.codeName !== "IndexNotFound") throw err; }
+    //             }
+    //         } catch (err) {
+    //             // If listIndexes itself fails for some reason, do not hide the error
+    //             throw new Error(`Failed to create index on collection "${this.name}": ${err}`, { cause: err });
+    //         }
+    //     }
+    //     try {
+    //         // Create (or re-create)
+    //         try {
+    //             return await this._col.createIndex(keys_obj, options);
+    //         }
+    //         // Retry once on IndexKeySpecsConflict when forced=true
+    //         catch (err) {
+    //             if (forced && err && typeof err === "object" && (
+    //                 (err as any).codeName === "IndexKeySpecsConflict"
+    //             )) {
+    //                 await drop_index();
+    //                 return await this._col.createIndex(keys_obj, options);
+    //             }
+    //             throw err;
+    //         }
+    //     } catch (err) {
+    //         throw new Error(`Failed to create index on collection "${this.name}": ${err}`, { cause: err });
+    //     }
+    // }
     // -------------------------------------------------------------------
     // Public methods.
     // -------------------------------------------------------------------
@@ -567,11 +875,13 @@ export class Collection {
                     this.db.server.log(3, "Setting up TTL index for collection: " + this.name);
                     await this._setup_ttl();
                 }
+                // Drop indexes that are not in this._init_indexes (keep _id_ + TTL).
+                await this._drop_non_init_indexes();
                 // Create indexes.
                 if (this._init_indexes?.length) {
                     for (const item of this._init_indexes) {
                         this.db.server.log(3, "Creating index " + JSON.stringify(item) + " on collection: " + this.name);
-                        await this.create_index(item);
+                        await this._create_index(item);
                     }
                 }
             }
@@ -685,157 +995,6 @@ export class Collection {
         this.assert_not_transaction_based();
         // No need to pass session obj here.
         return (await this._col.listIndexes().toArray()).some(x => x.name === index);
-    }
-    /**
-     * Creates indexes on collections.
-     *
-     * @note When transaction mode is enabled, the session option will not be used.
-     *
-     * @param opts The index create options.
-     *
-     * @docs
-     */
-    async create_index(opts) {
-        // Not supported on transaction-based collections.
-        this.assert_not_transaction_based();
-        // Ensure initialized
-        if (!this.initialized) {
-            await this.init();
-        }
-        this.assert_init();
-        // ---- Normalize inputs ----
-        let key;
-        let keys;
-        let options;
-        let unique;
-        let sparse;
-        let forced = false;
-        if (typeof opts === "string") {
-            key = opts;
-            unique = undefined;
-            sparse = undefined;
-        }
-        else {
-            ({ key, keys, forced = false } = opts);
-            const options = opts.options;
-            // Conflict guard between `unique` and `options.unique`
-            if (opts.unique != null && options?.unique != null && opts.unique !== options.unique) {
-                throw new InvalidUsageError({
-                    message: `Encountered different values for attribute 'unique': ${opts.unique} and 'options.unique': ${options.unique}.`,
-                    reason: "invalid_unique_option",
-                });
-            }
-            unique = opts.unique ?? options?.unique;
-            // Conflict guard between `sparse` and `options.sparse`
-            if (opts.sparse != null && options?.sparse != null && opts.sparse !== options.sparse) {
-                throw new InvalidUsageError({
-                    message: `Encountered different values for attribute 'sparse': ${opts.sparse} and 'options.sparse': ${options.sparse}.`,
-                    reason: "invalid_sparse_option",
-                });
-            }
-            sparse = opts.sparse ?? options?.sparse;
-        }
-        // Ensure `unique` in options when provided
-        if (unique) {
-            options = options || {};
-            options.unique = unique;
-        }
-        // Ensure `sparse` in options when provided
-        if (sparse) {
-            options = options || {};
-            options.sparse = sparse;
-        }
-        // Build keys object
-        let keys_obj;
-        if (key) {
-            keys_obj = { [key]: 1 };
-        }
-        else if (Array.isArray(keys) && keys.length > 0) {
-            keys_obj = {};
-            for (const k of keys)
-                keys_obj[k] = 1;
-        }
-        else if (keys != null && typeof keys === "object") {
-            keys_obj = keys;
-        }
-        else {
-            throw new InvalidUsageError({
-                message: "Define one of the following parameters: [key, keys].",
-                reason: "invalid_index_definition",
-            });
-        }
-        const drop_index = async () => {
-            try {
-                const existing = await this._col.listIndexes().toArray();
-                const match = existing.find(ix => {
-                    const ix_key = ix?.key;
-                    if (!ix_key)
-                        return false;
-                    const a = Object.entries(ix_key);
-                    const b = Object.entries(keys_obj);
-                    if (a.length !== b.length)
-                        return false;
-                    // exact key-value equality (order-insensitive)
-                    const as = new Map(a);
-                    for (const [kk, vv] of b) {
-                        if (as.get(kk) !== vv)
-                            return false;
-                    }
-                    return true;
-                });
-                // Prefer matched key's real name
-                if (match?.name) {
-                    try {
-                        await this._col.dropIndex(match.name);
-                    }
-                    catch (err) {
-                        if (err?.codeName !== "IndexNotFound")
-                            throw err;
-                    }
-                }
-                else if (options?.name) {
-                    try {
-                        await this._col.dropIndex(options.name);
-                    }
-                    catch (err) {
-                        if (err?.codeName !== "IndexNotFound")
-                            throw err;
-                    }
-                }
-                else {
-                    // last-resort synthesized name (simple cases)
-                    const synthesized = Object.entries(keys_obj).map(([k, v]) => `${k}_${v}`).join("_");
-                    try {
-                        await this._col.dropIndex(synthesized);
-                    }
-                    catch (err) {
-                        if (err?.codeName !== "IndexNotFound")
-                            throw err;
-                    }
-                }
-            }
-            catch (err) {
-                // If listIndexes itself fails for some reason, do not hide the error
-                throw new Error(`Failed to create index on collection "${this.name}": ${err}`, { cause: err });
-            }
-        };
-        try {
-            // Create (or re-create)
-            try {
-                return await this._col.createIndex(keys_obj, options);
-            }
-            // Retry once on IndexKeySpecsConflict when forced=true
-            catch (err) {
-                if (forced && err && typeof err === "object" && (err.codeName === "IndexKeySpecsConflict")) {
-                    await drop_index();
-                    return await this._col.createIndex(keys_obj, options);
-                }
-                throw err;
-            }
-        }
-        catch (err) {
-            throw new Error(`Failed to create index on collection "${this.name}": ${err}`, { cause: err });
-        }
     }
     /**
      * Standalone helper: merge `source` into `target` for missing keys only.

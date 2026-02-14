@@ -159,6 +159,23 @@ export declare class Collection<Data extends mongodb.Document = mongodb.Document
       * - Plain object without '$' keys → NOT valid for updateOne/findOneAndUpdate.
       */
     private _is_operator_update_or_pipeline;
+    private _index_key_signature;
+    private _keys_equal;
+    private _normalize_index_opts;
+    /**
+     * Drop all indexes that are NOT part of this._init_indexes, excluding _id_ (and TTL index if enabled).
+     *
+     * @note We match by key pattern rather than name because names can differ.
+     */
+    private _drop_non_init_indexes;
+    /**
+     * Creates indexes on collections.
+     *
+     * @note When transaction mode is enabled, the session option will not be used.
+     *
+     * @param opts The index create options.
+     */
+    private _create_index;
     /**
      * Initialize the collection, creating indexes and setting up TTL if needed.
      * @returns The initialized collection instance.
@@ -215,16 +232,6 @@ export declare class Collection<Data extends mongodb.Document = mongodb.Document
      * @docs
      */
     has_index(index: string): Promise<boolean>;
-    /**
-     * Creates indexes on collections.
-     *
-     * @note When transaction mode is enabled, the session option will not be used.
-     *
-     * @param opts The index create options.
-     *
-     * @docs
-     */
-    create_index(opts: string | Collection.IndexOpts): Promise<string>;
     /**
      * Standalone helper: merge `source` into `target` for missing keys only.
      * Clones assigned nested objects/arrays/dates once (when `clone` is true).

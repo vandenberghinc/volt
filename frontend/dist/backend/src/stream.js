@@ -1477,31 +1477,115 @@ export class Stream {
     remove_headers(...names) {
         return this.remove_header(...names);
     }
-    // Set a cookie.
     /**
-     * Set a cookie that will be sent with the response.
+     * Set a cookie to be sent with the response.
      *
-     * @warning Will only be added to the response when the user uses `send()`, `success()` or `error()`.
-     * @param cookie The cookie string.
+     * Accepts either:
+     * 1) a pre-built cookie header string (used as-is, no validation), or
+     * 2) a structured object describing the cookie, from which a standards-compliant
+     *    cookie string will be generated.
+     *
+     * If a cookie with the same name already exists in the pending response list,
+     * it will be replaced.
+     *
+     * @warning Cookies are only included in the response when using `send()`,
+     *          `success()` or `error()`.
+     *
      * @example
      * ```ts
-     * stream.set_cookie("MyCookie=Hello World;");
+     * stream.set_cookie("sid=abc123; Path=/; SameSite=Lax; Secure; HttpOnly");
+     *
+     * stream.set_cookie({
+     *   name: "sid",
+     *   value: session_id,
+     *   http_only: true,
+     *   secure: true,
+     *   same_site: "Lax",
+     *   path: "/",
+     *   max_age: 60 * 60 * 24 * 14,
+     * });
      * ```
-     * @docs
      */
     set_cookie(cookie) {
-        cookie = cookie.trim();
-        const name_end = cookie.indexOf("=");
+        // If the user provided a raw cookie string, trust it and use it as-is.
+        if (typeof cookie === "string") {
+            const cookie_str = cookie.trim();
+            const name_end = cookie_str.indexOf("=");
+            if (name_end !== -1) {
+                const name = cookie_str.substring(0, name_end);
+                for (let i = 0; i < this.res_cookies.length; i++) {
+                    if (this.res_cookies[i].startsWith(name)) {
+                        this.res_cookies[i] = cookie_str;
+                        return this;
+                    }
+                }
+            }
+            this.res_cookies.push(cookie_str);
+            return this;
+        }
+        // Structured cookie path (commercial-grade, predictable, minimal validation)
+        const { name, value, path = "/", domain, max_age, expires, secure, http_only, same_site, prefix, extra, } = cookie;
+        if (!name || typeof name !== "string") {
+            throw new Error("set_cookie: cookie.name must be a non-empty string");
+        }
+        const full_name = `${prefix ?? ""}${name}`;
+        // Enforce prefix rules (light but correct)
+        if (prefix === "__Host-") {
+            if (domain) {
+                throw new Error("__Host- cookies must not include a domain attribute");
+            }
+            if (path !== "/") {
+                throw new Error("__Host- cookies must have path='/'");
+            }
+            if (!secure) {
+                throw new Error("__Host- cookies require secure=true");
+            }
+        }
+        if (prefix === "__Secure-" && !secure) {
+            throw new Error("__Secure- cookies require secure=true");
+        }
+        const encoded_value = value === null || typeof value === "undefined"
+            ? ""
+            : encodeURIComponent(String(value));
+        const parts = [];
+        parts.push(`${full_name}=${encoded_value}`);
+        if (path)
+            parts.push(`Path=${path}`);
+        if (domain)
+            parts.push(`Domain=${domain}`);
+        if (typeof max_age === "number" && Number.isFinite(max_age)) {
+            parts.push(`Max-Age=${Math.trunc(max_age)}`);
+        }
+        if (expires) {
+            const exp = expires instanceof Date ? expires.toUTCString() : String(expires).trim();
+            if (exp)
+                parts.push(`Expires=${exp}`);
+        }
+        if (secure)
+            parts.push("Secure");
+        if (http_only)
+            parts.push("HttpOnly");
+        if (same_site)
+            parts.push(`SameSite=${same_site}`);
+        if (extra && Array.isArray(extra)) {
+            for (const attr of extra) {
+                const trimmed = String(attr).trim();
+                if (trimmed)
+                    parts.push(trimmed);
+            }
+        }
+        const cookie_str = parts.join("; ");
+        const name_end = cookie_str.indexOf("=");
         if (name_end !== -1) {
-            const name = cookie.substr(0, name_end);
+            const existing_name = cookie_str.substring(0, name_end);
             for (let i = 0; i < this.res_cookies.length; i++) {
-                if (this.res_cookies[i].startsWith(name)) {
-                    this.res_cookies[i] = cookie;
+                if (this.res_cookies[i].startsWith(existing_name)) {
+                    this.res_cookies[i] = cookie_str;
                     return this;
                 }
             }
         }
-        this.res_cookies.push(cookie);
+        this.res_cookies.push(cookie_str);
         return this;
     }
     // Set cookies.

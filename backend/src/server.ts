@@ -39,6 +39,7 @@ import { Route } from "./route.js";
 import { EventCallback, EventName, Events } from './events.js';
 import { ExternalError } from './errors/internal_external.js';
 import { Stripe } from "./payments/stripe/stripe.js";
+import Frontend from './frontend.js';
 
 // import { ThreadMonitor } from "./plugins/thread_monitor.js";
 // const thread_monitor = new ThreadMonitor()
@@ -660,12 +661,8 @@ export class Server {
         this.statics_aspect_ratios = new Map();
 
         // Add the default static to statics.
-        const volt_assets_path = new vlib.Path(`${__dirname}/../../../../../frontend/src/assets/`);
-        if (!volt_assets_path.exists()) {
-            this.log.warning(`${vlib.Color.yellow_bold("Warning")}: Could not find volt assets directory at "${volt_assets_path.abs().str()}". Please create a GitHub issue to report this.`)
-        }
         this.statics.push({
-            path: volt_assets_path.str(),
+            path: Frontend.assets,
             endpoint: "/volt/assets",
         });
 

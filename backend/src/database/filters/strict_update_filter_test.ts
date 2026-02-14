@@ -592,3 +592,15 @@ const ok_query: StrictUpdateFilter<QuotaDocument<'my-project'>> = {
         start: 0,
     },
 };
+
+// ============================================================================
+// $set + $concatArray
+
+// const u: StrictUpdateFilter<TestSchema> = {
+//     $set: {
+//         items: { $concatArrays: [
+//             { $ifNull: ["$items", []] },
+//             [{ id: "x", quantity: 1 }]]
+//         }
+//     }
+// };

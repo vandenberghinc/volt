@@ -51,6 +51,7 @@ var import_rate_limit = require("./rate_limit.js");
 var import_route = require("./route.js");
 var import_internal_external = require("./errors/internal_external.js");
 var import_stripe = require("./payments/stripe/stripe.js");
+var import_frontend = __toESM(require("./frontend.js"));
 const import_meta = {};
 const __filename = (0, import_url.fileURLToPath)(import_meta.url);
 const __dirname = path.dirname(__filename);
@@ -252,12 +253,8 @@ class Server {
     this.endpoint_cache_dir = new vlib.Path("/tmp/volt_server_endpoint_cache/" + this.hash(this.domain));
     this.statics = statics;
     this.statics_aspect_ratios = /* @__PURE__ */ new Map();
-    const volt_assets_path = new vlib.Path(`${__dirname}/../../../../../frontend/src/assets/`);
-    if (!volt_assets_path.exists()) {
-      this.log.warning(`${vlib.Color.yellow_bold("Warning")}: Could not find volt assets directory at "${volt_assets_path.abs().str()}". Please create a GitHub issue to report this.`);
-    }
     this.statics.push({
-      path: volt_assets_path.str(),
+      path: import_frontend.default.assets,
       endpoint: "/volt/assets"
     });
     if (!(meta instanceof import_meta2.Meta)) {

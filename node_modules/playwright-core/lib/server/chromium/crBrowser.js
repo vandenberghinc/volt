@@ -284,11 +284,12 @@ class CRBrowser extends import_browser.Browser {
     return this._clientRootSessionPromise;
   }
 }
+const CREvents = {
+  ServiceWorker: "serviceworker"
+};
 class CRBrowserContext extends import_browserContext.BrowserContext {
   static {
-    this.CREvents = {
-      ServiceWorker: "serviceworker"
-    };
+    this.CREvents = CREvents;
   }
   constructor(browser, browserContextId, options) {
     super(browser, options, browserContextId);
@@ -388,15 +389,24 @@ class CRBrowserContext extends import_browserContext.BrowserContext {
       ["midi-sysex", "midiSysex"],
       ["storage-access", "storageAccess"],
       ["local-fonts", "localFonts"],
-      ["local-network-access", "localNetworkAccess"]
+      ["local-network-access", ["localNetworkAccess", "localNetwork", "loopbackNetwork"]]
     ]);
-    const filtered = permissions.map((permission) => {
-      const protocolPermission = webPermissionToProtocol.get(permission);
-      if (!protocolPermission)
-        throw new Error("Unknown permission: " + permission);
-      return protocolPermission;
-    });
-    await this._browser._session.send("Browser.grantPermissions", { origin: origin === "*" ? void 0 : origin, browserContextId: this._browserContextId, permissions: filtered });
+    const grantPermissions = async (mapping) => {
+      const filtered = permissions.flatMap((permission) => {
+        const protocolPermission = mapping.get(permission);
+        if (!protocolPermission)
+          throw new Error("Unknown permission: " + permission);
+        return typeof protocolPermission === "string" ? [protocolPermission] : protocolPermission;
+      });
+      await this._browser._session.send("Browser.grantPermissions", { origin: origin === "*" ? void 0 : origin, browserContextId: this._browserContextId, permissions: filtered });
+    };
+    try {
+      await grantPermissions(webPermissionToProtocol);
+    } catch (e) {
+      const fallbackMapping = new Map(webPermissionToProtocol);
+      fallbackMapping.set("local-network-access", ["localNetworkAccess"]);
+      await grantPermissions(fallbackMapping);
+    }
   }
   async doClearPermissions() {
     await this._browser._session.send("Browser.resetPermissions", { browserContextId: this._browserContextId });
@@ -470,7 +480,7 @@ class CRBrowserContext extends import_browserContext.BrowserContext {
     }
   }
   async stopVideoRecording() {
-    await Promise.all(this._crPages().map((crPage) => crPage._mainFrameSession._stopVideoRecording()));
+    await Promise.all(this._crPages().map((crPage) => crPage._page.screencast.stopVideoRecording()));
   }
   onClosePersistent() {
   }

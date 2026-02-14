@@ -290,6 +290,7 @@ export async function register_or_update_stripe_webhook_endpoint(client, server,
         // Stripe's WebhookEndpoint has `status` (enabled/disabled).
         const needs_enable = ensure_enabled && endpoint.status !== "enabled";
         if (needs_event_update || needs_enable) {
+            server.log(1, `Updating webhook ${opts.webhook_app_id} for URL ${opts.webhook_url}.`);
             const update_params = {
                 enabled_events,
                 ...(needs_enable ? { disabled: false } : {}),
@@ -335,6 +336,7 @@ export async function register_or_update_stripe_webhook_endpoint(client, server,
         const needs_enable = ensure_enabled && existing.status !== "enabled";
         const needs_url_update = existing.url !== opts.webhook_url;
         if (needs_event_update || needs_enable || needs_url_update) {
+            server.log(1, `Updating webhook ${opts.webhook_app_id} for URL ${opts.webhook_url}.`);
             const update_params = {
                 enabled_events,
                 ...(needs_enable ? { disabled: false } : {}),
@@ -357,6 +359,7 @@ export async function register_or_update_stripe_webhook_endpoint(client, server,
         // If you reached this branch without a DB record, you must provide the secret out-of-band.
         throw new InternalStripeError("webhook_endpoint_secret_missing", "Stripe webhook endpoint exists but signing secret is not available. Store the whsec_ value at creation time.", { webhook_url: opts.webhook_url, stripe_webhook_endpoint_id: existing.id });
     }
+    server.log(1, `Creating webhook ${opts.webhook_app_id} for URL ${opts.webhook_url}.`);
     // Third: create a new endpoint in Stripe.
     const create_params = {
         // Docs: https://docs.stripe.com/api/webhook_endpoints/create
@@ -378,6 +381,7 @@ export async function register_or_update_stripe_webhook_endpoint(client, server,
     }
     // Optionally enforce enabled state (Stripe defaults to enabled, but we harden this anyway).
     if (ensure_enabled && created.status !== "enabled") {
+        server.log(1, `Enabling webhook ${opts.webhook_app_id} for URL ${opts.webhook_url}.`);
         await stripe_api_call(() => client.webhookEndpoints.update(created.id, { disabled: false }, {
             idempotencyKey: stable_idempotency_key(`webhook_endpoints.enable:${created.id}:${opts.webhook_url}`, 255),
         }), {

@@ -571,63 +571,141 @@ export class Users {
 
     /**
      * Create the auth token cookie on the response.
+     * `T` is treated as a real authentication credential.
+     *
      * @param stream The request stream.
      * @param token The token string or Token object.
      */
     _create_token_cookie(stream: Stream, token: string | User.Token): void {
-        stream.set_header("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate, proxy-revalidate");
+        stream.set_header(
+            "Cache-Control",
+            "max-age=0, no-cache, no-store, must-revalidate, proxy-revalidate"
+        );
         stream.set_header("Access-Control-Allow-Credentials", "true");
-        if (typeof token === "object") {
-            token = token.token;
-        }
+
+        const token_value = typeof token === "object" ? token.token : token;
         const max_age = this.token_expiration; // seconds
-        const expires = new Date(Date.now() + max_age * 1000).toUTCString();
-        stream.set_cookie(`T=${encodeURIComponent(token ?? "")}; Max-Age=${max_age}; Path=/; Expires=${expires}; SameSite=Strict; Secure; HttpOnly;`);
+
+        stream.set_cookie({
+            name: "T",
+            value: token_value,
+            path: "/",
+            max_age,
+            secure: true,
+            http_only: true,
+            same_site: "Lax", // REQUIRED for Stripe success/cancel redirects
+        });
     }
 
     /**
-     * Create user cookies (id and activation flag).
+     * Create user cookies (ID and activation flag).
+     * These are user-state cookies, NOT auth credentials.
+     *
      * @param stream The request stream.
      * @param uid The user ID, or invalid to clear.
      */
-    async _create_user_cookie(stream: Stream, uid: string): Promise<void> {
-        if (typeof uid === "string") {
-            stream.set_cookie(`UserID=${encodeURIComponent(uid ?? "")}; Path=/; SameSite=Strict; Secure;`); // http only since we use this value for account activation without signin.
-            const is_activated = this.enable_account_activation ? await this.is_activated(uid) : true;
-            stream.set_cookie(`UserActivated=${is_activated}; Path=/; SameSite=Strict; Secure;`);
+    async _create_user_cookie(stream: Stream, uid: string | null): Promise<void> {
+        if (typeof uid === "string" && uid.length > 0) {
+            stream.set_cookie({
+                name: "UserID",
+                value: uid,
+                path: "/",
+                secure: true,
+                same_site: "Lax",
+            });
+            const is_activated = this.enable_account_activation
+                ? await this.is_activated(uid)
+                : true;
+            stream.set_cookie({
+                name: "UserActivated",
+                value: is_activated ? "1" : "0",
+                path: "/",
+                secure: true,
+                same_site: "Lax",
+            });
         } else {
-            stream.set_cookie(`UserID=-1; Path=/; SameSite=Strict; Secure;`); // http only since we use this value for account activation without signin.
-            const is_activated = this.enable_account_activation ? false : true;
-            stream.set_cookie(`UserActivated=${is_activated}; Path=/; SameSite=Strict; Secure;`);
+            stream.set_cookie({
+                name: "UserID",
+                value: "",
+                path: "/",
+                max_age: 0,
+                secure: true,
+                same_site: "Lax",
+            });
+            stream.set_cookie({
+                name: "UserActivated",
+                value: "0",
+                path: "/",
+                max_age: 0,
+                secure: true,
+                same_site: "Lax",
+            });
         }
     }
 
     /**
-     * Create non-HTTP-only cookies with detailed user info for the frontend.
+     * Create non-HttpOnly cookies with detailed user info for frontend usage.
+     * These are UI convenience cookies only.
+     *
      * @param stream The request stream.
      * @param uid The user ID.
      */
     async _create_detailed_user_cookie(stream: Stream, uid: string): Promise<void> {
         const user = await this.get(uid);
-        stream.set_cookie(`UserName=${encodeURIComponent(user.username ?? "")}; Path=/; SameSite=Strict; Secure;`);
-        stream.set_cookie(`UserFirstName=${encodeURIComponent(user.first_name ?? "")}; Path=/; SameSite=Strict; Secure;`);
-        stream.set_cookie(`UserLastName=${encodeURIComponent(user.last_name ?? "")}; Path=/; SameSite=Strict; Secure;`);
-        stream.set_cookie(`UserEmail=${encodeURIComponent(user.email ?? "")}; Path=/; SameSite=Strict; Secure;`);
+
+        stream.set_cookie({
+            name: "UserName",
+            value: user.username ?? "",
+            path: "/",
+            secure: true,
+            same_site: "Lax",
+        });
+
+        stream.set_cookie({
+            name: "UserFirstName",
+            value: user.first_name ?? "",
+            path: "/",
+            secure: true,
+            same_site: "Lax",
+        });
+
+        stream.set_cookie({
+            name: "UserLastName",
+            value: user.last_name ?? "",
+            path: "/",
+            secure: true,
+            same_site: "Lax",
+        });
+
+        stream.set_cookie({
+            name: "UserEmail",
+            value: user.email ?? "",
+            path: "/",
+            secure: true,
+            same_site: "Lax",
+        });
     }
 
     /**
-     * Clear all default auth/user cookies.
+     * Clear all default auth and user-related cookies.
+     *
      * @param stream The request stream.
      */
     _reset_cookies(stream: Stream): void {
-        const past = "Thu, 01 Jan 1970 00:00:00 GMT";
-        stream.set_cookie(`T=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure; HttpOnly;`);
-        stream.set_cookie(`UserID=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`); // http only since we use this value for account activation without signin.
-        stream.set_cookie(`UserActivated=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
-        stream.set_cookie(`UserName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
-        stream.set_cookie(`UserFirstName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
-        stream.set_cookie(`UserLastName=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
-        stream.set_cookie(`UserEmail=; Max-Age=0; Path=/; Expires=${past}; SameSite=Strict; Secure;`);
+        const clear = {
+            path: "/",
+            max_age: 0,
+            secure: true,
+            same_site: "Lax",
+        } as const;
+
+        stream.set_cookie({ name: "T", value: "", http_only: true, ...clear });
+        stream.set_cookie({ name: "UserID", value: "", ...clear });
+        stream.set_cookie({ name: "UserActivated", value: "", ...clear });
+        stream.set_cookie({ name: "UserName", value: "", ...clear });
+        stream.set_cookie({ name: "UserFirstName", value: "", ...clear });
+        stream.set_cookie({ name: "UserLastName", value: "", ...clear });
+        stream.set_cookie({ name: "UserEmail", value: "", ...clear });
     }
 
     // ---------------------------------------------------------

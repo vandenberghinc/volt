@@ -259,24 +259,31 @@ export declare class Users {
     }): Promise<void>;
     /**
      * Create the auth token cookie on the response.
+     * `T` is treated as a real authentication credential.
+     *
      * @param stream The request stream.
      * @param token The token string or Token object.
      */
     _create_token_cookie(stream: Stream, token: string | User.Token): void;
     /**
-     * Create user cookies (id and activation flag).
+     * Create user cookies (ID and activation flag).
+     * These are user-state cookies, NOT auth credentials.
+     *
      * @param stream The request stream.
      * @param uid The user ID, or invalid to clear.
      */
-    _create_user_cookie(stream: Stream, uid: string): Promise<void>;
+    _create_user_cookie(stream: Stream, uid: string | null): Promise<void>;
     /**
-     * Create non-HTTP-only cookies with detailed user info for the frontend.
+     * Create non-HttpOnly cookies with detailed user info for frontend usage.
+     * These are UI convenience cookies only.
+     *
      * @param stream The request stream.
      * @param uid The user ID.
      */
     _create_detailed_user_cookie(stream: Stream, uid: string): Promise<void>;
     /**
-     * Clear all default auth/user cookies.
+     * Clear all default auth and user-related cookies.
+     *
      * @param stream The request stream.
      */
     _reset_cookies(stream: Stream): void;

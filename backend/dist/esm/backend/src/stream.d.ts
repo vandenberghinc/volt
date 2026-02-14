@@ -362,17 +362,69 @@ export declare class Stream {
      */
     remove_headers(...names: string[]): this;
     /**
-     * Set a cookie that will be sent with the response.
+     * Set a cookie to be sent with the response.
      *
-     * @warning Will only be added to the response when the user uses `send()`, `success()` or `error()`.
-     * @param cookie The cookie string.
+     * Accepts either:
+     * 1) a pre-built cookie header string (used as-is, no validation), or
+     * 2) a structured object describing the cookie, from which a standards-compliant
+     *    cookie string will be generated.
+     *
+     * If a cookie with the same name already exists in the pending response list,
+     * it will be replaced.
+     *
+     * @warning Cookies are only included in the response when using `send()`,
+     *          `success()` or `error()`.
+     *
      * @example
      * ```ts
-     * stream.set_cookie("MyCookie=Hello World;");
+     * stream.set_cookie("sid=abc123; Path=/; SameSite=Lax; Secure; HttpOnly");
+     *
+     * stream.set_cookie({
+     *   name: "sid",
+     *   value: session_id,
+     *   http_only: true,
+     *   secure: true,
+     *   same_site: "Lax",
+     *   path: "/",
+     *   max_age: 60 * 60 * 24 * 14,
+     * });
      * ```
-     * @docs
      */
-    set_cookie(cookie: string): this;
+    set_cookie(cookie: string | {
+        /** Cookie name (required). */
+        name: string;
+        /** Cookie value. Will be URI-encoded. Defaults to empty string. */
+        value?: string | number | boolean | null;
+        /** Cookie path attribute. Defaults to "/". */
+        path?: string;
+        /** Cookie domain attribute. */
+        domain?: string;
+        /** Max-Age in seconds. Must be a finite number. */
+        max_age?: number;
+        /** Expiration date (Date or preformatted HTTP date string). */
+        expires?: Date | string;
+        /** Adds the Secure attribute (HTTPS only). */
+        secure?: boolean;
+        /** Adds the HttpOnly attribute (not accessible to JS). */
+        http_only?: boolean;
+        /**
+         * SameSite attribute.
+         * Use "Lax" for most session cookies.
+         * Use "None" only together with `secure: true`.
+         */
+        same_site?: "Strict" | "Lax" | "None";
+        /**
+         * Cookie name prefix.
+         * "__Host-" requires: secure=true, path="/", and no domain.
+         * "__Secure-" requires: secure=true.
+         */
+        prefix?: "__Host-" | "__Secure-";
+        /**
+         * Additional raw attributes appended verbatim.
+         * Example: ["Priority=High"]
+         */
+        extra?: string[];
+    }): this;
     /**
      * Set cookies that will be sent with the response.
      *

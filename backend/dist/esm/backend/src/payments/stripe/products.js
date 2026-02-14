@@ -224,6 +224,7 @@ async function list_all_stripe_products(client) {
         const page = await stripe_api_call(() => client.products.list({
             limit: stripe_list_page_size,
             starting_after,
+            expand: ["data.default_price"],
         }), { operation: "products.list_all", starting_after });
         all_products.push(...page.data);
         if (!page.has_more || page.data.length === 0) {
@@ -399,7 +400,7 @@ function find_matching_active_price(active_prices, app_price_id, expected_signat
  * Tax code docs: https://docs.stripe.com/tax/tax-codes
  */
 async function create_stripe_product(client, server, product) {
-    server.log(0, `Creating Stripe product for product '${product.id}'`);
+    server.log(1, `Creating Stripe product for product '${product.id}'`);
     return await stripe_api_call(() => client.products.create({
         name: product.name,
         description: product.description,
@@ -408,6 +409,7 @@ async function create_stripe_product(client, server, product) {
         metadata: {
             [app_product_id_metadata_key]: product.id,
         },
+        expand: ["default_price"],
     }, { idempotencyKey: generate_random_idempotency_key(`create_product_${product.id}`) }), { operation: "products.create", app_product_id: product.id });
 }
 /**
@@ -427,22 +429,41 @@ async function update_stripe_product_if_needed(client, server, stripe_product, p
     if (!needs_update) {
         return stripe_product;
     }
-    server.log(0, `Updating Stripe product '${stripe_product.id}' to match app product '${product.id}'`);
+    server.log(1, `Updating Stripe product '${stripe_product.id}' to match app product '${product.id}'`);
     return await stripe_api_call(() => client.products.update(stripe_product.id, {
         name: product.name,
         description: product.description,
         tax_code: product.tax_code,
         images: product.images,
+        expand: ["default_price"],
     }, { idempotencyKey: generate_random_idempotency_key(`update_product_${product.id}_${stripe_product.id}`) }), { operation: "products.update", app_product_id: product.id, stripe_product_id: stripe_product.id });
 }
 /**
  * Update default price on a stripe product if needed.
  */
-async function update_stripe_product_default_price_if_needed(client, server, stripe_product, default_price) {
-    if (stripe_product.default_price === default_price.id) {
+async function update_stripe_product_default_price_if_needed(client, server, stripe_product, default_price, other_plans_from_parent_subscription) {
+    // Extract default price.
+    let default_price_id = null;
+    if (typeof stripe_product.default_price === "string") {
+        default_price_id = stripe_product.default_price;
+    }
+    else if (stripe_product.default_price && typeof stripe_product.default_price === "object") {
+        default_price_id = stripe_product.default_price.id;
+    }
+    // If its still undefined, fetch the product to get the default_price expanded (this should be rare since we expand it on list/create/update).
+    if (!default_price_id) {
+        const fetched = await stripe_api_call(() => client.products.retrieve(stripe_product.id, {
+            expand: ["default_price"],
+        }), { operation: "products.retrieve_for_default_price", stripe_product_id: stripe_product.id });
+        default_price_id = typeof fetched.default_price === "string" ? fetched.default_price : fetched.default_price?.id ?? null;
+    }
+    // If the default price is already correct, do nothing.
+    if (default_price_id === default_price.id
+        // For subscription products, the default_price may be shared across multiple plans, so we also check if any other plan from the same subscription is using the price. If so, we should not update the default_price since it would affect those plans as well.
+        || other_plans_from_parent_subscription?.some((plan) => plan.stripe_price_id === default_price_id)) {
         return;
     }
-    server.log(0, `Updating default price for Stripe product '${stripe_product.id}' to price '${default_price.id}'`);
+    server.log(1, `Updating default price for Stripe product '${stripe_product.id}' to price '${default_price.id}'`);
     await stripe_api_call(() => client.products.update(stripe_product.id, {
         default_price: default_price.id,
     }, { idempotencyKey: generate_random_idempotency_key(`update_product_default_price_${stripe_product.id}_${default_price.id}`) }), { operation: "products.update", app_product_id: stripe_product.metadata?.[app_product_id_metadata_key], stripe_product_id: stripe_product.id, action: "update_default_price" });
@@ -453,7 +474,7 @@ async function update_stripe_product_default_price_if_needed(client, server, str
  * Docs: https://docs.stripe.com/api/prices/create
  */
 async function create_one_time_price(client, server, opts) {
-    server.log(0, `Creating stripe one-time price for product: ${opts.product_id}`);
+    server.log(1, `Creating stripe one-time price for product: ${opts.product_id}`);
     return await stripe_api_call(() => client.prices.create({
         product: opts.stripe_product_id,
         currency: opts.currency,
@@ -499,7 +520,7 @@ async function create_recurring_price(client, server, opts) {
         usage_type: opts.recurring_usage.usage_type,
         meter_id: opts.recurring_usage.usage_type === "metered" ? opts.recurring_usage.meter_id : undefined,
     });
-    server.log(0, `Creating stripe recurring price for product: ${opts.product_id}`);
+    server.log(1, `Creating stripe recurring price for product: ${opts.product_id}`);
     return await stripe_api_call(() => client.prices.create({
         product: opts.stripe_product_id,
         currency: opts.currency,
@@ -525,7 +546,7 @@ async function create_stripe_meter(client, server, product) {
     const aggregation_formula = product.aggregation_formula ?? "sum";
     const customer_mapping_event_payload_key = product.customer_mapping_event_payload_key ?? "stripe_customer_id";
     const value_settings_event_payload_key = product.value_settings_event_payload_key ?? "value";
-    server.log(0, `Creating stripe billing meter for product: ${product.id}`);
+    server.log(1, `Creating stripe billing meter for product: ${product.id}`);
     return await stripe_api_call(() => client.billing.meters.create({
         display_name: product.name,
         event_name: product.meter_event_name,
@@ -756,7 +777,7 @@ async function initialize_product(client, server, product, stripe_products_by_ap
                 const updated_prices = [...active_prices, stripe_price];
                 active_prices_by_stripe_product_id.set(stripe_product.id, updated_prices);
             }
-            await update_stripe_product_default_price_if_needed(client, server, stripe_product, stripe_price);
+            await update_stripe_product_default_price_if_needed(client, server, stripe_product, stripe_price, initialized_plans);
             initialized_plans.push({
                 ...plan,
                 type: "subscription_plan",
